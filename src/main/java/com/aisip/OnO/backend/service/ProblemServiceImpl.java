@@ -12,7 +12,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -50,5 +53,15 @@ public class ProblemServiceImpl implements ProblemService{
         } else{
             return null;
         }
+    }
+
+    @Override
+    public List<ProblemResponseDto> findAllProblemsByUserId(Long userId) {
+        Optional<User> user = userRepository.findById(userId);
+        return user.map(u -> problemRepository.findByUser(u)
+                    .stream()
+                    .map(ProblemConverter::convertToResponseDto)
+                    .collect(Collectors.toList()))
+                .orElse(Collections.emptyList());
     }
 }
