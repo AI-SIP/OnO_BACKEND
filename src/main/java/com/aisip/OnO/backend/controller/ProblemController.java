@@ -4,9 +4,10 @@ import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.service.ProblemService;
 import lombok.RequiredArgsConstructor;
-import org.apache.coyote.Response;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RequiredArgsConstructor
 @RestController
@@ -25,7 +26,8 @@ public class ProblemController {
     }
 
     @GetMapping("/problems")
-    public ResponseEntity<?> findAllProblemsByUserId(@RequestHeader("userId") Long userId){
-        return null;
+    public ResponseEntity<?> getProblemsByUserId(@RequestHeader("userId") Long userId){
+        List<ProblemResponseDto> problems = problemService.findAllProblemsByUserId(userId);
+        return ResponseEntity.ok(problems);
     }
 }

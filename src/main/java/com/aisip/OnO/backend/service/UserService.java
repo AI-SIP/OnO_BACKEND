@@ -9,5 +9,7 @@ public interface UserService {
     public UserResponseDto getUserByUserId(Long userId);
     public UserResponseDto saveUser(UserRegisterDto userRegisterDto);
     public UserResponseDto getUserByGoogleId(String googleId);
+
+
 }
 
