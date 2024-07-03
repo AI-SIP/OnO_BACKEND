@@ -13,6 +13,7 @@ public class UserConverter {
         UserResponseDto dto = new UserResponseDto();
         dto.setUserId(user.getId());
         dto.setUserName(user.getUserName());
+        dto.setUserEmail(user.getEmail());
 
         return dto;
     }
