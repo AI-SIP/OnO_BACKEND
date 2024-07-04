@@ -7,7 +7,12 @@ import java.util.List;
 
 public interface ProblemService {
 
-    public ProblemResponseDto saveProblem(Long userId, ProblemRegisterDto problemRegisterDto);
+    ProblemResponseDto findProblemByUserId(Long userId, Long problemId);
 
     List<ProblemResponseDto> findAllProblemsByUserId(Long userId);
+    ProblemResponseDto saveProblem(Long userId, ProblemRegisterDto problemRegisterDto);
+
+    ProblemResponseDto updateProblem(Long userId, Long problemId, ProblemRegisterDto problemRegisterDto);
+
+    void deleteProblem(Long userId, Long problemId);
 }
