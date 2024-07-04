@@ -56,6 +56,21 @@ public class ProblemServiceImpl implements ProblemService{
     }
 
     @Override
+    public boolean deleteProblem(Long userId, Long problemId) {
+        Optional<Problem> optionalProblem = problemRepository.findById(problemId);
+        if(optionalProblem.isPresent()){
+            Problem problem = optionalProblem.get();
+
+            if (problem.getUser().getId().equals(userId)) {
+                problemRepository.delete(problem);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    @Override
     public List<ProblemResponseDto> findAllProblemsByUserId(Long userId) {
         Optional<User> user = userRepository.findById(userId);
         return user.map(u -> problemRepository.findByUser(u)

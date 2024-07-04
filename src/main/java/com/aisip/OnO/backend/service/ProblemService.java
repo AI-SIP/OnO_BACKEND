@@ -9,5 +9,7 @@ public interface ProblemService {
 
     public ProblemResponseDto saveProblem(Long userId, ProblemRegisterDto problemRegisterDto);
 
+    public boolean deleteProblem(Long userId, Long problemId);
+
     List<ProblemResponseDto> findAllProblemsByUserId(Long userId);
 }
