@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.Dto.User.UserRegisterDto;
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
 import com.aisip.OnO.backend.converter.UserConverter;
 import com.aisip.OnO.backend.entity.User;
+import com.aisip.OnO.backend.exception.UserNotFoundException;
 import com.aisip.OnO.backend.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -21,18 +22,17 @@ public class UserServiceImpl implements UserService{
 
     @Override
     public UserResponseDto getUserByUserId(Long userId) {
-
         Optional<User> optionalUser = userRepository.findById(userId);
         if(optionalUser.isPresent()){
             User user = optionalUser.get();
             return UserConverter.convertToResponseDto(user);
+        } else {
+            throw new UserNotFoundException("User not found with ID: " + userId);
         }
-
-        return null;
     }
 
+    @Override
     public UserResponseDto saveUser(UserRegisterDto userRegisterDto) {
-
         String googleId = userRegisterDto.getGoogleId();
         Optional<User> optionalUser = userRepository.findByGoogleId(googleId);
         if(optionalUser.isPresent()){
@@ -52,13 +52,14 @@ public class UserServiceImpl implements UserService{
         return UserConverter.convertToResponseDto(savedUser);
     }
 
+    @Override
     public UserResponseDto getUserByGoogleId(String googleId) {
         Optional<User> optionalUser = userRepository.findByGoogleId(googleId);
         if(optionalUser.isPresent()){
             User user = optionalUser.get();
             return UserConverter.convertToResponseDto(user);
+        } else {
+            throw new UserNotFoundException("User not found with Google ID: " + googleId);
         }
-
-        return null;
     }
 }

@@ -5,6 +5,9 @@ import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.converter.ProblemConverter;
 import com.aisip.OnO.backend.entity.Problem;
 import com.aisip.OnO.backend.entity.User;
+import com.aisip.OnO.backend.exception.ProblemNotFoundException;
+import com.aisip.OnO.backend.exception.UserNotAuthorizedException;
+import com.aisip.OnO.backend.exception.UserNotFoundException;
 import com.aisip.OnO.backend.repository.ProblemRepository;
 import com.aisip.OnO.backend.repository.UserRepository;
 import jakarta.transaction.Transactional;
@@ -20,17 +23,42 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class ProblemServiceImpl implements ProblemService{
+public class ProblemServiceImpl implements ProblemService {
 
     private final UserRepository userRepository;
     private final ProblemRepository problemRepository;
 
     @Override
-    public ProblemResponseDto saveProblem(Long userId, ProblemRegisterDto problemRegisterDto) {
+    public ProblemResponseDto findProblemByUserId(Long userId, Long problemId) {
+        Optional<Problem> optionalProblem = problemRepository.findById(problemId);
+        if (optionalProblem.isPresent()) {
+            Problem problem = optionalProblem.get();
 
+            if (problem.getUser().getId().equals(userId)) {
+                return ProblemConverter.convertToResponseDto(problem);
+            } else {
+                throw new UserNotAuthorizedException("User ID does not match with problem's user ID");
+            }
+        } else {
+            throw new ProblemNotFoundException("Problem not found with ID: " + problemId);
+        }
+    }
+
+    @Override
+    public List<ProblemResponseDto> findAllProblemsByUserId(Long userId) {
+        Optional<User> user = userRepository.findById(userId);
+        return user.map(u -> problemRepository.findByUser(u)
+                        .stream()
+                        .map(ProblemConverter::convertToResponseDto)
+                        .collect(Collectors.toList()))
+                .orElse(Collections.emptyList());
+    }
+
+    @Override
+    public ProblemResponseDto saveProblem(Long userId, ProblemRegisterDto problemRegisterDto) {
         Optional<User> optionalUser = userRepository.findById(userId);
 
-        if(optionalUser.isPresent()){
+        if (optionalUser.isPresent()) {
             User user = optionalUser.get();
 
             Problem problem = Problem.builder()
@@ -47,36 +75,24 @@ public class ProblemServiceImpl implements ProblemService{
                     .build();
 
             Problem savedProblem = problemRepository.save(problem);
-
             return ProblemConverter.convertToResponseDto(savedProblem);
-
-        } else{
-            return null;
+        } else {
+            throw new UserNotFoundException("User not found with ID: " + userId);
         }
     }
 
     @Override
-    public boolean deleteProblem(Long userId, Long problemId) {
+    public void deleteProblem(Long userId, Long problemId) {
         Optional<Problem> optionalProblem = problemRepository.findById(problemId);
-        if(optionalProblem.isPresent()){
+        if (optionalProblem.isPresent()) {
             Problem problem = optionalProblem.get();
-
             if (problem.getUser().getId().equals(userId)) {
                 problemRepository.delete(problem);
-                return true;
+            } else {
+                throw new UserNotAuthorizedException("User ID does not match with problem's user ID");
             }
+        } else {
+            throw new ProblemNotFoundException("Problem not found with ID: " + problemId);
         }
-
-        return false;
-    }
-
-    @Override
-    public List<ProblemResponseDto> findAllProblemsByUserId(Long userId) {
-        Optional<User> user = userRepository.findById(userId);
-        return user.map(u -> problemRepository.findByUser(u)
-                    .stream()
-                    .map(ProblemConverter::convertToResponseDto)
-                    .collect(Collectors.toList()))
-                .orElse(Collections.emptyList());
     }
 }

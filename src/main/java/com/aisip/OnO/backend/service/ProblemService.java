@@ -7,9 +7,10 @@ import java.util.List;
 
 public interface ProblemService {
 
-    public ProblemResponseDto saveProblem(Long userId, ProblemRegisterDto problemRegisterDto);
-
-    public boolean deleteProblem(Long userId, Long problemId);
+    ProblemResponseDto findProblemByUserId(Long userId, Long problemId);
 
     List<ProblemResponseDto> findAllProblemsByUserId(Long userId);
+    ProblemResponseDto saveProblem(Long userId, ProblemRegisterDto problemRegisterDto);
+
+    void deleteProblem(Long userId, Long problemId);
 }
