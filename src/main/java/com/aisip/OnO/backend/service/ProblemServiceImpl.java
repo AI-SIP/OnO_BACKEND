@@ -82,6 +82,31 @@ public class ProblemServiceImpl implements ProblemService {
     }
 
     @Override
+    public ProblemResponseDto updateProblem(Long userId, Long problemId, ProblemRegisterDto problemRegisterDto) {
+        Optional<User> optionalUser = userRepository.findById(userId);
+        Optional<Problem> optionalProblem = problemRepository.findById(problemId);
+
+        if (optionalUser.isPresent() && optionalProblem.isPresent()) {
+            User user = optionalUser.get();
+            Problem problem = optionalProblem.get();
+
+            // Update fields from ProblemRegisterDto
+            problem.setImageUrl(problemRegisterDto.getImageUrl());
+            problem.setAnswerImageUrl(problemRegisterDto.getAnswerImageUrl());
+            problem.setSolveImageUrl(problemRegisterDto.getSolveImageUrl());
+            problem.setMemo(problemRegisterDto.getMemo());
+            problem.setReference(problemRegisterDto.getReference());
+            problem.setSolvedAt(problemRegisterDto.getSolvedAt());
+            problem.setUpdateAt(LocalDate.now());
+
+            Problem savedProblem = problemRepository.save(problem);
+            return ProblemConverter.convertToResponseDto(savedProblem);
+        } else {
+            throw new ProblemNotFoundException("Problem not found with ID: " + problemId);
+        }
+    }
+
+    @Override
     public void deleteProblem(Long userId, Long problemId) {
         Optional<Problem> optionalProblem = problemRepository.findById(problemId);
         if (optionalProblem.isPresent()) {

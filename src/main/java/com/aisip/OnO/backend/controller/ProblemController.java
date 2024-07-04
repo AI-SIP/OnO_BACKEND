@@ -46,6 +46,20 @@ public class ProblemController {
         return ResponseEntity.ok().body(savedProblem);
     }
 
+    @PutMapping("/problem/{problemId}")
+    public ResponseEntity<?> updateProblem(
+            @RequestHeader("userId") Long userId,
+            @PathVariable("problemId") Long problemId,
+            @RequestBody ProblemRegisterDto problemRegisterDto
+    ) {
+        try {
+            ProblemResponseDto updatedProblem = problemService.updateProblem(userId, problemId, problemRegisterDto);
+            return ResponseEntity.ok(updatedProblem);
+        } catch (ProblemNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
+    }
+
     @DeleteMapping("/problem")
     public ResponseEntity<?> deleteProblem(
             @RequestHeader("userId") Long userId,
