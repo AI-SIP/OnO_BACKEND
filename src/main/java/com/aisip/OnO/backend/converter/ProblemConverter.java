@@ -12,7 +12,7 @@ public class ProblemConverter {
 
         ProblemResponseDto dto = new ProblemResponseDto();
         dto.setProblemId(problem.getId());
-        dto.setImageUrl(problem.getImageUrl());
+        dto.setProblemImageUrl(problem.getImageUrl());
         dto.setProcessImageUrl(problem.getProcessImageUrl());
         dto.setAnswerImageUrl(problem.getAnswerImageUrl());
         dto.setSolveImageUrl(problem.getSolveImageUrl());

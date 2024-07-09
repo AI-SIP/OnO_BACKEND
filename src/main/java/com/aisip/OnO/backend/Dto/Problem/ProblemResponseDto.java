@@ -1,6 +1,5 @@
 package com.aisip.OnO.backend.Dto.Problem;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,7 +16,7 @@ public class ProblemResponseDto {
 
     private Long problemId;
 
-    private String imageUrl;
+    private String problemImageUrl;
 
     private String processImageUrl;
 
