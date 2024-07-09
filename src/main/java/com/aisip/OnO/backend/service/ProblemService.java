@@ -10,7 +10,7 @@ public interface ProblemService {
     ProblemResponseDto findProblemByUserId(Long userId, Long problemId);
 
     List<ProblemResponseDto> findAllProblemsByUserId(Long userId);
-    ProblemResponseDto saveProblem(Long userId, ProblemRegisterDto problemRegisterDto);
+    boolean saveProblem(Long userId, ProblemRegisterDto problemRegisterDto);
 
 
     //ProblemResponseDto updateProblem(Long userId, Long problemId, ProblemRegisterDto problemRegisterDto);
