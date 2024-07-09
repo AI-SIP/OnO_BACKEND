@@ -141,6 +141,11 @@ public class ProblemServiceImpl implements ProblemService {
         if (optionalProblem.isPresent()) {
             Problem problem = optionalProblem.get();
             if (problem.getUser().getId().equals(userId)) {
+                // 문제와 관련된 이미지 데이터를 조회
+                List<ImageData> images = fileUploadService.getProblemImages(problemId);
+                // 각 이미지에 대해 S3에서 삭제
+                images.forEach(image -> fileUploadService.deleteImage(image.getImageUrl()));
+                // 문제 데이터 삭제
                 problemRepository.delete(problem);
             } else {
                 throw new UserNotAuthorizedException("User ID does not match with problem's user ID");

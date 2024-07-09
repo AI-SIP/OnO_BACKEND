@@ -5,6 +5,7 @@ import com.aisip.OnO.backend.entity.Image.ImageType;
 import com.aisip.OnO.backend.entity.Problem;
 import com.aisip.OnO.backend.repository.ImageDataRepository;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.model.DeleteObjectRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -52,6 +53,13 @@ public class FileUploadServiceImpl implements FileUploadService{
     @Transactional(readOnly = true)
     public List<ImageData> getProblemImages(Long problemId) {
         return imageDataRepository.findByProblemId(problemId);
+    }
+
+    public void deleteImage(String fileUrl) {
+        String splitStr = ".com/";
+        String fileName = fileUrl.substring(fileUrl.lastIndexOf(splitStr) + splitStr.length());
+
+        amazonS3Client.deleteObject(new DeleteObjectRequest(bucket, fileName));
     }
 
     //파일 이름 생성 로직

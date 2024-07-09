@@ -15,4 +15,6 @@ public interface FileUploadService {
     ImageData saveImageData(String imageUrl, Problem problem, ImageType imageType);
 
     List<ImageData> getProblemImages(Long problemId);
+
+    void deleteImage(String fileUrl);
 }

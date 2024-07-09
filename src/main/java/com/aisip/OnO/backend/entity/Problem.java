@@ -34,6 +34,6 @@ public class Problem {
 
     private LocalDateTime updateAt;
 
-    @OneToMany(mappedBy = "problem", fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<ImageData> images;
 }
