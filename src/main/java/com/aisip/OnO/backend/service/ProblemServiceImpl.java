@@ -10,11 +10,16 @@ import com.aisip.OnO.backend.exception.UserNotAuthorizedException;
 import com.aisip.OnO.backend.exception.UserNotFoundException;
 import com.aisip.OnO.backend.repository.ProblemRepository;
 import com.aisip.OnO.backend.repository.UserRepository;
+import com.amazonaws.services.s3.model.ObjectMetadata;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -27,6 +32,8 @@ public class ProblemServiceImpl implements ProblemService {
 
     private final UserRepository userRepository;
     private final ProblemRepository problemRepository;
+
+    private final FileUploadService fileUploadService;
 
     @Override
     public ProblemResponseDto findProblemByUserId(Long userId, Long problemId) {
@@ -58,29 +65,42 @@ public class ProblemServiceImpl implements ProblemService {
     public ProblemResponseDto saveProblem(Long userId, ProblemRegisterDto problemRegisterDto) {
         Optional<User> optionalUser = userRepository.findById(userId);
 
-        if (optionalUser.isPresent()) {
-            User user = optionalUser.get();
+        try{
+            if (optionalUser.isPresent()) {
+                User user = optionalUser.get();
 
-            Problem problem = Problem.builder()
-                    .user(user)
-                    .imageUrl(problemRegisterDto.getImageUrl())
-                    .processImageUrl("")
-                    .solveImageUrl(problemRegisterDto.getSolveImageUrl())
-                    .answerImageUrl(problemRegisterDto.getAnswerImageUrl())
-                    .reference(problemRegisterDto.getReference())
-                    .memo(problemRegisterDto.getMemo())
-                    .solvedAt(problemRegisterDto.getSolvedAt())
-                    .createdAt(LocalDate.now())
-                    .updateAt(LocalDate.now())
-                    .build();
+                Problem problem = Problem.builder()
+                        .user(user)
+                        .processImageUrl("")
+                        .reference(problemRegisterDto.getReference())
+                        .memo(problemRegisterDto.getMemo())
+                        .solvedAt(problemRegisterDto.getSolvedAt())
+                        .createdAt(LocalDateTime.now())
+                        .updateAt(LocalDateTime.now())
+                        .build();
 
-            Problem savedProblem = problemRepository.save(problem);
-            return ProblemConverter.convertToResponseDto(savedProblem);
-        } else {
-            throw new UserNotFoundException("User not found with ID: " + userId);
+                String problemImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getProblemImage());
+                problem.setImageUrl(problemImageUrl);
+
+                String answerImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getAnswerImage());
+                problem.setAnswerImageUrl(answerImageUrl);
+
+                String solveImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getSolveImage());
+                problem.setSolveImageUrl(solveImageUrl);
+
+                Problem savedProblem = problemRepository.save(problem);
+                return ProblemConverter.convertToResponseDto(savedProblem);
+            } else {
+                throw new UserNotFoundException("User not found with ID: " + userId);
+            }
+        } catch (Exception e){
+            e.printStackTrace();
+            return null;
         }
+
     }
 
+    /*
     @Override
     public ProblemResponseDto updateProblem(Long userId, Long problemId, ProblemRegisterDto problemRegisterDto) {
         Optional<User> optionalUser = userRepository.findById(userId);
@@ -105,6 +125,7 @@ public class ProblemServiceImpl implements ProblemService {
             throw new ProblemNotFoundException("Problem not found with ID: " + problemId);
         }
     }
+     */
 
     @Override
     public void deleteProblem(Long userId, Long problemId) {

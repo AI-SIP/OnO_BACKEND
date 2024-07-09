@@ -3,7 +3,7 @@ package com.aisip.OnO.backend.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Getter
@@ -34,9 +34,9 @@ public class Problem {
 
     private String reference;
 
-    private LocalDate solvedAt;
+    private LocalDateTime solvedAt;
 
-    private LocalDate createdAt;
+    private LocalDateTime createdAt;
 
-    private LocalDate updateAt;
+    private LocalDateTime updateAt;
 }
