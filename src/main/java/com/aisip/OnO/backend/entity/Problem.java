@@ -1,9 +1,11 @@
 package com.aisip.OnO.backend.entity;
 
+import com.aisip.OnO.backend.entity.Image.ImageData;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Getter
@@ -22,21 +24,16 @@ public class Problem {
     @JoinColumn(name = "user_id")
     private User user;
 
-    private String imageUrl;
-
-    private String processImageUrl;
-
-    private String answerImageUrl;
-
-    private String solveImageUrl;
-
     private String memo;
 
     private String reference;
 
-    private LocalDate solvedAt;
+    private LocalDateTime solvedAt;
 
-    private LocalDate createdAt;
+    private LocalDateTime createdAt;
 
-    private LocalDate updateAt;
+    private LocalDateTime updateAt;
+
+    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<ImageData> images;
 }

@@ -5,12 +5,15 @@ import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.exception.ProblemNotFoundException;
 import com.aisip.OnO.backend.service.ProblemService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.coyote.Response;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Slf4j
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api")
@@ -40,12 +43,26 @@ public class ProblemController {
     @PostMapping("/problem")
     public ResponseEntity<?> registerProblem(
             @RequestHeader("userId") Long userId,
-            @RequestBody ProblemRegisterDto problemRegisterDto
+            @ModelAttribute ProblemRegisterDto problemRegisterDto
     ) {
-        ProblemResponseDto savedProblem = problemService.saveProblem(userId, problemRegisterDto);
-        return ResponseEntity.ok().body(savedProblem);
+        try {
+            System.out.println(problemRegisterDto.toString());
+            boolean isSaved = problemService.saveProblem(userId, problemRegisterDto);
+
+            if(isSaved){
+                return ResponseEntity.ok().body("문제가 등록되었습니다.");
+            } else{
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("문제 등록에 실패했습니다.");
+            }
+
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(
+                    "Error Processing Problem: " + e.getMessage()
+            );
+        }
     }
 
+    /*
     @PutMapping("/problem/{problemId}")
     public ResponseEntity<?> updateProblem(
             @RequestHeader("userId") Long userId,
@@ -59,6 +76,7 @@ public class ProblemController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }
     }
+     */
 
     @DeleteMapping("/problem")
     public ResponseEntity<?> deleteProblem(

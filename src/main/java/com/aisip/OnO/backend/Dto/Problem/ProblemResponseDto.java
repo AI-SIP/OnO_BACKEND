@@ -1,12 +1,11 @@
 package com.aisip.OnO.backend.Dto.Problem;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -17,7 +16,7 @@ public class ProblemResponseDto {
 
     private Long problemId;
 
-    private String imageUrl;
+    private String problemImageUrl;
 
     private String processImageUrl;
 
@@ -29,5 +28,5 @@ public class ProblemResponseDto {
 
     private String reference;
 
-    private LocalDate solvedAt;
+    private LocalDateTime solvedAt;
 }
