@@ -62,7 +62,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       run: | 
-        aws s3 cp ./springboot-ono-backend-build.zip s3://springboot-ono-backend-build/ \
+        aws s3 cp ./springboot-ono-backend-build.zip s3://dev-an2-ono-bucket/ \
           --region ap-northeast-2 \
           --acl private
 
