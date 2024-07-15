@@ -61,11 +61,10 @@ jobs:
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-	run: |
-        aws s3 cp \
-        --region ap-northeast-2 \
-        --acl private \          
-	  ./springboot-intro-build.zip s3://springboot-ono-backend-build/
+      run: | 
+        aws s3 cp ./springboot-ono-backend-build.zip s3://springboot-ono-backend-build/ \
+          --region ap-northeast-2 \
+          --acl private
 
     # NOTE: The Gradle Wrapper is the default and recommended way to run Gradle (https://docs.gradle.org/current/userguide/gradle_wrapper.html).
     # If your project does not have the Gradle Wrapper configured, you can use the following configuration to run Gradle with a specified version.
