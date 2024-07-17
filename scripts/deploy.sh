@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-REPOSITORY=/home/ubuntu/backend
+REPOSITORY=/home/ubuntu/springboot
 cd $REPOSITORY
 
 APP_NAME=onobackend
