@@ -3,7 +3,7 @@
 REPOSITORY=/home/ubuntu/backend
 cd $REPOSITORY
 
-APP_NAME=moduform
+APP_NAME=onobackend
 JAR_NAME=$(ls $REPOSITORY/build/libs/ | grep 'backend-0.0.1-SNAPSHOT.jar' | tail -n 1)
 JAR_PATH=$REPOSITORY/build/libs/$JAR_NAME
 
