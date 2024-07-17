@@ -6,8 +6,10 @@ files:
     destination: /home/ubuntu/springboot
     overwrite: yes
 
+file_exists_behavior: OVERWRITE
+
 permissions:
-  - object: /
+  - object: /home/ubuntu
     owner: ubuntu
     group: ubuntu
 
