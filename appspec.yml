@@ -2,7 +2,7 @@ version: 0.0
 os: linux
 
 files:
-  - source:  /
+  - source:  /springboot-ono-backend-build.zip
     destination: /home/ubuntu/springboot
     overwrite: yes
 
