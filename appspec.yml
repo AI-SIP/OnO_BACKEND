@@ -6,14 +6,18 @@ files:
     destination: /home/ubuntu/springboot
     overwrite: yes
 
-file_exists_behavior: OVERWRITE
-
 permissions:
-  - object: /home/ubuntu
+  - object: /
+    pattern: "**"
     owner: ubuntu
     group: ubuntu
 
 hooks:
   AfterInstall:
-    - location: scripts/deploy.sh
+    - location: scripts/stop.sh
       timeout: 60
+      runas: ubuntu
+  ApplicationStart:
+    - location: scripts/start.sh
+      timeout: 60
+      runas: ubuntu
