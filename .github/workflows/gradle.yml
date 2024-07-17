@@ -62,6 +62,13 @@ jobs:
     - name: Make zip file
       run: zip -r -qq -j ./springboot-ono-backend-build.zip ./deploy
 
+    - name: AWS credential 설정
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-region: ${{ env.AWS_REGION }}
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
     # S3 Bucket으로 copy
     - name: S3에 배포
       env:
