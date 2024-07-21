@@ -1,11 +1,13 @@
 package com.aisip.OnO.backend.converter;
 
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
+import com.aisip.OnO.backend.entity.SocialLogin.SocialLogin;
+import com.aisip.OnO.backend.entity.SocialLogin.SocialLoginType;
 import com.aisip.OnO.backend.entity.User;
 
 public class UserConverter {
 
-    public static UserResponseDto convertToResponseDto(User user) {
+    public static UserResponseDto convertToResponseDto(User user, SocialLogin socialLogin) {
         if(user == null){
             return null;
         }
@@ -14,6 +16,8 @@ public class UserConverter {
         dto.setUserId(user.getId());
         dto.setUserName(user.getUserName());
         dto.setUserEmail(user.getEmail());
+        dto.setSocialId(socialLogin.getSocialId());
+        dto.setSocialLoginType(socialLogin.getSocialLoginType().name());
 
         return dto;
     }

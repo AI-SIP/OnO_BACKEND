@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.entity;
 
+import com.aisip.OnO.backend.entity.SocialLogin.SocialLogin;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -19,8 +20,6 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String googleId;
-
     private String email;
 
     private String userName;
@@ -28,6 +27,9 @@ public class User {
     private LocalDate createdAt;
 
     private LocalDate updateAt;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<SocialLogin> socialLogins;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Problem> problems;

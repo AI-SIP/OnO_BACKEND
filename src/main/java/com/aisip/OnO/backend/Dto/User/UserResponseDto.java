@@ -15,6 +15,10 @@ public class UserResponseDto {
 
     private Long userId;
 
+    private String socialId;
+
+    private String socialLoginType;
+
     private String userName;
 
     private String userEmail;
