@@ -30,13 +30,13 @@ public class UserController {
         return ResponseEntity.ok().body(userResponseDto);
     }
 
-    @GetMapping("/autoLogin/{googleId}")
-    public ResponseEntity<?> autoLogin(@PathVariable String googleId) {
-        try {
-            UserResponseDto userResponseDto = userService.getUserByGoogleId(googleId);
-            return ResponseEntity.ok().body(userResponseDto);
-        } catch (UserNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
-    }
+//    @GetMapping("/autoLogin/{googleId}")
+//    public ResponseEntity<?> autoLogin(@PathVariable String googleId) {
+//        try {
+//            UserResponseDto userResponseDto = userService.getUserByGoogleId(googleId);
+//            return ResponseEntity.ok().body(userResponseDto);
+//        } catch (UserNotFoundException e) {
+//            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+//        }
+//    }
 }
