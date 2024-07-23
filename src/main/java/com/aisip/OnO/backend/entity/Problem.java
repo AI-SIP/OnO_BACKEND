@@ -14,7 +14,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Problem {
+public class Problem extends BaseEntity{
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -29,10 +29,6 @@ public class Problem {
     private String reference;
 
     private LocalDateTime solvedAt;
-
-    private LocalDateTime createdAt;
-
-    private LocalDateTime updateAt;
 
     @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<ImageData> images;
