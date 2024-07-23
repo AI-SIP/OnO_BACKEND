@@ -78,8 +78,6 @@ public class ProblemServiceImpl implements ProblemService {
                         .reference(problemRegisterDto.getReference())
                         .memo(problemRegisterDto.getMemo())
                         .solvedAt(problemRegisterDto.getSolvedAt())
-                        .createdAt(LocalDateTime.now())
-                        .updateAt(LocalDateTime.now())
                         .build();
 
                 Problem savedProblem = problemRepository.save(problem);

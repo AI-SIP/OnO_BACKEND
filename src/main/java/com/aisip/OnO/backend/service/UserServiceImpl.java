@@ -55,9 +55,8 @@ public class UserServiceImpl implements UserService{
             user = User.builder()
                     .email(userRegisterDto.getEmail())
                     .userName(userRegisterDto.getUserName())
-                    .createdAt(LocalDate.now())
-                    .updateAt(LocalDate.now())
                     .build();
+
 
             user = userRepository.save(user); // 새 사용자 정보 저장
 
