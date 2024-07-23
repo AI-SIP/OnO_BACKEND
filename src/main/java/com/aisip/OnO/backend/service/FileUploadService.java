@@ -14,6 +14,8 @@ public interface FileUploadService {
     String uploadFileToS3(MultipartFile file) throws IOException;
     ImageData saveImageData(String imageUrl, Problem problem, ImageType imageType);
 
+    String getProcessImageUrlFromProblemImageUrl(String problemImageUrl);
+
     List<ImageData> getProblemImages(Long problemId);
 
     void deleteImage(String fileUrl);

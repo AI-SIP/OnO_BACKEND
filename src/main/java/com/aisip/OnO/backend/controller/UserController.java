@@ -2,12 +2,8 @@ package com.aisip.OnO.backend.controller;
 
 import com.aisip.OnO.backend.Dto.User.UserRegisterDto;
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
-import com.aisip.OnO.backend.exception.UserNotFoundException;
 import com.aisip.OnO.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,7 +20,7 @@ public class UserController {
         return ResponseEntity.ok().body(userResponseDto);
     }
 
-    @PostMapping("")
+    @PostMapping("/join")
     public ResponseEntity<UserResponseDto> saveUser(@RequestBody UserRegisterDto userRegisterDto) {
         UserResponseDto userResponseDto = userService.saveUser(userRegisterDto);
         return ResponseEntity.ok().body(userResponseDto);

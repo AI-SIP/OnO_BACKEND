@@ -12,7 +12,6 @@ public interface ProblemService {
     List<ProblemResponseDto> findAllProblemsByUserId(Long userId);
     boolean saveProblem(Long userId, ProblemRegisterDto problemRegisterDto);
 
-
     //ProblemResponseDto updateProblem(Long userId, Long problemId, ProblemRegisterDto problemRegisterDto);
 
     void deleteProblem(Long userId, Long problemId);

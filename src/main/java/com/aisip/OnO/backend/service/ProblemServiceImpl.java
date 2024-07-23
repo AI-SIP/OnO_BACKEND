@@ -93,7 +93,10 @@ public class ProblemServiceImpl implements ProblemService {
                 String solveImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getSolveImage());
                 fileUploadService.saveImageData(solveImageUrl, savedProblem, ImageType.SOLVE_IMAGE);
 
-                String processImageUrl = "";
+                if (problemImageUrl != null && !problemImageUrl.isEmpty()){
+                    String processImageUrl = fileUploadService.getProcessImageUrlFromProblemImageUrl(problemImageUrl);
+                    fileUploadService.saveImageData("processImageUrl", savedProblem, ImageType.PROCESS_IMAGE);
+                }
 
                 return true;
             } else {
@@ -103,7 +106,6 @@ public class ProblemServiceImpl implements ProblemService {
             e.printStackTrace();
             return false;
         }
-
     }
 
     /**문제 업데이트*/

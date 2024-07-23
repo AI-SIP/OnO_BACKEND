@@ -11,7 +11,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 import java.util.List;
@@ -26,6 +28,10 @@ public class FileUploadServiceImpl implements FileUploadService{
     @Value("${cloud.aws.s3.bucket}")
     private String bucket;
 
+    @Value("${external.api.fastApiUrl}")
+    private String fastApiUrl;
+
+    @Override
     public String uploadFileToS3(MultipartFile file) throws IOException {
         String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
         String fileUrl = "https://" + bucket + ".s3.ap-northeast-2.amazonaws.com/" + fileName;
@@ -39,6 +45,7 @@ public class FileUploadServiceImpl implements FileUploadService{
         return fileUrl;
     }
 
+    @Override
     public ImageData saveImageData(String imageUrl, Problem problem, ImageType imageType){
 
         ImageData imageData = ImageData.builder()
@@ -48,6 +55,22 @@ public class FileUploadServiceImpl implements FileUploadService{
                 .build();
 
         return imageDataRepository.save(imageData);
+    }
+
+    @Override
+    public String getProcessImageUrlFromProblemImageUrl(String problemImageUrl) {
+        RestTemplate restTemplate = new RestTemplate();
+        String url = fastApiUrl + "/show-url";
+
+        UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(url)
+                .queryParam("full_url", problemImageUrl);
+
+        // GET 요청 보내기
+        String response = restTemplate.getForObject(uriBuilder.toUriString(), String.class);
+
+        // 응답 로그 출력
+        System.out.println("Response from server: " + response);
+        return response;
     }
 
     @Transactional(readOnly = true)
