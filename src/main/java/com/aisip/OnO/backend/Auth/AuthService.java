@@ -10,20 +10,18 @@ public class AuthService {
     @Autowired
     private UserEntityRepository userEntityRepository;
 
-    public UserEntity registerOrLoginUser(GoogleIdToken.Payload payload) {
-        String userId = payload.getSubject();
-        String email = payload.getEmail();
-        String name = (String) payload.get("name");
-
+    public UserEntity registerOrLoginUser(String email, String name) {
         UserEntity userEntity = userEntityRepository.findByEmail(email);
         if (userEntity == null) {
             userEntity = new UserEntity();
-            userEntity.setUserId(userId);
             userEntity.setEmail(email);
             userEntity.setName(name);
             userEntityRepository.save(userEntity);
         }
-
         return userEntity;
+    }
+
+    public UserEntity getUserById(Long userId) {
+        return userEntityRepository.findById(userId).orElse(null);
     }
 }

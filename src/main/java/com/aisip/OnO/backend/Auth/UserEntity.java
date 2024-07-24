@@ -1,6 +1,8 @@
 package com.aisip.OnO.backend.Auth;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import lombok.Getter;
 import lombok.Setter;
@@ -10,7 +12,8 @@ import lombok.Setter;
 @Entity
 public class UserEntity {
     @Id
-    private String userId;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long userId;
     private String email;
     private String name;
 }

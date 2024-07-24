@@ -26,9 +26,9 @@ public class AuthController {
     @PostMapping("/google")
     public ResponseEntity<?> googleLogin(@RequestBody TokenRequest tokenRequest) {
         try {
-            GoogleIdToken.Payload payload = googleTokenVerifier.verifyGoogleToken(tokenRequest.getIdToken());
-            UserEntity user = authService.registerOrLoginUser(payload);
-            String token = jwtTokenProvider.createToken(user.getUserId(), user.getEmail());
+            GoogleIdToken.Payload payload = googleTokenVerifier.verifyToken(tokenRequest.getIdToken());
+            UserEntity userEntity = authService.registerOrLoginUser(payload.getEmail(), (String) payload.get("name"));
+            String token = jwtTokenProvider.createToken(userEntity.getUserId(), userEntity.getEmail());
             return ResponseEntity.ok(new AuthResponse(token));
         } catch (IllegalArgumentException e) {
             e.printStackTrace();
