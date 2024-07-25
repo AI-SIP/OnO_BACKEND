@@ -1,40 +1,45 @@
 package com.aisip.OnO.backend.controller;
 
-import com.aisip.OnO.backend.Dto.User.UserRegisterDto;
-import com.aisip.OnO.backend.Dto.User.UserResponseDto;
-import com.aisip.OnO.backend.service.UserService;
-import com.google.auth.oauth2.IdToken;
-import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
+import com.aisip.OnO.backend.service.AuthService;
+import com.aisip.OnO.backend.entity.User;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-@RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/user")
 public class UserController {
 
-    private final UserService userService;
+    @Autowired
+    private AuthService authService;
 
-    @GetMapping("/{userId}")
-    public ResponseEntity<UserResponseDto> getUserById(@PathVariable Long userId) {
-        UserResponseDto userResponseDto = userService.getUserByUserId(userId);
-        return ResponseEntity.ok().body(userResponseDto);
+    @GetMapping("/info")
+    public ResponseEntity<?> getUserInfo(Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        User user = authService.getUserById(userId);
+        if (user != null) {
+            return ResponseEntity.ok(user);
+        } else {
+            return ResponseEntity.status(404).body(new ErrorResponse("User not found"));
+        }
     }
 
-    @PostMapping("/join")
-    public ResponseEntity<UserResponseDto> saveUser(@RequestBody UserRegisterDto userRegisterDto) {
-        UserResponseDto userResponseDto = userService.saveUser(userRegisterDto);
-        return ResponseEntity.ok().body(userResponseDto);
-    }
+    public static class ErrorResponse {
+        private String error;
 
-//    @GetMapping("/autoLogin/{googleId}")
-//    public ResponseEntity<?> autoLogin(@PathVariable String googleId) {
-//        try {
-//            UserResponseDto userResponseDto = userService.getUserByGoogleId(googleId);
-//            return ResponseEntity.ok().body(userResponseDto);
-//        } catch (UserNotFoundException e) {
-//            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-//        }
-//    }
+        public ErrorResponse(String error) {
+            this.error = error;
+        }
+
+        public String getError() {
+            return error;
+        }
+
+        public void setError(String error) {
+            this.error = error;
+        }
+    }
 }

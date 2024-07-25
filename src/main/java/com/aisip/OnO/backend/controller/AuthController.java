@@ -1,5 +1,9 @@
-package com.aisip.OnO.backend.Auth;
+package com.aisip.OnO.backend.controller;
 
+import com.aisip.OnO.backend.service.AuthService;
+import com.aisip.OnO.backend.Auth.GoogleTokenVerifier;
+import com.aisip.OnO.backend.Auth.JwtTokenProvider;
+import com.aisip.OnO.backend.entity.User;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.common.io.BaseEncoding;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,8 +31,8 @@ public class AuthController {
     public ResponseEntity<?> googleLogin(@RequestBody TokenRequest tokenRequest) {
         try {
             GoogleIdToken.Payload payload = googleTokenVerifier.verifyToken(tokenRequest.getIdToken());
-            UserEntity userEntity = authService.registerOrLoginUser(payload.getEmail(), (String) payload.get("name"));
-            String token = jwtTokenProvider.createToken(userEntity.getUserId(), userEntity.getEmail());
+            User user = authService.registerOrLoginUser(payload.getEmail(), (String) payload.get("name"));
+            String token = jwtTokenProvider.createToken(user.getUserId(), user.getEmail());
             return ResponseEntity.ok(new AuthResponse(token));
         } catch (IllegalArgumentException e) {
             e.printStackTrace();
