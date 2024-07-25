@@ -1,36 +1,20 @@
 package com.aisip.OnO.backend.entity;
 
-import com.aisip.OnO.backend.entity.SocialLogin.SocialLogin;
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import lombok.Getter;
+import lombok.Setter;
 
-import java.time.LocalDate;
-import java.util.List;
-
-@Entity
 @Getter
 @Setter
-@Table(name = "user")
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Entity
 public class User {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
+    private Long userId;
     private String email;
-
-    private String userName;
-
-    private LocalDate createdAt;
-
-    private LocalDate updateAt;
-
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<SocialLogin> socialLogins;
-
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Problem> problems;
+    private String name;
 }
+

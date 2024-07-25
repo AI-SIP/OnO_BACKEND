@@ -31,6 +31,12 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.cloud:spring-cloud-starter-aws:2.2.6.RELEASE'
+	implementation 'com.google.api-client:google-api-client:2.4.0'
+	implementation 'com.auth0:java-jwt:4.4.0'
+	implementation group: 'com.google.auth', name: 'google-auth-library-oauth2-http', version: '1.23.0'
+	implementation group: 'com.google.http-client', name: 'google-http-client-jackson2', version: '1.44.2'
+	implementation group: 'org.springframework.security', name: 'spring-security-core', version: '6.3.1'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
 	// Hibernate Core
 	implementation 'org.hibernate:hibernate-core:6.5.2.Final'
 	compileOnly 'org.projectlombok:lombok'
