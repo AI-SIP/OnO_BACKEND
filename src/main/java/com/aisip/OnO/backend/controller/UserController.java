@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.controller;
 
+import com.aisip.OnO.backend.Dto.User.UserResponseDto;
 import com.aisip.OnO.backend.service.AuthService;
 import com.aisip.OnO.backend.entity.User;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,9 +20,9 @@ public class UserController {
     @GetMapping("/info")
     public ResponseEntity<?> getUserInfo(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
-        User user = authService.getUserById(userId);
-        if (user != null) {
-            return ResponseEntity.ok(user);
+        UserResponseDto userResponseDto = authService.getUserById(userId);
+        if (userResponseDto != null) {
+            return ResponseEntity.ok(userResponseDto);
         } else {
             return ResponseEntity.status(404).body(new ErrorResponse("User not found"));
         }

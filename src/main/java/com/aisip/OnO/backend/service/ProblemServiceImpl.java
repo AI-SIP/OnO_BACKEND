@@ -91,7 +91,7 @@ public class ProblemServiceImpl implements ProblemService {
 
                 if (problemImageUrl != null && !problemImageUrl.isEmpty()) {
                     String processImageUrl = fileUploadService.getProcessImageUrlFromProblemImageUrl(problemImageUrl);
-                    fileUploadService.saveImageData("processImageUrl", savedProblem, ImageType.PROCESS_IMAGE);
+                    fileUploadService.saveImageData(processImageUrl, savedProblem, ImageType.PROCESS_IMAGE);
                 }
 
                 return true;

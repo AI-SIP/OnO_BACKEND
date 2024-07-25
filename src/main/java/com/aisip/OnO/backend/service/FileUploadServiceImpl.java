@@ -7,6 +7,8 @@ import com.aisip.OnO.backend.repository.ImageDataRepository;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.DeleteObjectRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -60,7 +62,7 @@ public class FileUploadServiceImpl implements FileUploadService{
     @Override
     public String getProcessImageUrlFromProblemImageUrl(String problemImageUrl) {
         RestTemplate restTemplate = new RestTemplate();
-        String url = fastApiUrl + "/show-url";
+        String url = fastApiUrl + "/process-color";
 
         UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(url)
                 .queryParam("full_url", problemImageUrl);
@@ -70,7 +72,20 @@ public class FileUploadServiceImpl implements FileUploadService{
 
         // 응답 로그 출력
         System.out.println("Response from server: " + response);
-        return response;
+
+        // JSON 응답 파싱
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.readTree(response);
+            JsonNode pathNode = rootNode.path("path");
+            String inputPath = pathNode.path("output_path").asText();
+
+            return "https://" + bucket + ".s3.ap-northeast-2.amazonaws.com/" + inputPath;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Failed to parse response", e);
+        }
     }
 
     @Transactional(readOnly = true)

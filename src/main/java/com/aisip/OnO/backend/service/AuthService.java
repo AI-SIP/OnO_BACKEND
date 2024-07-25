@@ -1,5 +1,7 @@
 package com.aisip.OnO.backend.service;
 
+import com.aisip.OnO.backend.Dto.User.UserResponseDto;
+import com.aisip.OnO.backend.converter.UserConverter;
 import com.aisip.OnO.backend.repository.UserRepository;
 import com.aisip.OnO.backend.entity.User;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,10 +21,14 @@ public class AuthService {
             user.setName(name);
             userRepository.save(user);
         }
+
         return user;
     }
 
-    public User getUserById(Long userId) {
-        return userRepository.findById(userId).orElse(null);
+    public UserResponseDto getUserById(Long userId) {
+
+        User user = userRepository.findById(userId).orElse(null);
+
+        return UserConverter.convertToResponseDto(user);
     }
 }
