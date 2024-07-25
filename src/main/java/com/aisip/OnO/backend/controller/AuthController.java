@@ -1,9 +1,11 @@
 package com.aisip.OnO.backend.controller;
 
+import com.aisip.OnO.backend.Auth.AppleTokenVerifier;
 import com.aisip.OnO.backend.service.AuthService;
 import com.aisip.OnO.backend.Auth.GoogleTokenVerifier;
 import com.aisip.OnO.backend.Auth.JwtTokenProvider;
 import com.aisip.OnO.backend.entity.User;
+import com.auth0.jwt.interfaces.DecodedJWT;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.common.io.BaseEncoding;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +22,9 @@ public class AuthController {
 
     @Autowired
     private GoogleTokenVerifier googleTokenVerifier;
+
+    @Autowired
+    private AppleTokenVerifier appleTokenVerifier;
 
     @Autowired
     private AuthService authService;
@@ -49,11 +54,39 @@ public class AuthController {
         }
     }
 
+    @PostMapping("/apple")
+    public ResponseEntity<?> appleLogin(@RequestBody TokenRequest tokenRequest) {
+        try {
+            DecodedJWT jwt = appleTokenVerifier.verifyToken(tokenRequest.getIdToken());
+            String email = tokenRequest.getEmail();
+            String name = tokenRequest.getName();
+            User user = authService.registerOrLoginUser(email, name);
+            String token = jwtTokenProvider.createToken(user.getUserId(), user.getEmail());
+            return ResponseEntity.ok(new AuthResponse(token));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse("Invalid Apple token"));
+        }
+    }
+
+
     public static class TokenRequest {
         private String idToken;
 
+        private String email;
+
+        private String name;
+
         public String getIdToken() {
             return idToken;
+        }
+
+        public String getEmail(){
+            return email;
+        }
+
+        public String getName() {
+            return name;
         }
 
         public void setIdToken(String idToken) {
