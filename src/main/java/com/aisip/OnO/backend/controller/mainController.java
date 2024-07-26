@@ -10,6 +10,6 @@ public class mainController {
 
     @GetMapping("/")
     public ResponseEntity<?> mainPage(){
-        return ResponseEntity.ok().body("hello");
+        return ResponseEntity.ok().body("main page");
     }
 }
