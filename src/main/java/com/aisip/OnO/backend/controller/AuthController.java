@@ -57,6 +57,7 @@ public class AuthController {
     @PostMapping("/apple")
     public ResponseEntity<?> appleLogin(@RequestBody TokenRequest tokenRequest) {
         try {
+            System.out.println("tokenRequest: " + tokenRequest);
             DecodedJWT jwt = appleTokenVerifier.verifyToken(tokenRequest.getIdToken());
             String email = tokenRequest.getEmail();
             String name = tokenRequest.getName();
