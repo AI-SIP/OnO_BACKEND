@@ -35,7 +35,7 @@ public class AuthController {
     @PostMapping("/google")
     public ResponseEntity<?> googleLogin(@RequestBody TokenRequest tokenRequest) {
         try {
-            GoogleIdToken.Payload payload = googleTokenVerifier.verifyToken(tokenRequest.getIdToken());
+            GoogleIdToken.Payload payload = googleTokenVerifier.verifyToken(tokenRequest.getIdToken(), tokenRequest.getPlatform());
             User user = authService.registerOrLoginUser(payload.getEmail(), (String) payload.get("name"));
             String token = jwtTokenProvider.createToken(user.getUserId(), user.getEmail());
             return ResponseEntity.ok(new AuthResponse(token));
@@ -73,6 +73,8 @@ public class AuthController {
     public static class TokenRequest {
         private String idToken;
 
+        private String platform;
+
         private String email;
 
         private String name;
@@ -87,6 +89,10 @@ public class AuthController {
 
         public String getName() {
             return name;
+        }
+
+        public String getPlatform() {
+            return platform;
         }
 
         public void setIdToken(String idToken) {
