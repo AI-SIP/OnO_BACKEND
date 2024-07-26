@@ -14,10 +14,19 @@ import java.util.Collections;
 @Component
 public class GoogleTokenVerifier {
 
+    /*
     @Value("${spring.security.oauth2.client.registration.google.client-id}")
     private String clientId; // static 제거
+     */
 
-    public GoogleIdToken.Payload verifyToken(String idTokenString) throws GeneralSecurityException, IOException {
+    @Value("${spring.security.oauth2.client.registration.google.client-id.android}")
+    private String androidClientId;
+
+    @Value("${spring.security.oauth2.client.registration.google.client-id.ios}")
+    private String iosClientId;
+
+    public GoogleIdToken.Payload verifyToken(String idTokenString, String platform) throws GeneralSecurityException, IOException {
+        String clientId = getClientIdByPlatform(platform);
 
         GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new JacksonFactory())
                 .setAudience(Collections.singletonList(clientId))
@@ -28,6 +37,17 @@ public class GoogleTokenVerifier {
             return idToken.getPayload();
         } else {
             throw new GeneralSecurityException("Invalid ID token.");
+        }
+    }
+
+    private String getClientIdByPlatform(String platform) {
+        switch (platform.toLowerCase()) {
+            case "android":
+                return androidClientId;
+            case "ios":
+                return iosClientId;
+            default:
+                throw new IllegalArgumentException("Invalid platform specified");
         }
     }
 }
