@@ -36,7 +36,7 @@ public class AuthController {
     public ResponseEntity<?> googleLogin(@RequestBody TokenRequest tokenRequest) {
         try {
             GoogleIdToken.Payload payload = googleTokenVerifier.verifyToken(tokenRequest.getIdToken(), tokenRequest.getPlatform());
-            User user = authService.registerOrLoginUser(payload.getEmail(), (String) payload.get("name"));
+            User user = authService.registerOrLoginUser(payload.getEmail(), (String) payload.get("name"), payload.getEmail());
             String token = jwtTokenProvider.createToken(user.getUserId(), user.getEmail());
             return ResponseEntity.ok(new AuthResponse(token));
         } catch (IllegalArgumentException e) {
@@ -59,9 +59,13 @@ public class AuthController {
         try {
             System.out.println("tokenRequest: " + tokenRequest);
             DecodedJWT jwt = appleTokenVerifier.verifyToken(tokenRequest.getIdToken());
+            System.out.println("jwt: " + jwt);
+            System.out.println("email: " + jwt.getClaim("email").asString());
+            System.out.println("name: " + jwt.getClaim("name").asString());
             String email = tokenRequest.getEmail();
             String name = tokenRequest.getName();
-            User user = authService.registerOrLoginUser(email, name);
+            String identifier = jwt.getClaim("email").asString();
+            User user = authService.registerOrLoginUser(email, name, identifier);
             String token = jwtTokenProvider.createToken(user.getUserId(), user.getEmail());
             return ResponseEntity.ok(new AuthResponse(token));
         } catch (Exception e) {
