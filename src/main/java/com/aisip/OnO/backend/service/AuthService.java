@@ -13,12 +13,13 @@ public class AuthService {
     @Autowired
     private UserRepository userRepository;
 
-    public User registerOrLoginUser(String email, String name) {
-        User user = userRepository.findByEmail(email);
+    public User registerOrLoginUser(String email, String name, String identifier) {
+        User user = userRepository.findByIdentifier(identifier);
         if (user == null) {
             user = new User();
             user.setEmail(email);
             user.setName(name);
+            user.setIdentifier(identifier);
             userRepository.save(user);
         }
 
