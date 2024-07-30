@@ -1,11 +1,11 @@
 package com.aisip.OnO.backend.controller;
 
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
-import com.aisip.OnO.backend.service.AuthService;
-import com.aisip.OnO.backend.entity.User;
+import com.aisip.OnO.backend.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -15,17 +15,25 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     @Autowired
-    private AuthService authService;
+    private UserService userService;
 
-    @GetMapping("/info")
+    @GetMapping("")
     public ResponseEntity<?> getUserInfo(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
-        UserResponseDto userResponseDto = authService.getUserById(userId);
+        UserResponseDto userResponseDto = userService.getUserById(userId);
         if (userResponseDto != null) {
             return ResponseEntity.ok(userResponseDto);
         } else {
             return ResponseEntity.status(404).body(new ErrorResponse("User not found"));
         }
+    }
+
+    @DeleteMapping("")
+    public ResponseEntity<?> deleteUserInfo(Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        userService.deleteUserById(userId);
+
+        return ResponseEntity.ok().body("delete complete");
     }
 
     public static class ErrorResponse {
