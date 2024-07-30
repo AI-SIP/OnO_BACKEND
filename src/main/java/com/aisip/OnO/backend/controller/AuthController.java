@@ -57,17 +57,20 @@ public class AuthController {
     @PostMapping("/apple")
     public ResponseEntity<?> appleLogin(@RequestBody TokenRequest tokenRequest) {
         try {
-            System.out.println("tokenRequest: " + tokenRequest);
             DecodedJWT jwt = appleTokenVerifier.verifyToken(tokenRequest.getIdToken());
-            System.out.println("jwt: " + jwt);
-            System.out.println("email: " + jwt.getClaim("email").asString());
-            System.out.println("name: " + jwt.getClaim("name").asString());
+            //System.out.println(jwt.getClaims());
             String email = tokenRequest.getEmail();
             String name = tokenRequest.getName();
-            String identifier = jwt.getClaim("email").asString();
-            User user = userService.registerOrLoginUser(email, name);
-            String token = jwtTokenProvider.createToken(user.getUserId(), user.getEmail());
-            return ResponseEntity.ok(new AuthResponse(token));
+            //String identifier = jwt.getClaim("sub").toString();
+
+            if(email != null && name != null){
+                User user = userService.registerOrLoginUser(email, name);
+                String token = jwtTokenProvider.createToken(user.getUserId(), user.getEmail());
+                return ResponseEntity.ok(new AuthResponse(token));
+            } else{
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse("Invalid Apple token"));
+            }
+
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse("Invalid Apple token"));
