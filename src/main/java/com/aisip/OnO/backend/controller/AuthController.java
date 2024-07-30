@@ -1,21 +1,18 @@
 package com.aisip.OnO.backend.controller;
 
 import com.aisip.OnO.backend.Auth.AppleTokenVerifier;
-import com.aisip.OnO.backend.service.AuthService;
+import com.aisip.OnO.backend.service.UserService;
 import com.aisip.OnO.backend.Auth.GoogleTokenVerifier;
 import com.aisip.OnO.backend.Auth.JwtTokenProvider;
 import com.aisip.OnO.backend.entity.User;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.google.common.io.BaseEncoding;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
-import java.security.GeneralSecurityException;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -28,35 +25,10 @@ public class AuthController {
     private AppleTokenVerifier appleTokenVerifier;
 
     @Autowired
-    private AuthService authService;
+    private UserService userService;
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
-
-    /*
-    @PostMapping("/google")
-    public ResponseEntity<?> googleLogin(@RequestBody TokenRequest tokenRequest) {
-        try {
-            GoogleIdToken.Payload payload = googleTokenVerifier.verifyToken(tokenRequest.getIdToken(), tokenRequest.getPlatform());
-            User user = authService.registerOrLoginUser(payload.getEmail(), (String) payload.get("name"), payload.getEmail());
-            String token = jwtTokenProvider.createToken(user.getUserId(), user.getEmail());
-            return ResponseEntity.ok(new AuthResponse(token));
-        } catch (IllegalArgumentException e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse("Invalid ID token format"));
-        } catch (BaseEncoding.DecodingException e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse("ID token decoding error"));
-        } catch (GeneralSecurityException | IOException e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse("Invalid Google token"));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponse("Internal server error"));
-        }
-    }
-
-     */
 
     @PostMapping("/google")
     public ResponseEntity<?> googleLogin(@RequestBody TokenRequest tokenRequest) {
@@ -66,7 +38,7 @@ public class AuthController {
             String name = tokenRequest.getName();
 
             if (tokenInfo != null && email != null && name != null) {
-                User user = authService.registerOrLoginUser(email, name, email);
+                User user = userService.registerOrLoginUser(email, name);
                 String token = jwtTokenProvider.createToken(user.getUserId(), user.getEmail());
                 return ResponseEntity.ok(new AuthResponse(token));
             } else {
@@ -93,7 +65,7 @@ public class AuthController {
             String email = tokenRequest.getEmail();
             String name = tokenRequest.getName();
             String identifier = jwt.getClaim("email").asString();
-            User user = authService.registerOrLoginUser(email, name, identifier);
+            User user = userService.registerOrLoginUser(email, name);
             String token = jwtTokenProvider.createToken(user.getUserId(), user.getEmail());
             return ResponseEntity.ok(new AuthResponse(token));
         } catch (Exception e) {

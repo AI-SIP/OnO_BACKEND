@@ -2,18 +2,12 @@ package com.aisip.OnO.backend.Auth;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
-import com.google.api.client.http.javanet.NetHttpTransport;
-import com.google.api.client.json.jackson2.JacksonFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.security.GeneralSecurityException;
-import java.util.Collections;
 
 @Component
 public class GoogleTokenVerifier {
@@ -28,24 +22,6 @@ public class GoogleTokenVerifier {
 
     @Value("${spring.security.oauth2.client.registration.google.client-id.ios}")
     private String iosClientId;
-
-    /*
-    public GoogleIdToken.Payload verifyToken(String idTokenString, String platform) throws GeneralSecurityException, IOException {
-        String clientId = getClientIdByPlatform(platform);
-
-        GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new JacksonFactory())
-                .setAudience(Collections.singletonList(clientId))
-                .build();
-
-        GoogleIdToken idToken = verifier.verify(idTokenString);
-        if (idToken != null) {
-            return idToken.getPayload();
-        } else {
-            throw new GeneralSecurityException("Invalid ID token.");
-        }
-    }
-
-     */
 
     public JsonNode verifyToken(String accessToken, String platform) throws IOException {
         String clientId = getClientIdByPlatform(platform);
