@@ -40,7 +40,7 @@ public class AuthController {
 
             if (tokenInfo != null && identifier != null) {
                 User user = userService.registerOrLoginUser(email, name, identifier);
-                String token = jwtTokenProvider.createToken(user.getUserId(), user.getEmail());
+                String token = jwtTokenProvider.createToken(user.getId(), user.getEmail());
                 return ResponseEntity.ok(new AuthResponse(token));
             } else {
                 throw new IllegalArgumentException("Invalid token information or user data");
@@ -65,7 +65,7 @@ public class AuthController {
 
             if(jwt != null && identifier != null){
                 User user = userService.registerOrLoginUser(email, name, identifier);
-                String token = jwtTokenProvider.createToken(user.getUserId(), user.getEmail());
+                String token = jwtTokenProvider.createToken(user.getId(), user.getEmail());
                 return ResponseEntity.ok(new AuthResponse(token));
             } else{
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse("Invalid Apple token"));

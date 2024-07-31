@@ -30,14 +30,13 @@ public class ProblemServiceImpl implements ProblemService {
     private final ProblemRepository problemRepository;
     private final FileUploadService fileUploadService;
 
-    /**특정 문제 조회*/
     @Override
     public ProblemResponseDto findProblemByUserId(Long userId, Long problemId) {
         Optional<Problem> optionalProblem = problemRepository.findById(problemId);
         if (optionalProblem.isPresent()) {
             Problem problem = optionalProblem.get();
 
-            if (problem.getUser().getUserId().equals(userId)) {
+            if (problem.getUser().getId().equals(userId)) {
                 List<ImageData> images = fileUploadService.getProblemImages(problemId);
                 return ProblemConverter.convertToResponseDto(problem, images);
             } else {
@@ -52,7 +51,7 @@ public class ProblemServiceImpl implements ProblemService {
     @Override
     public List<ProblemResponseDto> findAllProblemsByUserId(Long userId) {
         Optional<User> user = userRepository.findById(userId);
-        return user.map(u -> problemRepository.findByUser(u)
+        return user.map(u -> problemRepository.findAllByUserId(u.getId())
                         .stream()
                         .map(problem -> {
                             List<ImageData> images = fileUploadService.getProblemImages(problem.getId());
@@ -110,11 +109,11 @@ public class ProblemServiceImpl implements ProblemService {
         Optional<Problem> optionalProblem = problemRepository.findById(problemId);
         if (optionalProblem.isPresent()) {
             Problem problem = optionalProblem.get();
-            if (problem.getUser().getUserId().equals(userId)) {
+            if (problem.getUser().getId().equals(userId)) {
                 // 문제와 관련된 이미지 데이터를 조회
                 List<ImageData> images = fileUploadService.getProblemImages(problemId);
                 // 각 이미지에 대해 S3에서 삭제
-                images.forEach(image -> fileUploadService.deleteImage(image.getImageUrl()));
+                images.forEach(fileUploadService::deleteImage);
                 // 문제 데이터 삭제
                 problemRepository.delete(problem);
             } else {
@@ -123,5 +122,16 @@ public class ProblemServiceImpl implements ProblemService {
         } else {
             throw new ProblemNotFoundException("Problem not found with ID: " + problemId);
         }
+    }
+
+    @Override
+    public void deleteUserProblems(Long userId) {
+        List<Problem> problemList = problemRepository.findAllByUserId(userId);
+        problemList.forEach(problem -> {
+            Long problemId = problem.getId();
+            List<ImageData> images = fileUploadService.getProblemImages(problemId);
+            images.forEach(fileUploadService::deleteImage);
+            problemRepository.delete(problem);
+        });
     }
 }
