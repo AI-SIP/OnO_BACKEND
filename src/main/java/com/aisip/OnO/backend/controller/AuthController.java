@@ -36,10 +36,11 @@ public class AuthController {
             JsonNode tokenInfo = googleTokenVerifier.verifyToken(tokenRequest.getAccessToken(), tokenRequest.getPlatform());
             String email = tokenRequest.getEmail();
             String name = tokenRequest.getName();
+            String identifier = tokenRequest.getIdentifier();
 
-            if (tokenInfo != null && email != null && name != null) {
-                User user = userService.registerOrLoginUser(email, name);
-                String token = jwtTokenProvider.createToken(user.getUserId(), user.getEmail());
+            if (tokenInfo != null && identifier != null) {
+                User user = userService.registerOrLoginUser(email, name, identifier);
+                String token = jwtTokenProvider.createToken(user.getId(), user.getEmail());
                 return ResponseEntity.ok(new AuthResponse(token));
             } else {
                 throw new IllegalArgumentException("Invalid token information or user data");
@@ -58,14 +59,13 @@ public class AuthController {
     public ResponseEntity<?> appleLogin(@RequestBody TokenRequest tokenRequest) {
         try {
             DecodedJWT jwt = appleTokenVerifier.verifyToken(tokenRequest.getIdToken());
-            //System.out.println(jwt.getClaims());
             String email = tokenRequest.getEmail();
             String name = tokenRequest.getName();
-            //String identifier = jwt.getClaim("sub").toString();
+            String identifier = tokenRequest.getIdentifier();
 
-            if(email != null && name != null){
-                User user = userService.registerOrLoginUser(email, name);
-                String token = jwtTokenProvider.createToken(user.getUserId(), user.getEmail());
+            if(jwt != null && identifier != null){
+                User user = userService.registerOrLoginUser(email, name, identifier);
+                String token = jwtTokenProvider.createToken(user.getId(), user.getEmail());
                 return ResponseEntity.ok(new AuthResponse(token));
             } else{
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse("Invalid Apple token"));
@@ -89,6 +89,8 @@ public class AuthController {
 
         private String name;
 
+        private String identifier;
+
 
         public String getIdToken() {
             return idToken;
@@ -111,6 +113,9 @@ public class AuthController {
             return platform;
         }
 
+        public String getIdentifier() {
+            return identifier;
+        }
 
         public void setIdToken(String idToken) {
             this.idToken = idToken;

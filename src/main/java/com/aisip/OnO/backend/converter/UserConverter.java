@@ -12,7 +12,7 @@ public class UserConverter {
         }
 
         UserResponseDto userResponseDto = UserResponseDto.builder()
-                .userId(user.getUserId())
+                .userId(user.getId())
                 .userName(user.getName())
                 .userEmail(user.getEmail())
                 .build();

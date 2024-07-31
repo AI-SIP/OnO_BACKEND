@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 
 public interface UserService {
 
-    public User registerOrLoginUser(String email, String name);
+    public User registerOrLoginUser(String email, String name, String identifier);
 
     public UserResponseDto getUserById(Long userId);
 

@@ -93,11 +93,14 @@ public class FileUploadServiceImpl implements FileUploadService{
         return imageDataRepository.findByProblemId(problemId);
     }
 
-    public void deleteImage(String fileUrl) {
+    public void deleteImage(ImageData imageData) {
+
+        String fileUrl = imageData.getImageUrl();
         String splitStr = ".com/";
         String fileName = fileUrl.substring(fileUrl.lastIndexOf(splitStr) + splitStr.length());
-
         amazonS3Client.deleteObject(new DeleteObjectRequest(bucket, fileName));
+
+        imageDataRepository.deleteById(imageData.getId());
     }
 
     //파일 이름 생성 로직

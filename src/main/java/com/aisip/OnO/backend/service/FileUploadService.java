@@ -18,5 +18,5 @@ public interface FileUploadService {
 
     List<ImageData> getProblemImages(Long problemId);
 
-    void deleteImage(String fileUrl);
+    void deleteImage(ImageData imageData);
 }

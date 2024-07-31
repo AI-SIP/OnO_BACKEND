@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.controller;
 
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
+import com.aisip.OnO.backend.service.ProblemService;
 import com.aisip.OnO.backend.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,9 @@ public class UserController {
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private ProblemService problemService;
+
     @GetMapping("")
     public ResponseEntity<?> getUserInfo(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
@@ -31,6 +35,7 @@ public class UserController {
     @DeleteMapping("")
     public ResponseEntity<?> deleteUserInfo(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
+        problemService.deleteUserProblems(userId);
         userService.deleteUserById(userId);
 
         return ResponseEntity.ok().body("delete complete");
