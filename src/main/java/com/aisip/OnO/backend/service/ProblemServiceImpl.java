@@ -79,18 +79,24 @@ public class ProblemServiceImpl implements ProblemService {
 
                 Problem savedProblem = problemRepository.save(problem);
 
-                String problemImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getProblemImage());
-                fileUploadService.saveImageData(problemImageUrl, savedProblem, ImageType.PROBLEM_IMAGE);
+                if(problemRegisterDto.getProblemImage() != null){
+                    String problemImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getProblemImage());
+                    fileUploadService.saveImageData(problemImageUrl, savedProblem, ImageType.PROBLEM_IMAGE);
 
-                String answerImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getAnswerImage());
-                fileUploadService.saveImageData(answerImageUrl, savedProblem, ImageType.ANSWER_IMAGE);
+                    if (problemImageUrl != null && !problemImageUrl.isEmpty()) {
+                        String processImageUrl = fileUploadService.getProcessImageUrlFromProblemImageUrl(problemImageUrl);
+                        fileUploadService.saveImageData(processImageUrl, savedProblem, ImageType.PROCESS_IMAGE);
+                    }
+                }
 
-                String solveImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getSolveImage());
-                fileUploadService.saveImageData(solveImageUrl, savedProblem, ImageType.SOLVE_IMAGE);
+                if(problemRegisterDto.getAnswerImage() != null){
+                    String answerImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getAnswerImage());
+                    fileUploadService.saveImageData(answerImageUrl, savedProblem, ImageType.ANSWER_IMAGE);
+                }
 
-                if (problemImageUrl != null && !problemImageUrl.isEmpty()) {
-                    String processImageUrl = fileUploadService.getProcessImageUrlFromProblemImageUrl(problemImageUrl);
-                    fileUploadService.saveImageData(processImageUrl, savedProblem, ImageType.PROCESS_IMAGE);
+                if(problemRegisterDto.getSolveImage() != null){
+                    String solveImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getSolveImage());
+                    fileUploadService.saveImageData(solveImageUrl, savedProblem, ImageType.SOLVE_IMAGE);
                 }
 
                 return true;
