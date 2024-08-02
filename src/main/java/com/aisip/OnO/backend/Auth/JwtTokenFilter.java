@@ -35,8 +35,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                 JWTVerifier verifier = JWT.require(algorithm).build();
                 DecodedJWT decodedJWT = verifier.verify(token);
 
-                String username = decodedJWT.getSubject();
-                Long userId = decodedJWT.getClaim("userId").asLong();
+                Long userId = Long.parseLong(decodedJWT.getSubject());
 
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userId, null, Collections.emptyList());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
