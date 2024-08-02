@@ -40,8 +40,9 @@ public class AuthController {
 
             if (tokenInfo != null && identifier != null) {
                 User user = userService.registerOrLoginUser(email, name, identifier);
-                String token = jwtTokenProvider.createToken(user.getId(), user.getEmail());
-                return ResponseEntity.ok(new AuthResponse(token));
+                String accessToken = jwtTokenProvider.createAccessToken(user.getId());
+                String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
+                return ResponseEntity.ok(new AuthResponse(accessToken, refreshToken));
             } else {
                 throw new IllegalArgumentException("Invalid token information or user data");
             }
@@ -65,8 +66,9 @@ public class AuthController {
 
             if(jwt != null && identifier != null){
                 User user = userService.registerOrLoginUser(email, name, identifier);
-                String token = jwtTokenProvider.createToken(user.getId(), user.getEmail());
-                return ResponseEntity.ok(new AuthResponse(token));
+                String accessToken = jwtTokenProvider.createAccessToken(user.getId());
+                String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
+                return ResponseEntity.ok(new AuthResponse(accessToken, refreshToken));
             } else{
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse("Invalid Apple token"));
             }
@@ -77,11 +79,51 @@ public class AuthController {
         }
     }
 
+    // Access Token을 검증하는 메서드 추가
+    @GetMapping("/verifyAccessToken")
+    public ResponseEntity<?> verifyAccessToken(@RequestHeader("Authorization") String authorizationHeader) {
+        try {
+            if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+                String accessToken = authorizationHeader.substring(7);
+                if (jwtTokenProvider.validateToken(accessToken)) {
+                    return ResponseEntity.ok("Token is valid");
+                } else {
+                    System.out.println("token is invalid");
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse("Invalid or expired access token"));
+                }
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse("Authorization header missing or invalid"));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponse("Token verification failed"));
+        }
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refreshToken(@RequestBody TokenRequest tokenRequest) {
+        try {
+            String requestRefreshToken = tokenRequest.getRefreshToken();
+            if (jwtTokenProvider.validateToken(requestRefreshToken)) {
+                Long userId = Long.parseLong(jwtTokenProvider.getSubjectFromToken(requestRefreshToken));
+                // 액세스 토큰을 생성할 때 userId만을 사용하도록 수정
+                String newAccessToken = jwtTokenProvider.createAccessToken(userId);
+                // 리프레시 토큰을 재발급하지 않고 기존 리프레시 토큰을 재사용하거나, 필요에 따라 새 리프레시 토큰을 생성
+                return ResponseEntity.ok(new AuthResponse(newAccessToken, requestRefreshToken));
+            } else {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse("Invalid or expired refresh token"));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponse("Could not refresh access token"));
+        }
+    }
+
 
     public static class TokenRequest {
         private String idToken;
 
         private String accessToken;
+
+        private String refreshToken;
 
         private String platform;
 
@@ -124,21 +166,39 @@ public class AuthController {
         public void setAccessToken(String accessToken) {
             this.accessToken = accessToken;
         }
+
+        public String getRefreshToken() {
+            return refreshToken;
+        }
+
+        public void setRefreshToken(String refreshToken) {
+            this.refreshToken = refreshToken;
+        }
     }
 
     public static class AuthResponse {
-        private String token;
+        private String accessToken;
 
-        public AuthResponse(String token) {
-            this.token = token;
+        private String refreshToken;
+
+        public AuthResponse(String accessToken, String refreshToken) {
+            this.accessToken = accessToken;this.refreshToken = refreshToken;
         }
 
-        public String getToken() {
-            return token;
+        public String getAccessToken() {
+            return accessToken;
         }
 
-        public void setToken(String token) {
-            this.token = token;
+        public String getRefreshToken(){
+            return refreshToken;
+        }
+
+        public void setAccessToken(String accessToken) {
+            this.accessToken = accessToken;
+        }
+
+        public void setRefreshToken(String refreshToken) {
+            this.refreshToken= refreshToken;
         }
     }
 

@@ -1,7 +1,10 @@
 package com.aisip.OnO.backend.Auth;
 
 import com.auth0.jwt.JWT;
+import com.auth0.jwt.JWTVerifier;
 import com.auth0.jwt.algorithms.Algorithm;
+import com.auth0.jwt.exceptions.JWTVerificationException;
+import com.auth0.jwt.interfaces.DecodedJWT;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -16,20 +19,41 @@ public class JwtTokenProvider {
     @Value("${spring.jwt.expiration}")
     private long expirationTime;
 
-    public String createToken(Long userId, String email) {
+    public String createAccessToken(Long userId) {
         return JWT.create()
-                .withSubject(email)
-                .withClaim("userId", userId)
+                .withSubject(userId.toString())
                 .withIssuedAt(new Date())
                 .withExpiresAt(new Date(System.currentTimeMillis() + expirationTime))
                 .sign(Algorithm.HMAC512(secret.getBytes()));
     }
 
-    public Long getUserIdFromToken(String token) {
-        return JWT.decode(token).getClaim("userId").asLong();
+    public String createRefreshToken(Long userId) {
+        long refreshExpirationTime = 3_600_000 * 24 * 14; // 예: 2주
+        return JWT.create()
+                .withSubject(userId.toString())
+                .withIssuedAt(new Date())
+                .withExpiresAt(new Date(System.currentTimeMillis() + refreshExpirationTime))
+                .sign(Algorithm.HMAC512(secret.getBytes()));
     }
 
-    public String getEmailFromToken(String token) {
-        return JWT.decode(token).getSubject();
+    public boolean validateToken(String token) {
+        try {
+            Algorithm algorithm = Algorithm.HMAC512(secret.getBytes());
+            JWTVerifier verifier = JWT.require(algorithm).build();
+            DecodedJWT jwt = verifier.verify(token);
+            return true;
+        } catch (JWTVerificationException exception) {
+            // 토큰이 유효하지 않은 경우
+            return false;
+        }
+    }
+
+    public String getSubjectFromToken(String token) {
+        DecodedJWT jwt = JWT.decode(token);
+        return jwt.getSubject();
+    }
+
+    public Long getUserIdFromToken(String token) {
+        return Long.parseLong(JWT.decode(token).getSubject());
     }
 }
