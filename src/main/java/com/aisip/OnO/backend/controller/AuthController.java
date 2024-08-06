@@ -1,10 +1,11 @@
 package com.aisip.OnO.backend.controller;
 
 import com.aisip.OnO.backend.Auth.AppleTokenVerifier;
+import com.aisip.OnO.backend.entity.User.UserType;
 import com.aisip.OnO.backend.service.UserService;
 import com.aisip.OnO.backend.Auth.GoogleTokenVerifier;
 import com.aisip.OnO.backend.Auth.JwtTokenProvider;
-import com.aisip.OnO.backend.entity.User;
+import com.aisip.OnO.backend.entity.User.User;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +31,20 @@ public class AuthController {
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
+    @PostMapping("/guest")
+    public ResponseEntity<?> guestLogin(){
+
+        String email = userService.makeGuestEmail();
+        String name = userService.makeGuestName();
+        String identifier = userService.makeGuestIdentifier();
+
+        User user = userService.registerOrLoginUser(email, name, identifier, UserType.GUEST);
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId());
+        String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
+
+        return ResponseEntity.ok(new AuthResponse(accessToken, refreshToken));
+    }
+
     @PostMapping("/google")
     public ResponseEntity<?> googleLogin(@RequestBody TokenRequest tokenRequest) {
         try {
@@ -39,14 +54,14 @@ public class AuthController {
             String identifier = tokenRequest.getIdentifier();
 
             if (tokenInfo != null && identifier != null) {
-                User user = userService.registerOrLoginUser(email, name, identifier);
+                User user = userService.registerOrLoginUser(email, name, identifier, UserType.MEMBER);
                 String accessToken = jwtTokenProvider.createAccessToken(user.getId());
                 String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
                 return ResponseEntity.ok(new AuthResponse(accessToken, refreshToken));
             } else {
                 throw new IllegalArgumentException("Invalid token information or user data");
             }
-        } catch (IOException  e) {
+        } catch (IOException e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse("Invalid Google token"));
         } catch (Exception e) {
@@ -65,7 +80,7 @@ public class AuthController {
             String identifier = tokenRequest.getIdentifier();
 
             if(jwt != null && identifier != null){
-                User user = userService.registerOrLoginUser(email, name, identifier);
+                User user = userService.registerOrLoginUser(email, name, identifier, UserType.MEMBER);
                 String accessToken = jwtTokenProvider.createAccessToken(user.getId());
                 String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
                 return ResponseEntity.ok(new AuthResponse(accessToken, refreshToken));

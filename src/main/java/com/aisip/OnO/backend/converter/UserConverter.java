@@ -1,7 +1,7 @@
 package com.aisip.OnO.backend.converter;
 
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
-import com.aisip.OnO.backend.entity.User;
+import com.aisip.OnO.backend.entity.User.User;
 
 public class UserConverter {
 
