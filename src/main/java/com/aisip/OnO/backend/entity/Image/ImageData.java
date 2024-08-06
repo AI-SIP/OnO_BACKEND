@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.entity.Image;
 
+import com.aisip.OnO.backend.entity.BaseEntity;
 import com.aisip.OnO.backend.entity.Problem;
 import jakarta.persistence.*;
 import lombok.*;
@@ -11,7 +12,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ImageData {
+public class ImageData extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -20,7 +21,7 @@ public class ImageData {
     @Column(name = "image_url")
     private String imageUrl;
 
-    @Enumerated(EnumType.STRING) // Enum 타입을 문자열로 저장
+    @Enumerated(EnumType.STRING)
     @Column(name = "image_type")
     private ImageType imageType;
 

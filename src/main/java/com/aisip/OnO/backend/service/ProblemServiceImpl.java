@@ -1,6 +1,6 @@
 package com.aisip.OnO.backend.service;
 
-import com.aisip.OnO.backend.entity.User;
+import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.repository.UserRepository;
 import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;

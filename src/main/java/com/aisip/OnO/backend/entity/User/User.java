@@ -1,5 +1,6 @@
-package com.aisip.OnO.backend.entity;
+package com.aisip.OnO.backend.entity.User;
 
+import com.aisip.OnO.backend.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -7,7 +8,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @Entity
-public class User {
+public class User extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -17,5 +18,8 @@ public class User {
     private String name;
 
     private String identifier;
+
+    @Enumerated(EnumType.STRING)
+    private UserType type;
 }
 
