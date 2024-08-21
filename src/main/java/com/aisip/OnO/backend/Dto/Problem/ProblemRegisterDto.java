@@ -23,6 +23,5 @@ public class ProblemRegisterDto {
 
     private String reference;
 
-    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private LocalDateTime solvedAt;
 }
