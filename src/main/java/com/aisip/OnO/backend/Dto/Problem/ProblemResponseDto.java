@@ -27,4 +27,8 @@ public class ProblemResponseDto {
     private String reference;
 
     private LocalDateTime solvedAt;
+
+    private LocalDateTime createdAt;
+
+    private LocalDateTime updateAt;
 }
