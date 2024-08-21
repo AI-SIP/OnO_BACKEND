@@ -19,6 +19,8 @@ public class ProblemConverter {
                 .memo(problem.getMemo())
                 .reference(problem.getReference())
                 .solvedAt(problem.getSolvedAt())
+                .createdAt(problem.getCreatedAt())
+                .updateAt(problem.getUpdatedAt())
                 .build();
         
         // 이미지 데이터를 DTO에 설정
