@@ -4,12 +4,10 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+@Data
 @Builder
-@Getter
-@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-//@JsonInclude(JsonInclude.Include.NON_NULL) // NULL 값이 아닌 필드만 포함
 public class ProblemResponseDto {
 
     private Long problemId;

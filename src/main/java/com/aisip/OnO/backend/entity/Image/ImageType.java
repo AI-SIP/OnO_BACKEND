@@ -22,7 +22,6 @@ public enum ImageType {
         return description;
     }
 
-    // code로 enum 찾기
     public static ImageType valueOf(int code) {
         for (ImageType type : values()) {
             if (type.getCode() == code) {

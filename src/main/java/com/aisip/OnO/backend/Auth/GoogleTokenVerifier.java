@@ -12,11 +12,6 @@ import java.net.URL;
 @Component
 public class GoogleTokenVerifier {
 
-    /*
-    @Value("${spring.security.oauth2.client.registration.google.client-id}")
-    private String clientId; // static 제거
-     */
-
     @Value("${spring.security.oauth2.client.registration.google.client-id.android}")
     private String androidClientId;
 

@@ -74,7 +74,7 @@ public class ProblemController {
 
             if (isUpdated) {
                 return ResponseEntity.ok().body("문제가 수정되었습니다.");
-            } else{
+            } else {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("문제 등록에 실패했습니다.");
             }
 

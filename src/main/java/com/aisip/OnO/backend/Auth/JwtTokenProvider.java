@@ -28,7 +28,7 @@ public class JwtTokenProvider {
     }
 
     public String createRefreshToken(Long userId) {
-        long refreshExpirationTime = 3_600_000 * 24 * 14; // 예: 2주
+        long refreshExpirationTime = 3_600_000 * 24 * 14; // 14 days
         return JWT.create()
                 .withSubject(userId.toString())
                 .withIssuedAt(new Date())
@@ -43,7 +43,6 @@ public class JwtTokenProvider {
             DecodedJWT jwt = verifier.verify(token);
             return true;
         } catch (JWTVerificationException exception) {
-            // 토큰이 유효하지 않은 경우
             return false;
         }
     }
@@ -51,9 +50,5 @@ public class JwtTokenProvider {
     public String getSubjectFromToken(String token) {
         DecodedJWT jwt = JWT.decode(token);
         return jwt.getSubject();
-    }
-
-    public Long getUserIdFromToken(String token) {
-        return Long.parseLong(JWT.decode(token).getSubject());
     }
 }

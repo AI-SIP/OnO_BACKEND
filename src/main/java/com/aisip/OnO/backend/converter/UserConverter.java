@@ -5,18 +5,16 @@ import com.aisip.OnO.backend.entity.User.User;
 
 public class UserConverter {
 
-    public static UserResponseDto convertToResponseDto(User user){
+    public static UserResponseDto convertToResponseDto(User user) {
 
         if (user == null) {
             return null;
         }
 
-        UserResponseDto userResponseDto = UserResponseDto.builder()
+        return UserResponseDto.builder()
                 .userId(user.getId())
                 .userName(user.getName())
                 .userEmail(user.getEmail())
                 .build();
-
-        return userResponseDto;
     }
 }

@@ -22,22 +22,13 @@ public class ProblemConverter {
                 .createdAt(problem.getCreatedAt())
                 .updateAt(problem.getUpdatedAt())
                 .build();
-        
-        // 이미지 데이터를 DTO에 설정
+
         for (ImageData image : images) {
             switch (image.getImageType()) {
-                case PROBLEM_IMAGE:
-                    problemResponseDto.setProblemImageUrl(image.getImageUrl());
-                    break;
-                case PROCESS_IMAGE:
-                    problemResponseDto.setProcessImageUrl(image.getImageUrl());
-                    break;
-                case ANSWER_IMAGE:
-                    problemResponseDto.setAnswerImageUrl(image.getImageUrl());
-                    break;
-                case SOLVE_IMAGE:
-                    problemResponseDto.setSolveImageUrl(image.getImageUrl());
-                    break;
+                case PROBLEM_IMAGE -> problemResponseDto.setProblemImageUrl(image.getImageUrl());
+                case PROCESS_IMAGE -> problemResponseDto.setProcessImageUrl(image.getImageUrl());
+                case ANSWER_IMAGE -> problemResponseDto.setAnswerImageUrl(image.getImageUrl());
+                case SOLVE_IMAGE -> problemResponseDto.setSolveImageUrl(image.getImageUrl());
             }
         }
 

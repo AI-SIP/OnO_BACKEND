@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 import java.util.UUID;
 
 @Service
-public class UserServiceImpl implements UserService{
+public class UserServiceImpl implements UserService {
     @Autowired
     private UserRepository userRepository;
 
@@ -42,17 +42,17 @@ public class UserServiceImpl implements UserService{
     }
 
     @Override
-    public String makeGuestEmail(){
+    public String makeGuestEmail() {
         return "guest_" + UUID.randomUUID().toString() + "@ono.com";
     }
 
     @Override
-    public String makeGuestName(){
+    public String makeGuestName() {
         return "Guest" + UUID.randomUUID().toString().substring(0, 8);
     }
 
     @Override
-    public String makeGuestIdentifier(){
+    public String makeGuestIdentifier() {
         return UUID.randomUUID().toString();
     }
 }

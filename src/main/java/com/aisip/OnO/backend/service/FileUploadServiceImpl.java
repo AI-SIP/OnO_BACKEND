@@ -24,7 +24,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class FileUploadServiceImpl implements FileUploadService{
+public class FileUploadServiceImpl implements FileUploadService {
     private final AmazonS3Client amazonS3Client;
 
     private final ImageDataRepository imageDataRepository;
@@ -50,7 +50,7 @@ public class FileUploadServiceImpl implements FileUploadService{
     }
 
 
-    private void saveImageData(String imageUrl, Problem problem, ImageType imageType){
+    private void saveImageData(String imageUrl, Problem problem, ImageType imageType) {
 
         ImageData imageData = ImageData.builder()
                 .imageUrl(imageUrl)
@@ -69,13 +69,10 @@ public class FileUploadServiceImpl implements FileUploadService{
         UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(url)
                 .queryParam("full_url", problemImageUrl);
 
-        // GET 요청 보내기
         String response = restTemplate.getForObject(uriBuilder.toUriString(), String.class);
 
-        // 응답 로그 출력
         System.out.println("Response from server: " + response);
 
-        // JSON 응답 파싱
         try {
             ObjectMapper objectMapper = new ObjectMapper();
             JsonNode rootNode = objectMapper.readTree(response);
@@ -93,12 +90,12 @@ public class FileUploadServiceImpl implements FileUploadService{
     }
 
     @Override
-    public String updateImage(MultipartFile file, Problem problem, ImageType imageType) throws IOException{
+    public String updateImage(MultipartFile file, Problem problem, ImageType imageType) throws IOException {
 
         Optional<ImageData> beforeImageData = imageDataRepository.findByProblemIdAndImageType(problem.getId(), imageType);
         beforeImageData.ifPresent(this::deleteImage);
 
-        if(imageType.equals(ImageType.PROBLEM_IMAGE)){
+        if (imageType.equals(ImageType.PROBLEM_IMAGE)) {
             Optional<ImageData> processImageData = imageDataRepository.findByProblemIdAndImageType(problem.getId(), ImageType.PROCESS_IMAGE);
             processImageData.ifPresent(this::deleteImage);
         }
@@ -131,17 +128,15 @@ public class FileUploadServiceImpl implements FileUploadService{
         imageDataRepository.deleteById(imageData.getId());
     }
 
-    //파일 이름 생성 로직
     private String createFileName(String originalFileName) {
         return UUID.randomUUID().toString().concat(getFileExtension(originalFileName));
     }
 
-    //파일의 확장자명을 가져오는 로직
-    private String getFileExtension(String fileName){
-        try{
+    private String getFileExtension(String fileName) {
+        try {
             return fileName.substring(fileName.lastIndexOf("."));
-        }catch(StringIndexOutOfBoundsException e) {
-            throw new IllegalArgumentException(String.format("잘못된 형식의 파일 (%s) 입니다.",fileName));
+        } catch (StringIndexOutOfBoundsException e) {
+            throw new IllegalArgumentException(String.format("잘못된 형식의 파일 (%s) 입니다.", fileName));
         }
     }
 }

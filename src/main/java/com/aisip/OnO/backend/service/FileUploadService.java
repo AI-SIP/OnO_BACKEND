@@ -10,7 +10,6 @@ import java.util.List;
 
 public interface FileUploadService {
     String uploadFileToS3(MultipartFile file, Problem problem, ImageType imageType) throws IOException;
-    //ImageData saveImageData(String imageUrl, Problem problem, ImageType imageType);
 
     String saveProcessImageUrl(String problemImageUrl, Problem problem, ImageType imageType);
 
