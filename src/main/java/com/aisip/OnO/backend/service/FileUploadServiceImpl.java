@@ -19,6 +19,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -34,7 +35,7 @@ public class FileUploadServiceImpl implements FileUploadService{
     private String fastApiUrl;
 
     @Override
-    public String uploadFileToS3(MultipartFile file) throws IOException {
+    public String uploadFileToS3(MultipartFile file, Problem problem, ImageType imageType) throws IOException {
         String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
         String fileUrl = "https://" + bucket + ".s3.ap-northeast-2.amazonaws.com/" + fileName;
 
@@ -43,12 +44,13 @@ public class FileUploadServiceImpl implements FileUploadService{
         objectMetadata.setContentLength(file.getSize());
 
         amazonS3Client.putObject(bucket, fileName, file.getInputStream(), objectMetadata);
+        saveImageData(fileUrl, problem, imageType);
 
         return fileUrl;
     }
 
-    @Override
-    public ImageData saveImageData(String imageUrl, Problem problem, ImageType imageType){
+
+    private void saveImageData(String imageUrl, Problem problem, ImageType imageType){
 
         ImageData imageData = ImageData.builder()
                 .imageUrl(imageUrl)
@@ -56,11 +58,11 @@ public class FileUploadServiceImpl implements FileUploadService{
                 .imageType(imageType)
                 .build();
 
-        return imageDataRepository.save(imageData);
+        imageDataRepository.save(imageData);
     }
 
     @Override
-    public String getProcessImageUrlFromProblemImageUrl(String problemImageUrl) {
+    public String saveProcessImageUrl(String problemImageUrl, Problem problem, ImageType imageType) {
         RestTemplate restTemplate = new RestTemplate();
         String url = fastApiUrl + "/process-color";
 
@@ -80,12 +82,38 @@ public class FileUploadServiceImpl implements FileUploadService{
             JsonNode pathNode = rootNode.path("path");
             String inputPath = pathNode.path("output_path").asText();
 
-            return "https://" + bucket + ".s3.ap-northeast-2.amazonaws.com/" + inputPath;
+            String fileUrl = "https://" + bucket + ".s3.ap-northeast-2.amazonaws.com/" + inputPath;
+            saveImageData(fileUrl, problem, imageType);
 
+            return fileUrl;
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException("Failed to parse response", e);
         }
+    }
+
+    @Override
+    public String updateImage(MultipartFile file, Problem problem, ImageType imageType) throws IOException{
+
+        Optional<ImageData> beforeImageData = imageDataRepository.findByProblemIdAndImageType(problem.getId(), imageType);
+        beforeImageData.ifPresent(this::deleteImage);
+
+        if(imageType.equals(ImageType.PROBLEM_IMAGE)){
+            Optional<ImageData> processImageData = imageDataRepository.findByProblemIdAndImageType(problem.getId(), ImageType.PROCESS_IMAGE);
+            processImageData.ifPresent(this::deleteImage);
+        }
+
+        String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
+        String fileUrl = "https://" + bucket + ".s3.ap-northeast-2.amazonaws.com/" + fileName;
+
+        ObjectMetadata objectMetadata = new ObjectMetadata();
+        objectMetadata.setContentType(file.getContentType());
+        objectMetadata.setContentLength(file.getSize());
+
+        amazonS3Client.putObject(bucket, fileName, file.getInputStream(), objectMetadata);
+        saveImageData(fileUrl, problem, imageType);
+
+        return fileUrl;
     }
 
     @Transactional(readOnly = true)

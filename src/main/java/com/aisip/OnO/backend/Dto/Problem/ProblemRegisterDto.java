@@ -13,6 +13,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class ProblemRegisterDto {
 
+    private Long problemId;
+
     private MultipartFile problemImage;
 
     private MultipartFile answerImage;
