@@ -47,7 +47,6 @@ public class ProblemServiceImpl implements ProblemService {
         }
     }
 
-    /**특정 유저의 전체 문제 조회*/
     @Override
     public List<ProblemResponseDto> findAllProblemsByUserId(Long userId) {
         Optional<User> user = userRepository.findById(userId);
@@ -61,7 +60,6 @@ public class ProblemServiceImpl implements ProblemService {
                 .orElse(Collections.emptyList());
     }
 
-    /**문제 저장*/
     @Override
     public boolean saveProblem(Long userId, ProblemRegisterDto problemRegisterDto) {
         Optional<User> optionalUserEntity = userRepository.findById(userId);
@@ -79,24 +77,19 @@ public class ProblemServiceImpl implements ProblemService {
 
                 Problem savedProblem = problemRepository.save(problem);
 
-                if(problemRegisterDto.getProblemImage() != null){
-                    String problemImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getProblemImage());
-                    fileUploadService.saveImageData(problemImageUrl, savedProblem, ImageType.PROBLEM_IMAGE);
-
-                    if (problemImageUrl != null && !problemImageUrl.isEmpty()) {
-                        String processImageUrl = fileUploadService.getProcessImageUrlFromProblemImageUrl(problemImageUrl);
-                        fileUploadService.saveImageData(processImageUrl, savedProblem, ImageType.PROCESS_IMAGE);
+                if (problemRegisterDto.getProblemImage() != null) {
+                    String problemImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getProblemImage(), savedProblem, ImageType.PROBLEM_IMAGE);
+                    if (problemImageUrl != null) {
+                        String processImageUrl = fileUploadService.saveProcessImageUrl(problemImageUrl, savedProblem, ImageType.PROCESS_IMAGE);
                     }
                 }
 
-                if(problemRegisterDto.getAnswerImage() != null){
-                    String answerImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getAnswerImage());
-                    fileUploadService.saveImageData(answerImageUrl, savedProblem, ImageType.ANSWER_IMAGE);
+                if (problemRegisterDto.getAnswerImage() != null) {
+                    String answerImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getAnswerImage(), savedProblem, ImageType.ANSWER_IMAGE);
                 }
 
-                if(problemRegisterDto.getSolveImage() != null){
-                    String solveImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getSolveImage());
-                    fileUploadService.saveImageData(solveImageUrl, savedProblem, ImageType.SOLVE_IMAGE);
+                if (problemRegisterDto.getSolveImage() != null) {
+                    String solveImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getSolveImage(), savedProblem, ImageType.SOLVE_IMAGE);
                 }
 
                 return true;
@@ -109,18 +102,66 @@ public class ProblemServiceImpl implements ProblemService {
         }
     }
 
-    /**문제 삭제*/
+    @Override
+    public boolean updateProblem(Long userId, ProblemRegisterDto problemRegisterDto) {
+
+        Long problemId = problemRegisterDto.getProblemId();
+        Optional<Problem> optionalProblem = problemRepository.findById(problemId);
+        if (optionalProblem.isPresent()) {
+            Problem problem = optionalProblem.get();
+            if (problem.getUser().getId().equals(userId)) {
+
+                try {
+                    if (problemRegisterDto.getSolvedAt() != null) {
+                        problem.setSolvedAt(problemRegisterDto.getSolvedAt());
+                    }
+
+                    if (problemRegisterDto.getReference() != null) {
+                        problem.setReference(problemRegisterDto.getReference());
+                    }
+
+                    if (problemRegisterDto.getMemo() != null) {
+                        problem.setMemo(problemRegisterDto.getMemo());
+                    }
+
+                    if (problemRegisterDto.getProblemImage() != null) {
+                        String problemImageUrl = fileUploadService.updateImage(problemRegisterDto.getProblemImage(), problem, ImageType.PROBLEM_IMAGE);
+
+                        if (problemImageUrl != null) {
+                            String processImageUrl = fileUploadService.saveProcessImageUrl(problemImageUrl, problem, ImageType.PROCESS_IMAGE);
+                        }
+                    }
+
+                    if (problemRegisterDto.getSolveImage() != null) {
+                        fileUploadService.updateImage(problemRegisterDto.getSolveImage(), problem, ImageType.SOLVE_IMAGE);
+                    }
+
+                    if (problemRegisterDto.getAnswerImage() != null) {
+                        fileUploadService.updateImage(problemRegisterDto.getAnswerImage(), problem, ImageType.ANSWER_IMAGE);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return false;
+                }
+            } else {
+                return false;
+            }
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     @Override
     public void deleteProblem(Long userId, Long problemId) {
         Optional<Problem> optionalProblem = problemRepository.findById(problemId);
         if (optionalProblem.isPresent()) {
             Problem problem = optionalProblem.get();
             if (problem.getUser().getId().equals(userId)) {
-                // 문제와 관련된 이미지 데이터를 조회
+
                 List<ImageData> images = fileUploadService.getProblemImages(problemId);
-                // 각 이미지에 대해 S3에서 삭제
                 images.forEach(fileUploadService::deleteImage);
-                // 문제 데이터 삭제
+
                 problemRepository.delete(problem);
             } else {
                 throw new UserNotAuthorizedException("User ID does not match with problem's user ID");
