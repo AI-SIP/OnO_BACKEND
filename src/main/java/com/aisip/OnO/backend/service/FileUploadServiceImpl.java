@@ -36,8 +36,8 @@ public class FileUploadServiceImpl implements FileUploadService {
 
     @Override
     public String uploadFileToS3(MultipartFile file, Problem problem, ImageType imageType) throws IOException {
-        String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
-        String fileUrl = "https://" + bucket + ".s3.ap-northeast-2.amazonaws.com/" + fileName;
+        String fileName = createFileName(file, problem, imageType);
+        String fileUrl = getFileUrl(fileName);
 
         ObjectMetadata objectMetadata = new ObjectMetadata();
         objectMetadata.setContentType(file.getContentType());
@@ -100,8 +100,8 @@ public class FileUploadServiceImpl implements FileUploadService {
             processImageData.ifPresent(this::deleteImage);
         }
 
-        String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
-        String fileUrl = "https://" + bucket + ".s3.ap-northeast-2.amazonaws.com/" + fileName;
+        String fileName = createFileName(file, problem, imageType);
+        String fileUrl = getFileUrl(fileName);
 
         ObjectMetadata objectMetadata = new ObjectMetadata();
         objectMetadata.setContentType(file.getContentType());
@@ -125,11 +125,23 @@ public class FileUploadServiceImpl implements FileUploadService {
         String fileName = fileUrl.substring(fileUrl.lastIndexOf(splitStr) + splitStr.length());
         amazonS3Client.deleteObject(new DeleteObjectRequest(bucket, fileName));
 
+        if (imageData.getImageType() == ImageType.PROCESS_IMAGE) {
+            String suffix = ".output.png";
+            String originalFileName = fileName.substring(0, fileName.length() - suffix.length());
+
+            amazonS3Client.deleteObject(new DeleteObjectRequest(bucket, originalFileName + ".input.png"));
+            amazonS3Client.deleteObject(new DeleteObjectRequest(bucket, originalFileName + ".mask.png"));
+        }
+
         imageDataRepository.deleteById(imageData.getId());
     }
 
-    private String createFileName(String originalFileName) {
-        return UUID.randomUUID().toString().concat(getFileExtension(originalFileName));
+    private String createFileName(MultipartFile file, Problem problem, ImageType imageType) {
+        return problem.getCreatedAt() + "/" + imageType.getDescription() + "_" + file.getOriginalFilename();
+    }
+
+    private String getFileUrl(String fileName){
+        return "https://" + bucket + ".s3.ap-northeast-2.amazonaws.com/" + fileName;
     }
 
     private String getFileExtension(String fileName) {
