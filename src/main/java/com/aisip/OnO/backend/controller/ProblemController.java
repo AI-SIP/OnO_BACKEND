@@ -12,6 +12,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -48,6 +49,12 @@ public class ProblemController {
             @ModelAttribute ProblemRegisterDto problemRegisterDto
     ) {
         try {
+            /*
+            problemRegisterDto.initColorsList();
+
+            log.info("Parsed colorsList: {}", problemRegisterDto.getColorsList());
+
+             */
             Long userId = (Long) authentication.getPrincipal();
             boolean isSaved = problemService.saveProblem(userId, problemRegisterDto);
 
@@ -69,6 +76,12 @@ public class ProblemController {
             Authentication authentication, @ModelAttribute ProblemRegisterDto problemRegisterDto
     ) {
         try {
+            /*
+            problemRegisterDto.initColorsList();
+
+            log.info("Parsed colorsList: {}", problemRegisterDto.getColorsList());
+
+             */
             Long userId = (Long) authentication.getPrincipal();
             boolean isUpdated = problemService.updateProblem(userId, problemRegisterDto);
 
