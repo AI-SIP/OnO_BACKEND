@@ -36,7 +36,7 @@
 <script>
   function deleteUser() {
     if (confirm("Are you sure you want to delete this user?")) {
-      var userId = /*[[${user.id}]]*/ 1; // Thymeleaf syntax to insert the user ID
+      var userId = [[${user.id}]]; // Thymeleaf syntax to insert the user ID
       fetch(`/admin/user/${userId}`, {
         method: 'DELETE',
         headers: {
