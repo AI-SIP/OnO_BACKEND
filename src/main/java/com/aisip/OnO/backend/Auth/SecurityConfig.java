@@ -68,7 +68,7 @@ public class SecurityConfig {
                 )
                 .requiresChannel(channel ->
                         channel
-                                .requestMatchers("/admin/**").requiresSecure()  // 로그인 관련 및 관리자 페이지에 대해서만 HTTPS 강제
+                                .requestMatchers("perform_login","/admin/**").requiresSecure()  // 로그인 관련 및 관리자 페이지에 대해서만 HTTPS 강제
                 )
                 .addFilterBefore(jwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
 
