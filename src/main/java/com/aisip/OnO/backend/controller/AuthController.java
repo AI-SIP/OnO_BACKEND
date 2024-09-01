@@ -132,9 +132,6 @@ public class AuthController {
         }
     }
 
-
-
-
     public static class ErrorResponseDto {
         private String error;
 

@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.entity.User;
 
 import com.aisip.OnO.backend.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -18,6 +19,8 @@ public class User extends BaseEntity {
     private String name;
 
     private String identifier;
+
+    private String password;
 
     @Enumerated(EnumType.STRING)
     private UserType type;

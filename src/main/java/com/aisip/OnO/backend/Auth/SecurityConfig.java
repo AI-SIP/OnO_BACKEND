@@ -1,11 +1,15 @@
 package com.aisip.OnO.backend.Auth;
 
+import com.aisip.OnO.backend.service.CustomAdminService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -21,17 +25,45 @@ public class SecurityConfig {
         return new JwtTokenFilter(secret);
     }
 
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf().disable()
                 .authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
-                                .requestMatchers("/").permitAll()
-                                .requestMatchers("/api/auth/**").permitAll()
+                                .requestMatchers("/", "/api/auth/**", "/login", "/css/**", "/js/**").permitAll()
+                                .requestMatchers("/admin/**").hasRole("ADMIN")
                                 .anyRequest().authenticated()
                 )
+                .formLogin(formLogin -> formLogin
+                        .loginPage("/login") // 커스텀 로그인 페이지 경로
+                        .loginProcessingUrl("/perform_login")
+                        .successHandler((request, response, authentication) -> {
+                            CustomAdminService userDetails = (CustomAdminService) authentication.getPrincipal();
+                            Long adminId = userDetails.getUserId();
+                            String token = jwtTokenProvider.createAccessToken(adminId);
+                            response.setHeader("Authorization", "Bearer " + token);
+                            response.sendRedirect("/admin/main"); // 성공 후 관리자 페이지로 이동
+                        })
+                        .failureHandler((request, response, exception) -> {
+                            response.sendRedirect("/login?error");
+                        })
+                        .permitAll()
+                )
+                .logout(logout -> logout
+                        .logoutUrl("/logout")
+                        .logoutSuccessUrl("/login?logout")
+                        .permitAll()
+                )
                 .sessionManagement(sessionManagement ->
-                        sessionManagement.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                        sessionManagement.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED) // 세션을 필요할 때만 생성
                 )
                 .addFilterBefore(jwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
 

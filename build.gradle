@@ -39,6 +39,7 @@ dependencies {
 	implementation group: 'com.auth0', name: 'jwks-rsa', version: '0.22.1'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.17.2'
+	implementation group: 'org.springframework.boot', name: 'spring-boot-starter-thymeleaf', version: '3.3.3'
 	// Hibernate Core
 	implementation 'org.hibernate:hibernate-core:6.5.2.Final'
 	compileOnly 'org.projectlombok:lombok'
