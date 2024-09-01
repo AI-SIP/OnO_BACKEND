@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>유저 상세 정보</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="container mt-5">
+  <h1 class="mb-4">유저 상세 정보</h1>
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">ID: <span th:text="${user.id}">1</span></h5>
+      <h5 class="card-title">Name: <span th:text="${user.name}">User Name</span></h5>
+      <p class="card-text">Email: <span th:text="${user.email}">user@example.com</span></p>
+      <p class="card-text">Identifier: <span th:text="${user.identifier}">identifier</span></p>
+      <p class="card-text">Type: <span th:text="${user.type}">GUEST</span></p>
+      <p class="card-text">Created At: <span th:text="${user.createdAt}">2024-08-20T18:32:51</span></p>
+      <p class="card-text">Updated At: <span th:text="${user.updatedAt}">2024-08-20T18:32:51</span></p>
+
+      <!-- Buttons aligned in the same row -->
+      <div class="d-flex mt-3">
+        <a th:href="@{/users}" class="btn btn-primary me-2">Back to Users List</a>
+        <button class="btn btn-danger" onclick="deleteUser()">Delete User</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap JS (Optional) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- JavaScript for deleting the user -->
+<script>
+  function deleteUser() {
+    if (confirm("Are you sure you want to delete this user?")) {
+      var userId = /*[[${user.id}]]*/ 1; // Thymeleaf syntax to insert the user ID
+      fetch(`/admin/user/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+              .then(response => {
+                if (response.ok) {
+                  alert("User deleted successfully.");
+                  window.location.href = "/admin/users";
+                } else {
+                  alert("Failed to delete the user.");
+                }
+              })
+              .catch(error => {
+                console.error("Error deleting user:", error);
+                alert("An error occurred. Please try again.");
+              });
+    }
+  }
+</script>
+</body>
+</html>
