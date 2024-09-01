@@ -66,6 +66,9 @@ public class SecurityConfig {
                 .sessionManagement(sessionManagement ->
                         sessionManagement.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED) // 세션을 필요할 때만 생성
                 )
+                .requiresChannel(channel ->
+                        channel.anyRequest().requiresSecure() // 모든 요청에 대해 HTTPS를 요구
+                )
                 .addFilterBefore(jwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
