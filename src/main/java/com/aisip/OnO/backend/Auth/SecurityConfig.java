@@ -35,7 +35,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http.csrf().disable()
+        http.cors().and().csrf().disable()
                 .authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
                                 .requestMatchers("/", "/api/auth/**", "/login", "/css/**", "/js/**").permitAll()
@@ -45,6 +45,7 @@ public class SecurityConfig {
                 .formLogin(formLogin -> formLogin
                         .loginPage("/login") // 커스텀 로그인 페이지 경로
                         .loginProcessingUrl("/perform_login")
+                        .defaultSuccessUrl("/admin/main", true)
                         .successHandler((request, response, authentication) -> {
                             CustomAdminService userDetails = (CustomAdminService) authentication.getPrincipal();
                             Long adminId = userDetails.getUserId();
