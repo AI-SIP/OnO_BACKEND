@@ -75,9 +75,10 @@
       </div>
     </div>
   </div>
+  <br></br>
 
   <!-- 문제 목록 및 총 개수 표시 -->
-  <h2 class="mb-4">문제 목록</h2>
+  <h2 class="mb-4">작성한 문제 목록</h2>
   <p class="mb-4">총 문제 수: <span th:text="${#lists.size(problems)}">0</span></p>
 
   <div class="card">
@@ -86,12 +87,13 @@
         <thead>
         <tr>
           <th>ID</th>
+          <th>보정 이미지</th>
           <th>문제 이미지</th>
-          <th>풀이 이미지</th>
           <th>정답 이미지</th>
+          <th>풀이 이미지</th>
           <th>메모</th>
           <th>출처</th>
-          <th>해결일</th>
+          <th>푼 날짜</th>
           <th>생성일</th>
           <th>수정일</th>
         </tr>
@@ -99,9 +101,26 @@
         <tbody>
         <tr th:each="problem : ${problems}">
           <td th:text="${problem.problemId}">1</td>
-          <td><img th:src="${problem.problemImageUrl}" alt="Problem Image" class="img-thumbnail" style="max-width: 100px;"></td>
-          <td><img th:src="${problem.processImageUrl}" alt="Process Image" class="img-thumbnail" style="max-width: 100px;"></td>
-          <td><img th:src="${problem.answerImageUrl}" alt="Answer Image" class="img-thumbnail" style="max-width: 100px;"></td>
+          <td>
+            <a th:href="@{'/admin/user/image/view?url=' + ${problem.processImageUrl}}">
+              <img th:src="${problem.processImageUrl}" alt="Process Image" class="img-thumbnail" style="max-width: 100px;">
+            </a>
+          </td>
+          <td>
+            <a th:href="@{'/admin/user/image/view?url=' + ${problem.problemImageUrl}}">
+              <img th:src="${problem.problemImageUrl}" alt="Problem Image" class="img-thumbnail" style="max-width: 100px;">
+            </a>
+          </td>
+          <td>
+            <a th:href="@{'/admin/user/image/view?url=' + ${problem.answerImageUrl}}">
+              <img th:src="${problem.answerImageUrl}" alt="Answer Image" class="img-thumbnail" style="max-width: 100px;">
+            </a>
+          </td>
+          <td>
+            <a th:href="@{'/admin/user/image/view?url=' + ${problem.solveImageUrl}}">
+              <img th:src="${problem.solveImageUrl}" alt="Solve Image" class="img-thumbnail" style="max-width: 100px;">
+            </a>
+          </td>
           <td th:text="${problem.memo}">Memo</td>
           <td th:text="${problem.reference}">Reference</td>
           <td th:text="${problem.solvedAt}">Solved At</td>
@@ -141,6 +160,21 @@
                 alert("유저 삭제에 실패했습니다.");
               });
     }
+  }
+
+  function openImage(imageUrl) {
+    var imgWindow = window.open("", "_blank", "toolbar=no,scrollbars=no,resizable=yes");
+    imgWindow.document.write(`
+      <html>
+        <head>
+          <title>Image</title>
+        </head>
+        <body style="margin:0;display:flex;align-items:center;justify-content:center;background-color:black;">
+          <img src="${imageUrl}" style="width:100%; height:auto;">
+        </body>
+      </html>
+    `);
+    imgWindow.document.close();
   }
 </script>
 </body>
