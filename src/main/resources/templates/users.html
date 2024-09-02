@@ -14,12 +14,12 @@
     <thead>
     <tr>
       <th scope="col">ID</th>
-      <th scope="col">Name</th>
-      <th scope="col">Email</th>
-      <th scope="col">Identifier</th>
-      <th scope="col">Type</th>
-      <th scope="col">Created At</th>
-      <th scope="col">Updated At</th>
+      <th scope="col">이름</th>
+      <th scope="col">이메일</th>
+      <th scope="col">식별자</th>
+      <th scope="col">유저 유형</th>
+      <th scope="col">가입 날짜</th>
+      <th scope="col">수정 날짜</th>
     </tr>
     </thead>
     <tbody>
@@ -30,8 +30,8 @@
       <td th:text="${user.email}">user@example.com</td>
       <td th:text="${user.identifier}">identifier</td>
       <td th:text="${user.type}">GUEST</td>
-      <td th:text="${user.createdAt}">2024-08-20T18:32:51</td>
-      <td th:text="${user.updatedAt}">2024-08-20T18:32:51</td>
+      <td th:text="${@dateFormatter.format(user.createdAt)}">2024년 08월 20일 18시 32분 51초</td>
+      <td th:text="${@dateFormatter.format(user.updatedAt)}">2024년 08월 20일 18시 32분 51초</td>
     </tr>
     </tbody>
   </table>
