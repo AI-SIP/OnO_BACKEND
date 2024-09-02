@@ -71,8 +71,50 @@
       <!-- Buttons aligned in the same row -->
       <div class="d-flex mt-3">
         <a th:href="@{/admin/users}" class="btn btn-primary me-2">유저 목록 창으로 이동</a>
+        <button class="btn btn-warning me-2" data-bs-toggle="modal" data-bs-target="#editUserModal">유저 수정</button>
         <button class="btn btn-danger" onclick="deleteUser()">유저 삭제</button>
       </div>
+
+      <!-- 유저 수정 모달 -->
+      <div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="editUserModalLabel">유저 정보 수정</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form th:action="@{'/admin/user/' + ${user.id}}" method="post">
+              <div class="modal-body">
+                <div class="mb-3">
+                  <label for="email" class="form-label">이메일</label>
+                  <input type="email" class="form-control" id="email" name="email" th:value="${user.email}" required>
+                </div>
+                <div class="mb-3">
+                  <label for="name" class="form-label">이름</label>
+                  <input type="text" class="form-control" id="name" name="name" th:value="${user.name}" required>
+                </div>
+                <div class="mb-3">
+                  <label for="identifier" class="form-label">식별자</label>
+                  <input type="text" class="form-control" id="identifier" name="identifier" th:value="${user.identifier}" required>
+                </div>
+                <div class="mb-3">
+                  <label for="type" class="form-label">유저 유형</label>
+                  <select class="form-select" id="type" name="type" required>
+                    <option th:each="type : ${T(com.aisip.OnO.backend.entity.User.UserType).values()}"
+                            th:value="${type}" th:text="${type}"
+                            th:selected="${user.type == type}">GUEST</option>
+                  </select>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                <button type="submit" class="btn btn-primary">수정하기</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
   <br></br>

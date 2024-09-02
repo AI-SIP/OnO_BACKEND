@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.service;
 
+import com.aisip.OnO.backend.Dto.User.UserRegisterDto;
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.entity.User.UserType;
@@ -15,6 +16,8 @@ public interface UserService {
     public User getUserDetailsById(Long userId);
 
     public List<User> findAllUsers();
+
+    public User updateUser(Long userId, UserRegisterDto userRegisterDto);
 
     public void deleteUserById(Long userId);
 
