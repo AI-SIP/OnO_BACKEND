@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.service;
 
+import com.aisip.OnO.backend.Dto.Process.ImageProcessRegisterDto;
 import com.aisip.OnO.backend.entity.Image.ImageData;
 import com.aisip.OnO.backend.entity.Image.ImageType;
 import com.aisip.OnO.backend.entity.Problem;
@@ -10,18 +11,22 @@ import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class FileUploadServiceImpl implements FileUploadService {
@@ -46,6 +51,7 @@ public class FileUploadServiceImpl implements FileUploadService {
         amazonS3Client.putObject(bucket, fileName, file.getInputStream(), objectMetadata);
         saveImageData(fileUrl, problem, imageType);
 
+        log.info("file url : " + fileUrl + " has upload to S3");
         return fileUrl;
     }
 
@@ -62,29 +68,32 @@ public class FileUploadServiceImpl implements FileUploadService {
     }
 
     @Override
-    public String saveProcessImageUrl(String problemImageUrl, Problem problem, ImageType imageType) {
+    public String saveProcessImageUrl(ImageProcessRegisterDto imageProcessRegisterDto, Problem problem, ImageType imageType) {
         RestTemplate restTemplate = new RestTemplate();
         String url = fastApiUrl + "/process-color";
 
-        UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(url)
-                .queryParam("full_url", problemImageUrl);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
 
-        String response = restTemplate.getForObject(uriBuilder.toUriString(), String.class);
-
-        System.out.println("Response from server: " + response);
+        HttpEntity<ImageProcessRegisterDto> request = new HttpEntity<>(imageProcessRegisterDto, headers);
 
         try {
+            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+
+            log.info("Response from fastApi server: " + response);
+
             ObjectMapper objectMapper = new ObjectMapper();
-            JsonNode rootNode = objectMapper.readTree(response);
+            JsonNode rootNode = objectMapper.readTree(response.getBody());
             JsonNode pathNode = rootNode.path("path");
             String inputPath = pathNode.path("output_path").asText();
 
             String fileUrl = "https://" + bucket + ".s3.ap-northeast-2.amazonaws.com/" + inputPath;
             saveImageData(fileUrl, problem, imageType);
 
+            log.info("process image url : " + fileUrl + " has successfully processed");
             return fileUrl;
         } catch (Exception e) {
-            e.printStackTrace();
+            log.info(e.getMessage());
             throw new RuntimeException("Failed to parse response", e);
         }
     }
@@ -110,6 +119,7 @@ public class FileUploadServiceImpl implements FileUploadService {
         amazonS3Client.putObject(bucket, fileName, file.getInputStream(), objectMetadata);
         saveImageData(fileUrl, problem, imageType);
 
+        log.info("file url : " + fileUrl + " successfully updated");
         return fileUrl;
     }
 
@@ -133,6 +143,7 @@ public class FileUploadServiceImpl implements FileUploadService {
             amazonS3Client.deleteObject(new DeleteObjectRequest(bucket, originalFileName + ".mask.png"));
         }
 
+        log.info("imageData: " + imageData.getImageUrl() + " has successfully deleted");
         imageDataRepository.deleteById(imageData.getId());
     }
 

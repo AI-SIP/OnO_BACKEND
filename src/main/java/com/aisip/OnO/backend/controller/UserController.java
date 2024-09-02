@@ -1,8 +1,10 @@
 package com.aisip.OnO.backend.controller;
 
+import com.aisip.OnO.backend.Dto.ErrorResponseDto;
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
 import com.aisip.OnO.backend.service.ProblemService;
 import com.aisip.OnO.backend.service.UserService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/user")
 public class UserController {
@@ -26,9 +29,11 @@ public class UserController {
         Long userId = (Long) authentication.getPrincipal();
         UserResponseDto userResponseDto = userService.getUserById(userId);
         if (userResponseDto != null) {
+            log.info("userId: " + userId + " get user info");
             return ResponseEntity.ok(userResponseDto);
         } else {
-            return ResponseEntity.status(404).body(new ErrorResponse("User not found"));
+            log.info("userId: " + userId + " not found");
+            return ResponseEntity.status(404).body(new ErrorResponseDto("User not found"));
         }
     }
 
@@ -38,22 +43,7 @@ public class UserController {
         problemService.deleteUserProblems(userId);
         userService.deleteUserById(userId);
 
+        log.info("userId: " + userId + " has deleted");
         return ResponseEntity.ok().body("delete complete");
-    }
-
-    public static class ErrorResponse {
-        private String error;
-
-        public ErrorResponse(String error) {
-            this.error = error;
-        }
-
-        public String getError() {
-            return error;
-        }
-
-        public void setError(String error) {
-            this.error = error;
-        }
     }
 }

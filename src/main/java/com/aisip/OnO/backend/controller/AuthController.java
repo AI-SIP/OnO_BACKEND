@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.controller;
 
 import com.aisip.OnO.backend.Auth.AppleTokenVerifier;
+import com.aisip.OnO.backend.Dto.ErrorResponseDto;
 import com.aisip.OnO.backend.Dto.Token.TokenRequestDto;
 import com.aisip.OnO.backend.Dto.Token.TokenResponseDto;
 import com.aisip.OnO.backend.entity.User.UserType;
@@ -10,6 +11,7 @@ import com.aisip.OnO.backend.Auth.JwtTokenProvider;
 import com.aisip.OnO.backend.entity.User.User;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.fasterxml.jackson.databind.JsonNode;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -44,6 +47,7 @@ public class AuthController {
         String accessToken = jwtTokenProvider.createAccessToken(user.getId());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
 
+        log.info(user.getName() + " has login for guest");
         return ResponseEntity.ok(new TokenResponseDto(accessToken, refreshToken));
     }
 
@@ -59,15 +63,18 @@ public class AuthController {
                 User user = userService.registerOrLoginUser(email, name, identifier, UserType.MEMBER);
                 String accessToken = jwtTokenProvider.createAccessToken(user.getId());
                 String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
+
+                log.info(user.getName() + " has login for Google Login");
                 return ResponseEntity.ok(new TokenResponseDto(accessToken, refreshToken));
             } else {
+                log.warn("Invalid Token Issue for username: " + name);
                 throw new IllegalArgumentException("Invalid token information or user data");
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            log.warn(e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto("Invalid Google token"));
         } catch (Exception e) {
-            e.printStackTrace();
+            log.warn(e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Internal server error"));
         }
     }
@@ -85,13 +92,16 @@ public class AuthController {
                 User user = userService.registerOrLoginUser(email, name, identifier, UserType.MEMBER);
                 String accessToken = jwtTokenProvider.createAccessToken(user.getId());
                 String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
+
+                log.info(user.getName() + " has login for Apple Login");
                 return ResponseEntity.ok(new TokenResponseDto(accessToken, refreshToken));
             } else{
+                log.warn("Invalid Token Issue for username: " + name);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto("Invalid Apple token"));
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.warn(e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto("Invalid Apple token"));
         }
     }
@@ -104,13 +114,15 @@ public class AuthController {
                 if (jwtTokenProvider.validateToken(accessToken)) {
                     return ResponseEntity.ok("Token is valid");
                 } else {
-                    System.out.println("token is invalid");
+                    log.warn("token is invalid");
                     return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto("Invalid or expired access token"));
                 }
             } else {
+                log.warn("Authorization header missing or invalid");
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponseDto("Authorization header missing or invalid"));
             }
         } catch (Exception e) {
+            log.warn("Token verification failed");
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Token verification failed"));
         }
     }
@@ -123,28 +135,15 @@ public class AuthController {
                 Long userId = Long.parseLong(jwtTokenProvider.getSubjectFromToken(requestRefreshToken));
                 String newAccessToken = jwtTokenProvider.createAccessToken(userId);
 
+                log.info("Refresh Token Success for userId: " + userId);
                 return ResponseEntity.ok(new TokenResponseDto(newAccessToken, requestRefreshToken));
             } else {
+                log.warn("Invalid or expired refresh token");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto("Invalid or expired refresh token"));
             }
         } catch (Exception e) {
+            log.warn("Could not refresh access token");
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Could not refresh access token"));
-        }
-    }
-
-    public static class ErrorResponseDto {
-        private String error;
-
-        public ErrorResponseDto(String error) {
-            this.error = error;
-        }
-
-        public String getError() {
-            return error;
-        }
-
-        public void setError(String error) {
-            this.error = error;
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.service;
 
+import com.aisip.OnO.backend.Dto.User.UserRegisterDto;
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
 import com.aisip.OnO.backend.converter.UserConverter;
 import com.aisip.OnO.backend.entity.User.User;
@@ -48,6 +49,26 @@ public class UserServiceImpl implements UserService {
     @Override
     public List<User> findAllUsers() {
         return userRepository.findAll();
+    }
+
+    @Override
+    public User updateUser(Long userId, UserRegisterDto userRegisterDto) {
+
+        Optional<User> optionalUser = userRepository.findById(userId);
+        System.out.println("user update");
+
+        if(optionalUser.isPresent()){
+            User user = optionalUser.get();
+
+            user.setName(userRegisterDto.getName());
+            user.setEmail(userRegisterDto.getEmail());
+            user.setIdentifier(userRegisterDto.getIdentifier());
+            user.setType(userRegisterDto.getType());
+
+            return userRepository.save(user);
+        } else{
+            return null;
+        }
     }
 
     public List<User> getAllUsers(){

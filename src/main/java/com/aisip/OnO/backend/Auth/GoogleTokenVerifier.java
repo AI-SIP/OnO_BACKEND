@@ -31,7 +31,6 @@ public class GoogleTokenVerifier {
             ObjectMapper mapper = new ObjectMapper();
             JsonNode tokenInfo = mapper.readTree(connection.getInputStream());
 
-            // 검증된 토큰의 client_id가 기대하는 client_id와 일치하는지 확인
             if (!tokenInfo.get("aud").asText().equals(clientId)) {
                 throw new SecurityException("Invalid client ID");
             }

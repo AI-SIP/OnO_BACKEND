@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.service;
 
+import com.aisip.OnO.backend.Dto.Process.ImageProcessRegisterDto;
 import com.aisip.OnO.backend.entity.Image.ImageData;
 import com.aisip.OnO.backend.entity.Image.ImageType;
 import com.aisip.OnO.backend.entity.Problem;
@@ -11,7 +12,7 @@ import java.util.List;
 public interface FileUploadService {
     String uploadFileToS3(MultipartFile file, Problem problem, ImageType imageType) throws IOException;
 
-    String saveProcessImageUrl(String problemImageUrl, Problem problem, ImageType imageType);
+    String saveProcessImageUrl(ImageProcessRegisterDto imageProcessRegisterDto, Problem problem, ImageType imageType);
 
     String updateImage(MultipartFile file, Problem problem, ImageType imageType) throws IOException;
 
