@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.service;
 
+import com.aisip.OnO.backend.Dto.Process.ImageProcessRegisterDto;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.repository.UserRepository;
 import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
@@ -80,7 +81,14 @@ public class ProblemServiceImpl implements ProblemService {
                 if (problemRegisterDto.getProblemImage() != null) {
                     String problemImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getProblemImage(), savedProblem, ImageType.PROBLEM_IMAGE);
                     if (problemImageUrl != null) {
-                        String processImageUrl = fileUploadService.saveProcessImageUrl(problemImageUrl, savedProblem, ImageType.PROCESS_IMAGE);
+
+                        problemRegisterDto.initColorsList();
+                        ImageProcessRegisterDto imageProcessRegisterDto = ImageProcessRegisterDto.builder()
+                                .fullUrl(problemImageUrl)
+                                .colorsList(problemRegisterDto.getColorsList())
+                                .build();
+
+                        String processImageUrl = fileUploadService.saveProcessImageUrl(imageProcessRegisterDto, savedProblem, ImageType.PROCESS_IMAGE);
                     }
                 }
 
@@ -128,7 +136,14 @@ public class ProblemServiceImpl implements ProblemService {
                         String problemImageUrl = fileUploadService.updateImage(problemRegisterDto.getProblemImage(), problem, ImageType.PROBLEM_IMAGE);
 
                         if (problemImageUrl != null) {
-                            String processImageUrl = fileUploadService.saveProcessImageUrl(problemImageUrl, problem, ImageType.PROCESS_IMAGE);
+
+                            problemRegisterDto.initColorsList();
+                            ImageProcessRegisterDto imageProcessRegisterDto = ImageProcessRegisterDto.builder()
+                                    .fullUrl(problemImageUrl)
+                                    .colorsList(problemRegisterDto.getColorsList())
+                                    .build();
+
+                            String processImageUrl = fileUploadService.saveProcessImageUrl(imageProcessRegisterDto, problem, ImageType.PROCESS_IMAGE);
                         }
                     }
 

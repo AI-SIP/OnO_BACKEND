@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.service;
 
+import com.aisip.OnO.backend.Dto.Process.ImageProcessRegisterDto;
 import com.aisip.OnO.backend.entity.Image.ImageData;
 import com.aisip.OnO.backend.entity.Image.ImageType;
 import com.aisip.OnO.backend.entity.Problem;
@@ -11,6 +12,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -62,18 +66,24 @@ public class FileUploadServiceImpl implements FileUploadService {
     }
 
     @Override
-    public String saveProcessImageUrl(String problemImageUrl, Problem problem, ImageType imageType) {
+    public String saveProcessImageUrl(ImageProcessRegisterDto imageProcessRegisterDto, Problem problem, ImageType imageType) {
         RestTemplate restTemplate = new RestTemplate();
         String url = fastApiUrl + "/process-color";
 
         UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(url)
-                .queryParam("full_url", problemImageUrl);
+                .queryParam("full_url", imageProcessRegisterDto.getFullUrl());
 
-        String response = restTemplate.getForObject(uriBuilder.toUriString(), String.class);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
 
-        System.out.println("Response from server: " + response);
+        HttpEntity<ImageProcessRegisterDto> request = new HttpEntity<>(imageProcessRegisterDto, headers);
 
         try {
+            String response = restTemplate.getForObject(uriBuilder.toUriString(), String.class);
+            //String response = restTemplate.postForEntity(uriBuilder.toUriString(), request, String.class);
+
+            System.out.println("Response from server: " + response);
+
             ObjectMapper objectMapper = new ObjectMapper();
             JsonNode rootNode = objectMapper.readTree(response);
             JsonNode pathNode = rootNode.path("path");
