@@ -28,7 +28,7 @@ public class JwtTokenProvider {
     }
 
     public String createRefreshToken(Long userId) {
-        long refreshExpirationTime = 3_600_000 * 24 * 365; // 14 days
+        long refreshExpirationTime = 3_600_000 * 24 * 365; // 365 days
         return JWT.create()
                 .withSubject(userId.toString())
                 .withIssuedAt(new Date())

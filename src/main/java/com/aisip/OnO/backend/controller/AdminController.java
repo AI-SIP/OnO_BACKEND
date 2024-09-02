@@ -25,13 +25,13 @@ public class AdminController {
 
     @GetMapping("/main")
     public String adminPage() {
-        return "admin"; // admin.html로 연결
+        return "admin";
     }
 
     @GetMapping("/user/image/view")
     public String viewImage(@RequestParam("url") String imageUrl, Model model) {
         model.addAttribute("imageUrl", imageUrl);
-        return "image"; // image.html 파일을 렌더링
+        return "image";
     }
 
     @GetMapping("/user/{userId}")
@@ -41,7 +41,7 @@ public class AdminController {
 
         List<ProblemResponseDto> problems = problemService.findAllProblemsByUserId(userId);
         model.addAttribute("problems", problems);
-        return "user";  // user.html 파일을 렌더링
+        return "user";
     }
 
     @GetMapping("/users")

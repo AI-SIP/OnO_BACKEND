@@ -42,7 +42,6 @@ public class JwtTokenFilter extends OncePerRequestFilter {
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             } catch (JWTVerificationException e) {
-                // JWT Verification failed
                 SecurityContextHolder.clearContext();
             }
         }

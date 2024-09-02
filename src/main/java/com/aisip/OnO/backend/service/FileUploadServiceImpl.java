@@ -11,6 +11,7 @@ import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -24,8 +25,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class FileUploadServiceImpl implements FileUploadService {
@@ -50,6 +51,7 @@ public class FileUploadServiceImpl implements FileUploadService {
         amazonS3Client.putObject(bucket, fileName, file.getInputStream(), objectMetadata);
         saveImageData(fileUrl, problem, imageType);
 
+        log.info("file url : " + fileUrl + " has upload to S3");
         return fileUrl;
     }
 
@@ -82,7 +84,7 @@ public class FileUploadServiceImpl implements FileUploadService {
             String response = restTemplate.getForObject(uriBuilder.toUriString(), String.class);
             //String response = restTemplate.postForEntity(uriBuilder.toUriString(), request, String.class);
 
-            System.out.println("Response from server: " + response);
+            log.info("Response from fastApi server: " + response);
 
             ObjectMapper objectMapper = new ObjectMapper();
             JsonNode rootNode = objectMapper.readTree(response);
@@ -92,9 +94,10 @@ public class FileUploadServiceImpl implements FileUploadService {
             String fileUrl = "https://" + bucket + ".s3.ap-northeast-2.amazonaws.com/" + inputPath;
             saveImageData(fileUrl, problem, imageType);
 
+            log.info("process image url : " + fileUrl + " has successfully processed");
             return fileUrl;
         } catch (Exception e) {
-            e.printStackTrace();
+            log.info(e.getMessage());
             throw new RuntimeException("Failed to parse response", e);
         }
     }
@@ -120,6 +123,7 @@ public class FileUploadServiceImpl implements FileUploadService {
         amazonS3Client.putObject(bucket, fileName, file.getInputStream(), objectMetadata);
         saveImageData(fileUrl, problem, imageType);
 
+        log.info("file url : " + fileUrl + " successfully updated");
         return fileUrl;
     }
 
@@ -143,6 +147,7 @@ public class FileUploadServiceImpl implements FileUploadService {
             amazonS3Client.deleteObject(new DeleteObjectRequest(bucket, originalFileName + ".mask.png"));
         }
 
+        log.info("imageData: " + imageData.getImageUrl() + " has successfully deleted");
         imageDataRepository.deleteById(imageData.getId());
     }
 
