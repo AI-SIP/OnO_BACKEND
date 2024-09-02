@@ -25,8 +25,8 @@
     <tbody>
     <!-- Thymeleaf iteration over the users -->
     <tr th:each="user : ${users}">
-      <td th:text="${user.id}">1</td>
-      <td><a th:href="@{/admin/user/{userId}(userId=${user.id})}" th:text="${user.name}">User Name</a></td>
+      <td><a th:href="@{/admin/user/{userId}(userId=${user.id})}" th:text="${user.id}">1</a></td>
+      <td>User Name</td>
       <td th:text="${user.email}">user@example.com</td>
       <td th:text="${user.identifier}">identifier</td>
       <td th:text="${user.type}">GUEST</td>

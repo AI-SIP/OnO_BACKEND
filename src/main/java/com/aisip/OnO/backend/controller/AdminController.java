@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.controller;
 
+import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.service.ProblemService;
@@ -28,9 +29,12 @@ public class AdminController {
     }
 
     @GetMapping("/user/{userId}")
-    public String getUserById(@PathVariable Long userId, Model model) {
+    public String getUserDetailsById(@PathVariable Long userId, Model model) {
         User user = userService.getUserDetailsById(userId);
         model.addAttribute("user", user);
+
+        List<ProblemResponseDto> problems = problemService.findAllProblemsByUserId(userId);
+        model.addAttribute("problems", problems);
         return "user";  // user.html 파일을 렌더링
     }
 
@@ -39,6 +43,15 @@ public class AdminController {
         List<User> users = userService.findAllUsers();
         model.addAttribute("users", users);
         return "users";
+    }
+
+    @PatchMapping("/user/{userId}")
+    public ResponseEntity<?> updateUserInfo(@PathVariable Long userId) {
+
+        //problemService.deleteUserProblems(userId);
+        //userService.deleteUserById(userId);
+
+        return ResponseEntity.ok().body("update complete");
     }
 
     @DeleteMapping("/user/{userId}")

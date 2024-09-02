@@ -5,26 +5,111 @@
   <title>유저 상세 정보</title>
   <!-- Bootstrap CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .user-details-table, .problem-table {
+      width: 100%;
+    }
+    .user-details-table th, .user-details-table td,
+    .problem-table th, .problem-table td {
+      padding: 10px;
+      vertical-align: middle;
+      text-align: left;
+    }
+    .user-details-table th {
+      width: 30%;
+      background-color: #f8f9fa;
+    }
+    .user-details-table td, .problem-table td {
+      font-weight: bold;
+    }
+    .user-type {
+      font-weight: bold;
+      color: #007bff; /* 기본 색상, 필요에 따라 동적 변경 가능 */
+    }
+    .problem-table th {
+      background-color: #e9ecef;
+    }
+  </style>
 </head>
 <body>
 
 <div class="container mt-5">
   <h1 class="mb-4">유저 상세 정보</h1>
-  <div class="card">
+  <div class="card mb-4">
     <div class="card-body">
-      <h5 class="card-title">ID: <span th:text="${user.id}">1</span></h5>
-      <h5 class="card-title">Name: <span th:text="${user.name}">User Name</span></h5>
-      <p class="card-text">Email: <span th:text="${user.email}">user@example.com</span></p>
-      <p class="card-text">Identifier: <span th:text="${user.identifier}">identifier</span></p>
-      <p class="card-text">Type: <span th:text="${user.type}">GUEST</span></p>
-      <p class="card-text">Created At: <span th:text="${user.createdAt}">2024-08-20T18:32:51</span></p>
-      <p class="card-text">Updated At: <span th:text="${user.updatedAt}">2024-08-20T18:32:51</span></p>
+      <table class="table user-details-table">
+        <tr>
+          <th>ID</th>
+          <td th:text="${user.id}">1</td>
+        </tr>
+        <tr>
+          <th>Name</th>
+          <td th:text="${user.name}">User Name</td>
+        </tr>
+        <tr>
+          <th>Email</th>
+          <td th:text="${user.email}">user@example.com</td>
+        </tr>
+        <tr>
+          <th>Identifier</th>
+          <td th:text="${user.identifier}">identifier</td>
+        </tr>
+        <tr>
+          <th>Type</th>
+          <td class="user-type" th:text="${user.type}">GUEST</td>
+        </tr>
+        <tr>
+          <th>Created At</th>
+          <td th:text="${user.createdAt}">2024-08-20T18:32:51</td>
+        </tr>
+        <tr>
+          <th>Updated At</th>
+          <td th:text="${user.updatedAt}">2024-08-20T18:32:51</td>
+        </tr>
+      </table>
 
       <!-- Buttons aligned in the same row -->
       <div class="d-flex mt-3">
-        <a th:href="@{/users}" class="btn btn-primary me-2">Back to Users List</a>
-        <button class="btn btn-danger" onclick="deleteUser()">Delete User</button>
+        <a th:href="@{/admin/users}" class="btn btn-primary me-2">유저 목록 창으로 이동</a>
+        <button class="btn btn-danger" onclick="deleteUser()">유저 삭제</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 문제 목록 및 총 개수 표시 -->
+  <h2 class="mb-4">문제 목록</h2>
+  <p class="mb-4">총 문제 수: <span th:text="${#lists.size(problems)}">0</span></p>
+
+  <div class="card">
+    <div class="card-body">
+      <table class="table problem-table">
+        <thead>
+        <tr>
+          <th>ID</th>
+          <th>문제 이미지</th>
+          <th>풀이 이미지</th>
+          <th>정답 이미지</th>
+          <th>메모</th>
+          <th>출처</th>
+          <th>해결일</th>
+          <th>생성일</th>
+          <th>수정일</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="problem : ${problems}">
+          <td th:text="${problem.problemId}">1</td>
+          <td><img th:src="${problem.problemImageUrl}" alt="Problem Image" class="img-thumbnail" style="max-width: 100px;"></td>
+          <td><img th:src="${problem.processImageUrl}" alt="Process Image" class="img-thumbnail" style="max-width: 100px;"></td>
+          <td><img th:src="${problem.answerImageUrl}" alt="Answer Image" class="img-thumbnail" style="max-width: 100px;"></td>
+          <td th:text="${problem.memo}">Memo</td>
+          <td th:text="${problem.reference}">Reference</td>
+          <td th:text="${problem.solvedAt}">Solved At</td>
+          <td th:text="${problem.createdAt}">Created At</td>
+          <td th:text="${problem.updateAt}">Updated At</td>
+        </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -35,7 +120,7 @@
 <!-- JavaScript for deleting the user -->
 <script>
   function deleteUser() {
-    if (confirm("Are you sure you want to delete this user?")) {
+    if (confirm("정말 유저를 삭제하시겠습니까?")) {
       var userId = [[${user.id}]]; // Thymeleaf syntax to insert the user ID
       fetch(`/admin/user/${userId}`, {
         method: 'DELETE',
@@ -45,15 +130,15 @@
       })
               .then(response => {
                 if (response.ok) {
-                  alert("User deleted successfully.");
+                  alert("유저를 성공적으로 삭제했습니다.");
                   window.location.href = "/admin/users";
                 } else {
-                  alert("Failed to delete the user.");
+                  alert("유저 삭제에 실패했습니다.");
                 }
               })
               .catch(error => {
-                console.error("Error deleting user:", error);
-                alert("An error occurred. Please try again.");
+                console.error("삭제 중 에러가 발생했습니다:", error);
+                alert("유저 삭제에 실패했습니다.");
               });
     }
   }
