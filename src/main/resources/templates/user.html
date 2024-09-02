@@ -43,28 +43,28 @@
           <td th:text="${user.id}">1</td>
         </tr>
         <tr>
-          <th>Name</th>
+          <th>이름</th>
           <td th:text="${user.name}">User Name</td>
         </tr>
         <tr>
-          <th>Email</th>
+          <th>이메일</th>
           <td th:text="${user.email}">user@example.com</td>
         </tr>
         <tr>
-          <th>Identifier</th>
+          <th>식별자</th>
           <td th:text="${user.identifier}">identifier</td>
         </tr>
         <tr>
-          <th>Type</th>
+          <th>유저 유형</th>
           <td class="user-type" th:text="${user.type}">GUEST</td>
         </tr>
         <tr>
           <th>Created At</th>
-          <td th:text="${user.createdAt}">2024-08-20T18:32:51</td>
+          <td th:text="${@dateFormatter.format(user.createdAt)}">2024년 08월 20일 18시 32분 51초</td>
         </tr>
         <tr>
           <th>Updated At</th>
-          <td th:text="${user.updatedAt}">2024-08-20T18:32:51</td>
+          <td th:text="${@dateFormatter.format(user.updatedAt)}">2024년 08월 20일 18시 32분 51초</td>
         </tr>
       </table>
 
@@ -123,9 +123,9 @@
           </td>
           <td th:text="${problem.memo}">Memo</td>
           <td th:text="${problem.reference}">Reference</td>
-          <td th:text="${problem.solvedAt}">Solved At</td>
-          <td th:text="${problem.createdAt}">Created At</td>
-          <td th:text="${problem.updateAt}">Updated At</td>
+          <td th:text="${@dateFormatter.format(problem.solvedAt)}">2024년 08월 20일 18시 32분 51초</td>
+          <td th:text="${@dateFormatter.format(problem.createdAt)}">2024년 08월 20일 18시 32분 51초</td>
+          <td th:text="${@dateFormatter.format(problem.updateAt)}">2024년 08월 20일 18시 32분 51초</td>
         </tr>
         </tbody>
       </table>
