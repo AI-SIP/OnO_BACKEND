@@ -9,6 +9,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -43,6 +44,8 @@ public class ProblemRegisterDto {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+        } else{
+            this.colorsList = Arrays.asList(null, null, null);
         }
     }
 }

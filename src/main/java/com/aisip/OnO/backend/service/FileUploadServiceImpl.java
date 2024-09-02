@@ -16,11 +16,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 import java.util.List;
@@ -72,22 +72,18 @@ public class FileUploadServiceImpl implements FileUploadService {
         RestTemplate restTemplate = new RestTemplate();
         String url = fastApiUrl + "/process-color";
 
-        UriComponentsBuilder uriBuilder = UriComponentsBuilder.fromHttpUrl(url)
-                .queryParam("full_url", imageProcessRegisterDto.getFullUrl());
-
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         HttpEntity<ImageProcessRegisterDto> request = new HttpEntity<>(imageProcessRegisterDto, headers);
 
         try {
-            String response = restTemplate.getForObject(uriBuilder.toUriString(), String.class);
-            //String response = restTemplate.postForEntity(uriBuilder.toUriString(), request, String.class);
+            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
 
             log.info("Response from fastApi server: " + response);
 
             ObjectMapper objectMapper = new ObjectMapper();
-            JsonNode rootNode = objectMapper.readTree(response);
+            JsonNode rootNode = objectMapper.readTree(response.getBody());
             JsonNode pathNode = rootNode.path("path");
             String inputPath = pathNode.path("output_path").asText();
 
