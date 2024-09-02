@@ -77,6 +77,8 @@ public class FileUploadServiceImpl implements FileUploadService {
 
         HttpEntity<ImageProcessRegisterDto> request = new HttpEntity<>(imageProcessRegisterDto, headers);
 
+        log.info("remove colors on problemImage by colors: " + imageProcessRegisterDto.getColorsList());
+
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
 
