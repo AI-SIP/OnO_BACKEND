@@ -28,6 +28,12 @@ public class AdminController {
         return "admin"; // admin.html로 연결
     }
 
+    @GetMapping("/user/image/view")
+    public String viewImage(@RequestParam("url") String imageUrl, Model model) {
+        model.addAttribute("imageUrl", imageUrl);
+        return "image"; // image.html 파일을 렌더링
+    }
+
     @GetMapping("/user/{userId}")
     public String getUserDetailsById(@PathVariable Long userId, Model model) {
         User user = userService.getUserDetailsById(userId);
