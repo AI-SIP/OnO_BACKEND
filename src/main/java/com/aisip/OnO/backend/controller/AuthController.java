@@ -53,6 +53,9 @@ public class AuthController {
 
     @PostMapping("/google")
     public ResponseEntity<?> googleLogin(@RequestBody TokenRequestDto tokenRequestDto) {
+
+        log.info("Starting google login with Token : " + tokenRequestDto.toString());
+
         try {
             JsonNode tokenInfo = googleTokenVerifier.verifyToken(tokenRequestDto.getAccessToken(), tokenRequestDto.getPlatform());
             String email = tokenRequestDto.getEmail();
