@@ -90,6 +90,8 @@ public class AuthController {
             String name = tokenRequestDto.getName();
             String identifier = tokenRequestDto.getIdentifier();
 
+            log.info("start apple login verify access token");
+
             if(jwt != null && identifier != null){
                 User user = userService.registerOrLoginUser(email, name, identifier, UserType.MEMBER);
                 String accessToken = jwtTokenProvider.createAccessToken(user.getId());
@@ -115,6 +117,7 @@ public class AuthController {
             if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
                 String accessToken = authorizationHeader.substring(7);
                 if (jwtTokenProvider.validateToken(accessToken)) {
+                    log.info("success for verify access token");
                     return ResponseEntity.ok("Token is valid");
                 } else {
                     log.warn("token is invalid");
