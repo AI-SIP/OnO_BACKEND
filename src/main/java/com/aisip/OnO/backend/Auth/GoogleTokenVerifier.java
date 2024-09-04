@@ -45,13 +45,10 @@ public class GoogleTokenVerifier {
     }
 
     private String getClientIdByPlatform(String platform) {
-        switch (platform.toLowerCase()) {
-            case "android":
-                return androidClientId;
-            case "ios":
-                return iosClientId;
-            default:
-                throw new IllegalArgumentException("Invalid platform specified");
-        }
+        return switch (platform.toLowerCase()) {
+            case "android" -> androidClientId;
+            case "ios" -> iosClientId;
+            default -> throw new IllegalArgumentException("Invalid platform specified");
+        };
     }
 }
