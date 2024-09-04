@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.Auth;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -9,6 +10,7 @@ import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+@Slf4j
 @Component
 public class GoogleTokenVerifier {
 
@@ -35,6 +37,7 @@ public class GoogleTokenVerifier {
                 throw new SecurityException("Invalid client ID");
             }
 
+            log.info("google token verify success");
             return tokenInfo;
         } else {
             throw new IOException("Invalid access token");

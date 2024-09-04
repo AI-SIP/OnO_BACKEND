@@ -59,6 +59,8 @@ public class AuthController {
             String name = tokenRequestDto.getName();
             String identifier = tokenRequestDto.getIdentifier();
 
+            log.info("start google login verify access token");
+
             if (tokenInfo != null && identifier != null) {
                 User user = userService.registerOrLoginUser(email, name, identifier, UserType.MEMBER);
                 String accessToken = jwtTokenProvider.createAccessToken(user.getId());
@@ -109,6 +111,7 @@ public class AuthController {
     @GetMapping("/verifyAccessToken")
     public ResponseEntity<?> verifyAccessToken(@RequestHeader("Authorization") String authorizationHeader) {
         try {
+            log.info("start verify access token");
             if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
                 String accessToken = authorizationHeader.substring(7);
                 if (jwtTokenProvider.validateToken(accessToken)) {
@@ -131,6 +134,7 @@ public class AuthController {
     public ResponseEntity<?> refreshToken(@RequestBody TokenRequestDto tokenRequestDto) {
         try {
             String requestRefreshToken = tokenRequestDto.getRefreshToken();
+            log.info("start refresh token");
             if (jwtTokenProvider.validateToken(requestRefreshToken)) {
                 Long userId = Long.parseLong(jwtTokenProvider.getSubjectFromToken(requestRefreshToken));
                 String newAccessToken = jwtTokenProvider.createAccessToken(userId);
