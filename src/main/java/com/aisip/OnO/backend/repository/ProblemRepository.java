@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface ProblemRepository extends JpaRepository<Problem, Long> {
     List<Problem> findAllByUserId(Long userId);
+
+    List<Problem> findAllByFolderId(Long folderId);
 }

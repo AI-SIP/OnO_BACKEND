@@ -1,7 +1,9 @@
 package com.aisip.OnO.backend.service;
 
 import com.aisip.OnO.backend.Dto.Process.ImageProcessRegisterDto;
+import com.aisip.OnO.backend.entity.Folder;
 import com.aisip.OnO.backend.entity.User.User;
+import com.aisip.OnO.backend.repository.FolderRepository;
 import com.aisip.OnO.backend.repository.UserRepository;
 import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
@@ -29,6 +31,8 @@ public class ProblemServiceImpl implements ProblemService {
 
     private final UserRepository userRepository;
     private final ProblemRepository problemRepository;
+
+    private final FolderRepository folderRepository;
     private final FileUploadService fileUploadService;
 
     @Override
@@ -62,6 +66,17 @@ public class ProblemServiceImpl implements ProblemService {
     }
 
     @Override
+    public List<ProblemResponseDto> findAllProblemsByFolderId(Long folderId) {
+
+        return problemRepository.findAllByFolderId(folderId)
+                .stream().map(problem -> {
+                    List<ImageData> images = fileUploadService.getProblemImages(problem.getId());
+                    return ProblemConverter.convertToResponseDto(problem, images); // 문제 데이터와 이미지 데이터를 DTO로 변환
+                }).collect(Collectors.toList());
+
+    }
+
+    @Override
     public boolean saveProblem(Long userId, ProblemRegisterDto problemRegisterDto) {
         Optional<User> optionalUserEntity = userRepository.findById(userId);
 
@@ -69,10 +84,14 @@ public class ProblemServiceImpl implements ProblemService {
             if (optionalUserEntity.isPresent()) {
                 User user = optionalUserEntity.get();
 
+                Optional<Folder> optionalFolder = folderRepository.findById(problemRegisterDto.getFolderId());
+                Folder folder = optionalFolder.orElse(null);
+
                 Problem problem = Problem.builder()
                         .user(user)
                         .reference(problemRegisterDto.getReference())
                         .memo(problemRegisterDto.getMemo())
+                        .folder(folder)
                         .solvedAt(problemRegisterDto.getSolvedAt())
                         .build();
 

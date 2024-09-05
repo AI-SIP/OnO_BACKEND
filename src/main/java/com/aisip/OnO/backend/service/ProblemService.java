@@ -10,6 +10,9 @@ public interface ProblemService {
     ProblemResponseDto findProblemByUserId(Long userId, Long problemId);
 
     List<ProblemResponseDto> findAllProblemsByUserId(Long userId);
+
+    List<ProblemResponseDto> findAllProblemsByFolderId(Long folderId);
+
     boolean saveProblem(Long userId, ProblemRegisterDto problemRegisterDto);
 
     boolean updateProblem(Long userId, ProblemRegisterDto problemRegisterDto);

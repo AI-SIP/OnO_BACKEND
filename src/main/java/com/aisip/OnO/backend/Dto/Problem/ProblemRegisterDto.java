@@ -30,6 +30,8 @@ public class ProblemRegisterDto {
 
     private String reference;
 
+    private Long folderId;
+
     private LocalDateTime solvedAt;
 
     private String colors;  // JSON 문자열 형태로 유지
