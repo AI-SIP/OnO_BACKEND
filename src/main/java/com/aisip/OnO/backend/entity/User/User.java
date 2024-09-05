@@ -2,7 +2,6 @@ package com.aisip.OnO.backend.entity.User;
 
 import com.aisip.OnO.backend.entity.BaseEntity;
 import jakarta.persistence.*;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 

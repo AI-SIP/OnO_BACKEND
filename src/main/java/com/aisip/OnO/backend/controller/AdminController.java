@@ -45,7 +45,7 @@ public class AdminController {
     }
 
     @GetMapping("/users")
-    public String getAllUser(Model model, Authentication authentication){
+    public String getAllUser(Model model, Authentication authentication) {
         List<User> users = userService.findAllUsers();
         model.addAttribute("users", users);
         return "users";
@@ -56,12 +56,12 @@ public class AdminController {
 
         try {
             User user = userService.updateUser(userId, userRegisterDto);
-            if(user != null){
+            if (user != null) {
                 model.addAttribute("user", user);
                 List<ProblemResponseDto> problems = problemService.findAllProblemsByUserId(userId);
                 model.addAttribute("problems", problems);
                 return "user";
-            } else{
+            } else {
                 return "users";
             }
         } catch (Exception e) {

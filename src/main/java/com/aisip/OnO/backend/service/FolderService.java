@@ -4,7 +4,6 @@ import com.aisip.OnO.backend.Dto.Folder.FolderResponseDto;
 import com.aisip.OnO.backend.entity.Folder;
 
 import java.util.List;
-import java.util.Optional;
 
 public interface FolderService {
 
