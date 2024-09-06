@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.service;
 
 import com.aisip.OnO.backend.Dto.Folder.FolderResponseDto;
+import com.aisip.OnO.backend.Dto.Folder.FolderThumbnailResponseDto;
 
 import java.util.List;
 
@@ -14,7 +15,7 @@ public interface FolderService {
 
     FolderResponseDto findFolder(Long userId, Long folderId);
 
-    List<FolderResponseDto> findAllFolderNamesByUserId(Long userId);
+    List<FolderThumbnailResponseDto> findAllFolderThumbnailsByUserId(Long userId);
 
     FolderResponseDto updateFolder(Long userId, Long folderId, String folderName, Long parentFolderId);
 

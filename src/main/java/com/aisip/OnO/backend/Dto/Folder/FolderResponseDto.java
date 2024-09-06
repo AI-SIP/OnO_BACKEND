@@ -19,9 +19,9 @@ public class FolderResponseDto {
 
     private String folderName;
 
-    private Long parentFolderId;
+    private FolderThumbnailResponseDto parentFolder;
 
-    private List<Long> subFoldersId;
+    private List<FolderThumbnailResponseDto> subFolders;
 
     private List<ProblemResponseDto> problems;
 
