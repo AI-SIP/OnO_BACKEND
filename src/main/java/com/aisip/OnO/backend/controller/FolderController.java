@@ -18,9 +18,38 @@ public class FolderController {
 
     private FolderService folderService;
 
+    @GetMapping()
+    public ResponseEntity<?> getRootFolder(Authentication authentication) {
+        try {
+            Long userId = (Long) authentication.getPrincipal();
+            return ResponseEntity.ok(folderService.findRootFolder(userId));
+        } catch (Exception e) {
+            log.warn(e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 탐색에 실패했습니다.");
+        }
+    }
+
     @GetMapping("/{folderId}")
     public ResponseEntity<?> getFolder(Authentication authentication, @PathVariable Long folderId) {
-        return ResponseEntity.ok(folderService.findFolder(folderId));
+
+        try {
+            Long userId = (Long) authentication.getPrincipal();
+            return ResponseEntity.ok(folderService.findFolder(userId, folderId));
+        } catch (Exception e) {
+            log.warn(e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 탐색에 실패했습니다.");
+        }
+    }
+
+    @GetMapping("/folders")
+    public ResponseEntity<?> getAllFolderName(Authentication authentication) {
+        try {
+            Long userId = (Long) authentication.getPrincipal();
+            return ResponseEntity.ok(folderService.findAllFolderNamesByUserId(userId));
+        } catch (Exception e) {
+            log.warn(e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 탐색에 실패했습니다.");
+        }
     }
 
     @PostMapping()

@@ -1,21 +1,22 @@
 package com.aisip.OnO.backend.service;
 
 import com.aisip.OnO.backend.Dto.Folder.FolderResponseDto;
-import com.aisip.OnO.backend.entity.Folder;
 
 import java.util.List;
 
 public interface FolderService {
 
-    public FolderResponseDto createRootFolder(Long userId, String folderName);
+    FolderResponseDto createRootFolder(Long userId, String folderName);
 
-    public FolderResponseDto createFolder(Long userId, String folderName, Long parentFolderId);
+    FolderResponseDto createFolder(Long userId, String folderName, Long parentFolderId);
 
-    public FolderResponseDto findFolder(Long folderId);
+    FolderResponseDto findRootFolder(Long userId);
 
-    public FolderResponseDto updateFolder(Long userId, Long folderId, String folderName, Long parentFolderId);
+    FolderResponseDto findFolder(Long userId, Long folderId);
 
-    public void deleteFolder(Long folderId);
+    List<FolderResponseDto> findAllFolderNamesByUserId(Long userId);
 
-    public List<Folder> getAllFolders();
+    FolderResponseDto updateFolder(Long userId, Long folderId, String folderName, Long parentFolderId);
+
+    void deleteFolder(Long folderId);
 }
