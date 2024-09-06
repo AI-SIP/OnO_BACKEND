@@ -153,7 +153,7 @@ public class FileUploadServiceImpl implements FileUploadService {
         return problem.getCreatedAt() + "/" + imageType.getDescription() + "_" + file.getOriginalFilename();
     }
 
-    private String getFileUrl(String fileName){
+    private String getFileUrl(String fileName) {
         return "https://" + bucket + ".s3.ap-northeast-2.amazonaws.com/" + fileName;
     }
 

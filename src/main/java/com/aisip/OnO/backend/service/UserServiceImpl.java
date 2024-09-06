@@ -6,7 +6,7 @@ import com.aisip.OnO.backend.converter.UserConverter;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.entity.User.UserType;
 import com.aisip.OnO.backend.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,8 +14,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
-    @Autowired
+
     private UserRepository userRepository;
 
     public User registerOrLoginUser(String email, String name, String identifier, UserType userType) {
@@ -57,7 +58,7 @@ public class UserServiceImpl implements UserService {
         Optional<User> optionalUser = userRepository.findById(userId);
         System.out.println("user update");
 
-        if(optionalUser.isPresent()){
+        if (optionalUser.isPresent()) {
             User user = optionalUser.get();
 
             user.setName(userRegisterDto.getName());
@@ -66,12 +67,12 @@ public class UserServiceImpl implements UserService {
             user.setType(userRegisterDto.getType());
 
             return userRepository.save(user);
-        } else{
+        } else {
             return null;
         }
     }
 
-    public List<User> getAllUsers(){
+    public List<User> getAllUsers() {
         return null;
     }
 

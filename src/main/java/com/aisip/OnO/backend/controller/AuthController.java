@@ -11,6 +11,7 @@ import com.aisip.OnO.backend.Auth.JwtTokenProvider;
 import com.aisip.OnO.backend.entity.User.User;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.fasterxml.jackson.databind.JsonNode;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -20,24 +21,21 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 
 @Slf4j
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    @Autowired
     private GoogleTokenVerifier googleTokenVerifier;
 
-    @Autowired
     private AppleTokenVerifier appleTokenVerifier;
 
-    @Autowired
     private UserService userService;
 
-    @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
     @PostMapping("/guest")
-    public ResponseEntity<?> guestLogin(){
+    public ResponseEntity<?> guestLogin() {
 
         String email = userService.makeGuestEmail();
         String name = userService.makeGuestName();
@@ -95,14 +93,14 @@ public class AuthController {
 
             log.info("start apple login verify access token");
 
-            if(jwt != null && identifier != null){
+            if (jwt != null && identifier != null) {
                 User user = userService.registerOrLoginUser(email, name, identifier, UserType.MEMBER);
                 String accessToken = jwtTokenProvider.createAccessToken(user.getId());
                 String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
 
                 log.info(user.getName() + " has login for Apple Login");
                 return ResponseEntity.ok(new TokenResponseDto(accessToken, refreshToken));
-            } else{
+            } else {
                 log.warn("Invalid Token Issue for username: " + name);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto("Invalid Apple token"));
             }

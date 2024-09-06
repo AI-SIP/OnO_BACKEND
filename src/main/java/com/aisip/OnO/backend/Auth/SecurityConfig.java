@@ -68,7 +68,7 @@ public class SecurityConfig {
                 .sessionManagement(sessionManagement ->
                         sessionManagement.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED) // 세션을 필요할 때만 생성
                 )
-                .addFilterBefore(new IpLoggingFilter(), UsernamePasswordAuthenticationFilter.class)
+                //.addFilterBefore(new IpLoggingFilter(), UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

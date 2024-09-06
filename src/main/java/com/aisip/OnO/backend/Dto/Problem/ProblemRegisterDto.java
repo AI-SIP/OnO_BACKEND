@@ -30,6 +30,8 @@ public class ProblemRegisterDto {
 
     private String reference;
 
+    private Long folderId;
+
     private LocalDateTime solvedAt;
 
     private String colors;  // JSON 문자열 형태로 유지
@@ -40,11 +42,12 @@ public class ProblemRegisterDto {
         if (colors != null && !colors.isEmpty()) {
             ObjectMapper objectMapper = new ObjectMapper();
             try {
-                this.colorsList = objectMapper.readValue(colors, new TypeReference<List<Map<String, Integer>>>() {});
+                this.colorsList = objectMapper.readValue(colors, new TypeReference<List<Map<String, Integer>>>() {
+                });
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        } else{
+        } else {
             this.colorsList = Arrays.asList(null, null, null);
         }
     }
