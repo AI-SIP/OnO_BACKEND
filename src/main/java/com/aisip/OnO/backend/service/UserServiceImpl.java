@@ -17,7 +17,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
     public User registerOrLoginUser(String email, String name, String identifier, UserType userType) {
         Optional<User> optionalUser = userRepository.findByIdentifier(identifier);

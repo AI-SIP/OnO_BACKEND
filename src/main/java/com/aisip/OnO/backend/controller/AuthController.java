@@ -16,23 +16,24 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 
 @Slf4j
+@Controller
 @RequiredArgsConstructor
-@RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    private GoogleTokenVerifier googleTokenVerifier;
+    private final GoogleTokenVerifier googleTokenVerifier;
 
-    private AppleTokenVerifier appleTokenVerifier;
+    private final AppleTokenVerifier appleTokenVerifier;
 
-    private UserService userService;
+    private final UserService userService;
 
-    private JwtTokenProvider jwtTokenProvider;
+    private final JwtTokenProvider jwtTokenProvider;
 
     @PostMapping("/guest")
     public ResponseEntity<?> guestLogin() {
@@ -130,6 +131,7 @@ public class AuthController {
             }
         } catch (Exception e) {
             log.warn("Token verification failed");
+            log.warn(e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Token verification failed"));
         }
     }

@@ -5,18 +5,19 @@ import com.aisip.OnO.backend.Dto.Folder.FolderResponseDto;
 import com.aisip.OnO.backend.service.FolderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @Slf4j
-@RequiredArgsConstructor
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/api/folder")
 public class FolderController {
 
-    private FolderService folderService;
+    private final FolderService folderService;
 
     @GetMapping()
     public ResponseEntity<?> getRootFolder(Authentication authentication) {
@@ -45,7 +46,7 @@ public class FolderController {
     public ResponseEntity<?> getAllFolderName(Authentication authentication) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            return ResponseEntity.ok(folderService.findAllFolderNamesByUserId(userId));
+            return ResponseEntity.ok(folderService.findAllFolderThumbnailsByUserId(userId));
         } catch (Exception e) {
             log.warn(e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 탐색에 실패했습니다.");
