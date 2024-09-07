@@ -234,6 +234,7 @@ public class FolderServiceImpl implements FolderService {
         if (folder.getSubFolders() != null && !folder.getSubFolders().isEmpty()) {
             for (Folder subFolder : folder.getSubFolders()) {
                 deleteSubFolders(subFolder); // 재귀적으로 하위 폴더 삭제
+                log.info("folderId: " + subFolder.getId() + " deleted");
                 folderRepository.deleteById(subFolder.getId()); // 하위 폴더 삭제
             }
         }

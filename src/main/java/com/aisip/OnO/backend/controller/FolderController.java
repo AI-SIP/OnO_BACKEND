@@ -109,11 +109,10 @@ public class FolderController {
             Long userId = (Long) authentication.getPrincipal();
             log.info("userId: " + userId + " try to delete folderId: " + folderId);
 
-            return folderService.deleteFolder(userId, folderId);
+            return ResponseEntity.ok(folderService.deleteFolder(userId, folderId));
         } catch (Exception e) {
             log.warn(e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 삭제에 실패했습니다.");
         }
-
     }
 }
