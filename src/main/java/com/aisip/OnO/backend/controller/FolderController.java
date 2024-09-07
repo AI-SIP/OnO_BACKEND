@@ -88,6 +88,21 @@ public class FolderController {
         }
     }
 
+    @PatchMapping("/problem")
+    public ResponseEntity<?> updateProblemPath(Authentication authentication, @RequestBody Long problemId, @RequestBody Long folderId) {
+        try {
+            Long userId = (Long) authentication.getPrincipal();
+            log.info("userId: " + userId + " try to update folderId: " + folderId);
+
+            FolderResponseDto folderResponseDto = folderService.updateProblemPath(userId, problemId, folderId);
+
+            return ResponseEntity.ok(folderResponseDto);
+        } catch (Exception e) {
+            log.warn(e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("문제 경로 변경에 실패했습니다.");
+        }
+    }
+
     @DeleteMapping("/{folderId}")
     public ResponseEntity<?> deleteFolder(Authentication authentication, @PathVariable Long folderId) {
         try {

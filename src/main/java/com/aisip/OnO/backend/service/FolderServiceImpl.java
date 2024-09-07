@@ -7,6 +7,7 @@ import com.aisip.OnO.backend.entity.Folder;
 import com.aisip.OnO.backend.entity.Problem;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.exception.FolderNotFoundException;
+import com.aisip.OnO.backend.exception.ProblemNotFoundException;
 import com.aisip.OnO.backend.exception.UserNotFoundException;
 import com.aisip.OnO.backend.repository.FolderRepository;
 import com.aisip.OnO.backend.repository.ProblemRepository;
@@ -16,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import javax.swing.text.html.Option;
 import java.util.List;
 import java.util.Optional;
 
@@ -157,6 +159,30 @@ public class FolderServiceImpl implements FolderService {
 
                 return findFolder(userId, folderId);
             }
+        }
+
+        throw new UserNotFoundException("유저를 찾을 수 없습니다!");
+    }
+
+    @Override
+    public FolderResponseDto updateProblemPath(Long userId, Long problemId, Long folderId) {
+
+        Optional<User> optionalUser = userRepository.findById(userId);
+        Optional<Problem> optionalProblem = problemRepository.findById(problemId);
+        Optional<Folder> optionalFolder = folderRepository.findById(folderId);
+
+        if (optionalUser.isPresent()) {
+            if (optionalProblem.isPresent() && optionalFolder.isPresent()) {
+                Problem problem = optionalProblem.get();
+                Folder folder = optionalFolder.get();
+
+                problem.setFolder(folder);
+                problemRepository.save(problem);
+
+                return findFolder(userId, folderId);
+            }
+
+            throw new ProblemNotFoundException("문제를 찾을 수 없습니다!");
         }
 
         throw new UserNotFoundException("유저를 찾을 수 없습니다!");
