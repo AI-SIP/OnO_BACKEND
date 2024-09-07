@@ -150,6 +150,11 @@ public class ProblemServiceImpl implements ProblemService {
                         problem.setMemo(problemRegisterDto.getMemo());
                     }
 
+                    if (problemRegisterDto.getFolderId() != null) {
+                        Optional<Folder> optionalFolder = folderRepository.findById(problemRegisterDto.getFolderId());
+                        optionalFolder.ifPresent(problem::setFolder);
+                    }
+
                     if (problemRegisterDto.getProblemImage() != null) {
                         String problemImageUrl = fileUploadService.updateImage(problemRegisterDto.getProblemImage(), problem, ImageType.PROBLEM_IMAGE);
 
