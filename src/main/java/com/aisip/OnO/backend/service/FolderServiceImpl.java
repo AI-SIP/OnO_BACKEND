@@ -70,6 +70,9 @@ public class FolderServiceImpl implements FolderService {
     @Override
     public FolderResponseDto createFolder(Long userId, String folderName, Long parentFolderId) {
         Optional<User> optionalUser = userRepository.findById(userId);
+
+        log.info("folderName: " + folderName + " parentFolderId : " + parentFolderId);
+
         if (optionalUser.isPresent()) {
             Folder folder = Folder.builder()
                     .name(folderName)

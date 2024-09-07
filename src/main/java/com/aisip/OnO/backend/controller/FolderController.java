@@ -59,7 +59,7 @@ public class FolderController {
     }
 
     @PostMapping()
-    public ResponseEntity<?> createFolder(Authentication authentication, @ModelAttribute FolderRegisterDto folderRegisterDto) {
+    public ResponseEntity<?> createFolder(Authentication authentication, @RequestBody FolderRegisterDto folderRegisterDto) {
         try {
             Long userId = (Long) authentication.getPrincipal();
             log.info("userId: " + userId + " try to create folder");
