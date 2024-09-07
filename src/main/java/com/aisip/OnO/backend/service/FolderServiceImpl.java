@@ -172,6 +172,14 @@ public class FolderServiceImpl implements FolderService {
     }
 
     @Override
+    public void deleteAllUserFolder(Long userId) {
+
+        List<Folder> folders = folderRepository.findAllByUserId(userId);
+
+        folderRepository.deleteAll(folders);
+    }
+
+    @Override
     public List<FolderThumbnailResponseDto> findAllFolderThumbnailsByUserId(Long userId) {
 
         List<Folder> folders = folderRepository.findAllByUserId(userId);

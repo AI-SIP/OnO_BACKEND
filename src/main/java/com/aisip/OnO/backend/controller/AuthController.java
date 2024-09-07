@@ -30,9 +30,11 @@ public class AuthController {
 
     private final AppleTokenVerifier appleTokenVerifier;
 
+    private final JwtTokenProvider jwtTokenProvider;
+
     private final UserService userService;
 
-    private final JwtTokenProvider jwtTokenProvider;
+
 
     @PostMapping("/guest")
     public ResponseEntity<?> guestLogin() {
@@ -81,7 +83,6 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Internal server error"));
         }
     }
-
 
     @PostMapping("/apple")
     public ResponseEntity<?> appleLogin(@RequestBody TokenRequestDto tokenRequestDto) {
