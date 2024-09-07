@@ -17,7 +17,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import javax.swing.text.html.Option;
 import java.util.List;
 import java.util.Optional;
 
@@ -145,7 +144,7 @@ public class FolderServiceImpl implements FolderService {
 
         List<Folder> folders = folderRepository.findAllByUserId(userId);
 
-        if(folders != null){
+        if (folders != null) {
             return folders.stream().map(folder -> {
                 return FolderThumbnailResponseDto.builder()
                         .folderId(folder.getId())
@@ -206,18 +205,25 @@ public class FolderServiceImpl implements FolderService {
     }
 
     @Override
-    public void deleteFolder(Long userId, Long folderId) {
+    public FolderResponseDto deleteFolder(Long userId, Long folderId) {
         Optional<Folder> optionalFolder = folderRepository.findById(folderId);
 
         if (optionalFolder.isPresent() && optionalFolder.get().getUser().getId().equals(userId)) {
             Folder folder = optionalFolder.get();
+            Long parentFolderId = folder.getParentFolder().getId();
 
             // 재귀적으로 하위 폴더를 삭제
             deleteSubFolders(folder);
 
-            // 현재 폴더 삭제
-            folderRepository.deleteById(folderId);
-            log.info("Folder and its subfolders deleted successfully for folderId: " + folderId);
+            if (parentFolderId != null) {
+                folderRepository.deleteById(folderId);
+                log.info("Folder and its subfolders deleted successfully for folderId: " + folderId);
+
+                return findFolder(userId, parentFolderId);
+            } else {
+                return findFolder(userId, folderId);
+            }
+
         } else {
             throw new FolderNotFoundException("폴더를 찾을 수 없습니다!");
         }
