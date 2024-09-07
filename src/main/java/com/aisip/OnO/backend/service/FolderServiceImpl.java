@@ -141,6 +141,23 @@ public class FolderServiceImpl implements FolderService {
     }
 
     @Override
+    public List<FolderThumbnailResponseDto> findAllFolderThumbnailsByUserId(Long userId) {
+
+        List<Folder> folders = folderRepository.findAllByUserId(userId);
+
+        if(folders != null){
+            return folders.stream().map(folder -> {
+                return FolderThumbnailResponseDto.builder()
+                        .folderId(folder.getId())
+                        .folderName(folder.getName())
+                        .build();
+            }).toList();
+        }
+
+        return null;
+    }
+
+    @Override
     public FolderResponseDto updateFolder(Long userId, Long folderId, String folderName, Long parentFolderId) {
         Optional<User> optionalUser = userRepository.findById(userId);
         if (optionalUser.isPresent()) {
@@ -190,13 +207,29 @@ public class FolderServiceImpl implements FolderService {
 
     @Override
     public void deleteFolder(Long userId, Long folderId) {
-
         Optional<Folder> optionalFolder = folderRepository.findById(folderId);
 
         if (optionalFolder.isPresent() && optionalFolder.get().getUser().getId().equals(userId)) {
+            Folder folder = optionalFolder.get();
+
+            // 재귀적으로 하위 폴더를 삭제
+            deleteSubFolders(folder);
+
+            // 현재 폴더 삭제
             folderRepository.deleteById(folderId);
-        } else{
+            log.info("Folder and its subfolders deleted successfully for folderId: " + folderId);
+        } else {
             throw new FolderNotFoundException("폴더를 찾을 수 없습니다!");
+        }
+    }
+
+    private void deleteSubFolders(Folder folder) {
+        // 하위 폴더들을 먼저 삭제
+        if (folder.getSubFolders() != null && !folder.getSubFolders().isEmpty()) {
+            for (Folder subFolder : folder.getSubFolders()) {
+                deleteSubFolders(subFolder); // 재귀적으로 하위 폴더 삭제
+                folderRepository.deleteById(subFolder.getId()); // 하위 폴더 삭제
+            }
         }
     }
 
@@ -206,22 +239,5 @@ public class FolderServiceImpl implements FolderService {
         List<Folder> folders = folderRepository.findAllByUserId(userId);
 
         folderRepository.deleteAll(folders);
-    }
-
-    @Override
-    public List<FolderThumbnailResponseDto> findAllFolderThumbnailsByUserId(Long userId) {
-
-        List<Folder> folders = folderRepository.findAllByUserId(userId);
-
-        if(folders != null){
-            return folders.stream().map(folder -> {
-                return FolderThumbnailResponseDto.builder()
-                        .folderId(folder.getId())
-                        .folderName(folder.getName())
-                        .build();
-            }).toList();
-        }
-
-        return null;
     }
 }
