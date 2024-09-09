@@ -17,7 +17,7 @@ env:
   AWS_REGION: ap-northeast-2
   AWS_S3_BUCKET: dev-an2-ono-bucket
   AWS_CODE_DEPLOY_APPLICATION: dev-an2-ono-spring-application
-  AWS_CODE_DEPLOY_GROUP: dev-an2-ono-spring-bg
+  AWS_CODE_DEPLOY_GROUP: prd-an2-ono-spring-bg
 
 jobs:
   build:
