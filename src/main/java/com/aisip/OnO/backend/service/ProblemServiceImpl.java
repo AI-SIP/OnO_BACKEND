@@ -91,8 +91,10 @@ public class ProblemServiceImpl implements ProblemService {
                         .solvedAt(problemRegisterDto.getSolvedAt())
                         .build();
 
-                Optional<Folder> optionalFolder = folderRepository.findById(problemRegisterDto.getFolderId());
-                optionalFolder.ifPresent(problem::setFolder);
+                if (problemRegisterDto.getFolderId() != null) {
+                    Optional<Folder> optionalFolder = folderRepository.findById(problemRegisterDto.getFolderId());
+                    optionalFolder.ifPresent(problem::setFolder);
+                }
 
                 Problem savedProblem = problemRepository.save(problem);
 
