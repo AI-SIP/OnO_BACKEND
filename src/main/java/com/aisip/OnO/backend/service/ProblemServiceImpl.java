@@ -84,16 +84,15 @@ public class ProblemServiceImpl implements ProblemService {
             if (optionalUserEntity.isPresent()) {
                 User user = optionalUserEntity.get();
 
-                Optional<Folder> optionalFolder = folderRepository.findById(problemRegisterDto.getFolderId());
-                Folder folder = optionalFolder.orElse(null);
-
                 Problem problem = Problem.builder()
                         .user(user)
                         .reference(problemRegisterDto.getReference())
                         .memo(problemRegisterDto.getMemo())
-                        .folder(folder)
                         .solvedAt(problemRegisterDto.getSolvedAt())
                         .build();
+
+                Optional<Folder> optionalFolder = folderRepository.findById(problemRegisterDto.getFolderId());
+                optionalFolder.ifPresent(problem::setFolder);
 
                 Problem savedProblem = problemRepository.save(problem);
 
@@ -149,6 +148,11 @@ public class ProblemServiceImpl implements ProblemService {
 
                     if (problemRegisterDto.getMemo() != null) {
                         problem.setMemo(problemRegisterDto.getMemo());
+                    }
+
+                    if (problemRegisterDto.getFolderId() != null) {
+                        Optional<Folder> optionalFolder = folderRepository.findById(problemRegisterDto.getFolderId());
+                        optionalFolder.ifPresent(problem::setFolder);
                     }
 
                     if (problemRegisterDto.getProblemImage() != null) {

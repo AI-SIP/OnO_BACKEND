@@ -13,7 +13,6 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -31,9 +30,11 @@ public class AuthController {
 
     private final AppleTokenVerifier appleTokenVerifier;
 
+    private final JwtTokenProvider jwtTokenProvider;
+
     private final UserService userService;
 
-    private final JwtTokenProvider jwtTokenProvider;
+
 
     @PostMapping("/guest")
     public ResponseEntity<?> guestLogin() {
@@ -82,7 +83,6 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Internal server error"));
         }
     }
-
 
     @PostMapping("/apple")
     public ResponseEntity<?> appleLogin(@RequestBody TokenRequestDto tokenRequestDto) {
