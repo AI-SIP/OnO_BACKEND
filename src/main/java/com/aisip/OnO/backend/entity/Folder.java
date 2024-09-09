@@ -10,7 +10,7 @@ import java.util.List;
 @Entity
 @Getter
 @Setter
-@Table(name = "folder")
+@Table(name = "folders")
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
