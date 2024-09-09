@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -110,10 +111,9 @@ public class FolderServiceImpl implements FolderService {
                         .build();
             }
 
-
             List<FolderThumbnailResponseDto> subFolders = null;
 
-            if (folder.getSubFolders() != null) {
+            if (folder.getSubFolders() != null && !folder.getSubFolders().isEmpty()) {
                 subFolders = folder.getSubFolders().stream().map(subFolder -> {
                     return FolderThumbnailResponseDto.builder()
                             .folderId(subFolder.getId())
@@ -144,16 +144,33 @@ public class FolderServiceImpl implements FolderService {
 
         List<Folder> folders = folderRepository.findAllByUserId(userId);
 
-        if (folders != null) {
-            return folders.stream().map(folder -> {
-                return FolderThumbnailResponseDto.builder()
-                        .folderId(folder.getId())
-                        .folderName(folder.getName())
-                        .build();
-            }).toList();
+        if (folders.isEmpty()) {
+            return new ArrayList<>();
         }
 
-        return null;
+        return folders.stream().map(folder -> {
+
+            Long parentFolderId = null;
+            if (folder.getParentFolder() != null) {
+                parentFolderId = folder.getParentFolder().getId();
+            }
+
+            List<Long> subFoldersId = new ArrayList<>();
+            List<Folder> subFolders = folder.getSubFolders();
+
+            if (subFolders != null && !subFolders.isEmpty()) {
+                subFoldersId = subFolders.stream()
+                        .map(Folder::getId).toList();
+            }
+
+            return FolderThumbnailResponseDto.builder()
+                    .folderId(folder.getId())
+                    .folderName(folder.getName())
+                    .parentFolderId(parentFolderId)
+                    .subFoldersId(subFoldersId)
+                    .build();
+
+        }).toList();
     }
 
     @Override
@@ -214,14 +231,16 @@ public class FolderServiceImpl implements FolderService {
 
             // 재귀적으로 하위 폴더를 삭제
             deleteSubFolders(folder);
+            folderRepository.flush();
 
             if (parentFolderId != null) {
-                folderRepository.deleteById(folderId);
                 log.info("Folder and its subfolders deleted successfully for folderId: " + folderId);
+                folderRepository.deleteById(folderId);
 
+                log.info("root folder id: " + parentFolderId);
                 return findFolder(userId, parentFolderId);
             } else {
-                return findFolder(userId, folderId);
+                throw new FolderNotFoundException("메인 폴더는 삭제할 수 없습니다.");
             }
 
         } else {
@@ -234,10 +253,15 @@ public class FolderServiceImpl implements FolderService {
         if (folder.getSubFolders() != null && !folder.getSubFolders().isEmpty()) {
             for (Folder subFolder : folder.getSubFolders()) {
                 deleteSubFolders(subFolder); // 재귀적으로 하위 폴더 삭제
-                log.info("folderId: " + subFolder.getId() + " deleted");
-                folderRepository.deleteById(subFolder.getId()); // 하위 폴더 삭제
             }
         }
+
+        if (folder.getProblems() != null && !folder.getProblems().isEmpty()) {
+            problemRepository.deleteAll(folder.getProblems()); // 문제들 삭제
+        }
+
+        folder.getSubFolders().clear(); // 하위 폴더 리스트 비우기 (orphanRemoval 보장)
+        folderRepository.delete(folder); // 폴더 삭제
     }
 
     @Override
