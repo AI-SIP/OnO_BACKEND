@@ -74,7 +74,7 @@ public class FolderController {
     }
 
     @PatchMapping("/{folderId}")
-    public ResponseEntity<?> updateFolder(Authentication authentication, @PathVariable Long folderId, @ModelAttribute FolderRegisterDto folderRegisterDto) {
+    public ResponseEntity<?> updateFolder(Authentication authentication, @PathVariable Long folderId, @RequestBody FolderRegisterDto folderRegisterDto) {
         try {
             Long userId = (Long) authentication.getPrincipal();
             log.info("userId: " + userId + " try to update folderId: " + folderId);

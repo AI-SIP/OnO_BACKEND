@@ -179,14 +179,19 @@ public class FolderServiceImpl implements FolderService {
         if (optionalUser.isPresent()) {
             Optional<Folder> optionalFolder = folderRepository.findById(folderId);
 
+            log.info("folderName: " + folderName + " , parentFolderId : " + parentFolderId);
+
             if (optionalFolder.isPresent()) {
                 Folder folder = optionalFolder.get();
-                folder.setName(folderName);
 
-                Optional<Folder> optionalParentFolder = folderRepository.findById(parentFolderId);
-                Folder parentFolder = optionalParentFolder.orElse(null);
+                if (folderName != null) {
+                    folder.setName(folderName);
+                }
 
-                folder.setParentFolder(parentFolder);
+                if (parentFolderId != null && !(parentFolderId.equals(folderId))) {
+                    Optional<Folder> optionalParentFolder = folderRepository.findById(parentFolderId);
+                    optionalParentFolder.ifPresent(folder::setParentFolder);
+                }
 
                 folderRepository.save(folder);
 
