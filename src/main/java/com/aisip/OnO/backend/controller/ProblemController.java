@@ -6,9 +6,11 @@ import com.aisip.OnO.backend.exception.ProblemNotFoundException;
 import com.aisip.OnO.backend.service.ProblemService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.propertyeditors.CustomNumberEditor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +20,11 @@ import java.util.List;
 @RequiredArgsConstructor
 @RequestMapping("/api")
 public class ProblemController {
+
+    @InitBinder
+    public void initBinder(WebDataBinder binder) {
+        binder.registerCustomEditor(Long.class, new CustomNumberEditor(Long.class, true));
+    }
 
     private final ProblemService problemService;
 
