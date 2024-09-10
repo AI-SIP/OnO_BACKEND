@@ -32,6 +32,8 @@ public class ProblemRegisterDto {
 
     private Long folderId;
 
+    private boolean process;
+
     private LocalDateTime solvedAt;
 
     private String colors;  // JSON 문자열 형태로 유지

@@ -17,6 +17,7 @@ import com.aisip.OnO.backend.exception.UserNotFoundException;
 import com.aisip.OnO.backend.repository.ProblemRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -102,13 +104,18 @@ public class ProblemServiceImpl implements ProblemService {
                     String problemImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getProblemImage(), savedProblem, ImageType.PROBLEM_IMAGE);
                     if (problemImageUrl != null) {
 
-                        problemRegisterDto.initColorsList();
-                        ImageProcessRegisterDto imageProcessRegisterDto = ImageProcessRegisterDto.builder()
-                                .fullUrl(problemImageUrl)
-                                .colorsList(problemRegisterDto.getColorsList())
-                                .build();
+                        log.info("isProcess: " + problemRegisterDto.isProcess());
+                        if(problemRegisterDto.isProcess()){
+                            problemRegisterDto.initColorsList();
+                            ImageProcessRegisterDto imageProcessRegisterDto = ImageProcessRegisterDto.builder()
+                                    .fullUrl(problemImageUrl)
+                                    .colorsList(problemRegisterDto.getColorsList())
+                                    .build();
 
-                        String processImageUrl = fileUploadService.saveProcessImageUrl(imageProcessRegisterDto, savedProblem, ImageType.PROCESS_IMAGE);
+                            String processImageUrl = fileUploadService.saveProcessImageUrl(imageProcessRegisterDto, savedProblem, ImageType.PROCESS_IMAGE);
+                        } else{
+                            String processImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getProblemImage(), savedProblem, ImageType.PROCESS_IMAGE);
+                        }
                     }
                 }
 
@@ -161,7 +168,6 @@ public class ProblemServiceImpl implements ProblemService {
                         String problemImageUrl = fileUploadService.updateImage(problemRegisterDto.getProblemImage(), problem, ImageType.PROBLEM_IMAGE);
 
                         if (problemImageUrl != null) {
-
                             problemRegisterDto.initColorsList();
                             ImageProcessRegisterDto imageProcessRegisterDto = ImageProcessRegisterDto.builder()
                                     .fullUrl(problemImageUrl)
