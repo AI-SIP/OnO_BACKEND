@@ -149,7 +149,13 @@ public class AuthController {
                 return ResponseEntity.ok(new TokenResponseDto(newAccessToken, requestRefreshToken));
             } else {
                 log.warn("Invalid or expired refresh token");
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto("Invalid or expired refresh token"));
+
+                Long userId = Long.parseLong(jwtTokenProvider.getSubjectFromToken(requestRefreshToken));
+
+                String newAccessToken = jwtTokenProvider.createAccessToken(userId);
+                String newRefreshToken = jwtTokenProvider.createRefreshToken(userId);
+
+                return ResponseEntity.ok(new TokenResponseDto(newAccessToken, newRefreshToken));
             }
         } catch (Exception e) {
             log.warn("Could not refresh access token");
