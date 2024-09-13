@@ -39,6 +39,14 @@ public class UserController {
         }
     }
 
+    @GetMapping("/problemCount")
+    public ResponseEntity<?> getUserProblemCount(Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        Long userProblemCount = problemService.findAllProblemCountByUserId(userId);
+
+        return ResponseEntity.ok(userProblemCount);
+    }
+
     @DeleteMapping("")
     public ResponseEntity<?> deleteUserInfo(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();

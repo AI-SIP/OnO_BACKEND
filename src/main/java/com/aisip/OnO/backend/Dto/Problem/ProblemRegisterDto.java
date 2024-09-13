@@ -32,7 +32,7 @@ public class ProblemRegisterDto {
 
     private Long folderId;
 
-    private boolean process;
+    private boolean process = true;
 
     private LocalDateTime solvedAt;
 
