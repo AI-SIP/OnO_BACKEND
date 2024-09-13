@@ -6,6 +6,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface ProblemRepository extends JpaRepository<Problem, Long> {
+
+    Long countByUserId(Long userId);
+
     List<Problem> findAllByUserId(Long userId);
 
     List<Problem> findAllByFolderId(Long folderId);

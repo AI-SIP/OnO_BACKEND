@@ -55,6 +55,17 @@ public class ProblemServiceImpl implements ProblemService {
     }
 
     @Override
+    public Long findAllProblemCountByUserId(Long userId) {
+        // 유저를 찾아서 해당 유저가 있는지 확인
+        Optional<User> user = userRepository.findById(userId);
+        if (user.isPresent()) {
+            return problemRepository.countByUserId(userId);
+        } else {
+            return 0L;
+        }
+    }
+
+    @Override
     public List<ProblemResponseDto> findAllProblemsByUserId(Long userId) {
         Optional<User> user = userRepository.findById(userId);
         return user.map(u -> problemRepository.findAllByUserId(u.getId())
