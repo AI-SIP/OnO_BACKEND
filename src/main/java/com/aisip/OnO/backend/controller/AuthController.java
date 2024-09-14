@@ -35,7 +35,6 @@ public class AuthController {
     private final UserService userService;
 
 
-
     @PostMapping("/guest")
     public ResponseEntity<?> guestLogin() {
 
@@ -109,6 +108,33 @@ public class AuthController {
         } catch (Exception e) {
             log.warn(e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto("Invalid Apple token"));
+        }
+    }
+
+    @PostMapping("/kakao")
+    public ResponseEntity<?> kakaoLogin(@RequestBody TokenRequestDto tokenRequestDto) {
+
+        log.info("Starting kakao login with Token : " + tokenRequestDto.toString());
+
+        try {
+            String email = tokenRequestDto.getEmail();
+            String name = tokenRequestDto.getName();
+            String identifier = tokenRequestDto.getIdentifier();
+
+            if (name != null && identifier != null) {
+                User user = userService.registerOrLoginUser(email, name, identifier, UserType.MEMBER);
+                String accessToken = jwtTokenProvider.createAccessToken(user.getId());
+                String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
+
+                log.info(user.getName() + " has login for kakao Login");
+                return ResponseEntity.ok(new TokenResponseDto(accessToken, refreshToken));
+            } else {
+                log.warn("Invalid Token Issue for username: " + name);
+                throw new IllegalArgumentException("Invalid token information or user data");
+            }
+        } catch (Exception e) {
+            log.warn(e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Internal server error"));
         }
     }
 
