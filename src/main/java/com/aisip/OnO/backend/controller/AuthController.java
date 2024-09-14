@@ -9,8 +9,6 @@ import com.aisip.OnO.backend.service.UserService;
 import com.aisip.OnO.backend.Auth.GoogleTokenVerifier;
 import com.aisip.OnO.backend.Auth.JwtTokenProvider;
 import com.aisip.OnO.backend.entity.User.User;
-import com.auth0.jwt.interfaces.DecodedJWT;
-import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -18,17 +16,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.IOException;
-
 @Slf4j
 @Controller
 @RequiredArgsConstructor
 @RequestMapping("/api/auth")
 public class AuthController {
-
-    private final GoogleTokenVerifier googleTokenVerifier;
-
-    private final AppleTokenVerifier appleTokenVerifier;
 
     private final JwtTokenProvider jwtTokenProvider;
 
@@ -42,12 +34,7 @@ public class AuthController {
         String name = userService.makeGuestName();
         String identifier = userService.makeGuestIdentifier();
 
-        User user = userService.registerOrLoginUser(email, name, identifier, UserType.GUEST);
-        String accessToken = jwtTokenProvider.createAccessToken(user.getId());
-        String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
-
-        log.info(user.getName() + " has login for guest");
-        return ResponseEntity.ok(new TokenResponseDto(accessToken, refreshToken));
+        return getUserTokenResponse(name, identifier, email, UserType.GUEST);
     }
 
     @PostMapping("/google")
@@ -56,27 +43,17 @@ public class AuthController {
         log.info("Starting google login with Token : " + tokenRequestDto.toString());
 
         try {
-            JsonNode tokenInfo = googleTokenVerifier.verifyToken(tokenRequestDto.getAccessToken(), tokenRequestDto.getPlatform());
+            //JsonNode tokenInfo = googleTokenVerifier.verifyToken(tokenRequestDto.getAccessToken(), tokenRequestDto.getPlatform());
             String email = tokenRequestDto.getEmail();
             String name = tokenRequestDto.getName();
             String identifier = tokenRequestDto.getIdentifier();
 
-            log.info("start google login verify access token");
-
-            if (tokenInfo != null && identifier != null) {
-                User user = userService.registerOrLoginUser(email, name, identifier, UserType.MEMBER);
-                String accessToken = jwtTokenProvider.createAccessToken(user.getId());
-                String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
-
-                log.info(user.getName() + " has login for Google Login");
-                return ResponseEntity.ok(new TokenResponseDto(accessToken, refreshToken));
+            if (name != null && identifier != null) {
+                return getUserTokenResponse(name, identifier, email, UserType.MEMBER);
             } else {
                 log.warn("Invalid Token Issue for username: " + name);
                 throw new IllegalArgumentException("Invalid token information or user data");
             }
-        } catch (IOException e) {
-            log.warn(e.getMessage());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto("Invalid Google token"));
         } catch (Exception e) {
             log.warn(e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Internal server error"));
@@ -85,21 +62,16 @@ public class AuthController {
 
     @PostMapping("/apple")
     public ResponseEntity<?> appleLogin(@RequestBody TokenRequestDto tokenRequestDto) {
+
+        log.info("Starting apple login with Token : " + tokenRequestDto.toString());
+
         try {
-            DecodedJWT jwt = appleTokenVerifier.verifyToken(tokenRequestDto.getIdToken());
             String email = tokenRequestDto.getEmail();
             String name = tokenRequestDto.getName();
             String identifier = tokenRequestDto.getIdentifier();
 
-            log.info("start apple login verify access token");
-
-            if (jwt != null && identifier != null) {
-                User user = userService.registerOrLoginUser(email, name, identifier, UserType.MEMBER);
-                String accessToken = jwtTokenProvider.createAccessToken(user.getId());
-                String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
-
-                log.info(user.getName() + " has login for Apple Login");
-                return ResponseEntity.ok(new TokenResponseDto(accessToken, refreshToken));
+            if (name != null && identifier != null) {
+                return getUserTokenResponse(name, identifier, email, UserType.MEMBER);
             } else {
                 log.warn("Invalid Token Issue for username: " + name);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto("Invalid Apple token"));
@@ -122,12 +94,29 @@ public class AuthController {
             String identifier = tokenRequestDto.getIdentifier();
 
             if (name != null && identifier != null) {
-                User user = userService.registerOrLoginUser(email, name, identifier, UserType.MEMBER);
-                String accessToken = jwtTokenProvider.createAccessToken(user.getId());
-                String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
+                return getUserTokenResponse(name, identifier, email, UserType.MEMBER);
+            } else {
+                log.warn("Invalid Token Issue for username: " + name);
+                throw new IllegalArgumentException("Invalid token information or user data");
+            }
+        } catch (Exception e) {
+            log.warn(e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Internal server error"));
+        }
+    }
 
-                log.info(user.getName() + " has login for kakao Login");
-                return ResponseEntity.ok(new TokenResponseDto(accessToken, refreshToken));
+    @PostMapping("/naver")
+    public ResponseEntity<?> naverLogin(@RequestBody TokenRequestDto tokenRequestDto) {
+
+        log.info("Starting naver login with Token : " + tokenRequestDto.toString());
+
+        try {
+            String email = tokenRequestDto.getEmail();
+            String name = tokenRequestDto.getName();
+            String identifier = tokenRequestDto.getIdentifier();
+
+            if (name != null && identifier != null) {
+                return getUserTokenResponse(name, identifier, email, UserType.MEMBER);
             } else {
                 log.warn("Invalid Token Issue for username: " + name);
                 throw new IllegalArgumentException("Invalid token information or user data");
@@ -187,5 +176,15 @@ public class AuthController {
             log.warn("Could not refresh access token");
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Could not refresh access token"));
         }
+    }
+
+    private ResponseEntity<?> getUserTokenResponse(String name, String identifier, String email, UserType userType){
+        User user = userService.registerOrLoginUser(email, name, identifier, userType);
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId());
+        String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
+
+        log.info(user.getName() + " has login");
+
+        return ResponseEntity.ok(new TokenResponseDto(accessToken, refreshToken));
     }
 }
