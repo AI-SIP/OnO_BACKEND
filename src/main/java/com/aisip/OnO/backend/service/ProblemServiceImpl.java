@@ -178,7 +178,8 @@ public class ProblemServiceImpl implements ProblemService {
                     if (problemRegisterDto.getProblemImage() != null) {
                         String problemImageUrl = fileUploadService.updateImage(problemRegisterDto.getProblemImage(), problem, ImageType.PROBLEM_IMAGE);
 
-                        if (problemImageUrl != null) {
+                        log.info("isProcess: " + problemRegisterDto.isProcess());
+                        if(problemRegisterDto.isProcess()){
                             problemRegisterDto.initColorsList();
                             ImageProcessRegisterDto imageProcessRegisterDto = ImageProcessRegisterDto.builder()
                                     .fullUrl(problemImageUrl)
@@ -186,6 +187,8 @@ public class ProblemServiceImpl implements ProblemService {
                                     .build();
 
                             String processImageUrl = fileUploadService.saveProcessImageUrl(imageProcessRegisterDto, problem, ImageType.PROCESS_IMAGE);
+                        } else{
+                            String processImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getProblemImage(), problem, ImageType.PROCESS_IMAGE);
                         }
                     }
 
