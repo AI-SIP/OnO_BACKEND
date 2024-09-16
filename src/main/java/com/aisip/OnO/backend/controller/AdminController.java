@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.controller;
 
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.Dto.User.UserRegisterDto;
+import com.aisip.OnO.backend.Dto.User.UserResponseDto;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.service.FolderService;
 import com.aisip.OnO.backend.service.ProblemService;
@@ -57,9 +58,9 @@ public class AdminController {
     public String updateUserInfo(@PathVariable Long userId, @ModelAttribute UserRegisterDto userRegisterDto, Model model) {
 
         try {
-            User user = userService.updateUser(userId, userRegisterDto);
-            if (user != null) {
-                model.addAttribute("user", user);
+            UserResponseDto userResponseDto = userService.updateUser(userId, userRegisterDto);
+            if (userResponseDto != null) {
+                model.addAttribute("user", userResponseDto);
                 List<ProblemResponseDto> problems = problemService.findAllProblemsByUserId(userId);
                 model.addAttribute("problems", problems);
                 return "user";

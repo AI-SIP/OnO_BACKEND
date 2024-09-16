@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.controller;
 
 import com.aisip.OnO.backend.Dto.ErrorResponseDto;
+import com.aisip.OnO.backend.Dto.User.UserRegisterDto;
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
 import com.aisip.OnO.backend.service.FolderService;
 import com.aisip.OnO.backend.service.ProblemService;
@@ -9,10 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
@@ -39,10 +37,23 @@ public class UserController {
         }
     }
 
+    @PatchMapping("")
+    public ResponseEntity<?> updateUserInfo(Authentication authentication, @RequestBody UserRegisterDto userRegisterDto) {
+        Long userId = (Long) authentication.getPrincipal();
+        UserResponseDto userResponseDto = userService.updateUser(userId, userRegisterDto);
+        if (userResponseDto != null) {
+            log.info("userId: " + userId + " update user info");
+            return ResponseEntity.ok(userResponseDto);
+        } else {
+            log.info("userId: " + userId + " not found");
+            return ResponseEntity.status(404).body(new ErrorResponseDto("User not found"));
+        }
+    }
+
     @GetMapping("/problemCount")
     public ResponseEntity<?> getUserProblemCount(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
-        Long userProblemCount = problemService.findAllProblemCountByUserId(userId);
+        Long userProblemCount = userService.findAllProblemCountByUserId(userId);
 
         return ResponseEntity.ok(userProblemCount);
     }

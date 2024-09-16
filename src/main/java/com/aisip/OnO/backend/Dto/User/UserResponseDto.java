@@ -1,5 +1,8 @@
 package com.aisip.OnO.backend.Dto.User;
 
+import com.aisip.OnO.backend.entity.User.UserType;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import lombok.*;
 
 @Data
@@ -11,4 +14,9 @@ public class UserResponseDto {
     private String userName;
 
     private String userEmail;
+
+    private String userIdentifier;
+
+    @Enumerated(EnumType.STRING)
+    private UserType userType;
 }
