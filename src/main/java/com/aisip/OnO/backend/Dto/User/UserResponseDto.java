@@ -5,6 +5,8 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Data
 @Builder
 public class UserResponseDto {
@@ -19,4 +21,8 @@ public class UserResponseDto {
 
     @Enumerated(EnumType.STRING)
     private UserType userType;
+
+    private LocalDateTime createdAt;
+
+    private LocalDateTime updatedAt;
 }

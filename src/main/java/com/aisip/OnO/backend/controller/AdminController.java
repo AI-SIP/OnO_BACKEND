@@ -39,7 +39,7 @@ public class AdminController {
 
     @GetMapping("/user/{userId}")
     public String getUserDetailsById(@PathVariable Long userId, Model model) {
-        User user = userService.getUserDetailsById(userId);
+        UserResponseDto user = userService.getUserDetailsById(userId);
         model.addAttribute("user", user);
 
         List<ProblemResponseDto> problems = problemService.findAllProblemsByUserId(userId);
@@ -49,7 +49,7 @@ public class AdminController {
 
     @GetMapping("/users")
     public String getAllUser(Model model, Authentication authentication) {
-        List<User> users = userService.findAllUsers();
+        List<UserResponseDto> users = userService.findAllUsers();
         model.addAttribute("users", users);
         return "users";
     }

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -22,7 +23,7 @@ public class UserServiceImpl implements UserService {
 
     private final ProblemRepository problemRepository;
 
-    public User registerOrLoginUser(String email, String name, String identifier, UserType userType) {
+    public UserResponseDto registerOrLoginUser(String email, String name, String identifier, UserType userType) {
         Optional<User> optionalUser = userRepository.findByIdentifier(identifier);
         if (optionalUser.isEmpty()) {
             User user = new User();
@@ -31,10 +32,10 @@ public class UserServiceImpl implements UserService {
             user.setIdentifier(identifier);
             user.setType(userType);
             userRepository.save(user);
-            return user;
+            return UserConverter.convertToResponseDto(user);
         }
 
-        return optionalUser.get();
+        return UserConverter.convertToResponseDto(optionalUser.get());
     }
 
     public UserResponseDto getUserById(Long userId) {
@@ -45,14 +46,16 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public User getUserDetailsById(Long userId) {
+    public UserResponseDto getUserDetailsById(Long userId) {
         Optional<User> optionalUser = userRepository.findById(userId);
-        return optionalUser.orElse(null);
+        return optionalUser.map(UserConverter::convertToResponseDto).orElse(null);
     }
 
     @Override
-    public List<User> findAllUsers() {
-        return userRepository.findAll();
+    public List<UserResponseDto> findAllUsers() {
+
+        List<User> userList = userRepository.findAll();
+        return userList.stream().map(UserConverter::convertToResponseDto).collect(Collectors.toList());
     }
 
     @Override

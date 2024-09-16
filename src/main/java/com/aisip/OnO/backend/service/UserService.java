@@ -9,13 +9,13 @@ import java.util.List;
 
 public interface UserService {
 
-    User registerOrLoginUser(String email, String name, String identifier, UserType userType);
+    UserResponseDto registerOrLoginUser(String email, String name, String identifier, UserType userType);
 
     UserResponseDto getUserById(Long userId);
 
-    User getUserDetailsById(Long userId);
+    UserResponseDto getUserDetailsById(Long userId);
 
-    List<User> findAllUsers();
+    List<UserResponseDto> findAllUsers();
 
     Long findAllProblemCountByUserId(Long userId);
 
