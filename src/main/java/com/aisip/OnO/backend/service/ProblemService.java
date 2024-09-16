@@ -9,8 +9,6 @@ public interface ProblemService {
 
     ProblemResponseDto findProblemByUserId(Long userId, Long problemId);
 
-    Long findAllProblemCountByUserId(Long userId);
-
     List<ProblemResponseDto> findAllProblemsByUserId(Long userId);
 
     List<ProblemResponseDto> findAllProblemsByFolderId(Long folderId);

@@ -40,23 +40,23 @@
       <table class="table user-details-table">
         <tr>
           <th>ID</th>
-          <td th:text="${user.id}">1</td>
+          <td th:text="${user.userId}">1</td>
         </tr>
         <tr>
           <th>이름</th>
-          <td th:text="${user.name}">User Name</td>
+          <td th:text="${user.userName}">User Name</td>
         </tr>
         <tr>
           <th>이메일</th>
-          <td th:text="${user.email}">user@example.com</td>
+          <td th:text="${user.userEmail}">user@example.com</td>
         </tr>
         <tr>
           <th>식별자</th>
-          <td th:text="${user.identifier}">identifier</td>
+          <td th:text="${user.userIdentifier}">identifier</td>
         </tr>
         <tr>
           <th>유저 유형</th>
-          <td class="user-type" th:text="${user.type}">GUEST</td>
+          <td class="user-type" th:text="${user.userType}">GUEST</td>
         </tr>
         <tr>
           <th>Created At</th>
@@ -83,26 +83,26 @@
               <h5 class="modal-title" id="editUserModalLabel">유저 정보 수정</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form th:action="@{'/admin/user/' + ${user.id}}" method="post">
+            <form th:action="@{'/admin/user/' + ${user.userId}}" method="post">
               <div class="modal-body">
                 <div class="mb-3">
                   <label for="email" class="form-label">이메일</label>
-                  <input type="email" class="form-control" id="email" name="email" th:value="${user.email}" required>
+                  <input type="email" class="form-control" id="email" name="email" th:value="${user.userEmail}" required>
                 </div>
                 <div class="mb-3">
                   <label for="name" class="form-label">이름</label>
-                  <input type="text" class="form-control" id="name" name="name" th:value="${user.name}" required>
+                  <input type="text" class="form-control" id="name" name="name" th:value="${user.userName}" required>
                 </div>
                 <div class="mb-3">
                   <label for="identifier" class="form-label">식별자</label>
-                  <input type="text" class="form-control" id="identifier" name="identifier" th:value="${user.identifier}" required>
+                  <input type="text" class="form-control" id="identifier" name="identifier" th:value="${user.userIdentifier}" required>
                 </div>
                 <div class="mb-3">
                   <label for="type" class="form-label">유저 유형</label>
                   <select class="form-select" id="type" name="type" required>
                     <option th:each="type : ${T(com.aisip.OnO.backend.entity.User.UserType).values()}"
                             th:value="${type}" th:text="${type}"
-                            th:selected="${user.type == type}">GUEST</option>
+                            th:selected="${user.userType == type}">GUEST</option>
                   </select>
                 </div>
               </div>
@@ -182,7 +182,7 @@
 <script>
   function deleteUser() {
     if (confirm("정말 유저를 삭제하시겠습니까?")) {
-      var userId = [[${user.id}]]; // Thymeleaf syntax to insert the user ID
+      var userId = [[${user.userId}]]; // Thymeleaf syntax to insert the user ID
       fetch(`/admin/user/${userId}`, {
         method: 'DELETE',
         headers: {

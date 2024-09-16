@@ -15,6 +15,10 @@ public class UserConverter {
                 .userId(user.getId())
                 .userName(user.getName())
                 .userEmail(user.getEmail())
+                .userIdentifier(user.getIdentifier())
+                .userType(user.getType())
+                .updatedAt(user.getUpdatedAt())
+                .createdAt(user.getCreatedAt())
                 .build();
     }
 }

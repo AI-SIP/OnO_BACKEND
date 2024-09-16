@@ -9,22 +9,23 @@ import java.util.List;
 
 public interface UserService {
 
-    public User registerOrLoginUser(String email, String name, String identifier, UserType userType);
+    UserResponseDto registerOrLoginUser(String email, String name, String identifier, UserType userType);
 
-    public UserResponseDto getUserById(Long userId);
+    UserResponseDto getUserById(Long userId);
 
-    public User getUserDetailsById(Long userId);
+    UserResponseDto getUserDetailsById(Long userId);
 
-    public List<User> findAllUsers();
+    List<UserResponseDto> findAllUsers();
 
-    public User updateUser(Long userId, UserRegisterDto userRegisterDto);
+    Long findAllProblemCountByUserId(Long userId);
 
-    public void deleteUserById(Long userId);
+    UserResponseDto updateUser(Long userId, UserRegisterDto userRegisterDto);
 
+    void deleteUserById(Long userId);
 
-    public String makeGuestEmail();
+    String makeGuestEmail();
 
-    public String makeGuestName();
+    String makeGuestName();
 
-    public String makeGuestIdentifier();
+    String makeGuestIdentifier();
 }

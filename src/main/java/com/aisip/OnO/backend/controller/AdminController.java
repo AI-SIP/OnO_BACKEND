@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.controller;
 
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.Dto.User.UserRegisterDto;
+import com.aisip.OnO.backend.Dto.User.UserResponseDto;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.service.FolderService;
 import com.aisip.OnO.backend.service.ProblemService;
@@ -38,7 +39,7 @@ public class AdminController {
 
     @GetMapping("/user/{userId}")
     public String getUserDetailsById(@PathVariable Long userId, Model model) {
-        User user = userService.getUserDetailsById(userId);
+        UserResponseDto user = userService.getUserDetailsById(userId);
         model.addAttribute("user", user);
 
         List<ProblemResponseDto> problems = problemService.findAllProblemsByUserId(userId);
@@ -48,7 +49,7 @@ public class AdminController {
 
     @GetMapping("/users")
     public String getAllUser(Model model, Authentication authentication) {
-        List<User> users = userService.findAllUsers();
+        List<UserResponseDto> users = userService.findAllUsers();
         model.addAttribute("users", users);
         return "users";
     }
@@ -57,9 +58,9 @@ public class AdminController {
     public String updateUserInfo(@PathVariable Long userId, @ModelAttribute UserRegisterDto userRegisterDto, Model model) {
 
         try {
-            User user = userService.updateUser(userId, userRegisterDto);
-            if (user != null) {
-                model.addAttribute("user", user);
+            UserResponseDto userResponseDto = userService.updateUser(userId, userRegisterDto);
+            if (userResponseDto != null) {
+                model.addAttribute("user", userResponseDto);
                 List<ProblemResponseDto> problems = problemService.findAllProblemsByUserId(userId);
                 model.addAttribute("problems", problems);
                 return "user";

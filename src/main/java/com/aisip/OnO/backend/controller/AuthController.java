@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.Auth.AppleTokenVerifier;
 import com.aisip.OnO.backend.Dto.ErrorResponseDto;
 import com.aisip.OnO.backend.Dto.Token.TokenRequestDto;
 import com.aisip.OnO.backend.Dto.Token.TokenResponseDto;
+import com.aisip.OnO.backend.Dto.User.UserResponseDto;
 import com.aisip.OnO.backend.entity.User.UserType;
 import com.aisip.OnO.backend.service.UserService;
 import com.aisip.OnO.backend.Auth.GoogleTokenVerifier;
@@ -179,11 +180,11 @@ public class AuthController {
     }
 
     private ResponseEntity<?> getUserTokenResponse(String name, String identifier, String email, UserType userType){
-        User user = userService.registerOrLoginUser(email, name, identifier, userType);
-        String accessToken = jwtTokenProvider.createAccessToken(user.getId());
-        String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
+        UserResponseDto user = userService.registerOrLoginUser(email, name, identifier, userType);
+        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId());
+        String refreshToken = jwtTokenProvider.createRefreshToken(user.getUserId());
 
-        log.info(user.getName() + " has login");
+        log.info(user.getUserName() + " has login");
 
         return ResponseEntity.ok(new TokenResponseDto(accessToken, refreshToken));
     }
