@@ -9,7 +9,11 @@
 <body>
 
 <div class="container mt-5">
-  <h1 class="mb-4">전체 유저 목록</h1>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>전체 유저 목록</h1>
+    <!-- 총 유저 수를 표시하는 부분 -->
+    <span th:text="'총 유저 수: ' + ${users.size()}" class="ml-auto"></span>
+  </div>
   <table class="table table-striped">
     <thead>
     <tr>
