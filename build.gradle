@@ -1,7 +1,9 @@
+
 plugins {
 	id 'java'
 	id 'org.springframework.boot' version '3.3.1'
 	id 'io.spring.dependency-management' version '1.1.5'
+	id "io.sentry.jvm.gradle" version "4.11.0"
 }
 
 group = 'com.aisip.OnO'
@@ -23,6 +25,7 @@ repositories {
 	mavenCentral()
 }
 
+
 jar {
 	enabled = false
 }
@@ -40,6 +43,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.17.2'
 	implementation group: 'org.springframework.boot', name: 'spring-boot-starter-thymeleaf', version: '3.3.3'
+	implementation 'io.sentry:sentry-spring-boot-starter-jakarta:7.14.0'
 	// Hibernate Core
 	implementation 'org.hibernate:hibernate-core:6.5.2.Final'
 	compileOnly 'org.projectlombok:lombok'

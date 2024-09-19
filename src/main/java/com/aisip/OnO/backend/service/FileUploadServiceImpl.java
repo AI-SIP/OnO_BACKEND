@@ -10,6 +10,7 @@ import com.amazonaws.services.s3.model.DeleteObjectRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.sentry.Sentry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -96,6 +97,7 @@ public class FileUploadServiceImpl implements FileUploadService {
             return fileUrl;
         } catch (Exception e) {
             log.info(e.getMessage());
+            Sentry.captureException(e);
             throw new RuntimeException("Failed to parse response", e);
         }
     }
@@ -161,6 +163,8 @@ public class FileUploadServiceImpl implements FileUploadService {
         try {
             return fileName.substring(fileName.lastIndexOf("."));
         } catch (StringIndexOutOfBoundsException e) {
+            log.warn(e.getMessage());
+            Sentry.captureException(e);
             throw new IllegalArgumentException(String.format("잘못된 형식의 파일 (%s) 입니다.", fileName));
         }
     }

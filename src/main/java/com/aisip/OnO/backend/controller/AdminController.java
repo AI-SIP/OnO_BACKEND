@@ -3,11 +3,12 @@ package com.aisip.OnO.backend.controller;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.Dto.User.UserRegisterDto;
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
-import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.service.FolderService;
 import com.aisip.OnO.backend.service.ProblemService;
 import com.aisip.OnO.backend.service.UserService;
+import io.sentry.Sentry;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Slf4j
 @RequiredArgsConstructor
 @Controller
 @RequestMapping("/admin")
@@ -65,9 +67,12 @@ public class AdminController {
                 model.addAttribute("problems", problems);
                 return "user";
             } else {
-                return "users";
+                throw new Exception("can't find user!");
+                //return "users";
             }
         } catch (Exception e) {
+            log.warn(e.getMessage());
+            Sentry.captureException(e);
             return "users";
         }
     }

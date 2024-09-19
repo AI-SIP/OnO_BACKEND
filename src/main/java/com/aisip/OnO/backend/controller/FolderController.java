@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.controller;
 import com.aisip.OnO.backend.Dto.Folder.FolderRegisterDto;
 import com.aisip.OnO.backend.Dto.Folder.FolderResponseDto;
 import com.aisip.OnO.backend.service.FolderService;
+import io.sentry.Sentry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -27,6 +28,7 @@ public class FolderController {
             return ResponseEntity.ok(folderService.findRootFolder(userId));
         } catch (Exception e) {
             log.warn(e.getMessage());
+            Sentry.captureException(e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 탐색에 실패했습니다.");
         }
     }
@@ -41,6 +43,7 @@ public class FolderController {
             return ResponseEntity.ok(folderService.findFolder(userId, folderId));
         } catch (Exception e) {
             log.warn(e.getMessage());
+            Sentry.captureException(e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 탐색에 실패했습니다.");
         }
     }
@@ -54,6 +57,7 @@ public class FolderController {
             return ResponseEntity.ok(folderService.findAllFolderThumbnailsByUserId(userId));
         } catch (Exception e) {
             log.warn(e.getMessage());
+            Sentry.captureException(e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 탐색에 실패했습니다.");
         }
     }
@@ -69,6 +73,7 @@ public class FolderController {
             return ResponseEntity.ok(folderResponseDto);
         } catch (Exception e) {
             log.warn(e.getMessage());
+            Sentry.captureException(e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 생성에 실패했습니다.");
         }
     }
@@ -84,6 +89,7 @@ public class FolderController {
             return ResponseEntity.ok(folderResponseDto);
         } catch (Exception e) {
             log.warn(e.getMessage());
+            Sentry.captureException(e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 생성에 실패했습니다.");
         }
     }
@@ -99,6 +105,7 @@ public class FolderController {
             return ResponseEntity.ok(folderResponseDto);
         } catch (Exception e) {
             log.warn(e.getMessage());
+            Sentry.captureException(e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("문제 경로 변경에 실패했습니다.");
         }
     }
@@ -112,6 +119,7 @@ public class FolderController {
             return ResponseEntity.ok(folderService.deleteFolder(userId, folderId));
         } catch (Exception e) {
             log.warn(e.getMessage());
+            Sentry.captureException(e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 삭제에 실패했습니다.");
         }
     }
