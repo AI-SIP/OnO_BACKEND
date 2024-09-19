@@ -3,7 +3,9 @@ package com.aisip.OnO.backend.controller;
 import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.exception.ProblemNotFoundException;
+import com.aisip.OnO.backend.exception.ProblemRegisterException;
 import com.aisip.OnO.backend.service.ProblemService;
+import io.sentry.Sentry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.propertyeditors.CustomNumberEditor;
@@ -40,18 +42,25 @@ public class ProblemController {
             log.info("userId: " + userId + " get problem for problemId: " + problemResponseDto.getProblemId());
             return ResponseEntity.ok(problemResponseDto);
         } catch (ProblemNotFoundException e) {
-            log.warn(e.getMessage());
+            log.error(e.getMessage());
+            Sentry.captureException(e);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }
     }
 
     @GetMapping("/problems")
     public ResponseEntity<?> getProblemsByUserId(Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
-        List<ProblemResponseDto> problems = problemService.findAllProblemsByUserId(userId);
+        try {
+            Long userId = (Long) authentication.getPrincipal();
+            List<ProblemResponseDto> problems = problemService.findAllProblemsByUserId(userId);
 
-        log.info("userId: " + userId + " get all problems");
-        return ResponseEntity.ok(problems);
+            log.info("userId: " + userId + " get all problems");
+            return ResponseEntity.ok(problems);
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            Sentry.captureException(e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("문제 조회에 실패했습니다.");
+        }
     }
 
     @PostMapping("/problem")
@@ -67,14 +76,14 @@ public class ProblemController {
                 log.info("userId: " + userId + " success for register problem");
                 return ResponseEntity.ok().body("문제가 등록되었습니다.");
             } else {
-                log.warn("userId: " + userId + " failed for register problem");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("문제 등록에 실패했습니다.");
+                throw new ProblemRegisterException("userId: " + userId + " failed for register problem");
             }
 
         } catch (Exception e) {
             log.error(e.getMessage());
+            Sentry.captureException(e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    "Error Processing Problem: " + e.getMessage()
+                    "Error Register Problem: " + e.getMessage()
             );
         }
     }
@@ -92,12 +101,12 @@ public class ProblemController {
                 log.info("userId: " + userId + " success for update problem");
                 return ResponseEntity.ok().body("문제가 수정되었습니다.");
             } else {
-                log.info("userId: " + userId + " failed for update problem");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("문제 등록에 실패했습니다.");
+                throw new ProblemRegisterException("userId: " + userId + " failed for update problem");
             }
 
         } catch (Exception e) {
             log.error(e.getMessage());
+            Sentry.captureException(e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                     "Error Processing Problem: " + e.getMessage()
             );
@@ -115,8 +124,9 @@ public class ProblemController {
 
             log.info("userId: " + userId + " success for delete problem");
             return ResponseEntity.ok("삭제를 완료했습니다.");
-        } catch (ProblemNotFoundException e) {
-            log.info("문제가 존재하지 않습니다.");
+        } catch (Exception e) {
+            log.warn(e.getMessage());
+            Sentry.captureException(e);
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(e.getMessage());
         }

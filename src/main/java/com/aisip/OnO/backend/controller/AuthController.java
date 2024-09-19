@@ -1,15 +1,13 @@
 package com.aisip.OnO.backend.controller;
 
-import com.aisip.OnO.backend.Auth.AppleTokenVerifier;
 import com.aisip.OnO.backend.Dto.ErrorResponseDto;
 import com.aisip.OnO.backend.Dto.Token.TokenRequestDto;
 import com.aisip.OnO.backend.Dto.Token.TokenResponseDto;
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
 import com.aisip.OnO.backend.entity.User.UserType;
 import com.aisip.OnO.backend.service.UserService;
-import com.aisip.OnO.backend.Auth.GoogleTokenVerifier;
 import com.aisip.OnO.backend.Auth.JwtTokenProvider;
-import com.aisip.OnO.backend.entity.User.User;
+import io.sentry.Sentry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -52,11 +50,11 @@ public class AuthController {
             if (name != null && identifier != null) {
                 return getUserTokenResponse(name, identifier, email, UserType.MEMBER);
             } else {
-                log.warn("Invalid Token Issue for username: " + name);
-                throw new IllegalArgumentException("Invalid token information or user data");
+                throw new IllegalArgumentException("Invalid token information or user data " + name);
             }
         } catch (Exception e) {
             log.warn(e.getMessage());
+            Sentry.captureException(e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Internal server error"));
         }
     }
@@ -74,12 +72,12 @@ public class AuthController {
             if (name != null && identifier != null) {
                 return getUserTokenResponse(name, identifier, email, UserType.MEMBER);
             } else {
-                log.warn("Invalid Token Issue for username: " + name);
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto("Invalid Apple token"));
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto("Invalid Apple token for username : " + name));
             }
 
         } catch (Exception e) {
             log.warn(e.getMessage());
+            Sentry.captureException(e);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto("Invalid Apple token"));
         }
     }
@@ -97,11 +95,11 @@ public class AuthController {
             if (name != null && identifier != null) {
                 return getUserTokenResponse(name, identifier, email, UserType.MEMBER);
             } else {
-                log.warn("Invalid Token Issue for username: " + name);
-                throw new IllegalArgumentException("Invalid token information or user data");
+                throw new IllegalArgumentException("Invalid token information or user data for username : " + name);
             }
         } catch (Exception e) {
             log.warn(e.getMessage());
+            Sentry.captureException(e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Internal server error"));
         }
     }
@@ -119,11 +117,11 @@ public class AuthController {
             if (name != null && identifier != null) {
                 return getUserTokenResponse(name, identifier, email, UserType.MEMBER);
             } else {
-                log.warn("Invalid Token Issue for username: " + name);
-                throw new IllegalArgumentException("Invalid token information or user data");
+                throw new IllegalArgumentException("Invalid token information or user data for username: " + name);
             }
         } catch (Exception e) {
             log.warn(e.getMessage());
+            Sentry.captureException(e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Internal server error"));
         }
     }
@@ -146,8 +144,8 @@ public class AuthController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponseDto("Authorization header missing or invalid"));
             }
         } catch (Exception e) {
-            log.warn("Token verification failed");
             log.warn(e.getMessage());
+            Sentry.captureException(e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Token verification failed"));
         }
     }
@@ -175,17 +173,25 @@ public class AuthController {
             }
         } catch (Exception e) {
             log.warn("Could not refresh access token");
+            Sentry.captureException(e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Could not refresh access token"));
         }
     }
 
     private ResponseEntity<?> getUserTokenResponse(String name, String identifier, String email, UserType userType){
-        UserResponseDto user = userService.registerOrLoginUser(email, name, identifier, userType);
-        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId());
-        String refreshToken = jwtTokenProvider.createRefreshToken(user.getUserId());
+        try {
+            UserResponseDto user = userService.registerOrLoginUser(email, name, identifier, userType);
+            String accessToken = jwtTokenProvider.createAccessToken(user.getUserId());
+            String refreshToken = jwtTokenProvider.createRefreshToken(user.getUserId());
 
-        log.info(user.getUserName() + " has login");
+            log.info(user.getUserName() + " has login");
 
-        return ResponseEntity.ok(new TokenResponseDto(accessToken, refreshToken));
+            return ResponseEntity.ok(new TokenResponseDto(accessToken, refreshToken));
+        } catch (Exception e) {
+            log.warn(e.getMessage());
+            Sentry.captureException(e);
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Could not Generate user token response"));
+        }
     }
 }

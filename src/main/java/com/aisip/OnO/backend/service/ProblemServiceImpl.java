@@ -15,6 +15,7 @@ import com.aisip.OnO.backend.exception.ProblemNotFoundException;
 import com.aisip.OnO.backend.exception.UserNotAuthorizedException;
 import com.aisip.OnO.backend.exception.UserNotFoundException;
 import com.aisip.OnO.backend.repository.ProblemRepository;
+import io.sentry.Sentry;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -133,6 +134,7 @@ public class ProblemServiceImpl implements ProblemService {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            Sentry.captureException(e);
             return false;
         }
     }
@@ -190,6 +192,7 @@ public class ProblemServiceImpl implements ProblemService {
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
+                    Sentry.captureException(e);
                     return false;
                 }
             } else {
