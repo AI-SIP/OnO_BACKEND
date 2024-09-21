@@ -19,6 +19,8 @@ public interface UserService {
 
     Long findAllProblemCountByUserId(Long userId);
 
+    List<Long> findAllUsersProblemCount();
+
     UserResponseDto updateUser(Long userId, UserRegisterDto userRegisterDto);
 
     void deleteUserById(Long userId);

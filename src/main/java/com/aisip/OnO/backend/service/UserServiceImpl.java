@@ -70,6 +70,15 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public List<Long> findAllUsersProblemCount() {
+        // 유저를 찾아서 해당 유저가 있는지 확인
+        List<User> userList = userRepository.findAll();
+        return userList.stream().map(user -> {
+            return findAllProblemCountByUserId(user.getId());
+        }).collect(Collectors.toList());
+    }
+
+    @Override
     public UserResponseDto updateUser(Long userId, UserRegisterDto userRegisterDto) {
 
         Optional<User> optionalUser = userRepository.findById(userId);
