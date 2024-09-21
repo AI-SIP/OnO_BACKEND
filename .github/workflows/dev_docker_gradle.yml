@@ -2,9 +2,9 @@ name: Java CI with Gradle  # 워크플로우의 이름 설정
 
 on:
   push:
-    branches: ["dev"]  # dev 브랜치에 푸시될 때 워크플로우 실행
+    branches: ["develop"]  # dev 브랜치에 푸시될 때 워크플로우 실행
   pull_request:
-    branches: ["dev"]  # dev 브랜치에 대한 PR이 생성되거나 업데이트될 때 워크플로우 실행
+    branches: ["develop"]  # dev 브랜치에 대한 PR이 생성되거나 업데이트될 때 워크플로우 실행
 
 permissions:
   contents: read  # 워크플로우의 권한 설정 (read-only)
