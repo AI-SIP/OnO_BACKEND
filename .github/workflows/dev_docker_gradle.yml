@@ -58,7 +58,7 @@ jobs:
           port: 22  # SSH 연결에 사용할 포트 (기본값 22)
           script: |
             # Bastion 서버에서 스프링 서버로 SSH 연결 및 도커 작업 수행
-            ssh -o StrictHostKeyChecking=no -i ~/your-spring-server-key.pem ec2-user@${{ secrets.DEV_SPRING_SERVER_IP }} << 'EOSSH'
+            ssh -o StrictHostKeyChecking=no -i ~/new-dev-an2-ono-spring-key.pem ec2-user@${{ secrets.DEV_SPRING_SERVER_IP }} << 'EOSSH'
               # 스프링 서버에서 Docker Hub에 로그인
               docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
               # 최신 Docker 이미지를 Docker Hub에서 Pull
