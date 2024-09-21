@@ -53,7 +53,7 @@ jobs:
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.DEV_BASTION_HOST }}  # Bastion 서버의 퍼블릭 IP 또는 DNS 주소
-          username: ec2-user  # Bastion 서버의 사용자 이름
+          username: ubuntu  # Bastion 서버의 사용자 이름
           key: ${{ secrets.DEV_BASTION_PRIVATE_KEY }}  # Bastion 서버의 SSH 개인 키 (GitHub Secrets에서 가져옴)
           port: 22  # SSH 연결에 사용할 포트 (기본값 22)
           script: |
