@@ -48,10 +48,10 @@ public class ProblemServiceImpl implements ProblemService {
                 List<ImageData> images = fileUploadService.getProblemImages(problemId);
                 return ProblemConverter.convertToResponseDto(problem, images);
             } else {
-                throw new UserNotAuthorizedException("User ID does not match with problem's user ID");
+                throw new UserNotAuthorizedException("해당 문제의 작성자가 아닙니다.");
             }
         } else {
-            throw new ProblemNotFoundException("Problem not found with ID: " + problemId);
+            throw new ProblemNotFoundException("문제를 찾을 수 없습니다! problemId: " + problemId);
         }
     }
 
@@ -130,7 +130,7 @@ public class ProblemServiceImpl implements ProblemService {
 
                 return true;
             } else {
-                throw new UserNotFoundException("User not found with ID: " + userId);
+                throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -216,10 +216,10 @@ public class ProblemServiceImpl implements ProblemService {
 
                 problemRepository.delete(problem);
             } else {
-                throw new UserNotAuthorizedException("User ID does not match with problem's user ID");
+                throw new UserNotAuthorizedException("문제 작성자와 유저가 불일치합니다!");
             }
         } else {
-            throw new ProblemNotFoundException("Problem not found with ID: " + problemId);
+            throw new ProblemNotFoundException("문제를 찾을 수 없습니다! problemId: " + problemId);
         }
     }
 

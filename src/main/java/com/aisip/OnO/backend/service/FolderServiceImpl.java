@@ -66,7 +66,7 @@ public class FolderServiceImpl implements FolderService {
             return findFolder(userId, rootFolder.getId());
         }
 
-        throw new UserNotFoundException("유저를 찾을 수 없습니다!");
+        throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
     }
 
     @Override
@@ -91,7 +91,7 @@ public class FolderServiceImpl implements FolderService {
             return findFolder(userId, folder.getId());
         }
 
-        throw new UserNotFoundException("유저를 찾을 수 없습니다!");
+        throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
     }
 
     @Override
@@ -136,7 +136,7 @@ public class FolderServiceImpl implements FolderService {
                     .build();
         }
 
-        throw new FolderNotFoundException("폴더를 찾을 수 없습니다!");
+        throw new FolderNotFoundException("폴더를 찾을 수 없습니다!, folderId: " + folderId);
     }
 
     @Override
@@ -199,7 +199,7 @@ public class FolderServiceImpl implements FolderService {
             }
         }
 
-        throw new UserNotFoundException("유저를 찾을 수 없습니다!");
+        throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
     }
 
     @Override
@@ -220,10 +220,10 @@ public class FolderServiceImpl implements FolderService {
                 return findFolder(userId, folderId);
             }
 
-            throw new ProblemNotFoundException("문제를 찾을 수 없습니다!");
+            throw new ProblemNotFoundException("문제를 찾을 수 없습니다!, problemId: " + problemId);
         }
 
-        throw new UserNotFoundException("유저를 찾을 수 없습니다!");
+        throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
     }
 
     @Override
@@ -249,7 +249,7 @@ public class FolderServiceImpl implements FolderService {
             }
 
         } else {
-            throw new FolderNotFoundException("폴더를 찾을 수 없습니다!");
+            throw new FolderNotFoundException("폴더를 찾을 수 없습니다!, folderId: " + folderId);
         }
     }
 
