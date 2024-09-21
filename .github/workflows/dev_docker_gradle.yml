@@ -68,7 +68,7 @@ jobs:
               # 중지된 모든 컨테이너를 제거 (없을 경우 오류 무시)
               docker rm $(docker ps -a -q) || true
               # 새로 받은 이미지를 기반으로 컨테이너 실행 (8080 포트 사용)
-              docker run -d --log-driver=syslog -p 8080:8080 ${{ secrets.DOCKER_USERNAME }}/ono:latest
+              docker run -d --restart unless-stopped --log-driver=syslog -p 8080:8080 ${{ secrets.DOCKER_USERNAME }}/ono:latest
               # 24시간 동안 사용되지 않은 모든 Docker 이미지를 삭제하여 공간 확보
               docker image prune -a -f --filter "until=24h"
             EOSSH
