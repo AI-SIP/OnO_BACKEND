@@ -26,10 +26,10 @@ jobs:
           distribution: 'temurin'  # Temurin JDK 배포판 사용
 
       # application-dev.yml 파일 생성: dev 환경의 설정 파일을 생성하고 secrets에서 값을 가져와 입력합니다.
-      - name: make application.yml
+      - name: make application.properties
         run: |
           cd ./src/main/resources  # resources 디렉토리로 이동
-          touch ./application.properties  # application-dev.yml 파일 생성
+          touch ./application.properties  # application.properties 파일 생성
           echo "${{ secrets.APPLICATION_DEV }}" > ./application.properties  # GitHub Secrets에서 설정값을 가져와 파일에 저장
 
       # Gradle Wrapper 실행 권한 부여: gradlew에 실행 권한을 부여합니다.
