@@ -55,6 +55,8 @@ jobs:
           key: ${{ secrets.PROD_BASTION_PRIVATE_KEY }}  # Bastion 서버의 SSH 개인 키 (GitHub Secrets에서 가져옴)
           port: 22  # SSH 연결에 사용할 포트 (기본값 22)
           script: |
+            sudo usermod -aG docker ubuntu
+            sudo chmod 666 /var/run/docker.sock
             # Bastion 서버에서 스프링 서버로 SSH 연결 및 도커 작업 수행
             ssh -o StrictHostKeyChecking=no -i /home/ubuntu/dev-an2-ono-test-spring-key.pem ubuntu@${{ secrets.PROD_SPRING_SERVER_IP }} << "EOSSH"
               # 스프링 서버에서 Docker Hub에 로그인
