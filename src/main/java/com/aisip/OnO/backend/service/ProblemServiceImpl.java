@@ -10,7 +10,7 @@ import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.converter.ProblemConverter;
 import com.aisip.OnO.backend.entity.Image.ImageData;
 import com.aisip.OnO.backend.entity.Image.ImageType;
-import com.aisip.OnO.backend.entity.Problem;
+import com.aisip.OnO.backend.entity.Problem.Problem;
 import com.aisip.OnO.backend.exception.ProblemNotFoundException;
 import com.aisip.OnO.backend.exception.UserNotAuthorizedException;
 import com.aisip.OnO.backend.exception.UserNotFoundException;

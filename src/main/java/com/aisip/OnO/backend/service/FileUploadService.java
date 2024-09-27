@@ -3,7 +3,7 @@ package com.aisip.OnO.backend.service;
 import com.aisip.OnO.backend.Dto.Process.ImageProcessRegisterDto;
 import com.aisip.OnO.backend.entity.Image.ImageData;
 import com.aisip.OnO.backend.entity.Image.ImageType;
-import com.aisip.OnO.backend.entity.Problem;
+import com.aisip.OnO.backend.entity.Problem.Problem;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;

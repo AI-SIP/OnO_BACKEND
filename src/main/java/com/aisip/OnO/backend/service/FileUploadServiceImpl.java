@@ -3,7 +3,7 @@ package com.aisip.OnO.backend.service;
 import com.aisip.OnO.backend.Dto.Process.ImageProcessRegisterDto;
 import com.aisip.OnO.backend.entity.Image.ImageData;
 import com.aisip.OnO.backend.entity.Image.ImageType;
-import com.aisip.OnO.backend.entity.Problem;
+import com.aisip.OnO.backend.entity.Problem.Problem;
 import com.aisip.OnO.backend.repository.ImageDataRepository;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.DeleteObjectRequest;
@@ -55,7 +55,6 @@ public class FileUploadServiceImpl implements FileUploadService {
         log.info("file url : " + fileUrl + " has upload to S3");
         return fileUrl;
     }
-
 
     private void saveImageData(String imageUrl, Problem problem, ImageType imageType) {
 
@@ -157,15 +156,5 @@ public class FileUploadServiceImpl implements FileUploadService {
 
     private String getFileUrl(String fileName) {
         return "https://" + bucket + ".s3.ap-northeast-2.amazonaws.com/" + fileName;
-    }
-
-    private String getFileExtension(String fileName) {
-        try {
-            return fileName.substring(fileName.lastIndexOf("."));
-        } catch (StringIndexOutOfBoundsException e) {
-            log.warn(e.getMessage());
-            Sentry.captureException(e);
-            throw new IllegalArgumentException(String.format("잘못된 형식의 파일 (%s) 입니다.", fileName));
-        }
     }
 }
