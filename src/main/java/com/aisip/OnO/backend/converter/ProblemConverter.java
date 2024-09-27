@@ -20,6 +20,8 @@ public class ProblemConverter {
                 .solvedAt(problem.getSolvedAt())
                 .createdAt(problem.getCreatedAt())
                 .updateAt(problem.getUpdatedAt())
+                .analysis(problem.getAnalysis())
+                .templateType(problem.getTemplateType())
                 .build();
 
         for (ImageData image : images) {

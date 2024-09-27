@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.service;
 
 import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
+import com.aisip.OnO.backend.entity.Problem.Problem;
 
 import java.util.List;
 
@@ -12,6 +13,8 @@ public interface ProblemService {
     List<ProblemResponseDto> findAllProblemsByUserId(Long userId);
 
     List<ProblemResponseDto> findAllProblemsByFolderId(Long folderId);
+
+    Problem createProblem(Long userId);
 
     boolean saveProblem(Long userId, ProblemRegisterDto problemRegisterDto);
 

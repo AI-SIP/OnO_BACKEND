@@ -80,6 +80,24 @@ public class ProblemServiceImpl implements ProblemService {
     }
 
     @Override
+    public Problem createProblem(Long userId) {
+
+        Optional<User> optionalUserEntity = userRepository.findById(userId);
+        if (optionalUserEntity.isPresent()) {
+            User user = optionalUserEntity.get();
+
+            Problem problem = Problem.builder()
+                    .user(user)
+                    .build();
+
+            return problemRepository.save(problem);
+        } else{
+            throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
+        }
+    }
+
+
+    @Override
     public boolean saveProblem(Long userId, ProblemRegisterDto problemRegisterDto) {
         Optional<User> optionalUserEntity = userRepository.findById(userId);
 
@@ -113,7 +131,7 @@ public class ProblemServiceImpl implements ProblemService {
                                     .colorsList(problemRegisterDto.getColorsList())
                                     .build();
 
-                            String processImageUrl = fileUploadService.saveProcessImageUrl(imageProcessRegisterDto, savedProblem, ImageType.PROCESS_IMAGE);
+                            String processImageUrl = fileUploadService.saveAndGetProcessImageUrl(imageProcessRegisterDto, savedProblem, ImageType.PROCESS_IMAGE);
                         } else{
                             String processImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getProblemImage(), savedProblem, ImageType.PROCESS_IMAGE);
                         }
@@ -177,7 +195,7 @@ public class ProblemServiceImpl implements ProblemService {
                                     .colorsList(problemRegisterDto.getColorsList())
                                     .build();
 
-                            String processImageUrl = fileUploadService.saveProcessImageUrl(imageProcessRegisterDto, problem, ImageType.PROCESS_IMAGE);
+                            String processImageUrl = fileUploadService.saveAndGetProcessImageUrl(imageProcessRegisterDto, problem, ImageType.PROCESS_IMAGE);
                         } else{
                             String processImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getProblemImage(), problem, ImageType.PROCESS_IMAGE);
                         }

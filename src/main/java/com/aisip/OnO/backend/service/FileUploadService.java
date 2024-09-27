@@ -12,7 +12,12 @@ import java.util.List;
 public interface FileUploadService {
     String uploadFileToS3(MultipartFile file, Problem problem, ImageType imageType) throws IOException;
 
-    String saveProcessImageUrl(ImageProcessRegisterDto imageProcessRegisterDto, Problem problem, ImageType imageType);
+    String getProcessImageUrl(ImageProcessRegisterDto imageProcessRegisterDto);
+
+    String saveAndGetProcessImageUrl(ImageProcessRegisterDto imageProcessRegisterDto, Problem problem, ImageType imageType);
+
+
+    String getProblemAnalysis(String problemImageUrl);
 
     String updateImage(MultipartFile file, Problem problem, ImageType imageType) throws IOException;
 

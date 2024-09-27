@@ -1,5 +1,8 @@
 package com.aisip.OnO.backend.Dto.Problem;
 
+import com.aisip.OnO.backend.entity.Problem.TemplateType;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -23,6 +26,11 @@ public class ProblemResponseDto {
     private String memo;
 
     private String reference;
+
+    private String analysis;
+
+    @Enumerated(EnumType.STRING)
+    private TemplateType templateType;
 
     private LocalDateTime solvedAt;
 
