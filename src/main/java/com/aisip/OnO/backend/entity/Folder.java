@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.entity;
 
+import com.aisip.OnO.backend.entity.Problem.Problem;
 import com.aisip.OnO.backend.entity.User.User;
 import jakarta.persistence.*;
 import lombok.*;

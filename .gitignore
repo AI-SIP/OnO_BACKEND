@@ -39,3 +39,5 @@ out/
 ### aws properties file
 application.properties
 application-aws.properties
+application-dev.properties
+application-prod.properties

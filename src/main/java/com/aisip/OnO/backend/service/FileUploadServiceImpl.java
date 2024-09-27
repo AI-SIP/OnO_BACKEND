@@ -3,7 +3,7 @@ package com.aisip.OnO.backend.service;
 import com.aisip.OnO.backend.Dto.Process.ImageProcessRegisterDto;
 import com.aisip.OnO.backend.entity.Image.ImageData;
 import com.aisip.OnO.backend.entity.Image.ImageType;
-import com.aisip.OnO.backend.entity.Problem;
+import com.aisip.OnO.backend.entity.Problem.Problem;
 import com.aisip.OnO.backend.repository.ImageDataRepository;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.DeleteObjectRequest;
@@ -14,17 +14,17 @@ import io.sentry.Sentry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Slf4j
@@ -56,7 +56,6 @@ public class FileUploadServiceImpl implements FileUploadService {
         return fileUrl;
     }
 
-
     private void saveImageData(String imageUrl, Problem problem, ImageType imageType) {
 
         ImageData imageData = ImageData.builder()
@@ -69,7 +68,40 @@ public class FileUploadServiceImpl implements FileUploadService {
     }
 
     @Override
-    public String saveProcessImageUrl(ImageProcessRegisterDto imageProcessRegisterDto, Problem problem, ImageType imageType) {
+    public String getProcessImageUrl(ImageProcessRegisterDto imageProcessRegisterDto) {
+        RestTemplate restTemplate = new RestTemplate();
+        String url = fastApiUrl + "/process-color";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        HttpEntity<ImageProcessRegisterDto> request = new HttpEntity<>(imageProcessRegisterDto, headers);
+
+        log.info("remove colors on problemImage by colors: " + imageProcessRegisterDto.getColorsList());
+
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+
+            log.info("Response from fastApi server: " + response);
+
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.readTree(response.getBody());
+            JsonNode pathNode = rootNode.path("path");
+            String inputPath = pathNode.path("output_path").asText();
+
+            String fileUrl = "https://" + bucket + ".s3.ap-northeast-2.amazonaws.com/" + inputPath;
+
+            log.info("process image url : " + fileUrl + " has successfully processed");
+            return fileUrl;
+        } catch (Exception e) {
+            log.info(e.getMessage());
+            Sentry.captureException(e);
+            throw new RuntimeException("Failed to parse response", e);
+        }
+    }
+
+    @Override
+    public String saveAndGetProcessImageUrl(ImageProcessRegisterDto imageProcessRegisterDto, Problem problem, ImageType imageType) {
         RestTemplate restTemplate = new RestTemplate();
         String url = fastApiUrl + "/process-color";
 
@@ -99,6 +131,41 @@ public class FileUploadServiceImpl implements FileUploadService {
             log.info(e.getMessage());
             Sentry.captureException(e);
             throw new RuntimeException("Failed to parse response", e);
+        }
+    }
+
+    @Override
+    public String getProblemAnalysis(String problemImageUrl){
+        try{
+            RestTemplate restTemplate = new RestTemplate();
+            String url = UriComponentsBuilder.fromHttpUrl(fastApiUrl + "/analysis/whole")
+                    .queryParam("problem_url", problemImageUrl)
+                    .toUriString();
+
+            ResponseEntity<Map<String, Object>> responseEntity = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<>() {
+                    }
+            );
+
+            // JSON 응답에서 필요한 값 추출
+            if (responseEntity.getStatusCode().is2xxSuccessful()) {
+                Map<String, Object> response = responseEntity.getBody();
+
+                // 응답 본문에서 필요한 값 추출
+                if (response != null) {
+                    return (String) response.get("answer");
+                } else {
+                    throw new RuntimeException("응답 데이터가 비어있습니다.");
+                }
+            } else {
+                throw new RuntimeException("요청이 실패했습니다. 상태 코드: " + responseEntity.getStatusCode());
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("문제 분석 요청 중 오류가 발생했습니다.", e);
         }
     }
 
@@ -157,15 +224,5 @@ public class FileUploadServiceImpl implements FileUploadService {
 
     private String getFileUrl(String fileName) {
         return "https://" + bucket + ".s3.ap-northeast-2.amazonaws.com/" + fileName;
-    }
-
-    private String getFileExtension(String fileName) {
-        try {
-            return fileName.substring(fileName.lastIndexOf("."));
-        } catch (StringIndexOutOfBoundsException e) {
-            log.warn(e.getMessage());
-            Sentry.captureException(e);
-            throw new IllegalArgumentException(String.format("잘못된 형식의 파일 (%s) 입니다.", fileName));
-        }
     }
 }

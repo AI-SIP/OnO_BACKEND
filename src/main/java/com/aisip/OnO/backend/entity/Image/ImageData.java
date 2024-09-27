@@ -1,7 +1,7 @@
 package com.aisip.OnO.backend.entity.Image;
 
 import com.aisip.OnO.backend.entity.BaseEntity;
-import com.aisip.OnO.backend.entity.Problem;
+import com.aisip.OnO.backend.entity.Problem.Problem;
 import jakarta.persistence.*;
 import lombok.*;
 

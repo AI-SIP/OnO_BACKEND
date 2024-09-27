@@ -4,7 +4,7 @@ import com.aisip.OnO.backend.Dto.Folder.FolderResponseDto;
 import com.aisip.OnO.backend.Dto.Folder.FolderThumbnailResponseDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.entity.Folder;
-import com.aisip.OnO.backend.entity.Problem;
+import com.aisip.OnO.backend.entity.Problem.Problem;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.exception.FolderNotFoundException;
 import com.aisip.OnO.backend.exception.ProblemNotFoundException;
@@ -114,13 +114,10 @@ public class FolderServiceImpl implements FolderService {
             List<FolderThumbnailResponseDto> subFolders = null;
 
             if (folder.getSubFolders() != null && !folder.getSubFolders().isEmpty()) {
-                subFolders = folder.getSubFolders().stream().map(subFolder -> {
-                    return FolderThumbnailResponseDto.builder()
-                            .folderId(subFolder.getId())
-                            .folderName(subFolder.getName())
-                            .build();
-
-                }).toList();
+                subFolders = folder.getSubFolders().stream().map(subFolder -> FolderThumbnailResponseDto.builder()
+                        .folderId(subFolder.getId())
+                        .folderName(subFolder.getName())
+                        .build()).toList();
             }
 
             List<ProblemResponseDto> problems = problemService.findAllProblemsByFolderId(folderId);
