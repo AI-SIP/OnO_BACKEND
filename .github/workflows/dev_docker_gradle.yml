@@ -1,4 +1,4 @@
-name: Java CI with Gradle  # 워크플로우의 이름 설정
+name: DOCKER CI IN DEVELOPMENT SERVER  # 워크플로우의 이름 설정
 
 on:
   push:
