@@ -56,15 +56,18 @@ public class FileUploadServiceImpl implements FileUploadService {
         return fileUrl;
     }
 
-    private void saveImageData(String imageUrl, Problem problem, ImageType imageType) {
+    @Override
+    public void saveImageData(String imageUrl, Problem problem, ImageType imageType) {
 
-        ImageData imageData = ImageData.builder()
-                .imageUrl(imageUrl)
-                .problem(problem)
-                .imageType(imageType)
-                .build();
+        if(imageDataRepository.findByImageUrl(imageUrl).isEmpty()){
+            ImageData imageData = ImageData.builder()
+                    .imageUrl(imageUrl)
+                    .problem(problem)
+                    .imageType(imageType)
+                    .build();
 
-        imageDataRepository.save(imageData);
+            imageDataRepository.save(imageData);
+        }
     }
 
     @Override

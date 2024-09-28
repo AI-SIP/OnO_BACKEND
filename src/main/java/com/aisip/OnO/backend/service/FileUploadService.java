@@ -16,6 +16,7 @@ public interface FileUploadService {
 
     String saveAndGetProcessImageUrl(ImageProcessRegisterDto imageProcessRegisterDto, Problem problem, ImageType imageType);
 
+    void saveImageData(String imageUrl, Problem problem, ImageType imageType);
 
     String getProblemAnalysis(String problemImageUrl);
 

@@ -1,7 +1,9 @@
 package com.aisip.OnO.backend.service;
 
+import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDtoV2;
 import com.aisip.OnO.backend.Dto.Process.ImageProcessRegisterDto;
 import com.aisip.OnO.backend.entity.Folder;
+import com.aisip.OnO.backend.entity.Problem.TemplateType;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.repository.FolderRepository;
 import com.aisip.OnO.backend.repository.UserRepository;
@@ -144,6 +146,58 @@ public class ProblemServiceImpl implements ProblemService {
 
                 if (problemRegisterDto.getSolveImage() != null) {
                     String solveImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getSolveImage(), savedProblem, ImageType.SOLVE_IMAGE);
+                }
+
+                return true;
+            } else {
+                throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            Sentry.captureException(e);
+            return false;
+        }
+    }
+
+    @Override
+    public boolean saveProblemV2(Long userId, ProblemRegisterDtoV2 problemRegisterDto) {
+        Optional<User> optionalUserEntity = userRepository.findById(userId);
+
+        try {
+            if (optionalUserEntity.isPresent()) {
+                User user = optionalUserEntity.get();
+                Problem problem;
+
+                Optional<Problem> optionalProblem = problemRepository.findById(problemRegisterDto.getProblemId());
+                problem = optionalProblem.orElseGet(() -> Problem.builder()
+                        .build());
+
+                problem.setUser(user);
+                problem.setMemo(problemRegisterDto.getMemo());
+                problem.setReference(problemRegisterDto.getReference());
+                problem.setAnalysis(problemRegisterDto.getAnalysis());
+                problem.setTemplateType(TemplateType.valueOf(problemRegisterDto.getTemplateType()));
+                problem.setSolvedAt(problemRegisterDto.getSolvedAt());
+
+                if (problemRegisterDto.getFolderId() != null) {
+                    Optional<Folder> optionalFolder = folderRepository.findById(problemRegisterDto.getFolderId());
+                    optionalFolder.ifPresent(problem::setFolder);
+                }
+
+                if(problemRegisterDto.getProblemImageUrl() != null){
+                    fileUploadService.saveImageData(problemRegisterDto.getProblemImageUrl(), problem, ImageType.PROBLEM_IMAGE);
+                }
+
+                if (problemRegisterDto.getAnswerImage() != null) {
+                    String answerImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getAnswerImage(), problem, ImageType.ANSWER_IMAGE);
+                }
+
+                if (problemRegisterDto.getSolveImage() != null) {
+                    String solveImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getSolveImage(), problem, ImageType.SOLVE_IMAGE);
+                }
+
+                if(problemRegisterDto.getProcessImageUrl() != null){
+                    fileUploadService.saveImageData(problemRegisterDto.getProcessImageUrl(), problem, ImageType.PROCESS_IMAGE);
                 }
 
                 return true;

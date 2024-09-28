@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.service;
 
 import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
+import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDtoV2;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.entity.Problem.Problem;
 
@@ -17,6 +18,8 @@ public interface ProblemService {
     Problem createProblem(Long userId);
 
     boolean saveProblem(Long userId, ProblemRegisterDto problemRegisterDto);
+
+    boolean saveProblemV2(Long userId, ProblemRegisterDtoV2 problemRegisterDto);
 
     boolean updateProblem(Long userId, ProblemRegisterDto problemRegisterDto);
 
