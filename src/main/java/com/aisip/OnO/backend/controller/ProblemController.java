@@ -157,4 +157,23 @@ public class ProblemController {
                     .body(e.getMessage());
         }
     }
+
+    @PostMapping("/problem/repeat")
+    public ResponseEntity<?> addRepeatCount(
+            Authentication authentication,
+            @RequestHeader("problemId") Long problemId
+    ){
+        try{
+            Long userId = (Long) authentication.getPrincipal();
+            problemService.addRepeatCount(problemId);
+
+            log.info("userId: " + userId + " repeat problemId : " + problemId);
+            return ResponseEntity.ok("삭제를 완료했습니다.");
+        } catch (Exception e) {
+            log.warn(e.getMessage());
+            Sentry.captureException(e);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(e.getMessage());
+        }
+    }
 }

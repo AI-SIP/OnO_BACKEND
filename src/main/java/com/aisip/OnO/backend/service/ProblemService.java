@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDtoV2;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.entity.Problem.Problem;
+import com.aisip.OnO.backend.entity.Problem.ProblemRepeat;
 
 import java.util.List;
 
@@ -26,4 +27,8 @@ public interface ProblemService {
     void deleteProblem(Long userId, Long problemId);
 
     void deleteUserProblems(Long userId);
+
+    List<ProblemRepeat> getProblemRepeats(Long problemId);
+
+    void addRepeatCount(Long problemId);
 }
