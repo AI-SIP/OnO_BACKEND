@@ -1,9 +1,13 @@
 package com.aisip.OnO.backend.service;
 
+import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDtoV2;
 import com.aisip.OnO.backend.Dto.Process.ImageProcessRegisterDto;
 import com.aisip.OnO.backend.entity.Folder;
+import com.aisip.OnO.backend.entity.Problem.ProblemRepeat;
+import com.aisip.OnO.backend.entity.Problem.TemplateType;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.repository.FolderRepository;
+import com.aisip.OnO.backend.repository.ProblemRepeatRepository;
 import com.aisip.OnO.backend.repository.UserRepository;
 import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
@@ -35,8 +39,11 @@ public class ProblemServiceImpl implements ProblemService {
     private final UserRepository userRepository;
     private final ProblemRepository problemRepository;
 
+    private final ProblemRepeatRepository problemRepeatRepository;
+
     private final FolderRepository folderRepository;
     private final FileUploadService fileUploadService;
+
 
     @Override
     public ProblemResponseDto findProblemByUserId(Long userId, Long problemId) {
@@ -46,7 +53,8 @@ public class ProblemServiceImpl implements ProblemService {
 
             if (problem.getUser().getId().equals(userId)) {
                 List<ImageData> images = fileUploadService.getProblemImages(problemId);
-                return ProblemConverter.convertToResponseDto(problem, images);
+                List<ProblemRepeat> repeats = getProblemRepeats(problemId);
+                return ProblemConverter.convertToResponseDto(problem, images, repeats);
             } else {
                 throw new UserNotAuthorizedException("해당 문제의 작성자가 아닙니다.");
             }
@@ -62,7 +70,8 @@ public class ProblemServiceImpl implements ProblemService {
                         .stream()
                         .map(problem -> {
                             List<ImageData> images = fileUploadService.getProblemImages(problem.getId());
-                            return ProblemConverter.convertToResponseDto(problem, images); // 문제 데이터와 이미지 데이터를 DTO로 변환
+                            List<ProblemRepeat> repeats = getProblemRepeats(problem.getId());
+                            return ProblemConverter.convertToResponseDto(problem, images, repeats); // 문제 데이터와 이미지 데이터를 DTO로 변환
                         })
                         .collect(Collectors.toList()))
                 .orElse(Collections.emptyList());
@@ -74,7 +83,8 @@ public class ProblemServiceImpl implements ProblemService {
         return problemRepository.findAllByFolderId(folderId)
                 .stream().map(problem -> {
                     List<ImageData> images = fileUploadService.getProblemImages(problem.getId());
-                    return ProblemConverter.convertToResponseDto(problem, images); // 문제 데이터와 이미지 데이터를 DTO로 변환
+                    List<ProblemRepeat> repeats = getProblemRepeats(problem.getId());
+                    return ProblemConverter.convertToResponseDto(problem, images, repeats); // 문제 데이터와 이미지 데이터를 DTO로 변환
                 }).collect(Collectors.toList());
 
     }
@@ -144,6 +154,58 @@ public class ProblemServiceImpl implements ProblemService {
 
                 if (problemRegisterDto.getSolveImage() != null) {
                     String solveImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getSolveImage(), savedProblem, ImageType.SOLVE_IMAGE);
+                }
+
+                return true;
+            } else {
+                throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            Sentry.captureException(e);
+            return false;
+        }
+    }
+
+    @Override
+    public boolean saveProblemV2(Long userId, ProblemRegisterDtoV2 problemRegisterDto) {
+        Optional<User> optionalUserEntity = userRepository.findById(userId);
+
+        try {
+            if (optionalUserEntity.isPresent()) {
+                User user = optionalUserEntity.get();
+                Problem problem;
+
+                Optional<Problem> optionalProblem = problemRepository.findById(problemRegisterDto.getProblemId());
+                problem = optionalProblem.orElseGet(() -> Problem.builder()
+                        .build());
+
+                problem.setUser(user);
+                problem.setMemo(problemRegisterDto.getMemo());
+                problem.setReference(problemRegisterDto.getReference());
+                problem.setAnalysis(problemRegisterDto.getAnalysis());
+                problem.setTemplateType(TemplateType.valueOf(problemRegisterDto.getTemplateType()));
+                problem.setSolvedAt(problemRegisterDto.getSolvedAt());
+
+                if (problemRegisterDto.getFolderId() != null) {
+                    Optional<Folder> optionalFolder = folderRepository.findById(problemRegisterDto.getFolderId());
+                    optionalFolder.ifPresent(problem::setFolder);
+                }
+
+                if(problemRegisterDto.getProblemImageUrl() != null){
+                    fileUploadService.saveImageData(problemRegisterDto.getProblemImageUrl(), problem, ImageType.PROBLEM_IMAGE);
+                }
+
+                if (problemRegisterDto.getAnswerImage() != null) {
+                    String answerImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getAnswerImage(), problem, ImageType.ANSWER_IMAGE);
+                }
+
+                if (problemRegisterDto.getSolveImage() != null) {
+                    String solveImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getSolveImage(), problem, ImageType.SOLVE_IMAGE);
+                }
+
+                if(problemRegisterDto.getProcessImageUrl() != null){
+                    fileUploadService.saveImageData(problemRegisterDto.getProcessImageUrl(), problem, ImageType.PROCESS_IMAGE);
                 }
 
                 return true;
@@ -250,5 +312,26 @@ public class ProblemServiceImpl implements ProblemService {
             images.forEach(fileUploadService::deleteImage);
             problemRepository.delete(problem);
         });
+    }
+
+    @Override
+    public List<ProblemRepeat> getProblemRepeats(Long problemId){
+        return problemRepeatRepository.findAllByProblemId(problemId);
+    }
+
+    @Override
+    public void addRepeatCount(Long problemId) {
+        Optional<Problem> optionalProblem = problemRepository.findById(problemId);
+
+        if (optionalProblem.isPresent()) {
+            Problem problem = optionalProblem.get();
+            ProblemRepeat problemRepeat = ProblemRepeat.builder()
+                    .problem(problem)
+                    .build();
+
+            problemRepeatRepository.save(problemRepeat);
+        } else {
+            throw new ProblemNotFoundException("문제를 찾을 수 없습니다! problemId: " + problemId);
+        }
     }
 }

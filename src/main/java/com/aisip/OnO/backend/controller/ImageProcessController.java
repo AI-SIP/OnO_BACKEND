@@ -47,12 +47,13 @@ public class ImageProcessController {
         }
     }
 
-    @GetMapping("/analysis")
+    @PostMapping("/analysis")
     public ResponseEntity<?> getProblemAnalysis(
             Authentication authentication,
-            @RequestParam("problemImageUrl") String problemImageUrl
+            @RequestBody Map<String, String> requestBody
     ) {
         try {
+            String problemImageUrl = requestBody.get("problemImageUrl");
             String analysisResult = fileUploadService.getProblemAnalysis(problemImageUrl);
 
             return ResponseEntity.ok(Map.of("analysis", analysisResult));
@@ -63,10 +64,10 @@ public class ImageProcessController {
         }
     }
 
-    @GetMapping("/processImage")
+    @PostMapping("/processImage")
     public ResponseEntity<?> getProcessImage(
             Authentication authentication,
-            @ModelAttribute ImageProcessRegisterDto imageProcessRegisterDto
+            @RequestBody ImageProcessRegisterDto imageProcessRegisterDto
             ) {
         try {
             String processImageUrl = fileUploadService.getProcessImageUrl(imageProcessRegisterDto);

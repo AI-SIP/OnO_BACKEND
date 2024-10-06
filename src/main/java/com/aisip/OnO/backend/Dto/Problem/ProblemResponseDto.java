@@ -1,11 +1,13 @@
 package com.aisip.OnO.backend.Dto.Problem;
 
+import com.aisip.OnO.backend.entity.Problem.ProblemRepeat;
 import com.aisip.OnO.backend.entity.Problem.TemplateType;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -25,12 +27,16 @@ public class ProblemResponseDto {
 
     private String memo;
 
+    private Long folderId;
+
     private String reference;
 
     private String analysis;
 
+    private List<ProblemRepeatDto> repeats;
+
     @Enumerated(EnumType.STRING)
-    private TemplateType templateType;
+    private Long templateType;
 
     private LocalDateTime solvedAt;
 
@@ -38,3 +44,4 @@ public class ProblemResponseDto {
 
     private LocalDateTime updateAt;
 }
+

@@ -10,5 +10,6 @@ import java.util.Optional;
 public interface ImageDataRepository extends JpaRepository<ImageData, Long> {
     List<ImageData> findByProblemId(Long problemId);
 
+    Optional<ImageData> findByImageUrl(String imageUrl);
     Optional<ImageData> findByProblemIdAndImageType(Long problemId, ImageType imageType);
 }

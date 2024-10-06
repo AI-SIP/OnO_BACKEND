@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.controller;
 
 import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
+import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDtoV2;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.exception.ProblemNotFoundException;
 import com.aisip.OnO.backend.exception.ProblemRegisterException;
@@ -88,6 +89,31 @@ public class ProblemController {
         }
     }
 
+    @PostMapping("/problem/V2")
+    public ResponseEntity<?> registerProblemV2(
+            Authentication authentication,
+            @ModelAttribute ProblemRegisterDtoV2 problemRegisterDto
+    ) {
+        try {
+            Long userId = (Long) authentication.getPrincipal();
+            boolean isSaved = problemService.saveProblemV2(userId, problemRegisterDto);
+
+            if (isSaved) {
+                log.info("userId: " + userId + " success for register problem");
+                return ResponseEntity.ok().body("문제가 등록되었습니다.");
+            } else {
+                throw new ProblemRegisterException("userId: " + userId + " failed for register problem");
+            }
+
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            Sentry.captureException(e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    "Error Register Problem: " + e.getMessage()
+            );
+        }
+    }
+
     @PatchMapping("/problem")
     public ResponseEntity<?> updateProblem(
             Authentication authentication, @ModelAttribute ProblemRegisterDto problemRegisterDto
@@ -123,6 +149,25 @@ public class ProblemController {
             problemService.deleteProblem(userId, problemId);
 
             log.info("userId: " + userId + " success for delete problem");
+            return ResponseEntity.ok("삭제를 완료했습니다.");
+        } catch (Exception e) {
+            log.warn(e.getMessage());
+            Sentry.captureException(e);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/problem/repeat")
+    public ResponseEntity<?> addRepeatCount(
+            Authentication authentication,
+            @RequestHeader("problemId") Long problemId
+    ){
+        try{
+            Long userId = (Long) authentication.getPrincipal();
+            problemService.addRepeatCount(problemId);
+
+            log.info("userId: " + userId + " repeat problemId : " + problemId);
             return ResponseEntity.ok("삭제를 완료했습니다.");
         } catch (Exception e) {
             log.warn(e.getMessage());

@@ -37,6 +37,7 @@ public class Problem extends BaseEntity {
 
     private LocalDateTime solvedAt;
 
+    @Column(columnDefinition = "LONGTEXT")
     private String analysis;
 
     @Enumerated(EnumType.STRING)
