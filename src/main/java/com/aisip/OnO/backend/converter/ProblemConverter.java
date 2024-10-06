@@ -5,6 +5,7 @@ import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.entity.Image.ImageData;
 import com.aisip.OnO.backend.entity.Problem.Problem;
 import com.aisip.OnO.backend.entity.Problem.ProblemRepeat;
+import com.aisip.OnO.backend.entity.Problem.TemplateType;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,7 +32,7 @@ public class ProblemConverter {
                             .updatedAt(problemRepeat.getUpdatedAt())
                             .build()
                 ).collect(Collectors.toList()))
-                .templateType(problem.getTemplateType().getCode())
+                .templateType(problem.getTemplateType() != null ? problem.getTemplateType().getCode() : TemplateType.SIMPLE_TEMPLATE.getCode())
                 .build();
 
         for (ImageData image : images) {
