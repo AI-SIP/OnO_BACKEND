@@ -8,6 +8,8 @@
   <style>
     .user-details-table, .problem-table {
       width: 100%;
+      table-layout: fixed;
+      word-wrap : break-word;
     }
     .user-details-table th, .user-details-table td,
     .problem-table th, .problem-table td {
@@ -125,52 +127,64 @@
 
   <div class="card">
     <div class="card-body">
-      <table class="table problem-table">
-        <thead>
-        <tr>
-          <th>ID</th>
-          <th>보정 이미지</th>
-          <th>문제 이미지</th>
-          <th>정답 이미지</th>
-          <th>풀이 이미지</th>
-          <th>메모</th>
-          <th>출처</th>
-          <th>푼 날짜</th>
-          <th>생성일</th>
-          <th>수정일</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="problem : ${problems}">
-          <td th:text="${problem.problemId}">1</td>
-          <td>
-            <a th:href="@{'/admin/user/image/view?url=' + ${problem.processImageUrl}}">
-              <img th:src="${problem.processImageUrl}" alt="Process Image" class="img-thumbnail" style="max-width: 100px;">
-            </a>
-          </td>
-          <td>
-            <a th:href="@{'/admin/user/image/view?url=' + ${problem.problemImageUrl}}">
-              <img th:src="${problem.problemImageUrl}" alt="Problem Image" class="img-thumbnail" style="max-width: 100px;">
-            </a>
-          </td>
-          <td>
-            <a th:href="@{'/admin/user/image/view?url=' + ${problem.answerImageUrl}}">
-              <img th:src="${problem.answerImageUrl}" alt="Answer Image" class="img-thumbnail" style="max-width: 100px;">
-            </a>
-          </td>
-          <td>
-            <a th:href="@{'/admin/user/image/view?url=' + ${problem.solveImageUrl}}">
-              <img th:src="${problem.solveImageUrl}" alt="Solve Image" class="img-thumbnail" style="max-width: 100px;">
-            </a>
-          </td>
-          <td th:text="${problem.memo}">Memo</td>
-          <td th:text="${problem.reference}">Reference</td>
-          <td th:text="${@dateFormatter.format(problem.solvedAt)}">2024년 08월 20일 18시 32분 51초</td>
-          <td th:text="${@dateFormatter.format(problem.createdAt)}">2024년 08월 20일 18시 32분 51초</td>
-          <td th:text="${@dateFormatter.format(problem.updateAt)}">2024년 08월 20일 18시 32분 51초</td>
-        </tr>
-        </tbody>
-      </table>
+      <div class = "table-responsive">
+        <table class="table problem-table table-hover table-striped">
+          <thead>
+          <tr>
+            <th style="width:5%">ID</th>
+            <th style="width:10%">작성 유저</th>
+            <th style="width:10%">템플릿 타입</th>
+            <th style="width:5%">폴더 ID</th>
+            <th style="width:10%">출처</th>
+            <th style="width:10%">메모</th>
+            <th style="width:20%">분석 결과</th>
+            <th style="width:5%">복습 횟수</th>
+            <th style="width:10%">푼 날짜</th>
+            <th style="width:10%">생성일</th>
+            <th style="width:10%">수정일</th>
+            <th style="width:10%">보정 이미지</th>
+            <th style="width:10%">문제 이미지</th>
+            <th style="width:10%">정답 이미지</th>
+            <th style="width:10%">풀이 이미지</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr th:each="problem : ${problems}">
+            <td th:text="${problem.problemId}">problemId</td>
+            <td th:text="${problem.userName}">userName</td>
+            <td th:text="${problem.templateType}">templateType</td>
+            <td th:text="${problem.folderId}">folderId</td>
+            <td th:text="${problem.reference}">Reference</td>
+            <td th:text="${problem.memo}">memo</td>
+            <td th:text="${problem.analysis}">analysis</td>
+            <td th:text="${#lists.size(problem.repeats)}">repeats size</td>
+            <td th:text="${@dateFormatter.format(problem.solvedAt)}">2024년 08월 20일 18시 32분 51초</td>
+            <td th:text="${@dateFormatter.format(problem.createdAt)}">2024년 08월 20일 18시 32분 51초</td>
+            <td th:text="${@dateFormatter.format(problem.updateAt)}">2024년 08월 20일 18시 32분 51초</td>
+            <td>
+              <a th:href="@{'/admin/user/image/view?url=' + ${problem.processImageUrl}}">
+                <img th:src="${problem.processImageUrl}" alt="Process Image" class="img-thumbnail" style="max-width: 100px;">
+              </a>
+            </td>
+            <td>
+              <a th:href="@{'/admin/user/image/view?url=' + ${problem.problemImageUrl}}">
+                <img th:src="${problem.problemImageUrl}" alt="Problem Image" class="img-thumbnail" style="max-width: 100px;">
+              </a>
+            </td>
+            <td>
+              <a th:href="@{'/admin/user/image/view?url=' + ${problem.answerImageUrl}}">
+                <img th:src="${problem.answerImageUrl}" alt="Answer Image" class="img-thumbnail" style="max-width: 100px;">
+              </a>
+            </td>
+            <td>
+              <a th:href="@{'/admin/user/image/view?url=' + ${problem.solveImageUrl}}">
+                <img th:src="${problem.solveImageUrl}" alt="Solve Image" class="img-thumbnail" style="max-width: 100px;">
+              </a>
+            </td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>

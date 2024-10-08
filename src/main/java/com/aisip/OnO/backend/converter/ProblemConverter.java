@@ -18,13 +18,14 @@ public class ProblemConverter {
         }
 
         ProblemResponseDto problemResponseDto = ProblemResponseDto.builder()
+                .userName(problem.getUser() != null ? problem.getUser().getName() : "유저 없음")
                 .problemId(problem.getId())
                 .memo(problem.getMemo())
                 .reference(problem.getReference())
                 .solvedAt(problem.getSolvedAt())
                 .createdAt(problem.getCreatedAt())
                 .updateAt(problem.getUpdatedAt())
-                .folderId(problem.getFolder().getId())
+                .folderId(problem.getFolder() != null ? problem.getFolder().getId() : null)
                 .analysis(problem.getAnalysis())
                 .repeats(repeats.stream().map(problemRepeat -> ProblemRepeatDto.builder()
                             .id(problemRepeat.getId())

@@ -18,6 +18,8 @@ public interface FileUploadService {
 
     void saveImageData(String imageUrl, Problem problem, ImageType imageType);
 
+    Long getImageTypeCount(ImageType imageType);
+
     String getProblemAnalysis(String problemImageUrl);
 
     String updateImage(MultipartFile file, Problem problem, ImageType imageType) throws IOException;

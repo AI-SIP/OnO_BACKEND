@@ -24,11 +24,13 @@
 </head>
 <body>
 <div class="container d-flex align-items-center justify-content-center min-vh-100">
-  <div class="card text-center p-4">
+  <div class="card text-center p-5">
     <div class="card-body">
       <h1 class="card-title">관리자 페이지</h1>
       <p class="card-text">이곳은 관리자만 접근할 수 있는 페이지입니다.</p>
       <a th:href="@{/admin/users}" class="btn btn-primary btn-custom">전체 유저 조회</a>
+      <a th:href="@{/admin/problems}" class="btn btn-primary btn-custom">전체 문제 조회</a>
+      <a th:href="@{/admin/analysis}" class="btn btn-primary btn-custom">유저 통계</a>
       <a th:href="@{/logout}" class="btn btn-danger btn-custom">로그아웃</a>
     </div>
   </div>

@@ -57,6 +57,11 @@ public class FileUploadServiceImpl implements FileUploadService {
     }
 
     @Override
+    public Long getImageTypeCount(ImageType imageType){
+        return imageDataRepository.countAllByImageType(imageType);
+    }
+
+    @Override
     public void saveImageData(String imageUrl, Problem problem, ImageType imageType) {
 
         if(imageDataRepository.findByImageUrl(imageUrl).isEmpty()){
