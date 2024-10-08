@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>통계 목록</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="container mt-5">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>통계 목록 목록</h1>
+  </div>
+  <table class="table table-striped">
+    <thead>
+    <tr>
+      <th scope="col">유저 수</th>
+      <th scope="col">게스트 유저 수</th>
+      <th scope="col">일반 유저 수</th>
+      <th scope="col">총 문제 수</th>
+      <th scope="col">템플릿 업데이트 이전 문제 수</th>
+      <th scope="col">심플 템플릿 문제 수</th>
+      <th scope="col">클린 템플릿 문제 수</th>
+      <th scope="col">스페셜 템플릿 문제 수</th>
+      <th scope="col">보정 이미지 등록 수</th>
+      <th scope="col">문제 이미지 등록 수</th>
+      <th scope="col">정답 이미지 등록 수</th>
+      <th scope="col">해설 이미지 등록 수</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td th:text="${allUserCount}">allUserCount</td>
+      <td th:text="${guestMemberCount}">guestMemberCount</td>
+      <td th:text="${memberCount}">memberCount</td>
+      <td th:text="${allProblemCount}">allProblemCount</td>
+      <td th:text="${nullTemplateCount}">nullTemplateCount</td>
+      <td th:text="${simpleTemplateCount}">simpleTemplateCount</td>
+      <td th:text="${cleanTemplateCount}">cleanTemplateCount</td>
+      <td th:text="${specialTemplateCount}">specialTemplateCount</td>
+      <td th:text="${problemImageCount}">problemImageCount</td>
+      <td th:text="${answerImageCount}">answerImageCount</td>
+      <td th:text="${solveImageCount}">solveImageCount</td>
+      <td th:text="${processImageCount}">processImageCount</td>
+    </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Bootstrap JS (Optional) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

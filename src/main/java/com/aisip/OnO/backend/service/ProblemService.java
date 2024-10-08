@@ -5,6 +5,7 @@ import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDtoV2;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.entity.Problem.Problem;
 import com.aisip.OnO.backend.entity.Problem.ProblemRepeat;
+import com.aisip.OnO.backend.entity.Problem.TemplateType;
 
 import java.util.List;
 
@@ -31,6 +32,8 @@ public interface ProblemService {
     void deleteUserProblems(Long userId);
 
     List<ProblemRepeat> getProblemRepeats(Long problemId);
+
+    Long getTemplateTypeCount(TemplateType templateType);
 
     void addRepeatCount(Long problemId);
 }

@@ -12,4 +12,6 @@ public interface ImageDataRepository extends JpaRepository<ImageData, Long> {
 
     Optional<ImageData> findByImageUrl(String imageUrl);
     Optional<ImageData> findByProblemIdAndImageType(Long problemId, ImageType imageType);
+
+    Long countAllByImageType(ImageType imageType);
 }

@@ -350,4 +350,13 @@ public class ProblemServiceImpl implements ProblemService {
             throw new ProblemNotFoundException("문제를 찾을 수 없습니다! problemId: " + problemId);
         }
     }
+
+    @Override
+    public Long getTemplateTypeCount(TemplateType templateType){
+        if(templateType == null){
+            return problemRepository.countAllByTemplateTypeIsNull();
+        } else{
+            return problemRepository.countAllByTemplateType(templateType);
+        }
+    }
 }

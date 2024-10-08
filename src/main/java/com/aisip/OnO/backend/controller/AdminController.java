@@ -3,6 +3,10 @@ package com.aisip.OnO.backend.controller;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.Dto.User.UserRegisterDto;
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
+import com.aisip.OnO.backend.entity.Image.ImageType;
+import com.aisip.OnO.backend.entity.Problem.TemplateType;
+import com.aisip.OnO.backend.entity.User.UserType;
+import com.aisip.OnO.backend.service.FileUploadService;
 import com.aisip.OnO.backend.service.FolderService;
 import com.aisip.OnO.backend.service.ProblemService;
 import com.aisip.OnO.backend.service.UserService;
@@ -27,6 +31,8 @@ public class AdminController {
     private final ProblemService problemService;
 
     private final FolderService folderService;
+
+    private final FileUploadService fileUploadService;
 
     @GetMapping("/main")
     public String adminPage() {
@@ -95,5 +101,40 @@ public class AdminController {
         model.addAttribute("problems", problems);
 
         return "problems";
+    }
+
+    @GetMapping("/analysis")
+    public String getAllAnalysis(Model model, Authentication authentication) {
+
+        int allUserCount = userService.findAllUsers().size();
+        Long guestMemberCount = userService.findAllUserTypeCountByUserType(UserType.GUEST);
+        Long memberCount = userService.findAllUserTypeCountByUserType(UserType.MEMBER);
+
+        int allProblemCount = problemService.findAllProblems().size();
+        Long nullTemplateCount = problemService.getTemplateTypeCount(null);
+        Long simpleTemplateCount = problemService.getTemplateTypeCount(TemplateType.SIMPLE_TEMPLATE);
+        Long cleanTemplateCount = problemService.getTemplateTypeCount(TemplateType.CLEAN_TEMPLATE);
+        Long specialTemplateCount = problemService.getTemplateTypeCount(TemplateType.SPECIAL_TEMPLATE);
+
+        Long problemImageCount = fileUploadService.getImageTypeCount(ImageType.PROBLEM_IMAGE);
+        Long answerImageCount = fileUploadService.getImageTypeCount(ImageType.ANSWER_IMAGE);
+        Long solveImageCount = fileUploadService.getImageTypeCount(ImageType.SOLVE_IMAGE);
+        Long processImageCount = fileUploadService.getImageTypeCount(ImageType.PROCESS_IMAGE);
+
+
+        model.addAttribute("allUserCount", allUserCount);
+        model.addAttribute("guestMemberCount", guestMemberCount);
+        model.addAttribute("memberCount", memberCount);
+        model.addAttribute("allProblemCount", allProblemCount);
+        model.addAttribute("nullTemplateCount", nullTemplateCount);
+        model.addAttribute("simpleTemplateCount", simpleTemplateCount);
+        model.addAttribute("cleanTemplateCount", cleanTemplateCount);
+        model.addAttribute("specialTemplateCount", specialTemplateCount);
+        model.addAttribute("problemImageCount", problemImageCount);
+        model.addAttribute("answerImageCount", answerImageCount);
+        model.addAttribute("solveImageCount", solveImageCount);
+        model.addAttribute("processImageCount", processImageCount);
+
+        return "analysis";
     }
 }

@@ -79,6 +79,11 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public Long findAllUserTypeCountByUserType(UserType userType) {
+        return userRepository.countUserByType(userType);
+    }
+
+    @Override
     public UserResponseDto updateUser(Long userId, UserRegisterDto userRegisterDto) {
 
         Optional<User> optionalUser = userRepository.findById(userId);
