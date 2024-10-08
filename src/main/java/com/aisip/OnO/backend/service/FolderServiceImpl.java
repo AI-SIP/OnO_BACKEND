@@ -40,6 +40,14 @@ public class FolderServiceImpl implements FolderService {
         Optional<Folder> optionalRootFolder = folderRepository.findByUserIdAndParentFolderIsNull(userId);
 
         if (optionalRootFolder.isPresent()) {
+
+            List<Problem> noFolderProblems = problemRepository.findAllByUserIdAndFolderIsNull(userId);
+
+            for (Problem problem : noFolderProblems) {
+                problem.setFolder(optionalRootFolder.get());
+                problemRepository.save(problem);
+            }
+
             log.info("find root folder id: " + optionalRootFolder.get().getId());
             return findFolder(userId, optionalRootFolder.get().getId());
         } else {

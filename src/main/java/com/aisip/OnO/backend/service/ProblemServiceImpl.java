@@ -78,6 +78,16 @@ public class ProblemServiceImpl implements ProblemService {
     }
 
     @Override
+    public List<ProblemResponseDto> findAllProblems() {
+        List<Problem> problems = problemRepository.findAll();
+        return problems.stream().map(problem -> {
+            List<ImageData> images = fileUploadService.getProblemImages(problem.getId());
+            List<ProblemRepeat> repeats = getProblemRepeats(problem.getId());
+            return ProblemConverter.convertToResponseDto(problem, images, repeats); // 문제 데이터와 이미지 데이터를 DTO로 변환
+        }).collect(Collectors.toList());
+    }
+
+    @Override
     public List<ProblemResponseDto> findAllProblemsByFolderId(Long folderId) {
 
         return problemRepository.findAllByFolderId(folderId)

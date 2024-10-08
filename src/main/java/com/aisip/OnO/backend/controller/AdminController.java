@@ -50,7 +50,7 @@ public class AdminController {
     }
 
     @GetMapping("/users")
-    public String getAllUser(Model model, Authentication authentication) {
+    public String getAllUsers(Model model, Authentication authentication) {
         List<UserResponseDto> users = userService.findAllUsers();
         List<Long> problemCounts = userService.findAllUsersProblemCount();
         model.addAttribute("users", users);
@@ -86,5 +86,14 @@ public class AdminController {
         userService.deleteUserById(userId);
 
         return ResponseEntity.ok().body("delete complete");
+    }
+
+    @GetMapping("/problems")
+    public String getAllProblems(Model model, Authentication authentication) {
+
+        List<ProblemResponseDto> problems = problemService.findAllProblems();
+        model.addAttribute("problems", problems);
+
+        return "problems";
     }
 }

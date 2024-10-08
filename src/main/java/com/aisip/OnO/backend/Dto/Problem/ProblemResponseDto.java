@@ -17,6 +17,8 @@ public class ProblemResponseDto {
 
     private Long problemId;
 
+    private String userName;
+
     private String problemImageUrl;
 
     private String processImageUrl;

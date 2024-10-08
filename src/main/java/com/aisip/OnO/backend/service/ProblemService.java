@@ -14,6 +14,8 @@ public interface ProblemService {
 
     List<ProblemResponseDto> findAllProblemsByUserId(Long userId);
 
+    List<ProblemResponseDto> findAllProblems();
+
     List<ProblemResponseDto> findAllProblemsByFolderId(Long folderId);
 
     Problem createProblem(Long userId);
