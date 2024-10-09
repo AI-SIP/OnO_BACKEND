@@ -22,7 +22,7 @@ public class ProblemConverter {
                 .problemId(problem.getId())
                 .memo(problem.getMemo())
                 .reference(problem.getReference())
-                .solvedAt(problem.getSolvedAt())
+                .solvedAt(problem.getSolvedAt() != null ? problem.getSolvedAt() : problem.getCreatedAt())
                 .createdAt(problem.getCreatedAt())
                 .updateAt(problem.getUpdatedAt())
                 .folderId(problem.getFolder() != null ? problem.getFolder().getId() : null)
