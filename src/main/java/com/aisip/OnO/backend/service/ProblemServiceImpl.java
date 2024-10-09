@@ -25,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -195,7 +196,7 @@ public class ProblemServiceImpl implements ProblemService {
                 problem.setReference(problemRegisterDto.getReference());
                 problem.setAnalysis(problemRegisterDto.getAnalysis());
                 problem.setTemplateType(TemplateType.valueOf(problemRegisterDto.getTemplateType()));
-                problem.setSolvedAt(problemRegisterDto.getSolvedAt());
+                problem.setSolvedAt(problemRegisterDto.getSolvedAt() != null ? problemRegisterDto.getSolvedAt() : LocalDateTime.now());
 
                 if (problemRegisterDto.getFolderId() != null) {
                     Optional<Folder> optionalFolder = folderRepository.findById(problemRegisterDto.getFolderId());

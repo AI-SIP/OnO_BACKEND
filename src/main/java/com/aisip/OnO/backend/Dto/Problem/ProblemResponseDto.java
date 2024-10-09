@@ -1,7 +1,5 @@
 package com.aisip.OnO.backend.Dto.Problem;
 
-import com.aisip.OnO.backend.entity.Problem.ProblemRepeat;
-import com.aisip.OnO.backend.entity.Problem.TemplateType;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import lombok.*;
