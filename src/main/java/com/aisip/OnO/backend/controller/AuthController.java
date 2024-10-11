@@ -42,7 +42,6 @@ public class AuthController {
         log.info("Starting google login with Token : " + tokenRequestDto.toString());
 
         try {
-            //JsonNode tokenInfo = googleTokenVerifier.verifyToken(tokenRequestDto.getAccessToken(), tokenRequestDto.getPlatform());
             String email = tokenRequestDto.getEmail();
             String name = tokenRequestDto.getName();
             String identifier = tokenRequestDto.getIdentifier();
@@ -55,7 +54,7 @@ public class AuthController {
         } catch (Exception e) {
             log.warn(e.getMessage());
             Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Internal server error"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto(e.getMessage()));
         }
     }
 
@@ -78,7 +77,7 @@ public class AuthController {
         } catch (Exception e) {
             log.warn(e.getMessage());
             Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto("Invalid Apple token"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto(e.getMessage()));
         }
     }
 
@@ -100,29 +99,7 @@ public class AuthController {
         } catch (Exception e) {
             log.warn(e.getMessage());
             Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Internal server error"));
-        }
-    }
-
-    @PostMapping("/naver")
-    public ResponseEntity<?> naverLogin(@RequestBody TokenRequestDto tokenRequestDto) {
-
-        log.info("Starting naver login with Token : " + tokenRequestDto.toString());
-
-        try {
-            String email = tokenRequestDto.getEmail();
-            String name = tokenRequestDto.getName();
-            String identifier = tokenRequestDto.getIdentifier();
-
-            if (name != null && identifier != null) {
-                return getUserTokenResponse(name, identifier, email, UserType.MEMBER);
-            } else {
-                throw new IllegalArgumentException("Invalid token information or user data for username: " + name);
-            }
-        } catch (Exception e) {
-            log.warn(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponseDto("Internal server error"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto(e.getMessage()));
         }
     }
 

@@ -52,7 +52,7 @@ public class FolderServiceImpl implements FolderService {
             return findFolder(userId, optionalRootFolder.get().getId());
         } else {
             log.info("create root folder for userId: " + userId);
-            return createRootFolder(userId, "메인");
+            return createRootFolder(userId, "책장");
         }
     }
 
@@ -141,7 +141,7 @@ public class FolderServiceImpl implements FolderService {
                     .build();
         }
 
-        throw new FolderNotFoundException("폴더를 찾을 수 없습니다!, folderId: " + folderId);
+        throw new FolderNotFoundException("공책을 찾을 수 없습니다!, folderId: " + folderId);
     }
 
     @Override
@@ -240,7 +240,7 @@ public class FolderServiceImpl implements FolderService {
             Long parentFolderId = folder.getParentFolder().getId();
 
             // 재귀적으로 하위 폴더를 삭제
-            deleteSubFolders(folder);
+            deleteSubFolders(userId, folder);
             folderRepository.flush();
 
             if (parentFolderId != null) {
@@ -258,16 +258,18 @@ public class FolderServiceImpl implements FolderService {
         }
     }
 
-    private void deleteSubFolders(Folder folder) {
+    private void deleteSubFolders(Long userId, Folder folder) {
         // 하위 폴더들을 먼저 삭제
         if (folder.getSubFolders() != null && !folder.getSubFolders().isEmpty()) {
             for (Folder subFolder : folder.getSubFolders()) {
-                deleteSubFolders(subFolder); // 재귀적으로 하위 폴더 삭제
+                deleteSubFolders(userId, subFolder); // 재귀적으로 하위 폴더 삭제
             }
         }
 
         if (folder.getProblems() != null && !folder.getProblems().isEmpty()) {
-            problemRepository.deleteAll(folder.getProblems()); // 문제들 삭제
+            folder.getProblems().forEach(problem -> {
+                problemService.deleteProblem(userId, problem.getId());
+            });
         }
 
         folder.getSubFolders().clear(); // 하위 폴더 리스트 비우기 (orphanRemoval 보장)
