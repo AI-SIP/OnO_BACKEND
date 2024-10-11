@@ -31,8 +31,8 @@ public class UserServiceImpl implements UserService {
             user.setName(name);
             user.setIdentifier(identifier);
             user.setType(userType);
-            userRepository.save(user);
-            return UserConverter.convertToResponseDto(user);
+            User resultUser = userRepository.save(user);
+            return UserConverter.convertToResponseDto(resultUser);
         }
 
         return UserConverter.convertToResponseDto(optionalUser.get());

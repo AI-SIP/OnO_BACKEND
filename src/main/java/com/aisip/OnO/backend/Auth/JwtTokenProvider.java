@@ -25,7 +25,7 @@ public class JwtTokenProvider {
         return JWT.create()
                 .withSubject(userId.toString())
                 .withIssuedAt(new Date())
-                .withExpiresAt(new Date(System.currentTimeMillis() + expirationTime))
+                .withExpiresAt(new Date(System.currentTimeMillis() + (expirationTime * 24)))
                 .sign(Algorithm.HMAC512(secret.getBytes()));
     }
 
@@ -47,6 +47,7 @@ public class JwtTokenProvider {
             log.info("jwt validate success");
             return true;
         } catch (JWTVerificationException exception) {
+            log.warn("token validate failure : " + exception.getMessage());
             return false;
         }
     }
