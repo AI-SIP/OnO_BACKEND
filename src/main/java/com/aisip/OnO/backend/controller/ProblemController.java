@@ -163,7 +163,7 @@ public class ProblemController {
     public ResponseEntity<?> addRepeatCount(
             Authentication authentication,
             @RequestHeader("problemId") Long problemId,
-            @RequestParam("image")MultipartFile solveImage
+            @RequestParam(value = "solveImage", required = false) MultipartFile solveImage
             ){
         try{
             Long userId = (Long) authentication.getPrincipal();

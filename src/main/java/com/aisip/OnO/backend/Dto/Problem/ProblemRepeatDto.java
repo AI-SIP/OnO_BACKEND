@@ -3,7 +3,6 @@ package com.aisip.OnO.backend.Dto.Problem;
 import lombok.*;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Data
 @Builder
