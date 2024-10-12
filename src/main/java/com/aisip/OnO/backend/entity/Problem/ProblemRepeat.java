@@ -17,6 +17,9 @@ public class ProblemRepeat extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "solve_image_url")
+    private String solveImageUrl;
+
     @ManyToOne(fetch =  FetchType.LAZY)
     @JoinColumn(name = "problem_id")
     private Problem problem;
