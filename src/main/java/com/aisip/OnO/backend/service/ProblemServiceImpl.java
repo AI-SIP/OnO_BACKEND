@@ -24,7 +24,9 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -337,14 +339,18 @@ public class ProblemServiceImpl implements ProblemService {
     }
 
     @Override
-    public void addRepeatCount(Long problemId) {
+    public void addRepeatCount(Long problemId, MultipartFile solveImage) throws IOException {
         Optional<Problem> optionalProblem = problemRepository.findById(problemId);
-
         if (optionalProblem.isPresent()) {
             Problem problem = optionalProblem.get();
             ProblemRepeat problemRepeat = ProblemRepeat.builder()
                     .problem(problem)
                     .build();
+
+            if(solveImage != null){
+                String solveImageUrl = fileUploadService.uploadFileToS3(solveImage, problem, ImageType.SOLVE_IMAGE);
+                problemRepeat.setSolveImageUrl(solveImageUrl);
+            }
 
             problemRepeatRepository.save(problemRepeat);
         } else {

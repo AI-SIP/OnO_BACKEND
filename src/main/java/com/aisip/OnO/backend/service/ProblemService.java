@@ -6,7 +6,9 @@ import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.entity.Problem.Problem;
 import com.aisip.OnO.backend.entity.Problem.ProblemRepeat;
 import com.aisip.OnO.backend.entity.Problem.TemplateType;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 
 public interface ProblemService {
@@ -35,5 +37,5 @@ public interface ProblemService {
 
     Long getTemplateTypeCount(TemplateType templateType);
 
-    void addRepeatCount(Long problemId);
+    void addRepeatCount(Long problemId, MultipartFile solveImage) throws IOException;
 }

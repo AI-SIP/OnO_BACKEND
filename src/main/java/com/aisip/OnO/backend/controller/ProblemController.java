@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -161,11 +162,12 @@ public class ProblemController {
     @PostMapping("/problem/repeat")
     public ResponseEntity<?> addRepeatCount(
             Authentication authentication,
-            @RequestHeader("problemId") Long problemId
-    ){
+            @RequestHeader("problemId") Long problemId,
+            @RequestParam(value = "solveImage", required = false) MultipartFile solveImage
+            ){
         try{
             Long userId = (Long) authentication.getPrincipal();
-            problemService.addRepeatCount(problemId);
+            problemService.addRepeatCount(problemId, solveImage);
 
             log.info("userId: " + userId + " repeat problemId : " + problemId);
             return ResponseEntity.ok("삭제를 완료했습니다.");

@@ -106,7 +106,6 @@ public class AuthController {
     @GetMapping("/verifyAccessToken")
     public ResponseEntity<?> verifyAccessToken(@RequestHeader("Authorization") String authorizationHeader) {
         try {
-            log.info("start verify access token");
             if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
                 String accessToken = authorizationHeader.substring(7);
                 if (jwtTokenProvider.validateToken(accessToken)) {

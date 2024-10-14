@@ -50,7 +50,10 @@ public class FileUploadServiceImpl implements FileUploadService {
         objectMetadata.setContentLength(file.getSize());
 
         amazonS3Client.putObject(bucket, fileName, file.getInputStream(), objectMetadata);
-        saveImageData(fileUrl, problem, imageType);
+
+        if(imageType != ImageType.SOLVE_IMAGE){
+            saveImageData(fileUrl, problem, imageType);
+        }
 
         log.info("file url : " + fileUrl + " has upload to S3");
         return fileUrl;

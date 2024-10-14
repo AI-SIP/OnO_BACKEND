@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class ProblemRepeatDto {
     private Long id;
+    private String solveImageUrl;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

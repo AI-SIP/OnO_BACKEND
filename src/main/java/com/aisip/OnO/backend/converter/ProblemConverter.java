@@ -29,6 +29,7 @@ public class ProblemConverter {
                 .analysis(problem.getAnalysis())
                 .repeats(repeats.stream().map(problemRepeat -> ProblemRepeatDto.builder()
                             .id(problemRepeat.getId())
+                            .solveImageUrl(problemRepeat.getSolveImageUrl() != null ? problemRepeat.getSolveImageUrl() : null)
                             .createdAt(problemRepeat.getCreatedAt())
                             .updatedAt(problemRepeat.getUpdatedAt())
                             .build()
