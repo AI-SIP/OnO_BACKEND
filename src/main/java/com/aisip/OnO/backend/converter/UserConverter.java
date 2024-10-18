@@ -6,6 +6,10 @@ import com.aisip.OnO.backend.entity.User.User;
 public class UserConverter {
 
     public static UserResponseDto convertToResponseDto(User user) {
+        return convertToResponseDto(user, false);
+    }
+
+    public static UserResponseDto convertToResponseDto(User user, boolean firstLogin) {
 
         if (user == null) {
             return null;
@@ -17,6 +21,7 @@ public class UserConverter {
                 .userEmail(user.getEmail())
                 .userIdentifier(user.getIdentifier())
                 .userType(user.getType())
+                .firstLogin(firstLogin)
                 .updatedAt(user.getUpdatedAt())
                 .createdAt(user.getCreatedAt())
                 .build();

@@ -22,6 +22,8 @@ public class UserResponseDto {
     @Enumerated(EnumType.STRING)
     private UserType userType;
 
+    private boolean firstLogin;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;

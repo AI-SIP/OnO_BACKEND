@@ -10,6 +10,7 @@ import com.aisip.OnO.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -32,7 +33,7 @@ public class UserServiceImpl implements UserService {
             user.setIdentifier(identifier);
             user.setType(userType);
             User resultUser = userRepository.save(user);
-            return UserConverter.convertToResponseDto(resultUser);
+            return UserConverter.convertToResponseDto(resultUser, true);
         }
 
         return UserConverter.convertToResponseDto(optionalUser.get());
@@ -40,9 +41,21 @@ public class UserServiceImpl implements UserService {
 
     public UserResponseDto getUserById(Long userId) {
 
-        User user = userRepository.findById(userId).orElse(null);
+        Optional<User> optionalUser = userRepository.findById(userId);
 
-        return UserConverter.convertToResponseDto(user);
+        if(optionalUser.isPresent()){
+
+            User user = optionalUser.get();
+            LocalDate createdAtDate = user.getCreatedAt().toLocalDate();
+
+            if (createdAtDate.equals(LocalDate.now())) {
+                return UserConverter.convertToResponseDto(user, true);
+            }
+
+            return UserConverter.convertToResponseDto(user);
+        }
+
+        return null;
     }
 
     @Override
