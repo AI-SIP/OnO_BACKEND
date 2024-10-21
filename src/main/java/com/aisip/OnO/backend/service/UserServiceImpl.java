@@ -10,7 +10,9 @@ import com.aisip.OnO.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -46,9 +48,13 @@ public class UserServiceImpl implements UserService {
         if(optionalUser.isPresent()){
 
             User user = optionalUser.get();
-            LocalDate createdAtDate = user.getCreatedAt().toLocalDate();
+            LocalDateTime createdAtDateTime = user.getCreatedAt(); // LocalDateTime으로 변경
+            LocalDateTime now = LocalDateTime.now();
 
-            if (createdAtDate.equals(LocalDate.now())) {
+            // 두 시간 간의 차이를 계산하여 1시간 이내인지 확인
+            Duration duration = Duration.between(createdAtDateTime, now);
+
+            if (duration.toHours() < 1) {
                 return UserConverter.convertToResponseDto(user, true);
             }
 
