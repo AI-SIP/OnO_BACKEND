@@ -89,6 +89,7 @@ public class AdminController {
     public ResponseEntity<?> deleteUserInfo(@PathVariable Long userId) {
 
         problemService.deleteUserProblems(userId);
+        folderService.deleteAllUserFolder(userId);
         userService.deleteUserById(userId);
 
         return ResponseEntity.ok().body("delete complete");

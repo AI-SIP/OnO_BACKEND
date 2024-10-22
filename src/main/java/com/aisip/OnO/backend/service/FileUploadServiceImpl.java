@@ -88,6 +88,7 @@ public class FileUploadServiceImpl implements FileUploadService {
 
         HttpEntity<ImageProcessRegisterDto> request = new HttpEntity<>(imageProcessRegisterDto, headers);
 
+        log.info("intensity: " + imageProcessRegisterDto.getIntensity());
         log.info("remove colors on problemImage by colors: " + imageProcessRegisterDto.getColorsList());
 
         try {
