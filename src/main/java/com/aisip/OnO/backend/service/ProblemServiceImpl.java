@@ -1,8 +1,10 @@
 package com.aisip.OnO.backend.service;
 
+import com.aisip.OnO.backend.Dto.Problem.ProblemPractice.ProblemPracticeResponseDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDtoV2;
 import com.aisip.OnO.backend.Dto.Process.ImageProcessRegisterDto;
 import com.aisip.OnO.backend.entity.Folder;
+import com.aisip.OnO.backend.entity.Problem.ProblemPractice;
 import com.aisip.OnO.backend.entity.Problem.ProblemRepeat;
 import com.aisip.OnO.backend.entity.Problem.TemplateType;
 import com.aisip.OnO.backend.entity.User.User;
@@ -57,9 +59,7 @@ public class ProblemServiceImpl implements ProblemService {
             Problem problem = optionalProblem.get();
 
             if (problem.getUser().getId().equals(userId)) {
-                List<ImageData> images = fileUploadService.getProblemImages(problemId);
-                List<ProblemRepeat> repeats = getProblemRepeats(problemId);
-                return ProblemConverter.convertToResponseDto(problem, images, repeats);
+                return convertToProblemResponse(problem);
             } else {
                 throw new UserNotAuthorizedException("해당 문제의 작성자가 아닙니다.");
             }
@@ -69,15 +69,20 @@ public class ProblemServiceImpl implements ProblemService {
     }
 
     @Override
+    public ProblemResponseDto convertToProblemResponse(Problem problem){
+
+        List<ImageData> images = fileUploadService.getProblemImages(problem.getId());
+        List<ProblemRepeat> repeats = getProblemRepeats(problem.getId());
+
+        return ProblemConverter.convertToResponseDto(problem, images, repeats);
+    }
+
+    @Override
     public List<ProblemResponseDto> findUserProblems(Long userId) {
         Optional<User> user = userRepository.findById(userId);
         return user.map(u -> problemRepository.findAllByUserId(u.getId())
                         .stream()
-                        .map(problem -> {
-                            List<ImageData> images = fileUploadService.getProblemImages(problem.getId());
-                            List<ProblemRepeat> repeats = getProblemRepeats(problem.getId());
-                            return ProblemConverter.convertToResponseDto(problem, images, repeats); // 문제 데이터와 이미지 데이터를 DTO로 변환
-                        })
+                        .map(this::convertToProblemResponse)
                         .collect(Collectors.toList()))
                 .orElse(Collections.emptyList());
     }
@@ -85,23 +90,24 @@ public class ProblemServiceImpl implements ProblemService {
     @Override
     public List<ProblemResponseDto> findAllProblems() {
         List<Problem> problems = problemRepository.findAll();
-        return problems.stream().map(problem -> {
-            List<ImageData> images = fileUploadService.getProblemImages(problem.getId());
-            List<ProblemRepeat> repeats = getProblemRepeats(problem.getId());
-            return ProblemConverter.convertToResponseDto(problem, images, repeats); // 문제 데이터와 이미지 데이터를 DTO로 변환
-        }).collect(Collectors.toList());
+        return problems.stream().map(this::convertToProblemResponse).collect(Collectors.toList());
     }
 
     @Override
     public List<ProblemResponseDto> findAllProblemsByFolderId(Long folderId) {
 
         return problemRepository.findAllByFolderId(folderId)
-                .stream().map(problem -> {
-                    List<ImageData> images = fileUploadService.getProblemImages(problem.getId());
-                    List<ProblemRepeat> repeats = getProblemRepeats(problem.getId());
-                    return ProblemConverter.convertToResponseDto(problem, images, repeats); // 문제 데이터와 이미지 데이터를 DTO로 변환
-                }).collect(Collectors.toList());
+                .stream().map(this::convertToProblemResponse).collect(Collectors.toList());
 
+    }
+
+    @Override
+    public List<ProblemResponseDto> findProblemPractice(Long problemPracticeId) {
+        ProblemPractice problemPractice = problemPracticeService.findPracticeDetail(problemPracticeId);
+
+        return problemPractice.getProblems().stream().map(
+                this::convertToProblemResponse
+        ).collect(Collectors.toList());
     }
 
     @Override
@@ -120,7 +126,6 @@ public class ProblemServiceImpl implements ProblemService {
             throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
         }
     }
-
 
     @Override
     public boolean saveProblem(Long userId, ProblemRegisterDto problemRegisterDto) {

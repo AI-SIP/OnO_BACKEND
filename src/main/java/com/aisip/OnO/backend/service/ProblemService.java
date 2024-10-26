@@ -15,11 +15,15 @@ public interface ProblemService {
 
     ProblemResponseDto findProblem(Long userId, Long problemId);
 
+    ProblemResponseDto convertToProblemResponse(Problem problem);
+
     List<ProblemResponseDto> findUserProblems(Long userId);
 
     List<ProblemResponseDto> findAllProblems();
 
     List<ProblemResponseDto> findAllProblemsByFolderId(Long folderId);
+
+    List<ProblemResponseDto> findProblemPractice(Long problemPracticeId);
 
     Problem createProblem(Long userId);
 

@@ -1,8 +1,10 @@
 package com.aisip.OnO.backend.service;
 
-import com.aisip.OnO.backend.Dto.Problem.ProblemPracticeRegisterDto;
-import com.aisip.OnO.backend.Dto.Problem.ProblemPracticeResponseDto;
+import com.aisip.OnO.backend.Dto.Problem.ProblemPractice.ProblemPracticeRegisterDto;
+import com.aisip.OnO.backend.Dto.Problem.ProblemPractice.ProblemPracticeResponseDto;
 import com.aisip.OnO.backend.entity.Problem.ProblemPractice;
+
+import java.util.List;
 
 public interface ProblemPracticeService {
 
@@ -10,7 +12,13 @@ public interface ProblemPracticeService {
 
     void addProblemToPractice(Long practiceId, Long problemId);
 
-    ProblemPracticeResponseDto getPracticeById(Long practiceId);
+    ProblemPracticeResponseDto findPracticeThumbnail(Long practiceId);
+
+    ProblemPractice findPracticeDetail(Long practiceId);
+
+    List<ProblemPractice> findAllPracticeByUser(Long userId);
+
+    ProblemPractice updatePractice(Long practiceId, ProblemPracticeRegisterDto problemPracticeRegisterDto);
 
     void deletePractice(Long practiceId);
 

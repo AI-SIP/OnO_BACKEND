@@ -1,11 +1,8 @@
-package com.aisip.OnO.backend.Dto.Problem;
-
+package com.aisip.OnO.backend.Dto.Problem.ProblemPractice;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.util.List;
 
 @Data
 @Builder
@@ -19,5 +16,5 @@ public class ProblemPracticeResponseDto {
 
     private Long practiceCount;
 
-    private List<ProblemResponseDto> problems;
+    private Long practiceSize;
 }

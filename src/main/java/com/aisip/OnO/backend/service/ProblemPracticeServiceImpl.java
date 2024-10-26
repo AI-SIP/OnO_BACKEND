@@ -1,7 +1,7 @@
 package com.aisip.OnO.backend.service;
 
-import com.aisip.OnO.backend.Dto.Problem.ProblemPracticeRegisterDto;
-import com.aisip.OnO.backend.Dto.Problem.ProblemPracticeResponseDto;
+import com.aisip.OnO.backend.Dto.Problem.ProblemPractice.ProblemPracticeRegisterDto;
+import com.aisip.OnO.backend.Dto.Problem.ProblemPractice.ProblemPracticeResponseDto;
 import com.aisip.OnO.backend.converter.ProblemPracticeConverter;
 import com.aisip.OnO.backend.entity.Problem.Problem;
 import com.aisip.OnO.backend.entity.Problem.ProblemPractice;
@@ -66,15 +66,41 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
     }
 
     @Override
-    public ProblemPracticeResponseDto getPracticeById(Long practiceId) {
+    public ProblemPracticeResponseDto findPracticeThumbnail(Long practiceId) {
         ProblemPractice practice = problemPracticeRepository.findById(practiceId)
                 .orElseThrow(() -> new ProblemPracticeNotFoundException("Invalid practice practiceId: " + practiceId));
 
-        return ProblemPracticeConverter.convertToResponseDto(practice, false);
+        Long practiceSize = (long) problemPracticeRepository.countProblemsByPracticeId(practiceId);
+
+        return ProblemPracticeConverter.convertToResponseDto(practice, practiceSize);
     }
 
-    public List<ProblemPracticeResponseDto> findAllPracticeByUserId(Long userId){
-        return null;
+    public ProblemPractice findPracticeDetail(Long practiceId) {
+        ProblemPractice practice = problemPracticeRepository.findById(practiceId)
+                .orElseThrow(() -> new ProblemPracticeNotFoundException("Invalid practice practiceId: " + practiceId));
+
+        return practice;
+    }
+
+    @Override
+    public List<ProblemPractice> findAllPracticeByUser(Long userId){
+        return problemPracticeRepository.findAllByUserId(userId);
+    }
+
+    @Override
+    public ProblemPractice updatePractice(Long practiceId, ProblemPracticeRegisterDto problemPracticeRegisterDto) {
+        ProblemPractice practice = problemPracticeRepository.findById(practiceId)
+                .orElseThrow(() -> new ProblemPracticeNotFoundException("Invalid practice practiceId: " + practiceId));
+
+        if(problemPracticeRegisterDto.getTitle() != null){
+            practice.setTitle(problemPracticeRegisterDto.getTitle());
+        }
+
+        if(problemPracticeRegisterDto.getPracticeCount() != null && problemPracticeRegisterDto.getPracticeCount() > practice.getPracticeCount()){
+            practice.setPracticeCount(problemPracticeRegisterDto.getPracticeCount());
+        }
+
+        return practice;
     }
 
     @Override
