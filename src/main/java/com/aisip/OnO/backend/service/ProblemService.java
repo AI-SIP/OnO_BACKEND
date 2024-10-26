@@ -23,7 +23,7 @@ public interface ProblemService {
 
     List<ProblemResponseDto> findAllProblemsByFolderId(Long folderId);
 
-    List<ProblemResponseDto> findProblemPractice(Long problemPracticeId);
+    List<ProblemResponseDto> findAllProblemsByPracticeId(Long problemPracticeId);
 
     Problem createProblem(Long userId);
 

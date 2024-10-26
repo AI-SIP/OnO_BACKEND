@@ -1,6 +1,5 @@
 package com.aisip.OnO.backend.service;
 
-import com.aisip.OnO.backend.Dto.Problem.ProblemPractice.ProblemPracticeResponseDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDtoV2;
 import com.aisip.OnO.backend.Dto.Process.ImageProcessRegisterDto;
 import com.aisip.OnO.backend.entity.Folder;
@@ -102,8 +101,8 @@ public class ProblemServiceImpl implements ProblemService {
     }
 
     @Override
-    public List<ProblemResponseDto> findProblemPractice(Long problemPracticeId) {
-        ProblemPractice problemPractice = problemPracticeService.findPracticeDetail(problemPracticeId);
+    public List<ProblemResponseDto> findAllProblemsByPracticeId(Long problemPracticeId) {
+        ProblemPractice problemPractice = problemPracticeService.findPracticeEntity(problemPracticeId);
 
         return problemPractice.getProblems().stream().map(
                 this::convertToProblemResponse

@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -65,26 +66,22 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
         problemPracticeRepository.save(practice);
     }
 
-    @Override
-    public ProblemPracticeResponseDto findPracticeThumbnail(Long practiceId) {
-        ProblemPractice practice = problemPracticeRepository.findById(practiceId)
+    public ProblemPractice findPracticeEntity(Long practiceId) {
+
+        return problemPracticeRepository.findById(practiceId)
                 .orElseThrow(() -> new ProblemPracticeNotFoundException("Invalid practice practiceId: " + practiceId));
-
-        Long practiceSize = (long) problemPracticeRepository.countProblemsByPracticeId(practiceId);
-
-        return ProblemPracticeConverter.convertToResponseDto(practice, practiceSize);
-    }
-
-    public ProblemPractice findPracticeDetail(Long practiceId) {
-        ProblemPractice practice = problemPracticeRepository.findById(practiceId)
-                .orElseThrow(() -> new ProblemPracticeNotFoundException("Invalid practice practiceId: " + practiceId));
-
-        return practice;
     }
 
     @Override
-    public List<ProblemPractice> findAllPracticeByUser(Long userId){
-        return problemPracticeRepository.findAllByUserId(userId);
+    public List<ProblemPracticeResponseDto> findAllPracticeByUser(Long userId){
+        List<ProblemPractice> problemPracticeList = problemPracticeRepository.findAllByUserId(userId);
+
+        return problemPracticeList.stream().map(
+                problemPractice -> {
+                    Long practiceSize = (long) problemPracticeRepository.countProblemsByPracticeId(problemPractice.getId());
+                    return ProblemPracticeConverter.convertToResponseDto(problemPractice, practiceSize);
+                }
+        ).collect(Collectors.toList());
     }
 
     @Override

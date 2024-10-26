@@ -12,11 +12,9 @@ public interface ProblemPracticeService {
 
     void addProblemToPractice(Long practiceId, Long problemId);
 
-    ProblemPracticeResponseDto findPracticeThumbnail(Long practiceId);
+    ProblemPractice findPracticeEntity(Long practiceId);
 
-    ProblemPractice findPracticeDetail(Long practiceId);
-
-    List<ProblemPractice> findAllPracticeByUser(Long userId);
+    List<ProblemPracticeResponseDto> findAllPracticeByUser(Long userId);
 
     ProblemPractice updatePractice(Long practiceId, ProblemPracticeRegisterDto problemPracticeRegisterDto);
 

@@ -3,8 +3,6 @@ package com.aisip.OnO.backend.converter;
 import com.aisip.OnO.backend.Dto.Problem.ProblemPractice.ProblemPracticeResponseDto;
 import com.aisip.OnO.backend.entity.Problem.ProblemPractice;
 
-import java.util.List;
-
 public class ProblemPracticeConverter {
 
     public static ProblemPracticeResponseDto convertToResponseDto(ProblemPractice problemPractice, Long practiceSize) {
