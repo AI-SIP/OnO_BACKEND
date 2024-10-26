@@ -48,6 +48,21 @@ public class FolderController {
         }
     }
 
+    @GetMapping("/{folderId}")
+    public ResponseEntity<?> getFolderV2(Authentication authentication, @PathVariable Long folderId) {
+
+        try {
+            Long userId = (Long) authentication.getPrincipal();
+            log.info("userId: " + userId + " try to get folderId: " + folderId);
+
+            return ResponseEntity.ok(folderService.findFolder(userId, folderId));
+        } catch (Exception e) {
+            log.warn(e.getMessage());
+            Sentry.captureException(e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 탐색에 실패했습니다.");
+        }
+    }
+
     @GetMapping("/folders")
     public ResponseEntity<?> getAllFolderName(Authentication authentication) {
         try {

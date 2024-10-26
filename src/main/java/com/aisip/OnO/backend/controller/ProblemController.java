@@ -33,13 +33,13 @@ public class ProblemController {
     private final ProblemService problemService;
 
     @GetMapping("/problem/{problemId}")
-    public ResponseEntity<?> getProblemByUserId(
+    public ResponseEntity<?> getProblem(
             Authentication authentication,
             @PathVariable("problemId") Long problemId
     ) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            ProblemResponseDto problemResponseDto = problemService.findProblemByUserId(userId, problemId);
+            ProblemResponseDto problemResponseDto = problemService.findProblem(userId, problemId);
 
             log.info("userId: " + userId + " get problem for problemId: " + problemResponseDto.getProblemId());
             return ResponseEntity.ok(problemResponseDto);
@@ -54,7 +54,7 @@ public class ProblemController {
     public ResponseEntity<?> getProblemsByUserId(Authentication authentication) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            List<ProblemResponseDto> problems = problemService.findAllProblemsByUserId(userId);
+            List<ProblemResponseDto> problems = problemService.findUserProblems(userId);
 
             log.info("userId: " + userId + " get all problems");
             return ResponseEntity.ok(problems);

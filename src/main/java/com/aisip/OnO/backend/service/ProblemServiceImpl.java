@@ -45,11 +45,13 @@ public class ProblemServiceImpl implements ProblemService {
     private final ProblemRepeatRepository problemRepeatRepository;
 
     private final FolderRepository folderRepository;
+
+    private final ProblemPracticeService problemPracticeService;
     private final FileUploadService fileUploadService;
 
 
     @Override
-    public ProblemResponseDto findProblemByUserId(Long userId, Long problemId) {
+    public ProblemResponseDto findProblem(Long userId, Long problemId) {
         Optional<Problem> optionalProblem = problemRepository.findById(problemId);
         if (optionalProblem.isPresent()) {
             Problem problem = optionalProblem.get();
@@ -67,7 +69,7 @@ public class ProblemServiceImpl implements ProblemService {
     }
 
     @Override
-    public List<ProblemResponseDto> findAllProblemsByUserId(Long userId) {
+    public List<ProblemResponseDto> findUserProblems(Long userId) {
         Optional<User> user = userRepository.findById(userId);
         return user.map(u -> problemRepository.findAllByUserId(u.getId())
                         .stream()
@@ -329,6 +331,9 @@ public class ProblemServiceImpl implements ProblemService {
 
             List<ProblemRepeat> problemRepeats = getProblemRepeats(problemId);
             problemRepeatRepository.deleteAll(problemRepeats);
+
+            problemPracticeService.deleteProblemFromAllPractice(problemId);
+
             problemRepository.delete(problem);
         });
     }

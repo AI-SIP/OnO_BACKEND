@@ -13,9 +13,9 @@ import java.util.List;
 
 public interface ProblemService {
 
-    ProblemResponseDto findProblemByUserId(Long userId, Long problemId);
+    ProblemResponseDto findProblem(Long userId, Long problemId);
 
-    List<ProblemResponseDto> findAllProblemsByUserId(Long userId);
+    List<ProblemResponseDto> findUserProblems(Long userId);
 
     List<ProblemResponseDto> findAllProblems();
 

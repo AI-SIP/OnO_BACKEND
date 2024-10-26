@@ -31,6 +31,13 @@ public class Problem extends BaseEntity {
     @JoinColumn(name = "folder_id")
     private Folder folder;
 
+    /*
+    @ManyToOne(fetch =  FetchType.LAZY)
+    @JoinColumn(name = "problem_practice_id")
+    private ProblemPractice problemPractice;
+
+     */
+
     private String memo;
 
     private String reference;
