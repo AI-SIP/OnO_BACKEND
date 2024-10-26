@@ -15,5 +15,7 @@ public class ProblemPracticeRegisterDto {
 
     private String title;
 
-    private List<Long> problemIds;
+    private List<Long> registerProblemIds;
+
+    private List<Long> removeProblemIds;
 }

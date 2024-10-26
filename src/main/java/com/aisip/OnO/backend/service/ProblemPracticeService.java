@@ -8,7 +8,7 @@ import java.util.List;
 
 public interface ProblemPracticeService {
 
-    ProblemPractice createProblemPractice(Long userId, ProblemPracticeRegisterDto problemPracticeRegisterDto);
+    boolean createProblemPractice(Long userId, ProblemPracticeRegisterDto problemPracticeRegisterDto);
 
     void addProblemToPractice(Long practiceId, Long problemId);
 
@@ -16,11 +16,11 @@ public interface ProblemPracticeService {
 
     List<ProblemPracticeResponseDto> findAllPracticeByUser(Long userId);
 
-    ProblemPractice updatePractice(Long practiceId, ProblemPracticeRegisterDto problemPracticeRegisterDto);
+    boolean updatePractice(Long practiceId, ProblemPracticeRegisterDto problemPracticeRegisterDto);
 
     void deletePractice(Long practiceId);
 
-    void deleteProblemFromPractice(Long practiceId, Long problemId);
+    void removeProblemFromPractice(Long practiceId, Long problemId);
 
     void deleteProblemFromAllPractice(Long problemId);
 }
