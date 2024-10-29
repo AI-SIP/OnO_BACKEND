@@ -45,12 +45,12 @@ public class ProblemPracticeController {
     }
 
     @GetMapping("/all")
-    public ResponseEntity<?> getProblemPracticeDetail(
+    public ResponseEntity<?> getAllProblemPracticeThumbnail(
             Authentication authentication
     ) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            List<ProblemPracticeResponseDto> problemPracticeResponseDtoList = problemPracticeService.findAllPracticeByUser(userId);
+            List<ProblemPracticeResponseDto> problemPracticeResponseDtoList = problemPracticeService.findAllPracticeThumbnailsByUser(userId);
 
             log.info("userId: " + userId + " get all problem practice");
             return ResponseEntity.ok(problemPracticeResponseDtoList);
@@ -64,7 +64,7 @@ public class ProblemPracticeController {
     @PostMapping("")
     public ResponseEntity<?> registerProblemPractice(
             Authentication authentication,
-            @ModelAttribute ProblemPracticeRegisterDto problemPracticeRegisterDto
+            @RequestBody ProblemPracticeRegisterDto problemPracticeRegisterDto
             ) {
         try {
             Long userId = (Long) authentication.getPrincipal();

@@ -11,9 +11,12 @@ public class ProblemPracticeConverter {
         }
 
         return ProblemPracticeResponseDto.builder()
-                .title(problemPractice.getTitle())
+                .practiceId(problemPractice.getId())
+                .practiceTitle(problemPractice.getTitle())
                 .practiceCount(problemPractice.getPracticeCount())
                 .practiceSize(practiceSize)
+                .createdAt(problemPractice.getCreatedAt())
+                .lastSolvedAt(problemPractice.getLastSolvedAt())
                 .build();
     }
 }

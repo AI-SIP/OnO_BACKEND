@@ -13,7 +13,7 @@ public class ProblemPracticeRegisterDto {
 
     private Long practiceCount;
 
-    private String title;
+    private String practiceTitle;
 
     private List<Long> registerProblemIds;
 

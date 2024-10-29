@@ -5,10 +5,13 @@ import com.aisip.OnO.backend.Dto.Problem.ProblemPractice.ProblemPracticeResponse
 import com.aisip.OnO.backend.converter.ProblemPracticeConverter;
 import com.aisip.OnO.backend.entity.Problem.Problem;
 import com.aisip.OnO.backend.entity.Problem.ProblemPractice;
+import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.exception.ProblemNotFoundException;
 import com.aisip.OnO.backend.exception.ProblemPracticeNotFoundException;
+import com.aisip.OnO.backend.exception.UserNotFoundException;
 import com.aisip.OnO.backend.repository.ProblemPracticeRepository;
 import com.aisip.OnO.backend.repository.ProblemRepository;
+import com.aisip.OnO.backend.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,35 +28,46 @@ import java.util.stream.Collectors;
 @Transactional
 public class ProblemPracticeServiceImpl implements ProblemPracticeService{
 
+    private final UserRepository userRepository;
+
     private final ProblemRepository problemRepository;
 
     private final ProblemPracticeRepository problemPracticeRepository;
 
     @Override
     public boolean createProblemPractice(Long userId, ProblemPracticeRegisterDto problemPracticeRegisterDto) {
-        ProblemPractice practice = ProblemPractice.builder()
-                .practiceCount(0L)
-                .build();
 
-        if(problemPracticeRegisterDto.getTitle() != null){
-            practice.setTitle(problemPracticeRegisterDto.getTitle());
+        Optional<User> optionalUserEntity = userRepository.findById(userId);
+        if(optionalUserEntity.isPresent()){
+            ProblemPractice practice = ProblemPractice.builder()
+                    .practiceCount(0L)
+                    .user(optionalUserEntity.get())
+                    .build();
+
+            ProblemPractice resultPractice = problemPracticeRepository.save(practice);
+            log.info(resultPractice.getId().toString());
+
+            if(problemPracticeRegisterDto.getPracticeTitle() != null){
+                resultPractice.setTitle(problemPracticeRegisterDto.getPracticeTitle());
+            }
+
+            if(problemPracticeRegisterDto.getRegisterProblemIds() != null && !problemPracticeRegisterDto.getRegisterProblemIds().isEmpty()){
+                List<Long> problemIds = problemPracticeRegisterDto.getRegisterProblemIds();
+
+                List<Problem> problems = problemIds.stream()
+                        .map(problemRepository::findById)  // Optional<Problem> 반환
+                        .filter(optionalProblem -> optionalProblem.isPresent() &&
+                                optionalProblem.get().getUser().equals(optionalUserEntity.get()))  // 조건을 만족하는 Optional<Problem>만 남김
+                        .map(Optional::get)  // Optional<Problem>을 Problem으로 변환
+                        .toList();
+
+                resultPractice.setProblems(problems);
+            }
+
+            return true;
+        } else{
+            throw new UserNotFoundException("유저를 찾을 수 없습니다!");
         }
-
-        if(!problemPracticeRegisterDto.getRegisterProblemIds().isEmpty()){
-            List<Long> problemIds = problemPracticeRegisterDto.getRegisterProblemIds();
-
-            List<Problem> problems = problemIds.stream()
-                    .map(problemRepository::findById)  // Optional<Problem> 반환
-                    .filter(optionalProblem -> optionalProblem.isPresent() &&
-                            optionalProblem.get().getUser().getId().equals(userId))  // 조건을 만족하는 Optional<Problem>만 남김
-                    .map(Optional::get)  // Optional<Problem>을 Problem으로 변환
-                    .toList();
-
-            practice.setProblems(problems);
-        }
-
-        problemPracticeRepository.save(practice);
-        return true;
     }
 
     @Override
@@ -82,7 +96,7 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
     }
 
     @Override
-    public List<ProblemPracticeResponseDto> findAllPracticeByUser(Long userId){
+    public List<ProblemPracticeResponseDto> findAllPracticeThumbnailsByUser(Long userId){
         List<ProblemPractice> problemPracticeList = problemPracticeRepository.findAllByUserId(userId);
 
         return problemPracticeList.stream().map(
@@ -98,8 +112,8 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
         ProblemPractice practice = problemPracticeRepository.findById(practiceId)
                 .orElseThrow(() -> new ProblemPracticeNotFoundException("Invalid practice practiceId: " + practiceId));
 
-        if(problemPracticeRegisterDto.getTitle() != null){
-            practice.setTitle(problemPracticeRegisterDto.getTitle());
+        if(problemPracticeRegisterDto.getPracticeTitle() != null){
+            practice.setTitle(problemPracticeRegisterDto.getPracticeTitle());
         }
 
         if(problemPracticeRegisterDto.getPracticeCount() != null && problemPracticeRegisterDto.getPracticeCount() > practice.getPracticeCount()){

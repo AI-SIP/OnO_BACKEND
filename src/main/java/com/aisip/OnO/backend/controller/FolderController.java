@@ -48,14 +48,13 @@ public class FolderController {
         }
     }
 
-    @GetMapping("/{folderId}")
-    public ResponseEntity<?> getFolderV2(Authentication authentication, @PathVariable Long folderId) {
-
+    @GetMapping("/folders")
+    public ResponseEntity<?> getFolderThumbnailsTree(Authentication authentication) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            log.info("userId: " + userId + " try to get folderId: " + folderId);
+            log.info("userId: " + userId + " try to get folder thumbnail tree");
 
-            return ResponseEntity.ok(folderService.findFolder(userId, folderId));
+            return ResponseEntity.ok(folderService.findFolderThumbnailsTreeByUserId(userId));
         } catch (Exception e) {
             log.warn(e.getMessage());
             Sentry.captureException(e);
@@ -63,13 +62,13 @@ public class FolderController {
         }
     }
 
-    @GetMapping("/folders")
-    public ResponseEntity<?> getAllFolderName(Authentication authentication) {
+    @GetMapping("/folders/all")
+    public ResponseEntity<?> getAllFolderThumbnails(Authentication authentication) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            log.info("userId: " + userId + " try to get all folder name");
+            log.info("userId: " + userId + " try to get all folder thumbnails");
 
-            return ResponseEntity.ok(folderService.findAllFolderThumbnailsByUserId(userId));
+            return ResponseEntity.ok(folderService.findFolderThumbnailsTreeByUserId(userId));
         } catch (Exception e) {
             log.warn(e.getMessage());
             Sentry.captureException(e);

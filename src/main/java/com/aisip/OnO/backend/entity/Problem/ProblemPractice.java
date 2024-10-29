@@ -5,6 +5,7 @@ import com.aisip.OnO.backend.entity.User.User;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
@@ -28,7 +29,9 @@ public class ProblemPractice extends BaseEntity {
 
     private Long practiceCount;
 
-    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    private LocalDateTime lastSolvedAt;
+
+    @ManyToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinTable(
             name = "problem_practice_problems", // 중간 테이블 이름
             joinColumns = @JoinColumn(name = "problem_practice_id"), // ProblemPractice 엔티티의 외래 키

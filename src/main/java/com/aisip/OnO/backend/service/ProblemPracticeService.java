@@ -14,7 +14,7 @@ public interface ProblemPracticeService {
 
     ProblemPractice findPracticeEntity(Long practiceId);
 
-    List<ProblemPracticeResponseDto> findAllPracticeByUser(Long userId);
+    List<ProblemPracticeResponseDto> findAllPracticeThumbnailsByUser(Long userId);
 
     boolean updatePractice(Long practiceId, ProblemPracticeRegisterDto problemPracticeRegisterDto);
 

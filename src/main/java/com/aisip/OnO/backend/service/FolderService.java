@@ -15,7 +15,7 @@ public interface FolderService {
 
     FolderResponseDto findFolder(Long userId, Long folderId);
 
-    List<FolderThumbnailResponseDto> findAllFolderThumbnailsByUserId(Long userId);
+    List<FolderThumbnailResponseDto> findFolderThumbnailsTreeByUserId(Long userId);
 
     FolderResponseDto updateFolder(Long userId, Long folderId, String folderName, Long parentFolderId);
 
