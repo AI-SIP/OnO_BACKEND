@@ -83,10 +83,33 @@ public class ProblemPracticeController {
         }
     }
 
-    @PatchMapping("")
+    @PatchMapping("/complete/{practiceId}")
+    public ResponseEntity<?> addPracticeCount(
+            Authentication authentication,
+            @PathVariable("practiceId") Long practiceId
+    ) {
+        try {
+            Long userId = (Long) authentication.getPrincipal();
+            boolean isUpdated = problemPracticeService.addPracticeCount(practiceId);
+
+            if(isUpdated){
+                log.info("userId: " + userId + " complete problem practice");
+                return ResponseEntity.ok("복습을 완료했습니다.");
+            } else{
+                throw new ProblemPracticeNotFoundException("복습 완료에 실패했습니다.");
+            }
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            Sentry.captureException(e);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
+    }
+
+    @PatchMapping("/{practiceId}")
     public ResponseEntity<?> updateProblemPractice(
             Authentication authentication,
-            @ModelAttribute ProblemPracticeRegisterDto problemPracticeRegisterDto
+            @PathVariable("practiceId") Long practiceId,
+            @RequestBody ProblemPracticeRegisterDto problemPracticeRegisterDto
     ) {
         try {
             Long userId = (Long) authentication.getPrincipal();

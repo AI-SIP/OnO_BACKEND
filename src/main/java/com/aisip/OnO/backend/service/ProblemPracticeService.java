@@ -16,6 +16,8 @@ public interface ProblemPracticeService {
 
     List<ProblemPracticeResponseDto> findAllPracticeThumbnailsByUser(Long userId);
 
+    boolean addPracticeCount(Long practiceId);
+
     boolean updatePractice(Long practiceId, ProblemPracticeRegisterDto problemPracticeRegisterDto);
 
     void deletePractice(Long practiceId);

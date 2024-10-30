@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -101,10 +102,31 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
 
         return problemPracticeList.stream().map(
                 problemPractice -> {
-                    Long practiceSize = (long) problemPracticeRepository.countProblemsByPracticeId(problemPractice.getId());
-                    return ProblemPracticeConverter.convertToResponseDto(problemPractice, practiceSize);
+                    ProblemPracticeResponseDto problemPracticeResponseDto = ProblemPracticeConverter.convertToResponseDto(problemPractice);
+                    problemPracticeResponseDto.setPracticeSize((long) problemPracticeRepository.countProblemsByPracticeId(problemPractice.getId()));
+
+                    List<Problem> problems = problemPractice.getProblems();
+                    List<Long> problemIds = (problems != null)
+                            ? problems.stream().map(Problem::getId).toList()
+                            : null;
+
+                    problemPracticeResponseDto.setProblemIds(problemIds);
+
+                    return problemPracticeResponseDto;
                 }
         ).collect(Collectors.toList());
+    }
+
+    @Override
+    public boolean addPracticeCount(Long practiceId) {
+        ProblemPractice practice = problemPracticeRepository.findById(practiceId)
+                .orElseThrow(() -> new ProblemPracticeNotFoundException("Invalid practice practiceId: " + practiceId));
+
+        practice.setPracticeCount(practice.getPracticeCount() + 1);
+        practice.setLastSolvedAt(LocalDateTime.now());
+        problemPracticeRepository.save(practice);
+
+        return true;
     }
 
     @Override
