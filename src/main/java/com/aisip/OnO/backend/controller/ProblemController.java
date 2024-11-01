@@ -22,7 +22,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api")
+@RequestMapping("/api/problem")
 public class ProblemController {
 
     @InitBinder
@@ -32,14 +32,14 @@ public class ProblemController {
 
     private final ProblemService problemService;
 
-    @GetMapping("/problem/{problemId}")
-    public ResponseEntity<?> getProblemByUserId(
+    @GetMapping("/{problemId}")
+    public ResponseEntity<?> getProblem(
             Authentication authentication,
             @PathVariable("problemId") Long problemId
     ) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            ProblemResponseDto problemResponseDto = problemService.findProblemByUserId(userId, problemId);
+            ProblemResponseDto problemResponseDto = problemService.findProblem(userId, problemId);
 
             log.info("userId: " + userId + " get problem for problemId: " + problemResponseDto.getProblemId());
             return ResponseEntity.ok(problemResponseDto);
@@ -50,11 +50,11 @@ public class ProblemController {
         }
     }
 
-    @GetMapping("/problems")
+    @GetMapping("/all")
     public ResponseEntity<?> getProblemsByUserId(Authentication authentication) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            List<ProblemResponseDto> problems = problemService.findAllProblemsByUserId(userId);
+            List<ProblemResponseDto> problems = problemService.findUserProblems(userId);
 
             log.info("userId: " + userId + " get all problems");
             return ResponseEntity.ok(problems);
@@ -65,7 +65,7 @@ public class ProblemController {
         }
     }
 
-    @PostMapping("/problem")
+    @PostMapping("")
     public ResponseEntity<?> registerProblem(
             Authentication authentication,
             @ModelAttribute ProblemRegisterDto problemRegisterDto
@@ -90,7 +90,7 @@ public class ProblemController {
         }
     }
 
-    @PostMapping("/problem/V2")
+    @PostMapping("/V2")
     public ResponseEntity<?> registerProblemV2(
             Authentication authentication,
             @ModelAttribute ProblemRegisterDtoV2 problemRegisterDto
@@ -115,7 +115,7 @@ public class ProblemController {
         }
     }
 
-    @PatchMapping("/problem")
+    @PatchMapping("")
     public ResponseEntity<?> updateProblem(
             Authentication authentication, @ModelAttribute ProblemRegisterDto problemRegisterDto
     ) {
@@ -140,7 +140,7 @@ public class ProblemController {
         }
     }
 
-    @DeleteMapping("/problem")
+    @DeleteMapping("")
     public ResponseEntity<?> deleteProblem(
             Authentication authentication,
             @RequestHeader("problemId") Long problemId
@@ -159,7 +159,7 @@ public class ProblemController {
         }
     }
 
-    @PostMapping("/problem/repeat")
+    @PostMapping("/repeat")
     public ResponseEntity<?> addRepeatCount(
             Authentication authentication,
             @RequestHeader("problemId") Long problemId,

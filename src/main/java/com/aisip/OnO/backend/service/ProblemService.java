@@ -13,13 +13,17 @@ import java.util.List;
 
 public interface ProblemService {
 
-    ProblemResponseDto findProblemByUserId(Long userId, Long problemId);
+    ProblemResponseDto findProblem(Long userId, Long problemId);
 
-    List<ProblemResponseDto> findAllProblemsByUserId(Long userId);
+    ProblemResponseDto convertToProblemResponse(Problem problem);
+
+    List<ProblemResponseDto> findUserProblems(Long userId);
 
     List<ProblemResponseDto> findAllProblems();
 
     List<ProblemResponseDto> findAllProblemsByFolderId(Long folderId);
+
+    List<ProblemResponseDto> findAllProblemsByPracticeId(Long problemPracticeId);
 
     Problem createProblem(Long userId);
 

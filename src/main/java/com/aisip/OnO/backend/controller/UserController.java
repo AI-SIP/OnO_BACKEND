@@ -5,6 +5,7 @@ import com.aisip.OnO.backend.Dto.User.UserRegisterDto;
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
 import com.aisip.OnO.backend.exception.UserNotFoundException;
 import com.aisip.OnO.backend.service.FolderService;
+import com.aisip.OnO.backend.service.ProblemPracticeService;
 import com.aisip.OnO.backend.service.ProblemService;
 import com.aisip.OnO.backend.service.UserService;
 import io.sentry.Sentry;
@@ -26,6 +27,8 @@ public class UserController {
     private final ProblemService problemService;
 
     private final FolderService folderService;
+
+    private final ProblemPracticeService problemPracticeService;
 
     @GetMapping("")
     public ResponseEntity<?> getUserInfo(Authentication authentication) {

@@ -50,7 +50,7 @@ public class AdminController {
         UserResponseDto user = userService.getUserDetailsById(userId);
         model.addAttribute("user", user);
 
-        List<ProblemResponseDto> problems = problemService.findAllProblemsByUserId(userId);
+        List<ProblemResponseDto> problems = problemService.findUserProblems(userId);
         model.addAttribute("problems", problems);
         return "user";
     }
@@ -71,7 +71,7 @@ public class AdminController {
             UserResponseDto userResponseDto = userService.updateUser(userId, userRegisterDto);
             if (userResponseDto != null) {
                 model.addAttribute("user", userResponseDto);
-                List<ProblemResponseDto> problems = problemService.findAllProblemsByUserId(userId);
+                List<ProblemResponseDto> problems = problemService.findUserProblems(userId);
                 model.addAttribute("problems", problems);
                 return "user";
             } else {
@@ -89,6 +89,7 @@ public class AdminController {
     public ResponseEntity<?> deleteUserInfo(@PathVariable Long userId) {
 
         problemService.deleteUserProblems(userId);
+        folderService.deleteAllUserFolder(userId);
         userService.deleteUserById(userId);
 
         return ResponseEntity.ok().body("delete complete");

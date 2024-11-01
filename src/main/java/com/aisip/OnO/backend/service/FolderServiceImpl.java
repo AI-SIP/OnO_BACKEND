@@ -145,7 +145,7 @@ public class FolderServiceImpl implements FolderService {
     }
 
     @Override
-    public List<FolderThumbnailResponseDto> findAllFolderThumbnailsByUserId(Long userId) {
+    public List<FolderThumbnailResponseDto> findFolderThumbnailsTreeByUserId(Long userId) {
 
         List<Folder> folders = folderRepository.findAllByUserId(userId);
 
