@@ -1,10 +1,167 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Responsive Landing Page</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            font-family: Arial, sans-serif;
+            overflow-x: hidden;
+            background-color: #f3f3f3;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        /* 모바일 레이아웃 */
+        .phone-layout {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            padding: 50px 0; /* 상단과 하단에 마진 추가 */
+        }
+
+        .button-container {
+            display: flex;
+            flex-direction: row; /* 버튼을 가로로 나란히 배치 */
+            gap: 10px; /* 버튼 사이 간격 */
+            align-items: center;
+        }
+
+        .download-button {
+            background-size: contain;
+            background-repeat: no-repeat;
+            width: 150px;
+            height: 50px;
+            cursor: pointer;
+            margin-left: 10px; /* 오른쪽으로 10px 이동 */
+        }
+
+        .responsive-image {
+            width: 100%;
+            height: auto;
+        }
+
+        .download-button {
+            background-size: contain;
+            background-repeat: no-repeat;
+            width: 150px;
+            height: 50px;
+            cursor: pointer;
+            margin-left: 20px; /* 오른쪽으로 10px 이동 */
+        }
+
+        /* 기본 설정: 태블릿 레이아웃 및 이미지 숨기기 */
+        .tablet-layout {
+            display: none;
+        }
+        .tablet-image {
+            display: none;
+        }
+
+        /* 태블릿 레이아웃 */
+        @media screen and (min-width: 768px) {
+            .container {
+                flex-direction: row;
+                justify-content: center;
+                align-items: center;
+            }
+
+            .phone-layout {
+                display: none; /* 태블릿에서는 모바일 레이아웃 숨김 */
+            }
+
+            .tablet-layout {
+                display: flex; /* 태블릿에서만 보이도록 설정 */
+                align-items: center;
+                gap: 20px;
+            }
+
+            .tablet-layout .text-and-buttons {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start; /* 왼쪽 정렬로 텍스트와 버튼 정렬 */
+                gap: 20px;
+                padding-left: 20px; /* 텍스트와 버튼 정렬 시작점 맞추기 */
+            }
+
+            .tablet-layout .button-container {
+                display: flex;
+                flex-direction: row;
+                gap: 15px;
+            }
+
+            .tablet-image {
+                display: block; /* 태블릿에서만 보이도록 설정 */
+                width: 100%;
+                max-width: 400px;
+            }
+        }
+    </style>
 </head>
 <body>
+<div class="container">
+    <!-- 모바일 화면 레이아웃 -->
+    <div class="phone-layout">
+        <!-- 모바일 화면용 메인 텍스트 이미지 -->
+        <img src="/images/MainTextPhone.png" alt="메인 텍스트" class="responsive-image phone-image">
 
+        <!-- 모바일 화면용 버튼 -->
+        <div class="button-container">
+            <a href="https://yourappstorelink.com" target="_blank" class="download-button" style="background-image: url('/images/AppStoreDownloadButton.png');"></a>
+            <a href="https://yourgoogleplaylink.com" target="_blank" class="download-button" style="background-image: url('/images/GooglePlayDownloadButton.png');"></a>
+        </div>
+
+        <!-- 모바일 화면용 메인 디바이스 이미지 -->
+        <img src="/images/MainDevicePhone.png" alt="메인 디바이스" class="responsive-image phone-image">
+    </div>
+
+    <!-- 태블릿 화면 레이아웃 -->
+    <div class="tablet-layout">
+        <div class="text-and-buttons">
+            <!-- 태블릿 화면용 메인 텍스트 이미지 -->
+            <img src="/images/MainTextTablet.png" alt="메인 텍스트 태블릿" class="responsive-image tablet-image">
+
+            <!-- 태블릿 화면용 버튼 -->
+            <div class="button-container">
+                <a href="https://yourappstorelink.com" target="_blank" class="download-button" style="background-image: url('/images/AppStoreDownloadButton.png');"></a>
+                <a href="https://yourgoogleplaylink.com" target="_blank" class="download-button" style="background-image: url('/images/GooglePlayDownloadButton.png');"></a>
+            </div>
+        </div>
+
+        <!-- 태블릿 화면용 메인 디바이스 이미지 -->
+        <img src="/images/MainDeviceTablet.png" alt="메인 디바이스 태블릿" class="responsive-image tablet-image">
+    </div>
+</div>
+
+<script>
+    // 스크롤 시 버튼 애니메이션 효과 (옵션)
+    window.addEventListener('scroll', () => {
+        const opacityValue = window.scrollY > 100 ? 1 : 0;
+        document.querySelectorAll('.download-button').forEach(button => {
+            button.style.opacity = opacityValue;
+        });
+    });
+</script>
 </body>
 </html>
