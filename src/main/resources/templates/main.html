@@ -19,7 +19,7 @@
             background-color: #f3f3f3;
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items: flex-start;
         }
 
         .container {
@@ -30,6 +30,7 @@
             flex-direction: column;
             align-items: center;
             gap: 20px;
+            padding: 50px 0; /* 상단과 하단에 여백 추가 */
         }
 
         /* 모바일 레이아웃 */
@@ -38,7 +39,7 @@
             flex-direction: column;
             align-items: center;
             gap: 20px;
-            padding: 50px 0; /* 상단과 하단에 마진 추가 */
+            padding-top: 80px; /* 상단 여백을 추가하여 절대 위쪽이 잘리지 않도록 설정 */
         }
 
         .button-container {
@@ -62,15 +63,6 @@
             height: auto;
         }
 
-        .download-button {
-            background-size: contain;
-            background-repeat: no-repeat;
-            width: 150px;
-            height: 50px;
-            cursor: pointer;
-            margin-left: 20px; /* 오른쪽으로 10px 이동 */
-        }
-
         /* 기본 설정: 태블릿 레이아웃 및 이미지 숨기기 */
         .tablet-layout {
             display: none;
@@ -81,18 +73,26 @@
 
         /* 태블릿 레이아웃 */
         @media screen and (min-width: 768px) {
-            .container {
-                flex-direction: row;
+            body, html {
+                height: 100vh;
+                overflow-y: hidden;
                 justify-content: center;
                 align-items: center;
             }
 
+            .container {
+                flex-direction: row;
+                justify-content: center;
+                align-items: center;
+                padding: 0;
+            }
+
             .phone-layout {
-                display: none; /* 태블릿에서는 모바일 레이아웃 숨김 */
+                display: none;
             }
 
             .tablet-layout {
-                display: flex; /* 태블릿에서만 보이도록 설정 */
+                display: flex;
                 align-items: center;
                 gap: 20px;
             }
@@ -100,9 +100,9 @@
             .tablet-layout .text-and-buttons {
                 display: flex;
                 flex-direction: column;
-                align-items: flex-start; /* 왼쪽 정렬로 텍스트와 버튼 정렬 */
+                align-items: flex-start;
                 gap: 20px;
-                padding-left: 20px; /* 텍스트와 버튼 정렬 시작점 맞추기 */
+                padding-left: 20px;
             }
 
             .tablet-layout .button-container {
@@ -112,7 +112,7 @@
             }
 
             .tablet-image {
-                display: block; /* 태블릿에서만 보이도록 설정 */
+                display: block;
                 width: 100%;
                 max-width: 400px;
             }
