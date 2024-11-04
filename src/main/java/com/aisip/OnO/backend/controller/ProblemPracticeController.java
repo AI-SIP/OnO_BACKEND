@@ -27,7 +27,7 @@ public class ProblemPracticeController {
     private final ProblemPracticeService problemPracticeService;
 
     @GetMapping("/{practiceId}")
-    public ResponseEntity<?> getProblemPracticeDetail(
+    public ResponseEntity<?> getPracticeDetail(
             Authentication authentication,
             @PathVariable("practiceId") Long practiceId
     ) {
@@ -45,7 +45,7 @@ public class ProblemPracticeController {
     }
 
     @GetMapping("/all")
-    public ResponseEntity<?> getAllProblemPracticeThumbnail(
+    public ResponseEntity<?> getAllPracticeThumbnail(
             Authentication authentication
     ) {
         try {
@@ -62,13 +62,13 @@ public class ProblemPracticeController {
     }
 
     @PostMapping("")
-    public ResponseEntity<?> registerProblemPractice(
+    public ResponseEntity<?> registerPractice(
             Authentication authentication,
             @RequestBody ProblemPracticeRegisterDto problemPracticeRegisterDto
             ) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            boolean isSaved = problemPracticeService.createProblemPractice(userId, problemPracticeRegisterDto);
+            boolean isSaved = problemPracticeService.createPractice(userId, problemPracticeRegisterDto);
 
             if(isSaved){
                 log.info("userId: " + userId + " register problem  practice");
@@ -106,7 +106,7 @@ public class ProblemPracticeController {
     }
 
     @PatchMapping("/{practiceId}")
-    public ResponseEntity<?> updateProblemPractice(
+    public ResponseEntity<?> updatePractice(
             Authentication authentication,
             @PathVariable("practiceId") Long practiceId,
             @RequestBody ProblemPracticeRegisterDto problemPracticeRegisterDto
@@ -128,16 +128,16 @@ public class ProblemPracticeController {
         }
     }
 
-    @DeleteMapping("/{practiceId}")
-    public ResponseEntity<?> deleteProblemPractice(
+    @DeleteMapping("")
+    public ResponseEntity<?> deletePractices(
             Authentication authentication,
-            @PathVariable("practiceId") Long practiceId
+            @RequestParam List<Long> deletePracticeIds
     ) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            problemPracticeService.deletePractice(practiceId);
+            problemPracticeService.deletePractices(deletePracticeIds);
 
-            log.info("userId: " + userId + " delete problem  practice for practice id: " + practiceId);
+            log.info("userId: " + userId + " delete problem  practice ids: " + deletePracticeIds.toString());
             return ResponseEntity.ok("복습 리스트 삭제를 완료했습니다.");
         } catch (Exception e) {
             log.error(e.getMessage());

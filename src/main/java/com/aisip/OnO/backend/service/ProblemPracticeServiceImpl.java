@@ -36,7 +36,7 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
     private final ProblemPracticeRepository problemPracticeRepository;
 
     @Override
-    public boolean createProblemPractice(Long userId, ProblemPracticeRegisterDto problemPracticeRegisterDto) {
+    public boolean createPractice(Long userId, ProblemPracticeRegisterDto problemPracticeRegisterDto) {
 
         Optional<User> optionalUserEntity = userRepository.findById(userId);
         if(optionalUserEntity.isPresent()){
@@ -164,7 +164,20 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
 
     @Override
     public void deletePractice(Long practiceId) {
+        ProblemPractice practice = problemPracticeRepository.findById(practiceId)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid practice ID: " + practiceId));
+
+        // 연관 관계 제거
+        practice.getProblems().clear();
+        problemPracticeRepository.save(practice);
+
+        // 이제 ProblemPractice 엔티티 삭제
         problemPracticeRepository.deleteById(practiceId);
+    }
+
+    @Override
+    public void deletePractices(List<Long> practiceIds) {
+        practiceIds.forEach(this::deletePractice);
     }
 
     @Override
