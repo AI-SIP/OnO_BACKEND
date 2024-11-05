@@ -18,7 +18,7 @@ public interface ProblemPracticeService {
 
     boolean addPracticeCount(Long practiceId);
 
-    boolean updatePractice(Long practiceId, ProblemPracticeRegisterDto problemPracticeRegisterDto);
+    boolean updatePractice(ProblemPracticeRegisterDto problemPracticeRegisterDto);
 
     void deletePractice(Long practiceId);
 

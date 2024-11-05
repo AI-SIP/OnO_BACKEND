@@ -11,11 +11,9 @@ import java.util.List;
 @AllArgsConstructor
 public class ProblemPracticeRegisterDto {
 
-    private Long practiceCount;
+    private Long practiceId;
 
     private String practiceTitle;
 
     private List<Long> registerProblemIds;
-
-    private List<Long> removeProblemIds;
 }
