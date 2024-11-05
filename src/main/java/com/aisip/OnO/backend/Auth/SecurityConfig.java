@@ -11,6 +11,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -36,8 +37,16 @@ public class SecurityConfig {
     }
 
     @Bean
+    public AuthenticationEntryPoint authenticationEntryPoint() {
+        return (request, response, authException) -> response.sendRedirect("/home");
+    }
+
+    @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http.cors().and().csrf().disable()
+        http.exceptionHandling()
+                .authenticationEntryPoint(authenticationEntryPoint())
+                .and()
+                .cors().and().csrf().disable()
                 .authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
                                 .requestMatchers("/", "/home","/images/**", "/api/auth/**", "/login", "/css/**", "/js/**").permitAll()
@@ -56,7 +65,7 @@ public class SecurityConfig {
                             response.sendRedirect("/admin/main"); // 성공 후 관리자 페이지로 이동
                         })
                         .failureHandler((request, response, exception) -> {
-                            response.sendRedirect("/login?error");
+                             response.sendRedirect("/login?error");
                         })
                         .permitAll()
                 )
