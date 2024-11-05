@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class mainController {
 
-    @GetMapping("/")
+    @GetMapping("/home")
     public String mainPage() {
         /*
         String redirectUrl = "https://semnisem.notion.site/MVP-e104fd6af0064941acf464e6f77eabb3";
@@ -16,7 +16,7 @@ public class mainController {
 
          */
 
-        return "main";
+        return "home";
     }
 
     @GetMapping("/login")
