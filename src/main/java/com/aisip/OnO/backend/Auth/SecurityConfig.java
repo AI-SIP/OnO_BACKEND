@@ -38,7 +38,7 @@ public class SecurityConfig {
 
     @Bean
     public AuthenticationEntryPoint authenticationEntryPoint() {
-        return (request, response, authException) -> response.sendRedirect("/home");
+        return (request, response, authException) -> response.sendRedirect("https://ono-app.com/home");
     }
 
     @Bean

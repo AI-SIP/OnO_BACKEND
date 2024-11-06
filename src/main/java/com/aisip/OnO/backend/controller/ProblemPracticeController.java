@@ -105,15 +105,14 @@ public class ProblemPracticeController {
         }
     }
 
-    @PatchMapping("/{practiceId}")
+    @PatchMapping("")
     public ResponseEntity<?> updatePractice(
             Authentication authentication,
-            @PathVariable("practiceId") Long practiceId,
             @RequestBody ProblemPracticeRegisterDto problemPracticeRegisterDto
     ) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            boolean isUpdated = problemPracticeService.updatePractice(userId, problemPracticeRegisterDto);
+            boolean isUpdated = problemPracticeService.updatePractice(problemPracticeRegisterDto);
 
             if(isUpdated){
                 log.info("userId: " + userId + " register problem  practice");

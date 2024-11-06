@@ -8,6 +8,7 @@ import com.aisip.OnO.backend.entity.Problem.ProblemPractice;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.exception.ProblemNotFoundException;
 import com.aisip.OnO.backend.exception.ProblemPracticeNotFoundException;
+import com.aisip.OnO.backend.exception.UserNotAuthorizedException;
 import com.aisip.OnO.backend.exception.UserNotFoundException;
 import com.aisip.OnO.backend.repository.ProblemPracticeRepository;
 import com.aisip.OnO.backend.repository.ProblemRepository;
@@ -130,34 +131,37 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
     }
 
     @Override
-    public boolean updatePractice(Long practiceId, ProblemPracticeRegisterDto problemPracticeRegisterDto) {
+    public boolean updatePractice(ProblemPracticeRegisterDto problemPracticeRegisterDto){
+        Long practiceId = problemPracticeRegisterDto.getPracticeId();
+
         ProblemPractice practice = problemPracticeRepository.findById(practiceId)
                 .orElseThrow(() -> new ProblemPracticeNotFoundException("Invalid practice practiceId: " + practiceId));
 
-        if(problemPracticeRegisterDto.getPracticeTitle() != null){
+        // 제목 업데이트
+        if (problemPracticeRegisterDto.getPracticeTitle() != null) {
             practice.setTitle(problemPracticeRegisterDto.getPracticeTitle());
         }
 
-        if(problemPracticeRegisterDto.getPracticeCount() != null && problemPracticeRegisterDto.getPracticeCount() > practice.getPracticeCount()){
-            practice.setPracticeCount(problemPracticeRegisterDto.getPracticeCount());
-        }
+        // 문제 ID 목록 업데이트
+        List<Long> newProblemIds = problemPracticeRegisterDto.getRegisterProblemIds();
+        List<Long> existingProblemIds = practice.getProblems().stream()
+                .map(Problem::getId).toList();
 
-        if(problemPracticeRegisterDto.getRegisterProblemIds() != null){
-            List<Long> registerProblemIds = problemPracticeRegisterDto.getRegisterProblemIds();
+        // 새로 추가할 문제: newProblemIds에만 포함된 문제 ID
+        List<Long> problemsToAdd = newProblemIds.stream()
+                .filter(problemId -> !existingProblemIds.contains(problemId)).toList();
 
-            registerProblemIds.forEach(problemId -> {
-                addProblemToPractice(practiceId, problemId);
-            });
-        }
+        // 삭제할 문제: 기존 문제 목록에만 포함된 문제 ID
+        List<Long> problemsToRemove = existingProblemIds.stream()
+                .filter(problemId -> !newProblemIds.contains(problemId)).toList();
 
-        if(problemPracticeRegisterDto.getRemoveProblemIds() != null){
-            List<Long> removeProblemIds = problemPracticeRegisterDto.getRemoveProblemIds();
+        // 문제 추가
+        problemsToAdd.forEach(problemId -> addProblemToPractice(practiceId, problemId));
 
-            removeProblemIds.forEach(problemId -> {
-                removeProblemFromPractice(practiceId, problemId);
-            });
-        }
+        // 문제 삭제
+        problemsToRemove.forEach(problemId -> removeProblemFromPractice(practiceId, problemId));
 
+        // 연습 문제 저장
         problemPracticeRepository.save(practice);
         return true;
     }
@@ -192,7 +196,7 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
                 .map(Problem::getId)
                 .collect(Collectors.toSet());
 
-        if(!existingProblemIds.contains(problem.getId())){
+        if(existingProblemIds.contains(problem.getId())){
             practice.getProblems().remove(problem);
         }
 
