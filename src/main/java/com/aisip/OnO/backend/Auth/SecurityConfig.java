@@ -23,6 +23,9 @@ public class SecurityConfig {
     @Value("${spring.jwt.secret}")
     private String secret;
 
+    @Value("${spring.site.url}")  // 애플리케이션의 HTTPS 기본 URL을 환경 변수로 받아옴
+    private String siteUrl;
+
     @Bean
     public JwtTokenFilter jwtTokenFilter() {
         return new JwtTokenFilter(secret);
@@ -38,7 +41,7 @@ public class SecurityConfig {
 
     @Bean
     public AuthenticationEntryPoint authenticationEntryPoint() {
-        return (request, response, authException) -> response.sendRedirect("https://ono-app.com/home");
+        return (request, response, authException) -> response.sendRedirect(siteUrl+ "/home");
     }
 
     @Bean
@@ -49,7 +52,7 @@ public class SecurityConfig {
                 .cors().and().csrf().disable()
                 .authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
-                                .requestMatchers("/", "/home","/images/**", "/api/auth/**", "/login", "/css/**", "/js/**").permitAll()
+                                .requestMatchers("/", "/robots.txt", "/home","/images/**", "/api/auth/**", "/login", "/css/**", "/js/**").permitAll()
                                 .requestMatchers("/admin/**").hasRole("ADMIN")
                                 .anyRequest().authenticated()
                 )
@@ -62,16 +65,16 @@ public class SecurityConfig {
                             Long adminId = userDetails.getUserId();
                             String token = jwtTokenProvider.createAccessToken(adminId);
                             response.setHeader("Authorization", "Bearer " + token);
-                            response.sendRedirect("/admin/main"); // 성공 후 관리자 페이지로 이동
+                            response.sendRedirect(siteUrl + "/admin/main"); // 성공 후 관리자 페이지로 이동
                         })
                         .failureHandler((request, response, exception) -> {
-                             response.sendRedirect("/login?error");
+                             response.sendRedirect(siteUrl + "/login?error");
                         })
                         .permitAll()
                 )
                 .logout(logout -> logout
-                        .logoutUrl("/logout")
-                        .logoutSuccessUrl("/login?logout")
+                        .logoutUrl(siteUrl + "/logout")
+                        .logoutSuccessUrl(siteUrl + "/login?logout")
                         .permitAll()
                 )
                 .sessionManagement(sessionManagement ->
