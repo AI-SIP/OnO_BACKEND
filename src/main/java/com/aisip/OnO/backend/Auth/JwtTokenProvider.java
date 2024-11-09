@@ -44,7 +44,7 @@ public class JwtTokenProvider {
             JWTVerifier verifier = JWT.require(algorithm).build();
             DecodedJWT jwt = verifier.verify(token);
 
-            log.info("jwt validate success");
+            //log.info("jwt validate success");
             return true;
         } catch (JWTVerificationException exception) {
             log.warn("token validate failure : " + exception.getMessage());

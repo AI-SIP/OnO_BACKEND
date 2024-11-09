@@ -109,7 +109,7 @@ public class AuthController {
             if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
                 String accessToken = authorizationHeader.substring(7);
                 if (jwtTokenProvider.validateToken(accessToken)) {
-                    log.info("success for verify access token");
+                    //log.info("success for verify access token");
                     return ResponseEntity.ok("Token is valid");
                 } else {
                     log.warn("token is invalid");
