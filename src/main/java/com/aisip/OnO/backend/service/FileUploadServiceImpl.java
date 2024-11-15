@@ -86,9 +86,9 @@ public class FileUploadServiceImpl implements FileUploadService {
         if(imageProcessRegisterDto.getColorsList() != null){
             log.info("color list: " + imageProcessRegisterDto.getColorsList());
             url += "/process-color";
-        } else if (imageProcessRegisterDto.getCoordinateList() != null){
-            log.info("coordinate list: " + imageProcessRegisterDto.getCoordinateList().toString());
-            url += "/process-coordinates";
+        } else if (imageProcessRegisterDto.getPoints() != null){
+            log.info("point list: " + imageProcessRegisterDto.getPoints().toString());
+            url += "/process-shape";
         } else{
             url += "/process-color";
         }

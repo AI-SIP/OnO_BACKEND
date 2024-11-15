@@ -15,6 +15,6 @@ import java.util.Map;
 public class ImageProcessRegisterDto {
     private String fullUrl;
     private List<Map<String, Integer>> colorsList;
-    private List<List<Double>> coordinateList;
+    private List<List<Double>> points;
     private int intensity;
 }
