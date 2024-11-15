@@ -70,7 +70,7 @@ public class ImageProcessController {
             @RequestBody ImageProcessRegisterDto imageProcessRegisterDto
             ) {
         try {
-            String processImageUrl = fileUploadService.getProcessImageUrl(imageProcessRegisterDto);
+            String processImageUrl = fileUploadService.getProcessImage(imageProcessRegisterDto);
 
             return ResponseEntity.ok(Map.of("processImageUrl", processImageUrl));
         } catch (Exception e) {

@@ -79,9 +79,19 @@ public class FileUploadServiceImpl implements FileUploadService {
     }
 
     @Override
-    public String getProcessImageUrl(ImageProcessRegisterDto imageProcessRegisterDto) {
+    public String getProcessImage(ImageProcessRegisterDto imageProcessRegisterDto) {
         RestTemplate restTemplate = new RestTemplate();
-        String url = fastApiUrl + "/process-color";
+        String url = fastApiUrl;
+
+        if(imageProcessRegisterDto.getColorsList() != null){
+            log.info("color list: " + imageProcessRegisterDto.getColorsList());
+            url += "/process-color";
+        } else if (imageProcessRegisterDto.getPoints() != null){
+            log.info("point list: " + imageProcessRegisterDto.getPoints().toString());
+            url += "/process-shape";
+        } else{
+            url += "/process-color";
+        }
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
