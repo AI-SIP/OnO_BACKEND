@@ -16,5 +16,6 @@ public class ImageProcessRegisterDto {
     private String fullUrl;
     private List<Map<String, Integer>> colorsList;
     private List<List<Double>> points;
+    private List<Long> labels;
     private int intensity;
 }
