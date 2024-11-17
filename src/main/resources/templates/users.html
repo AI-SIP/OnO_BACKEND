@@ -17,9 +17,11 @@
   <table class="table table-striped">
     <thead>
     <tr>
-      <th scope="col">ID</th>
+      <th scope="col">User ID</th>
+      <!--
       <th scope="col">이름</th>
       <th scope="col">이메일</th>
+      -->
       <th scope="col">식별자</th>
       <th scope="col">유저 유형</th>
       <th scope="col">문제 수</th>
@@ -30,8 +32,10 @@
     <tbody>
     <tr th:each="user, stat : ${users}">
       <td><a th:href="@{/admin/user/{userId}(userId=${user.userId})}" th:text="${user.userId}">1</a></td>
+      <!--
       <td th:text="${user.userName}">User Name</td>
       <td th:text="${user.userEmail}">user@example.com</td>
+      -->
       <td th:text="${user.userIdentifier}">identifier</td>
       <td th:text="${user.userType}">GUEST</td>
       <td th:text="${problemCounts[stat.index]}"></td>

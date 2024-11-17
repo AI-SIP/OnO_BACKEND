@@ -38,7 +38,9 @@
           <thead>
           <tr>
             <th style="width:5%">ID</th>
+            <!--
             <th style="width:10%">작성 유저</th>
+            -->
             <th style="width:10%">템플릿 타입</th>
             <th style="width:5%">폴더 ID</th>
             <th style="width:10%">출처</th>
@@ -57,7 +59,7 @@
           <tbody>
           <tr th:each="problem : ${problems}">
             <td th:text="${problem.problemId}">problemId</td>
-            <td th:text="${problem.userName}">userName</td>
+            <!--<td th:text="${problem.userName}">userName</td>-->
             <td th:text="${problem.templateType}">templateType</td>
             <td th:text="${problem.folderId}">folderId</td>
             <td th:text="${problem.reference}">Reference</td>

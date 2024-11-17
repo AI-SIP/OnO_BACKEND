@@ -84,7 +84,8 @@ public class FileUploadServiceImpl implements FileUploadService {
         String url = fastApiUrl;
 
         if(imageProcessRegisterDto.getColorsList() != null){
-            log.info("color list: " + imageProcessRegisterDto.getColorsList());
+            log.info("intensity: " + imageProcessRegisterDto.getIntensity());
+            log.info("remove colors on problemImage by colors: " + imageProcessRegisterDto.getColorsList());
             url += "/process-color";
         } else if (imageProcessRegisterDto.getPoints() != null){
             log.info("point list: " + imageProcessRegisterDto.getPoints().toString());
@@ -97,9 +98,6 @@ public class FileUploadServiceImpl implements FileUploadService {
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         HttpEntity<ImageProcessRegisterDto> request = new HttpEntity<>(imageProcessRegisterDto, headers);
-
-        log.info("intensity: " + imageProcessRegisterDto.getIntensity());
-        log.info("remove colors on problemImage by colors: " + imageProcessRegisterDto.getColorsList());
 
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
