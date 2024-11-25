@@ -88,6 +88,9 @@ public class FileUploadServiceImpl implements FileUploadService {
             log.info("remove colors on problemImage by colors: " + imageProcessRegisterDto.getColorsList());
             url += "/process-color";
         } else if (imageProcessRegisterDto.getPoints() != null){
+            if(imageProcessRegisterDto.getPoints().isEmpty()){
+                imageProcessRegisterDto.setPoints(List.of(List.of(0.0, 0.0, 0.0, 0.0)));
+            }
             log.info("point list: " + imageProcessRegisterDto.getPoints().toString());
             url += "/process-shape";
         } else{
