@@ -8,16 +8,15 @@ import com.aisip.OnO.backend.entity.User.UserType;
 import com.aisip.OnO.backend.repository.ProblemRepository;
 import com.aisip.OnO.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
@@ -26,14 +25,35 @@ public class UserServiceImpl implements UserService {
 
     private final ProblemRepository problemRepository;
 
-    public UserResponseDto registerOrLoginUser(String email, String name, String identifier, UserType userType) {
-        Optional<User> optionalUser = userRepository.findByIdentifier(identifier);
+    @Override
+    public UserResponseDto registerGuestUser() {
+        User user = new User();
+        user.setName(makeGuestName());
+        user.setEmail(makeGuestEmail());
+        user.setIdentifier(makeGuestIdentifier());
+        user.setPlatform("GUEST");
+        user.setType(UserType.GUEST);
+
+        User resultUser = userRepository.save(user);
+        return UserConverter.convertToResponseDto(resultUser, true);
+    }
+
+    @Override
+    public UserResponseDto registerOrLoginUser(UserRegisterDto userRegisterDto, UserType userType) {
+        Optional<User> optionalUser = userRepository.findByIdentifier(userRegisterDto.getIdentifier());
+
         if (optionalUser.isEmpty()) {
+            if(userType.equals(UserType.GUEST)){
+                userRegisterDto = makeGuestUser();
+            }
+
             User user = new User();
-            user.setEmail(email);
-            user.setName(name);
-            user.setIdentifier(identifier);
+            user.setName(userRegisterDto.getName());
+            user.setEmail(userRegisterDto.getEmail());
+            user.setIdentifier(userRegisterDto.getIdentifier());
+            user.setPlatform(userRegisterDto.getPlatform());
             user.setType(userType);
+
             User resultUser = userRepository.save(user);
             return UserConverter.convertToResponseDto(resultUser, true);
         }
@@ -48,16 +68,6 @@ public class UserServiceImpl implements UserService {
         if(optionalUser.isPresent()){
 
             User user = optionalUser.get();
-            LocalDateTime createdAtDateTime = user.getCreatedAt(); // LocalDateTime으로 변경
-            LocalDateTime now = LocalDateTime.now();
-
-            // 두 시간 간의 차이를 계산하여 1시간 이내인지 확인
-            Duration duration = Duration.between(createdAtDateTime, now);
-
-            if (duration.toHours() < 1) {
-                return UserConverter.convertToResponseDto(user, true);
-            }
-
             return UserConverter.convertToResponseDto(user);
         }
 
@@ -79,7 +89,6 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public Long findAllProblemCountByUserId(Long userId) {
-        // 유저를 찾아서 해당 유저가 있는지 확인
         Optional<User> user = userRepository.findById(userId);
         if (user.isPresent()) {
             return problemRepository.countByUserId(userId);
@@ -90,11 +99,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public List<Long> findAllUsersProblemCount() {
-        // 유저를 찾아서 해당 유저가 있는지 확인
         List<User> userList = userRepository.findAll();
-        return userList.stream().map(user -> {
-            return findAllProblemCountByUserId(user.getId());
-        }).collect(Collectors.toList());
+        return userList.stream().map(user -> findAllProblemCountByUserId(user.getId())).collect(Collectors.toList());
     }
 
     @Override
@@ -136,27 +142,34 @@ public class UserServiceImpl implements UserService {
         }
     }
 
-    public List<User> getAllUsers() {
-        return null;
-    }
-
     @Override
     public void deleteUserById(Long userId) {
         userRepository.deleteById(userId);
     }
 
-    @Override
-    public String makeGuestEmail() {
-        return "guest_" + UUID.randomUUID().toString() + "@ono.com";
+    private UserRegisterDto makeGuestUser(){
+        String name = makeGuestName();
+        String email = makeGuestEmail();
+        String identifier = makeGuestIdentifier();
+
+        UserRegisterDto userRegisterDto = new UserRegisterDto();
+        userRegisterDto.setName(name);
+        userRegisterDto.setEmail(email);
+        userRegisterDto.setIdentifier(identifier);
+        userRegisterDto.setPlatform("GUEST");
+
+        return userRegisterDto;
     }
 
-    @Override
-    public String makeGuestName() {
+    private String makeGuestName() {
         return "Guest" + UUID.randomUUID().toString().substring(0, 8);
     }
 
-    @Override
-    public String makeGuestIdentifier() {
+    private String makeGuestEmail() {
+        return "guest_" + UUID.randomUUID() + "@ono.com";
+    }
+
+    private String makeGuestIdentifier() {
         return UUID.randomUUID().toString();
     }
 }

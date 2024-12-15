@@ -267,13 +267,13 @@ public class FolderServiceImpl implements FolderService {
         }
 
         if (folder.getProblems() != null && !folder.getProblems().isEmpty()) {
-            folder.getProblems().forEach(problem -> {
+            for (Problem problem : folder.getProblems()) {
                 problemService.deleteProblem(userId, problem.getId());
-            });
+            }
         }
 
-        folder.getSubFolders().clear(); // 하위 폴더 리스트 비우기 (orphanRemoval 보장)
-        folderRepository.delete(folder); // 폴더 삭제
+        folder.getSubFolders().clear();
+        folderRepository.delete(folder);
     }
 
     @Override

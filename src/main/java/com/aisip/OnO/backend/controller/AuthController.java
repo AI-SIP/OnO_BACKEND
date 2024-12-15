@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.controller;
 import com.aisip.OnO.backend.Dto.ErrorResponseDto;
 import com.aisip.OnO.backend.Dto.Token.TokenRequestDto;
 import com.aisip.OnO.backend.Dto.Token.TokenResponseDto;
+import com.aisip.OnO.backend.Dto.User.UserRegisterDto;
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
 import com.aisip.OnO.backend.entity.User.UserType;
 import com.aisip.OnO.backend.service.UserService;
@@ -26,53 +27,11 @@ public class AuthController {
     private final UserService userService;
 
 
-    @PostMapping("/guest")
+    @PostMapping("/login/guest")
     public ResponseEntity<?> guestLogin() {
-
-        String email = userService.makeGuestEmail();
-        String name = userService.makeGuestName();
-        String identifier = userService.makeGuestIdentifier();
-
-        return getUserTokenResponse(name, identifier, email, UserType.GUEST);
-    }
-
-    @PostMapping("/google")
-    public ResponseEntity<?> googleLogin(@RequestBody TokenRequestDto tokenRequestDto) {
-
-        log.info("Starting google login with Token : " + tokenRequestDto.toString());
-
-        try {
-            String email = tokenRequestDto.getEmail();
-            String name = tokenRequestDto.getName();
-            String identifier = tokenRequestDto.getIdentifier();
-
-            if (name != null && identifier != null) {
-                return getUserTokenResponse(name, identifier, email, UserType.MEMBER);
-            } else {
-                throw new IllegalArgumentException("Invalid token information or user data " + name);
-            }
-        } catch (Exception e) {
-            log.warn(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto(e.getMessage()));
-        }
-    }
-
-    @PostMapping("/apple")
-    public ResponseEntity<?> appleLogin(@RequestBody TokenRequestDto tokenRequestDto) {
-
-        log.info("Starting apple login with Token : " + tokenRequestDto.toString());
-
-        try {
-            String email = tokenRequestDto.getEmail();
-            String name = tokenRequestDto.getName();
-            String identifier = tokenRequestDto.getIdentifier();
-
-            if (name != null && identifier != null) {
-                return getUserTokenResponse(name, identifier, email, UserType.MEMBER);
-            } else {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponseDto("Invalid Apple token for username : " + name));
-            }
+        try{
+            UserResponseDto user = userService.registerGuestUser();
+            return getUserTokenResponse(user);
 
         } catch (Exception e) {
             log.warn(e.getMessage());
@@ -81,21 +40,13 @@ public class AuthController {
         }
     }
 
-    @PostMapping("/kakao")
-    public ResponseEntity<?> kakaoLogin(@RequestBody TokenRequestDto tokenRequestDto) {
-
-        log.info("Starting kakao login with Token : " + tokenRequestDto.toString());
+    @PostMapping("/login/social")
+    public ResponseEntity<?> socialLogin(@RequestBody UserRegisterDto userRegisterDto) {
+        log.info("Starting login with user info : " + userRegisterDto.toString());
 
         try {
-            String email = tokenRequestDto.getEmail();
-            String name = tokenRequestDto.getName();
-            String identifier = tokenRequestDto.getIdentifier();
-
-            if (name != null && identifier != null) {
-                return getUserTokenResponse(name, identifier, email, UserType.MEMBER);
-            } else {
-                throw new IllegalArgumentException("Invalid token information or user data for username : " + name);
-            }
+            UserResponseDto user = userService.registerOrLoginUser(userRegisterDto, UserType.MEMBER);
+            return getUserTokenResponse(user);
         } catch (Exception e) {
             log.warn(e.getMessage());
             Sentry.captureException(e);
@@ -154,13 +105,15 @@ public class AuthController {
         }
     }
 
-    private ResponseEntity<?> getUserTokenResponse(String name, String identifier, String email, UserType userType){
+
+    private ResponseEntity<?> getUserTokenResponse(UserResponseDto user){
         try {
-            UserResponseDto user = userService.registerOrLoginUser(email, name, identifier, userType);
             String accessToken = jwtTokenProvider.createAccessToken(user.getUserId());
             String refreshToken = jwtTokenProvider.createRefreshToken(user.getUserId());
 
-            log.info(user.getUserName() + " has login");
+            log.info(accessToken);
+            log.info(refreshToken);
+            log.info("id: " + user.getUserId() + ", name: " + user.getUserName() + " has login");
 
             return ResponseEntity.ok(new TokenResponseDto(accessToken, refreshToken));
         } catch (Exception e) {

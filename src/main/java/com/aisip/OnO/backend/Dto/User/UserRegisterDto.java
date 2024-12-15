@@ -11,6 +11,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UserRegisterDto {
 
+    private String platform;
+
     private String email;
 
     private String name;

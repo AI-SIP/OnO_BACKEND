@@ -1,7 +1,6 @@
 package com.aisip.OnO.backend.controller;
 
 import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
-import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDtoV2;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.exception.ProblemNotFoundException;
 import com.aisip.OnO.backend.exception.ProblemRegisterException;
@@ -93,11 +92,11 @@ public class ProblemController {
     @PostMapping("/V2")
     public ResponseEntity<?> registerProblemV2(
             Authentication authentication,
-            @ModelAttribute ProblemRegisterDtoV2 problemRegisterDto
+            @ModelAttribute ProblemRegisterDto problemRegisterDto
     ) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            boolean isSaved = problemService.saveProblemV2(userId, problemRegisterDto);
+            boolean isSaved = problemService.saveProblem(userId, problemRegisterDto);
 
             if (isSaved) {
                 log.info("userId: " + userId + " success for register problem");

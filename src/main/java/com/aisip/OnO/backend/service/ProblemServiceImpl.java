@@ -1,7 +1,6 @@
 package com.aisip.OnO.backend.service;
 
-import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDtoV2;
-import com.aisip.OnO.backend.Dto.Process.ImageProcessRegisterDto;
+import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
 import com.aisip.OnO.backend.entity.Folder;
 import com.aisip.OnO.backend.entity.Problem.ProblemPractice;
 import com.aisip.OnO.backend.entity.Problem.ProblemRepeat;
@@ -10,7 +9,6 @@ import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.repository.FolderRepository;
 import com.aisip.OnO.backend.repository.ProblemRepeatRepository;
 import com.aisip.OnO.backend.repository.UserRepository;
-import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.converter.ProblemConverter;
 import com.aisip.OnO.backend.entity.Image.ImageData;
@@ -133,66 +131,6 @@ public class ProblemServiceImpl implements ProblemService {
         try {
             if (optionalUserEntity.isPresent()) {
                 User user = optionalUserEntity.get();
-
-                Problem problem = Problem.builder()
-                        .user(user)
-                        .reference(problemRegisterDto.getReference())
-                        .memo(problemRegisterDto.getMemo())
-                        .solvedAt(problemRegisterDto.getSolvedAt())
-                        .build();
-
-                if (problemRegisterDto.getFolderId() != null) {
-                    Optional<Folder> optionalFolder = folderRepository.findById(problemRegisterDto.getFolderId());
-                    optionalFolder.ifPresent(problem::setFolder);
-                }
-
-                Problem savedProblem = problemRepository.save(problem);
-
-                if (problemRegisterDto.getProblemImage() != null) {
-                    String problemImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getProblemImage(), savedProblem, ImageType.PROBLEM_IMAGE);
-                    if (problemImageUrl != null) {
-
-                        log.info("isProcess: " + problemRegisterDto.isProcess());
-                        if(problemRegisterDto.isProcess()){
-                            problemRegisterDto.initColorsList();
-                            ImageProcessRegisterDto imageProcessRegisterDto = ImageProcessRegisterDto.builder()
-                                    .fullUrl(problemImageUrl)
-                                    .colorsList(problemRegisterDto.getColorsList())
-                                    .build();
-
-                            String processImageUrl = fileUploadService.saveAndGetProcessImageUrl(imageProcessRegisterDto, savedProblem, ImageType.PROCESS_IMAGE);
-                        } else{
-                            String processImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getProblemImage(), savedProblem, ImageType.PROCESS_IMAGE);
-                        }
-                    }
-                }
-
-                if (problemRegisterDto.getAnswerImage() != null) {
-                    String answerImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getAnswerImage(), savedProblem, ImageType.ANSWER_IMAGE);
-                }
-
-                if (problemRegisterDto.getSolveImage() != null) {
-                    String solveImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getSolveImage(), savedProblem, ImageType.SOLVE_IMAGE);
-                }
-
-                return true;
-            } else {
-                throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            Sentry.captureException(e);
-            return false;
-        }
-    }
-
-    @Override
-    public boolean saveProblemV2(Long userId, ProblemRegisterDtoV2 problemRegisterDto) {
-        Optional<User> optionalUserEntity = userRepository.findById(userId);
-
-        try {
-            if (optionalUserEntity.isPresent()) {
-                User user = optionalUserEntity.get();
                 Problem problem;
 
                 Optional<Problem> optionalProblem = problemRepository.findById(problemRegisterDto.getProblemId());
@@ -216,11 +154,11 @@ public class ProblemServiceImpl implements ProblemService {
                 }
 
                 if (problemRegisterDto.getAnswerImage() != null) {
-                    String answerImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getAnswerImage(), problem, ImageType.ANSWER_IMAGE);
+                    fileUploadService.uploadFileToS3(problemRegisterDto.getAnswerImage(), problem, ImageType.ANSWER_IMAGE);
                 }
 
                 if (problemRegisterDto.getSolveImage() != null) {
-                    String solveImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getSolveImage(), problem, ImageType.SOLVE_IMAGE);
+                    fileUploadService.uploadFileToS3(problemRegisterDto.getSolveImage(), problem, ImageType.SOLVE_IMAGE);
                 }
 
                 if(problemRegisterDto.getProcessImageUrl() != null){
@@ -263,23 +201,6 @@ public class ProblemServiceImpl implements ProblemService {
                     if (problemRegisterDto.getFolderId() != null) {
                         Optional<Folder> optionalFolder = folderRepository.findById(problemRegisterDto.getFolderId());
                         optionalFolder.ifPresent(problem::setFolder);
-                    }
-
-                    if (problemRegisterDto.getProblemImage() != null) {
-                        String problemImageUrl = fileUploadService.updateImage(problemRegisterDto.getProblemImage(), problem, ImageType.PROBLEM_IMAGE);
-
-                        log.info("isProcess: " + problemRegisterDto.isProcess());
-                        if(problemRegisterDto.isProcess()){
-                            problemRegisterDto.initColorsList();
-                            ImageProcessRegisterDto imageProcessRegisterDto = ImageProcessRegisterDto.builder()
-                                    .fullUrl(problemImageUrl)
-                                    .colorsList(problemRegisterDto.getColorsList())
-                                    .build();
-
-                            String processImageUrl = fileUploadService.saveAndGetProcessImageUrl(imageProcessRegisterDto, problem, ImageType.PROCESS_IMAGE);
-                        } else{
-                            String processImageUrl = fileUploadService.uploadFileToS3(problemRegisterDto.getProblemImage(), problem, ImageType.PROCESS_IMAGE);
-                        }
                     }
 
                     if (problemRegisterDto.getSolveImage() != null) {
