@@ -131,17 +131,20 @@ public class ProblemServiceImpl implements ProblemService {
         try {
             if (optionalUserEntity.isPresent()) {
                 User user = optionalUserEntity.get();
-                Problem problem;
+                Problem problem = Problem.builder().build();
 
-                Optional<Problem> optionalProblem = problemRepository.findById(problemRegisterDto.getProblemId());
-                problem = optionalProblem.orElseGet(() -> Problem.builder()
-                        .build());
+                if(problemRegisterDto.getProblemId() != null){
+                    Optional<Problem> optionalProblem = problemRepository.findById(problemRegisterDto.getProblemId());
+
+                    if(optionalProblem.isPresent()){
+                        problem = optionalProblem.get();
+                    }
+                }
 
                 problem.setUser(user);
                 problem.setMemo(problemRegisterDto.getMemo());
                 problem.setReference(problemRegisterDto.getReference());
-                problem.setAnalysis(problemRegisterDto.getAnalysis());
-                problem.setTemplateType(TemplateType.valueOf(problemRegisterDto.getTemplateType()));
+                problem.setTemplateType(TemplateType.SIMPLE_TEMPLATE);
                 problem.setSolvedAt(problemRegisterDto.getSolvedAt() != null ? problemRegisterDto.getSolvedAt() : LocalDateTime.now());
 
                 if (problemRegisterDto.getFolderId() != null) {
@@ -149,21 +152,15 @@ public class ProblemServiceImpl implements ProblemService {
                     optionalFolder.ifPresent(problem::setFolder);
                 }
 
-                if(problemRegisterDto.getProblemImageUrl() != null){
-                    fileUploadService.saveImageData(problemRegisterDto.getProblemImageUrl(), problem, ImageType.PROBLEM_IMAGE);
+                if(problemRegisterDto.getProblemImage() != null){
+                    fileUploadService.uploadFileToS3(problemRegisterDto.getProblemImage(), problem, ImageType.PROBLEM_IMAGE);
                 }
 
                 if (problemRegisterDto.getAnswerImage() != null) {
                     fileUploadService.uploadFileToS3(problemRegisterDto.getAnswerImage(), problem, ImageType.ANSWER_IMAGE);
                 }
 
-                if (problemRegisterDto.getSolveImage() != null) {
-                    fileUploadService.uploadFileToS3(problemRegisterDto.getSolveImage(), problem, ImageType.SOLVE_IMAGE);
-                }
-
-                if(problemRegisterDto.getProcessImageUrl() != null){
-                    fileUploadService.saveImageData(problemRegisterDto.getProcessImageUrl(), problem, ImageType.PROCESS_IMAGE);
-                }
+                problemRepository.save(problem);
 
                 return true;
             } else {

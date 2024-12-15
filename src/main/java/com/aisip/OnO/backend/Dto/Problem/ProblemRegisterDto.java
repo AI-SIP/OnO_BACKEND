@@ -14,9 +14,7 @@ public class ProblemRegisterDto {
 
     private Long problemId;
 
-    private String problemImageUrl;
-
-    private String processImageUrl;
+    private MultipartFile problemImage;
 
     private MultipartFile answerImage;
 
@@ -27,10 +25,6 @@ public class ProblemRegisterDto {
     private String reference;
 
     private Long folderId;
-
-    private Long templateType;
-
-    private String analysis;
 
     private LocalDateTime solvedAt;
 }

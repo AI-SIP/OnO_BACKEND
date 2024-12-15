@@ -45,11 +45,14 @@ public class FileUploadServiceImpl implements FileUploadService {
         String fileName = createFileName(file, problem, imageType);
         String fileUrl = getFileUrl(fileName);
 
+        /*
         ObjectMetadata objectMetadata = new ObjectMetadata();
         objectMetadata.setContentType(file.getContentType());
         objectMetadata.setContentLength(file.getSize());
 
         amazonS3Client.putObject(bucket, fileName, file.getInputStream(), objectMetadata);
+
+         */
 
         if(imageType != ImageType.SOLVE_IMAGE){
             saveImageData(fileUrl, problem, imageType);
