@@ -19,7 +19,21 @@ public class FolderController {
 
     private final FolderService folderService;
 
-    @GetMapping()
+    @GetMapping("")
+    public ResponseEntity<?> getAllFolders(Authentication authentication) {
+        try {
+            Long userId = (Long) authentication.getPrincipal();
+            log.info("userId: " + userId + " try to get all folder");
+
+            return ResponseEntity.ok(folderService.findAllFolders(userId));
+        } catch (Exception e) {
+            log.warn(e.getMessage());
+            Sentry.captureException(e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 탐색에 실패했습니다.");
+        }
+    }
+
+    @GetMapping("/root")
     public ResponseEntity<?> getRootFolder(Authentication authentication) {
         try {
             Long userId = (Long) authentication.getPrincipal();

@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.service;
 import com.aisip.OnO.backend.Dto.Folder.FolderResponseDto;
 import com.aisip.OnO.backend.Dto.Folder.FolderThumbnailResponseDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
+import com.aisip.OnO.backend.converter.FolderConverter;
 import com.aisip.OnO.backend.entity.Folder;
 import com.aisip.OnO.backend.entity.Problem.Problem;
 import com.aisip.OnO.backend.entity.User.User;
@@ -35,12 +36,32 @@ public class FolderServiceImpl implements FolderService {
     private final FolderRepository folderRepository;
 
     @Override
+    public List<FolderResponseDto> findAllFolders(Long userId) {
+
+        List<Folder> folders = folderRepository.findAllByUserId(userId);
+        if(folders.isEmpty()){
+            return List.of(findRootFolder(userId));
+        }
+
+        return folders.stream()
+                .map(this::getFolderResponseDto).toList();
+    }
+
+    @Override
+    public FolderResponseDto findFolder(Long userId, Long folderId) {
+        Optional<Folder> optionalFolder = folderRepository.findById(folderId);
+
+        return optionalFolder.map(this::getFolderResponseDto).orElse(null);
+    }
+
+    @Override
     public FolderResponseDto findRootFolder(Long userId) {
 
         Optional<Folder> optionalRootFolder = folderRepository.findByUserIdAndParentFolderIsNull(userId);
 
         if (optionalRootFolder.isPresent()) {
 
+            Folder rootFolder = optionalRootFolder.get();
             List<Problem> noFolderProblems = problemRepository.findAllByUserIdAndFolderIsNull(userId);
 
             for (Problem problem : noFolderProblems) {
@@ -49,7 +70,7 @@ public class FolderServiceImpl implements FolderService {
             }
 
             log.info("find root folder id: " + optionalRootFolder.get().getId());
-            return findFolder(userId, optionalRootFolder.get().getId());
+            return getFolderResponseDto(rootFolder);
         } else {
             log.info("create root folder for userId: " + userId);
             return createRootFolder(userId, "책장");
@@ -71,7 +92,7 @@ public class FolderServiceImpl implements FolderService {
                 problemRepository.save(problem);
             }
 
-            return findFolder(userId, rootFolder.getId());
+            return getFolderResponseDto(rootFolder);
         }
 
         throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
@@ -96,52 +117,18 @@ public class FolderServiceImpl implements FolderService {
 
             folderRepository.save(folder);
 
-            return findFolder(userId, folder.getId());
+            return getFolderResponseDto(folder);
         }
 
         throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
     }
 
     @Override
-    public FolderResponseDto findFolder(Long userId, Long folderId) {
+    public FolderResponseDto getFolderResponseDto(Folder folder) {
 
-        Optional<Folder> optionalFolder = folderRepository.findById(folderId);
+        List<ProblemResponseDto> problemResponseDtoList = problemService.findAllProblemsByFolderId(folder.getId());
 
-        if (optionalFolder.isPresent() && optionalFolder.get().getUser().getId().equals(userId)) {
-
-            Folder folder = optionalFolder.get();
-
-            FolderThumbnailResponseDto parentFolder = null;
-            if (folder.getParentFolder() != null) {
-                parentFolder = FolderThumbnailResponseDto.builder()
-                        .folderId(folder.getParentFolder().getId())
-                        .folderName(folder.getParentFolder().getName())
-                        .build();
-            }
-
-            List<FolderThumbnailResponseDto> subFolders = null;
-
-            if (folder.getSubFolders() != null && !folder.getSubFolders().isEmpty()) {
-                subFolders = folder.getSubFolders().stream().map(subFolder -> FolderThumbnailResponseDto.builder()
-                        .folderId(subFolder.getId())
-                        .folderName(subFolder.getName())
-                        .build()).toList();
-            }
-
-            List<ProblemResponseDto> problems = problemService.findAllProblemsByFolderId(folderId);
-
-            return FolderResponseDto.builder()
-                    .folderId(folder.getId())
-                    .folderName(folder.getName())
-                    .parentFolder(parentFolder)
-                    .subFolders(subFolders)
-                    .problems(problems)
-                    .updateAt(folder.getUpdatedAt())
-                    .createdAt(folder.getCreatedAt())
-                    .build();
-        }
-
-        throw new FolderNotFoundException("공책을 찾을 수 없습니다!, folderId: " + folderId);
+        return FolderConverter.convertToResponseDto(folder, problemResponseDtoList);
     }
 
     @Override
@@ -153,29 +140,7 @@ public class FolderServiceImpl implements FolderService {
             return new ArrayList<>();
         }
 
-        return folders.stream().map(folder -> {
-
-            Long parentFolderId = null;
-            if (folder.getParentFolder() != null) {
-                parentFolderId = folder.getParentFolder().getId();
-            }
-
-            List<Long> subFoldersId = new ArrayList<>();
-            List<Folder> subFolders = folder.getSubFolders();
-
-            if (subFolders != null && !subFolders.isEmpty()) {
-                subFoldersId = subFolders.stream()
-                        .map(Folder::getId).toList();
-            }
-
-            return FolderThumbnailResponseDto.builder()
-                    .folderId(folder.getId())
-                    .folderName(folder.getName())
-                    .parentFolderId(parentFolderId)
-                    .subFoldersId(subFoldersId)
-                    .build();
-
-        }).toList();
+        return folders.stream().map(FolderConverter::convertToThumbnailResponseDto).toList();
     }
 
     @Override
@@ -200,7 +165,7 @@ public class FolderServiceImpl implements FolderService {
 
                 folderRepository.save(folder);
 
-                return findFolder(userId, folderId);
+                return getFolderResponseDto(folder);
             }
         }
 
@@ -222,7 +187,7 @@ public class FolderServiceImpl implements FolderService {
                 problem.setFolder(folder);
                 problemRepository.save(problem);
 
-                return findFolder(userId, folderId);
+                return getFolderResponseDto(folder);
             }
 
             throw new ProblemNotFoundException("문제를 찾을 수 없습니다!, problemId: " + problemId);
@@ -248,7 +213,7 @@ public class FolderServiceImpl implements FolderService {
                 folderRepository.deleteById(folderId);
 
                 log.info("root folder id: " + parentFolderId);
-                return findFolder(userId, parentFolderId);
+                return getFolderResponseDto(folder);
             } else {
                 throw new FolderNotFoundException("메인 폴더는 삭제할 수 없습니다.");
             }
