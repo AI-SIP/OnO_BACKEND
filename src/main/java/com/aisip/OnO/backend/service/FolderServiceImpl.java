@@ -115,9 +115,7 @@ public class FolderServiceImpl implements FolderService {
                 parentFolder.ifPresent(folder::setParentFolder);
             }
 
-            folderRepository.save(folder);
-
-            return getFolderResponseDto(folder);
+            return getFolderResponseDto(folderRepository.save(folder));
         }
 
         throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
@@ -163,9 +161,7 @@ public class FolderServiceImpl implements FolderService {
                     optionalParentFolder.ifPresent(folder::setParentFolder);
                 }
 
-                folderRepository.save(folder);
-
-                return getFolderResponseDto(folder);
+                return getFolderResponseDto(folderRepository.save(folder));
             }
         }
 
@@ -187,7 +183,7 @@ public class FolderServiceImpl implements FolderService {
                 problem.setFolder(folder);
                 problemRepository.save(problem);
 
-                return getFolderResponseDto(folder);
+                return findFolder(userId, folderId);
             }
 
             throw new ProblemNotFoundException("문제를 찾을 수 없습니다!, problemId: " + problemId);
@@ -213,7 +209,8 @@ public class FolderServiceImpl implements FolderService {
                 folderRepository.deleteById(folderId);
 
                 log.info("root folder id: " + parentFolderId);
-                return getFolderResponseDto(folder);
+
+                return findFolder(userId, parentFolderId);
             } else {
                 throw new FolderNotFoundException("메인 폴더는 삭제할 수 없습니다.");
             }
