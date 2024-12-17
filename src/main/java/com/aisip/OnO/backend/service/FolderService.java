@@ -1,7 +1,6 @@
 package com.aisip.OnO.backend.service;
 
 import com.aisip.OnO.backend.Dto.Folder.FolderResponseDto;
-import com.aisip.OnO.backend.Dto.Folder.FolderThumbnailResponseDto;
 import com.aisip.OnO.backend.entity.Folder;
 
 import java.util.List;
@@ -21,8 +20,6 @@ public interface FolderService {
     FolderResponseDto findRootFolder(Long userId);
 
     FolderResponseDto getFolderResponseDto(Folder folder);
-
-    List<FolderThumbnailResponseDto> findAllFolderThumbnailsByUser(Long userId);
 
     FolderResponseDto updateFolder(Long userId, Long folderId, String folderName, Long parentFolderId);
 

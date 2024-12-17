@@ -1,7 +1,6 @@
 package com.aisip.OnO.backend.service;
 
 import com.aisip.OnO.backend.Dto.Folder.FolderResponseDto;
-import com.aisip.OnO.backend.Dto.Folder.FolderThumbnailResponseDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.converter.FolderConverter;
 import com.aisip.OnO.backend.entity.Folder;
@@ -14,7 +13,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -109,18 +107,6 @@ public class FolderServiceImpl implements FolderService {
         List<ProblemResponseDto> problemResponseDtoList = problemService.findAllProblemsByFolderId(folder.getId());
 
         return FolderConverter.convertToResponseDto(folder, problemResponseDtoList);
-    }
-
-    @Override
-    public List<FolderThumbnailResponseDto> findAllFolderThumbnailsByUser(Long userId) {
-
-        List<Folder> folders = folderRepository.findAllByUserId(userId);
-
-        if (folders.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        return folders.stream().map(FolderConverter::convertToThumbnailResponseDto).toList();
     }
 
     @Override

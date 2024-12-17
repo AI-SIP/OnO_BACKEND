@@ -62,20 +62,6 @@ public class FolderController {
         }
     }
 
-    @GetMapping("/thumbnail/all")
-    public ResponseEntity<?> getAllFolderThumbnails(Authentication authentication) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            log.info("userId: " + userId + " try to get all folder thumbnails");
-
-            return ResponseEntity.ok(folderService.findAllFolderThumbnailsByUser(userId));
-        } catch (Exception e) {
-            log.warn(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 탐색에 실패했습니다.");
-        }
-    }
-
     @PostMapping()
     public ResponseEntity<?> createFolder(Authentication authentication, @RequestBody FolderRegisterDto folderRegisterDto) {
         try {
