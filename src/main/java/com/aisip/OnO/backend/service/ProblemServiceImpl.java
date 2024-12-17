@@ -7,7 +7,6 @@ import com.aisip.OnO.backend.entity.Problem.TemplateType;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.repository.FolderRepository;
 import com.aisip.OnO.backend.repository.ProblemRepeatRepository;
-import com.aisip.OnO.backend.repository.UserRepository;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.converter.ProblemConverter;
 import com.aisip.OnO.backend.entity.Image.ImageData;
@@ -15,7 +14,6 @@ import com.aisip.OnO.backend.entity.Image.ImageType;
 import com.aisip.OnO.backend.entity.Problem.Problem;
 import com.aisip.OnO.backend.exception.ProblemNotFoundException;
 import com.aisip.OnO.backend.exception.UserNotAuthorizedException;
-import com.aisip.OnO.backend.exception.UserNotFoundException;
 import com.aisip.OnO.backend.repository.ProblemRepository;
 import io.sentry.Sentry;
 import jakarta.transaction.Transactional;
@@ -26,7 +24,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -37,7 +34,7 @@ import java.util.stream.Collectors;
 @Transactional
 public class ProblemServiceImpl implements ProblemService {
 
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final ProblemRepository problemRepository;
 
     private final ProblemRepeatRepository problemRepeatRepository;
@@ -48,17 +45,12 @@ public class ProblemServiceImpl implements ProblemService {
 
     @Override
     public ProblemResponseDto findProblem(Long userId, Long problemId) {
-        Optional<Problem> optionalProblem = problemRepository.findById(problemId);
-        if (optionalProblem.isPresent()) {
-            Problem problem = optionalProblem.get();
+        Problem problem = getProblemEntity(problemId);
 
-            if (problem.getUser().getId().equals(userId)) {
-                return convertToProblemResponse(problem);
-            } else {
-                throw new UserNotAuthorizedException("해당 문제의 작성자가 아닙니다.");
-            }
+        if (problem.getUser().getId().equals(userId)) {
+            return convertToProblemResponse(problem);
         } else {
-            throw new ProblemNotFoundException("문제를 찾을 수 없습니다! problemId: " + problemId);
+            throw new UserNotAuthorizedException("해당 문제의 작성자가 아닙니다.");
         }
     }
 
@@ -88,12 +80,11 @@ public class ProblemServiceImpl implements ProblemService {
 
     @Override
     public List<ProblemResponseDto> findUserProblems(Long userId) {
-        Optional<User> user = userRepository.findById(userId);
-        return user.map(u -> problemRepository.findAllByUserId(u.getId())
-                        .stream()
-                        .map(this::convertToProblemResponse)
-                        .collect(Collectors.toList()))
-                .orElse(Collections.emptyList());
+        User user = userService.getUserEntity(userId);
+        return problemRepository.findAllByUserId(user.getId())
+                .stream()
+                .map(this::convertToProblemResponse)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -112,63 +103,51 @@ public class ProblemServiceImpl implements ProblemService {
 
     @Override
     public Problem createProblem(Long userId) {
+        User user = userService.getUserEntity(userId);
 
-        Optional<User> optionalUserEntity = userRepository.findById(userId);
-        if (optionalUserEntity.isPresent()) {
-            User user = optionalUserEntity.get();
+        Problem problem = Problem.builder()
+                .user(user)
+                .build();
 
-            Problem problem = Problem.builder()
-                    .user(user)
-                    .build();
-
-            return problemRepository.save(problem);
-        } else{
-            throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
-        }
+        return problemRepository.save(problem);
     }
 
     @Override
     public boolean createProblem(Long userId, ProblemRegisterDto problemRegisterDto) {
-        Optional<User> optionalUserEntity = userRepository.findById(userId);
-
         try {
-            if (optionalUserEntity.isPresent()) {
-                User user = optionalUserEntity.get();
-                Problem problem = Problem.builder().build();
+            User user = userService.getUserEntity(userId);
+            Problem problem = Problem.builder().build();
 
-                if(problemRegisterDto.getProblemId() != null){
-                    Optional<Problem> optionalProblem = problemRepository.findById(problemRegisterDto.getProblemId());
+            if(problemRegisterDto.getProblemId() != null){
+                Optional<Problem> optionalProblem = problemRepository.findById(problemRegisterDto.getProblemId());
 
-                    if(optionalProblem.isPresent()){
-                        problem = optionalProblem.get();
-                    }
+                if(optionalProblem.isPresent()){
+                    problem = optionalProblem.get();
                 }
-
-                problem.setUser(user);
-                problem.setMemo(problemRegisterDto.getMemo());
-                problem.setReference(problemRegisterDto.getReference());
-                problem.setTemplateType(TemplateType.SIMPLE_TEMPLATE);
-                problem.setSolvedAt(problemRegisterDto.getSolvedAt() != null ? problemRegisterDto.getSolvedAt() : LocalDateTime.now());
-
-                if (problemRegisterDto.getFolderId() != null) {
-                    Optional<Folder> optionalFolder = folderRepository.findById(problemRegisterDto.getFolderId());
-                    optionalFolder.ifPresent(problem::setFolder);
-                }
-
-                if(problemRegisterDto.getProblemImage() != null){
-                    fileUploadService.uploadFileToS3(problemRegisterDto.getProblemImage(), problem, ImageType.PROBLEM_IMAGE);
-                }
-
-                if (problemRegisterDto.getAnswerImage() != null) {
-                    fileUploadService.uploadFileToS3(problemRegisterDto.getAnswerImage(), problem, ImageType.ANSWER_IMAGE);
-                }
-
-                problemRepository.save(problem);
-
-                return true;
-            } else {
-                throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
             }
+
+            problem.setUser(user);
+            problem.setMemo(problemRegisterDto.getMemo());
+            problem.setReference(problemRegisterDto.getReference());
+            problem.setTemplateType(TemplateType.SIMPLE_TEMPLATE);
+            problem.setSolvedAt(problemRegisterDto.getSolvedAt() != null ? problemRegisterDto.getSolvedAt() : LocalDateTime.now());
+
+            if (problemRegisterDto.getFolderId() != null) {
+                Optional<Folder> optionalFolder = folderRepository.findById(problemRegisterDto.getFolderId());
+                optionalFolder.ifPresent(problem::setFolder);
+            }
+
+            if(problemRegisterDto.getProblemImage() != null){
+                fileUploadService.uploadFileToS3(problemRegisterDto.getProblemImage(), problem, ImageType.PROBLEM_IMAGE);
+            }
+
+            if (problemRegisterDto.getAnswerImage() != null) {
+                fileUploadService.uploadFileToS3(problemRegisterDto.getAnswerImage(), problem, ImageType.ANSWER_IMAGE);
+            }
+
+            problemRepository.save(problem);
+
+            return true;
         } catch (Exception e) {
             e.printStackTrace();
             Sentry.captureException(e);
@@ -178,46 +157,39 @@ public class ProblemServiceImpl implements ProblemService {
 
     @Override
     public boolean updateProblem(Long userId, ProblemRegisterDto problemRegisterDto) {
-
-        Long problemId = problemRegisterDto.getProblemId();
-        Optional<Problem> optionalProblem = problemRepository.findById(problemId);
-        if (optionalProblem.isPresent()) {
-            Problem problem = optionalProblem.get();
-            if (problem.getUser().getId().equals(userId)) {
-
-                try {
-                    if (problemRegisterDto.getSolvedAt() != null) {
-                        problem.setSolvedAt(problemRegisterDto.getSolvedAt());
-                    }
-
-                    if (problemRegisterDto.getReference() != null) {
-                        problem.setReference(problemRegisterDto.getReference());
-                    }
-
-                    if (problemRegisterDto.getMemo() != null) {
-                        problem.setMemo(problemRegisterDto.getMemo());
-                    }
-
-                    if (problemRegisterDto.getFolderId() != null) {
-                        Optional<Folder> optionalFolder = folderRepository.findById(problemRegisterDto.getFolderId());
-                        optionalFolder.ifPresent(problem::setFolder);
-                    }
-
-                    if (problemRegisterDto.getSolveImage() != null) {
-                        fileUploadService.updateImage(problemRegisterDto.getSolveImage(), problem, ImageType.SOLVE_IMAGE);
-                    }
-
-                    if (problemRegisterDto.getAnswerImage() != null) {
-                        fileUploadService.updateImage(problemRegisterDto.getAnswerImage(), problem, ImageType.ANSWER_IMAGE);
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    Sentry.captureException(e);
-                    return false;
+        Problem problem = getProblemEntity(problemRegisterDto.getProblemId());
+        if (problem.getUser().getId().equals(userId)) {
+            try {
+                if (problemRegisterDto.getSolvedAt() != null) {
+                    problem.setSolvedAt(problemRegisterDto.getSolvedAt());
                 }
-            } else {
+
+                if (problemRegisterDto.getReference() != null) {
+                    problem.setReference(problemRegisterDto.getReference());
+                }
+
+                if (problemRegisterDto.getMemo() != null) {
+                    problem.setMemo(problemRegisterDto.getMemo());
+                }
+
+                if (problemRegisterDto.getFolderId() != null) {
+                    Optional<Folder> optionalFolder = folderRepository.findById(problemRegisterDto.getFolderId());
+                    optionalFolder.ifPresent(problem::setFolder);
+                }
+
+                if (problemRegisterDto.getSolveImage() != null) {
+                    fileUploadService.updateImage(problemRegisterDto.getSolveImage(), problem, ImageType.SOLVE_IMAGE);
+                }
+
+                if (problemRegisterDto.getAnswerImage() != null) {
+                    fileUploadService.updateImage(problemRegisterDto.getAnswerImage(), problem, ImageType.ANSWER_IMAGE);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                Sentry.captureException(e);
                 return false;
             }
+
             return true;
         } else {
             return false;
@@ -226,25 +198,18 @@ public class ProblemServiceImpl implements ProblemService {
 
     @Override
     public void deleteProblem(Long userId, Long problemId) {
-        Optional<Problem> optionalProblem = problemRepository.findById(problemId);
-        if (optionalProblem.isPresent()) {
-            Problem problem = optionalProblem.get();
-            if (problem.getUser().getId().equals(userId)) {
+        Problem problem = getProblemEntity(problemId);
+        if (problem.getUser().getId().equals(userId)) {
 
-                List<ImageData> images = fileUploadService.getProblemImages(problemId);
-                images.forEach(fileUploadService::deleteImage);
+            List<ImageData> images = fileUploadService.getProblemImages(problemId);
+            images.forEach(fileUploadService::deleteImage);
 
-                List<ProblemRepeat> problemRepeats = getProblemRepeats(problemId);
-                problemRepeatRepository.deleteAll(problemRepeats);
+            List<ProblemRepeat> problemRepeats = getProblemRepeats(problemId);
+            problemRepeatRepository.deleteAll(problemRepeats);
 
-                //problemPracticeService.deleteProblemFromAllPractice(problemId);
-
-                problemRepository.delete(problem);
-            } else {
-                throw new UserNotAuthorizedException("문제 작성자와 유저가 불일치합니다!");
-            }
+            problemRepository.delete(problem);
         } else {
-            throw new ProblemNotFoundException("문제를 찾을 수 없습니다! problemId: " + problemId);
+            throw new UserNotAuthorizedException("문제 작성자와 유저가 불일치합니다!");
         }
     }
 
@@ -270,22 +235,17 @@ public class ProblemServiceImpl implements ProblemService {
 
     @Override
     public void addRepeatCount(Long problemId, MultipartFile solveImage) throws IOException {
-        Optional<Problem> optionalProblem = problemRepository.findById(problemId);
-        if (optionalProblem.isPresent()) {
-            Problem problem = optionalProblem.get();
-            ProblemRepeat problemRepeat = ProblemRepeat.builder()
-                    .problem(problem)
-                    .build();
+        Problem problem = getProblemEntity(problemId);
+        ProblemRepeat problemRepeat = ProblemRepeat.builder()
+                .problem(problem)
+                .build();
 
-            if(solveImage != null){
-                String solveImageUrl = fileUploadService.uploadFileToS3(solveImage, problem, ImageType.SOLVE_IMAGE);
-                problemRepeat.setSolveImageUrl(solveImageUrl);
-            }
-
-            problemRepeatRepository.save(problemRepeat);
-        } else {
-            throw new ProblemNotFoundException("문제를 찾을 수 없습니다! problemId: " + problemId);
+        if(solveImage != null){
+            String solveImageUrl = fileUploadService.uploadFileToS3(solveImage, problem, ImageType.SOLVE_IMAGE);
+            problemRepeat.setSolveImageUrl(solveImageUrl);
         }
+
+        problemRepeatRepository.save(problemRepeat);
     }
 
     @Override
