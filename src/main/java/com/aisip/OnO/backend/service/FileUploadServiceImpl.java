@@ -230,6 +230,8 @@ public class FileUploadServiceImpl implements FileUploadService {
         String fileUrl = imageData.getImageUrl();
         String splitStr = ".com/";
         String fileName = fileUrl.substring(fileUrl.lastIndexOf(splitStr) + splitStr.length());
+
+        /*
         amazonS3Client.deleteObject(new DeleteObjectRequest(bucket, fileName));
 
         if (imageData.getImageType() == ImageType.PROCESS_IMAGE) {
@@ -239,6 +241,8 @@ public class FileUploadServiceImpl implements FileUploadService {
             amazonS3Client.deleteObject(new DeleteObjectRequest(bucket, originalFileName + ".input.png"));
             amazonS3Client.deleteObject(new DeleteObjectRequest(bucket, originalFileName + ".mask.png"));
         }
+
+         */
 
         log.info("imageData: " + imageData.getImageUrl() + " has successfully deleted");
         imageDataRepository.deleteById(imageData.getId());
