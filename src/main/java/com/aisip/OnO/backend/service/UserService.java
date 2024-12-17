@@ -21,10 +21,6 @@ public interface UserService {
 
     List<UserResponseDto> findAllUsers();
 
-    Long findAllProblemCountByUserId(Long userId);
-
-    List<Long> findAllUsersProblemCount();
-
     Long findAllUserTypeCountByUserType(UserType userType);
 
     UserResponseDto updateUser(Long userId, UserRegisterDto userRegisterDto);

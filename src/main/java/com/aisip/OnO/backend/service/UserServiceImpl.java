@@ -6,7 +6,6 @@ import com.aisip.OnO.backend.converter.UserConverter;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.entity.User.UserType;
 import com.aisip.OnO.backend.exception.UserNotFoundException;
-import com.aisip.OnO.backend.repository.ProblemRepository;
 import com.aisip.OnO.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,8 +22,6 @@ import java.util.stream.Collectors;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
-
-    private final ProblemRepository problemRepository;
 
     @Override
     public User getUserEntity(Long userId){
@@ -94,25 +91,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public List<UserResponseDto> findAllUsers() {
-
         List<User> userList = userRepository.findAll();
         return userList.stream().map(UserConverter::convertToResponseDto).collect(Collectors.toList());
-    }
-
-    @Override
-    public Long findAllProblemCountByUserId(Long userId) {
-        Optional<User> user = userRepository.findById(userId);
-        if (user.isPresent()) {
-            return problemRepository.countByUserId(userId);
-        } else {
-            return 0L;
-        }
-    }
-
-    @Override
-    public List<Long> findAllUsersProblemCount() {
-        List<User> userList = userRepository.findAll();
-        return userList.stream().map(user -> findAllProblemCountByUserId(user.getId())).collect(Collectors.toList());
     }
 
     @Override

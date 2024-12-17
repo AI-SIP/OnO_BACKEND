@@ -68,7 +68,7 @@ public class UserController {
     public ResponseEntity<?> getUserProblemCount(Authentication authentication) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            Long userProblemCount = userService.findAllProblemCountByUserId(userId);
+            Long userProblemCount = problemService.getProblemCountByUser(userId);
 
             return ResponseEntity.ok(userProblemCount);
         } catch (Exception e) {

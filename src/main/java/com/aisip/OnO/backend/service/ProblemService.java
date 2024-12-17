@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.service;
 
 import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
+import com.aisip.OnO.backend.Dto.User.UserResponseDto;
 import com.aisip.OnO.backend.entity.Problem.Problem;
 import com.aisip.OnO.backend.entity.Problem.ProblemRepeat;
 import com.aisip.OnO.backend.entity.Problem.TemplateType;
@@ -35,6 +36,10 @@ public interface ProblemService {
     void deleteProblem(Long userId, Long problemId);
 
     void deleteUserProblems(Long userId);
+
+    Long getProblemCountByUser(Long userId);
+
+    List<Long> getAllUsersProblemCount(List<UserResponseDto> userList);
 
     List<ProblemRepeat> getProblemRepeats(Long problemId);
 

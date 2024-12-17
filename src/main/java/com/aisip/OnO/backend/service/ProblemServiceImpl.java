@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.service;
 
 import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
+import com.aisip.OnO.backend.Dto.User.UserResponseDto;
 import com.aisip.OnO.backend.entity.Folder;
 import com.aisip.OnO.backend.entity.Problem.ProblemRepeat;
 import com.aisip.OnO.backend.entity.Problem.TemplateType;
@@ -226,6 +227,16 @@ public class ProblemServiceImpl implements ProblemService {
 
             problemRepository.delete(problem);
         });
+    }
+
+    @Override
+    public Long getProblemCountByUser(Long userId) {
+        return problemRepository.countByUserId(userId);
+    }
+
+    @Override
+    public List<Long> getAllUsersProblemCount(List<UserResponseDto> userList) {
+        return userList.stream().map(user -> getProblemCountByUser(user.getUserId())).collect(Collectors.toList());
     }
 
     @Override

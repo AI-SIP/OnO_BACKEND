@@ -58,7 +58,7 @@ public class AdminController {
     @GetMapping("/users")
     public String getAllUsers(Model model, Authentication authentication) {
         List<UserResponseDto> users = userService.findAllUsers();
-        List<Long> problemCounts = userService.findAllUsersProblemCount();
+        List<Long> problemCounts = problemService.getAllUsersProblemCount(users);
         model.addAttribute("users", users);
         model.addAttribute("problemCounts", problemCounts);
         return "users";
