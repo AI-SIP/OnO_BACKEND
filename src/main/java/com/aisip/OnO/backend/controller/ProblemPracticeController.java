@@ -44,7 +44,7 @@ public class ProblemPracticeController {
         }
     }
 
-    @GetMapping("/all")
+    @GetMapping("/thumbnail/all")
     public ResponseEntity<?> getAllPracticeThumbnail(
             Authentication authentication
     ) {

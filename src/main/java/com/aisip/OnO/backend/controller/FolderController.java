@@ -62,7 +62,7 @@ public class FolderController {
         }
     }
 
-    @GetMapping("/folders")
+    @GetMapping("/thumbnail/tree")
     public ResponseEntity<?> getFolderThumbnailsTree(Authentication authentication) {
         try {
             Long userId = (Long) authentication.getPrincipal();
@@ -76,7 +76,7 @@ public class FolderController {
         }
     }
 
-    @GetMapping("/folders/all")
+    @GetMapping("/thumbnail/all")
     public ResponseEntity<?> getAllFolderThumbnails(Authentication authentication) {
         try {
             Long userId = (Long) authentication.getPrincipal();
