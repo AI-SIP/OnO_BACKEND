@@ -74,7 +74,7 @@ public class ProblemController {
     ) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            boolean isSaved = problemService.saveProblem(userId, problemRegisterDto);
+            boolean isSaved = problemService.createProblem(userId, problemRegisterDto);
 
             if (isSaved) {
                 log.info("userId: " + userId + " success for register problem");
@@ -99,7 +99,7 @@ public class ProblemController {
     ) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            boolean isSaved = problemService.saveProblem(userId, problemRegisterDto);
+            boolean isSaved = problemService.createProblem(userId, problemRegisterDto);
 
             if (isSaved) {
                 log.info("userId: " + userId + " success for register problem");

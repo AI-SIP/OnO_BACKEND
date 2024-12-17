@@ -73,6 +73,11 @@ public class ProblemServiceImpl implements ProblemService {
     }
 
     @Override
+    public void saveProblemEntity(Problem problem) {
+        problemRepository.save(problem);
+    }
+
+    @Override
     public ProblemResponseDto convertToProblemResponse(Problem problem){
 
         List<ImageData> images = fileUploadService.getProblemImages(problem.getId());
@@ -123,7 +128,7 @@ public class ProblemServiceImpl implements ProblemService {
     }
 
     @Override
-    public boolean saveProblem(Long userId, ProblemRegisterDto problemRegisterDto) {
+    public boolean createProblem(Long userId, ProblemRegisterDto problemRegisterDto) {
         Optional<User> optionalUserEntity = userRepository.findById(userId);
 
         try {

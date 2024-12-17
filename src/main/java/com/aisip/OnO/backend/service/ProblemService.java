@@ -24,9 +24,11 @@ public interface ProblemService {
 
     Problem getProblemEntity(Long problemId);
 
+    void saveProblemEntity(Problem problem);
+
     Problem createProblem(Long userId);
 
-    boolean saveProblem(Long userId, ProblemRegisterDto problemRegisterDto);
+    boolean createProblem(Long userId, ProblemRegisterDto problemRegisterDto);
 
     boolean updateProblem(Long userId, ProblemRegisterDto problemRegisterDto);
 

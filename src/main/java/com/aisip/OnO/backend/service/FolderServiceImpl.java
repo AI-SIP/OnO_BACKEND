@@ -8,11 +8,7 @@ import com.aisip.OnO.backend.entity.Folder;
 import com.aisip.OnO.backend.entity.Problem.Problem;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.exception.FolderNotFoundException;
-import com.aisip.OnO.backend.exception.ProblemNotFoundException;
-import com.aisip.OnO.backend.exception.UserNotFoundException;
 import com.aisip.OnO.backend.repository.FolderRepository;
-import com.aisip.OnO.backend.repository.ProblemRepository;
-import com.aisip.OnO.backend.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,12 +24,22 @@ import java.util.Optional;
 @Transactional
 public class FolderServiceImpl implements FolderService {
 
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     private final ProblemService problemService;
-    private final ProblemRepository problemRepository;
 
     private final FolderRepository folderRepository;
+
+    @Override
+    public Folder getFolderEntity(Long folderId) {
+        Optional<Folder> optionalFolder = folderRepository.findById(folderId);
+
+        if(optionalFolder.isPresent()){
+            return optionalFolder.get();
+        } else{
+            throw new FolderNotFoundException("폴더를 찾을 수 없습니다!");
+        }
+    }
 
     @Override
     public List<FolderResponseDto> findAllFolders(Long userId) {
@@ -49,9 +55,7 @@ public class FolderServiceImpl implements FolderService {
 
     @Override
     public FolderResponseDto findFolder(Long userId, Long folderId) {
-        Optional<Folder> optionalFolder = folderRepository.findById(folderId);
-
-        return optionalFolder.map(this::getFolderResponseDto).orElse(null);
+        return getFolderResponseDto(getFolderEntity(folderId));
     }
 
     @Override
@@ -62,14 +66,8 @@ public class FolderServiceImpl implements FolderService {
         if (optionalRootFolder.isPresent()) {
 
             Folder rootFolder = optionalRootFolder.get();
-            List<Problem> noFolderProblems = problemRepository.findAllByUserIdAndFolderIsNull(userId);
-
-            for (Problem problem : noFolderProblems) {
-                problem.setFolder(optionalRootFolder.get());
-                problemRepository.save(problem);
-            }
-
             log.info("find root folder id: " + optionalRootFolder.get().getId());
+
             return getFolderResponseDto(rootFolder);
         } else {
             log.info("create root folder for userId: " + userId);
@@ -79,46 +77,30 @@ public class FolderServiceImpl implements FolderService {
 
     @Override
     public FolderResponseDto createRootFolder(Long userId, String folderName) {
-        Optional<User> optionalUser = userRepository.findById(userId);
-        if (optionalUser.isPresent()) {
-            Folder rootFolder = Folder.builder().name(folderName).user(optionalUser.get()).build();
+        User user = userService.getUserEntity(userId);
+        Folder rootFolder = Folder.builder().name(folderName).user(user).build();
 
-            folderRepository.save(rootFolder);
+        folderRepository.save(rootFolder);
 
-            List<Problem> noFolderProblems = problemRepository.findAllByUserIdAndFolderIsNull(userId);
-
-            for (Problem problem : noFolderProblems) {
-                problem.setFolder(rootFolder);
-                problemRepository.save(problem);
-            }
-
-            return getFolderResponseDto(rootFolder);
-        }
-
-        throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
+        return getFolderResponseDto(rootFolder);
     }
 
     @Override
     public FolderResponseDto createFolder(Long userId, String folderName, Long parentFolderId) {
-        Optional<User> optionalUser = userRepository.findById(userId);
+        log.info("create folder for folderName: " + folderName + " parentFolderId : " + parentFolderId);
 
-        log.info("folderName: " + folderName + " parentFolderId : " + parentFolderId);
+        User user = userService.getUserEntity(userId);
+        Folder folder = Folder.builder()
+                .name(folderName)
+                .user(user)
+                .build();
 
-        if (optionalUser.isPresent()) {
-            Folder folder = Folder.builder()
-                    .name(folderName)
-                    .user(optionalUser.get())
-                    .build();
-
-            if (parentFolderId != null) {
-                Optional<Folder> parentFolder = folderRepository.findById(parentFolderId);
-                parentFolder.ifPresent(folder::setParentFolder);
-            }
-
-            return getFolderResponseDto(folderRepository.save(folder));
+        if (parentFolderId != null) {
+            Optional<Folder> parentFolder = folderRepository.findById(parentFolderId);
+            parentFolder.ifPresent(folder::setParentFolder);
         }
 
-        throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
+        return getFolderResponseDto(folderRepository.save(folder));
     }
 
     @Override
@@ -143,80 +125,55 @@ public class FolderServiceImpl implements FolderService {
 
     @Override
     public FolderResponseDto updateFolder(Long userId, Long folderId, String folderName, Long parentFolderId) {
-        Optional<User> optionalUser = userRepository.findById(userId);
-        if (optionalUser.isPresent()) {
-            Optional<Folder> optionalFolder = folderRepository.findById(folderId);
+        User user = userService.getUserEntity(userId);
+        Folder folder = getFolderEntity(folderId);
+        Optional<Folder> optionalFolder = folderRepository.findById(folderId);
 
-            log.info("folderName: " + folderName + " , parentFolderId : " + parentFolderId);
+        log.info("update folderId: " + folderId + " , parentFolderId : " + parentFolderId);
 
-            if (optionalFolder.isPresent()) {
-                Folder folder = optionalFolder.get();
-
-                if (folderName != null) {
-                    folder.setName(folderName);
-                }
-
-                if (parentFolderId != null && !(parentFolderId.equals(folderId))) {
-                    Optional<Folder> optionalParentFolder = folderRepository.findById(parentFolderId);
-                    optionalParentFolder.ifPresent(folder::setParentFolder);
-                }
-
-                return getFolderResponseDto(folderRepository.save(folder));
-            }
+        if (folderName != null) {
+            folder.setName(folderName);
         }
 
-        throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
+        if (parentFolderId != null && !(parentFolderId.equals(folderId))) {
+            Folder parentFolder = getFolderEntity(parentFolderId);
+            folder.setParentFolder(parentFolder);
+        }
+
+        return getFolderResponseDto(folderRepository.save(folder));
     }
 
     @Override
     public FolderResponseDto updateProblemPath(Long userId, Long problemId, Long folderId) {
 
-        Optional<User> optionalUser = userRepository.findById(userId);
-        Optional<Problem> optionalProblem = problemRepository.findById(problemId);
-        Optional<Folder> optionalFolder = folderRepository.findById(folderId);
+        User user = userService.getUserEntity(userId);
+        Problem problem = problemService.getProblemEntity(problemId);
+        Folder folder = getFolderEntity(folderId);
 
-        if (optionalUser.isPresent()) {
-            if (optionalProblem.isPresent() && optionalFolder.isPresent()) {
-                Problem problem = optionalProblem.get();
-                Folder folder = optionalFolder.get();
+        problem.setFolder(folder);
+        problemService.saveProblemEntity(problem);
 
-                problem.setFolder(folder);
-                problemRepository.save(problem);
-
-                return findFolder(userId, folderId);
-            }
-
-            throw new ProblemNotFoundException("문제를 찾을 수 없습니다!, problemId: " + problemId);
-        }
-
-        throw new UserNotFoundException("유저를 찾을 수 없습니다!, userId : " + userId);
+        return findFolder(userId, folderId);
     }
 
     @Override
     public FolderResponseDto deleteFolder(Long userId, Long folderId) {
-        Optional<Folder> optionalFolder = folderRepository.findById(folderId);
+        Folder folder = getFolderEntity(folderId);
+        Long parentFolderId = folder.getParentFolder().getId();
 
-        if (optionalFolder.isPresent() && optionalFolder.get().getUser().getId().equals(userId)) {
-            Folder folder = optionalFolder.get();
-            Long parentFolderId = folder.getParentFolder().getId();
+        // 재귀적으로 하위 폴더를 삭제
+        deleteSubFolders(userId, folder);
+        folderRepository.flush();
 
-            // 재귀적으로 하위 폴더를 삭제
-            deleteSubFolders(userId, folder);
-            folderRepository.flush();
+        if (parentFolderId != null) {
+            log.info("Folder and its subfolders deleted successfully for folderId: " + folderId);
+            folderRepository.deleteById(folderId);
 
-            if (parentFolderId != null) {
-                log.info("Folder and its subfolders deleted successfully for folderId: " + folderId);
-                folderRepository.deleteById(folderId);
+            log.info("root folder id: " + parentFolderId);
 
-                log.info("root folder id: " + parentFolderId);
-
-                return findFolder(userId, parentFolderId);
-            } else {
-                throw new FolderNotFoundException("메인 폴더는 삭제할 수 없습니다.");
-            }
-
+            return findFolder(userId, parentFolderId);
         } else {
-            throw new FolderNotFoundException("폴더를 찾을 수 없습니다!, folderId: " + folderId);
+            throw new FolderNotFoundException("메인 폴더는 삭제할 수 없습니다.");
         }
     }
 
@@ -240,7 +197,6 @@ public class FolderServiceImpl implements FolderService {
 
     @Override
     public void deleteAllUserFolder(Long userId) {
-
         List<Folder> folders = folderRepository.findAllByUserId(userId);
 
         folderRepository.deleteAll(folders);

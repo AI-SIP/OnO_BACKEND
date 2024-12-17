@@ -8,6 +8,8 @@ import java.util.List;
 
 public interface FolderService {
 
+    Folder getFolderEntity(Long folderId);
+
     FolderResponseDto createRootFolder(Long userId, String folderName);
 
     FolderResponseDto createFolder(Long userId, String folderName, Long parentFolderId);
