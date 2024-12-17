@@ -10,7 +10,7 @@ public interface ProblemPracticeService {
 
     ProblemPractice getPracticeEntity(Long practiceId);
 
-    boolean createPractice(Long userId, ProblemPracticeRegisterDto problemPracticeRegisterDto);
+    ProblemPracticeResponseDto createPractice(Long userId, ProblemPracticeRegisterDto problemPracticeRegisterDto);
 
     void addProblemToPractice(Long practiceId, Long problemId);
 

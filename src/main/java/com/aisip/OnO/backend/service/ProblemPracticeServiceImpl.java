@@ -44,7 +44,7 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
     }
 
     @Override
-    public boolean createPractice(Long userId, ProblemPracticeRegisterDto problemPracticeRegisterDto) {
+    public ProblemPracticeResponseDto createPractice(Long userId, ProblemPracticeRegisterDto problemPracticeRegisterDto) {
 
         User user = userService.getUserEntity(userId);
         ProblemPractice practice = ProblemPractice.builder()
@@ -52,11 +52,8 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
                 .user(user)
                 .build();
 
-        ProblemPractice resultPractice = problemPracticeRepository.save(practice);
-        log.info(resultPractice.getId().toString());
-
         if(problemPracticeRegisterDto.getPracticeTitle() != null){
-            resultPractice.setTitle(problemPracticeRegisterDto.getPracticeTitle());
+            practice.setTitle(problemPracticeRegisterDto.getPracticeTitle());
         }
 
         if(problemPracticeRegisterDto.getRegisterProblemIds() != null && !problemPracticeRegisterDto.getRegisterProblemIds().isEmpty()){
@@ -65,10 +62,12 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
             List<Problem> problems = problemIds.stream()
                     .map(problemService::getProblemEntity).collect(Collectors.toList());
 
-            resultPractice.setProblems(problems);
+            practice.setProblems(problems);
         }
 
-        return true;
+        ProblemPractice resultPractice = problemPracticeRepository.save(practice);
+
+        return findPractice(resultPractice.getId());
     }
 
     @Override

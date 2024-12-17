@@ -21,8 +21,6 @@ import java.util.List;
 @RequestMapping("/api/problem/practice")
 public class ProblemPracticeController {
 
-    //private final ProblemService problemService;
-
     private final ProblemPracticeService problemPracticeService;
 
     @GetMapping("/{practiceId}")
@@ -85,14 +83,10 @@ public class ProblemPracticeController {
             ) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            boolean isSaved = problemPracticeService.createPractice(userId, problemPracticeRegisterDto);
+            ProblemPracticeResponseDto problemPracticeResponseDto = problemPracticeService.createPractice(userId, problemPracticeRegisterDto);
 
-            if(isSaved){
-                log.info("userId: " + userId + " register problem  practice");
-                return ResponseEntity.ok("복습 리스트 생성을 완료했습니다.");
-            } else{
-                throw new ProblemPracticeNotFoundException("복습 리스트 생성 과정에서 문제가 발생했습니다.");
-            }
+            log.info("userId: " + userId + " register problem  practice");
+            return ResponseEntity.ok(problemPracticeResponseDto);
         } catch (Exception e) {
             log.error(e.getMessage());
             Sentry.captureException(e);

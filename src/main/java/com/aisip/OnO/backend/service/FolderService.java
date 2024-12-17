@@ -22,7 +22,7 @@ public interface FolderService {
 
     FolderResponseDto getFolderResponseDto(Folder folder);
 
-    List<FolderThumbnailResponseDto> findFolderThumbnailsTreeByUserId(Long userId);
+    List<FolderThumbnailResponseDto> findAllFolderThumbnailsByUser(Long userId);
 
     FolderResponseDto updateFolder(Long userId, Long folderId, String folderName, Long parentFolderId);
 
