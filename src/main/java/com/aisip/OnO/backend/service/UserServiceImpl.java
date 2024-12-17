@@ -5,6 +5,7 @@ import com.aisip.OnO.backend.Dto.User.UserResponseDto;
 import com.aisip.OnO.backend.converter.UserConverter;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.entity.User.UserType;
+import com.aisip.OnO.backend.exception.UserNotFoundException;
 import com.aisip.OnO.backend.repository.ProblemRepository;
 import com.aisip.OnO.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,17 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
 
     private final ProblemRepository problemRepository;
+
+    @Override
+    public User getUserEntity(Long userId){
+        Optional<User> optionalUser = userRepository.findById(userId);
+
+        if(optionalUser.isPresent()){
+            return optionalUser.get();
+        } else{
+            throw new UserNotFoundException("유저를 찾을 수 없습니다!");
+        }
+    }
 
     @Override
     public UserResponseDto registerGuestUser() {
@@ -76,8 +88,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponseDto getUserDetailsById(Long userId) {
-        Optional<User> optionalUser = userRepository.findById(userId);
-        return optionalUser.map(UserConverter::convertToResponseDto).orElse(null);
+        User user = getUserEntity(userId);
+        return UserConverter.convertToResponseDto(user);
     }
 
     @Override
@@ -111,35 +123,28 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserResponseDto updateUser(Long userId, UserRegisterDto userRegisterDto) {
 
-        Optional<User> optionalUser = userRepository.findById(userId);
+        User user = getUserEntity(userId);
+        System.out.println("userId :" + user.getId() + " update");
 
-        if (optionalUser.isPresent()) {
-
-            User user = optionalUser.get();
-            System.out.println("userId :" + user.getId() + " update");
-
-            if(userRegisterDto.getName() != null){
-                user.setName(userRegisterDto.getName());
-            }
-
-            if (userRegisterDto.getEmail() != null) {
-                user.setEmail(userRegisterDto.getEmail());
-            }
-
-            if (userRegisterDto.getIdentifier() != null) {
-                user.setIdentifier(userRegisterDto.getIdentifier());
-            }
-
-            if (userRegisterDto.getType() != null) {
-                user.setType(userRegisterDto.getType());
-            }
-
-            User saveUser = userRepository.save(user);
-
-            return UserConverter.convertToResponseDto(saveUser);
-        } else {
-            return null;
+        if(userRegisterDto.getName() != null){
+            user.setName(userRegisterDto.getName());
         }
+
+        if (userRegisterDto.getEmail() != null) {
+            user.setEmail(userRegisterDto.getEmail());
+        }
+
+        if (userRegisterDto.getIdentifier() != null) {
+            user.setIdentifier(userRegisterDto.getIdentifier());
+        }
+
+        if (userRegisterDto.getType() != null) {
+            user.setType(userRegisterDto.getType());
+        }
+
+        User saveUser = userRepository.save(user);
+
+        return UserConverter.convertToResponseDto(saveUser);
     }
 
     @Override

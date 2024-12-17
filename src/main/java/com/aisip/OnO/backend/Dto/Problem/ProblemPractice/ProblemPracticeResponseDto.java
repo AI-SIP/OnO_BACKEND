@@ -1,4 +1,5 @@
 package com.aisip.OnO.backend.Dto.Problem.ProblemPractice;
+import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,7 +22,9 @@ public class ProblemPracticeResponseDto {
 
     private Long practiceSize;
 
-    private List<Long> problemIds;
+    private List<ProblemResponseDto> problems;
+
+    //private List<Long> problemIds;
 
     private LocalDateTime lastSolvedAt;
 

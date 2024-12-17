@@ -84,6 +84,7 @@ public class UserController {
     public ResponseEntity<?> deleteUserInfo(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
         try{
+            problemPracticeService.deleteAllPracticesByUser(userId);
             problemService.deleteUserProblems(userId);
             folderService.deleteAllUserFolder(userId);
             userService.deleteUserById(userId);

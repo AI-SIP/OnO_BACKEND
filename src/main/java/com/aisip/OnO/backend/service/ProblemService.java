@@ -22,7 +22,7 @@ public interface ProblemService {
 
     List<ProblemResponseDto> findAllProblemsByFolderId(Long folderId);
 
-    List<ProblemResponseDto> findAllProblemsByPracticeId(Long problemPracticeId);
+    Problem getProblemEntity(Long problemId);
 
     Problem createProblem(Long userId);
 

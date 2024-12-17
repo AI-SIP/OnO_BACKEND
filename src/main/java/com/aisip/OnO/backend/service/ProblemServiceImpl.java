@@ -2,7 +2,6 @@ package com.aisip.OnO.backend.service;
 
 import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
 import com.aisip.OnO.backend.entity.Folder;
-import com.aisip.OnO.backend.entity.Problem.ProblemPractice;
 import com.aisip.OnO.backend.entity.Problem.ProblemRepeat;
 import com.aisip.OnO.backend.entity.Problem.TemplateType;
 import com.aisip.OnO.backend.entity.User.User;
@@ -44,8 +43,6 @@ public class ProblemServiceImpl implements ProblemService {
     private final ProblemRepeatRepository problemRepeatRepository;
 
     private final FolderRepository folderRepository;
-
-    private final ProblemPracticeService problemPracticeService;
     private final FileUploadService fileUploadService;
 
 
@@ -60,6 +57,16 @@ public class ProblemServiceImpl implements ProblemService {
             } else {
                 throw new UserNotAuthorizedException("해당 문제의 작성자가 아닙니다.");
             }
+        } else {
+            throw new ProblemNotFoundException("문제를 찾을 수 없습니다! problemId: " + problemId);
+        }
+    }
+
+    @Override
+    public Problem getProblemEntity(Long problemId) {
+        Optional<Problem> optionalProblem = problemRepository.findById(problemId);
+        if (optionalProblem.isPresent()) {
+            return optionalProblem.get();
         } else {
             throw new ProblemNotFoundException("문제를 찾을 수 없습니다! problemId: " + problemId);
         }
@@ -96,15 +103,6 @@ public class ProblemServiceImpl implements ProblemService {
         return problemRepository.findAllByFolderId(folderId)
                 .stream().map(this::convertToProblemResponse).collect(Collectors.toList());
 
-    }
-
-    @Override
-    public List<ProblemResponseDto> findAllProblemsByPracticeId(Long problemPracticeId) {
-        ProblemPractice problemPractice = problemPracticeService.findPracticeEntity(problemPracticeId);
-
-        return problemPractice.getProblems().stream().map(
-                this::convertToProblemResponse
-        ).collect(Collectors.toList());
     }
 
     @Override
@@ -234,7 +232,7 @@ public class ProblemServiceImpl implements ProblemService {
                 List<ProblemRepeat> problemRepeats = getProblemRepeats(problemId);
                 problemRepeatRepository.deleteAll(problemRepeats);
 
-                problemPracticeService.deleteProblemFromAllPractice(problemId);
+                //problemPracticeService.deleteProblemFromAllPractice(problemId);
 
                 problemRepository.delete(problem);
             } else {
@@ -255,8 +253,6 @@ public class ProblemServiceImpl implements ProblemService {
 
             List<ProblemRepeat> problemRepeats = getProblemRepeats(problemId);
             problemRepeatRepository.deleteAll(problemRepeats);
-
-            problemPracticeService.deleteProblemFromAllPractice(problemId);
 
             problemRepository.delete(problem);
         });

@@ -5,7 +5,6 @@ import com.aisip.OnO.backend.Dto.Problem.ProblemPractice.ProblemPracticeResponse
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.exception.ProblemPracticeNotFoundException;
 import com.aisip.OnO.backend.service.ProblemPracticeService;
-import com.aisip.OnO.backend.service.ProblemService;
 import io.sentry.Sentry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +21,7 @@ import java.util.List;
 @RequestMapping("/api/problem/practice")
 public class ProblemPracticeController {
 
-    private final ProblemService problemService;
+    //private final ProblemService problemService;
 
     private final ProblemPracticeService problemPracticeService;
 
@@ -33,10 +32,11 @@ public class ProblemPracticeController {
     ) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            List<ProblemResponseDto> problems = problemService.findAllProblemsByPracticeId(practiceId);
+
+            ProblemPracticeResponseDto problemPracticeResponseDto = problemPracticeService.findPractice(practiceId);
 
             log.info("userId: " + userId + " get problem  practice for practice id: " + practiceId);
-            return ResponseEntity.ok(problems);
+            return ResponseEntity.ok(problemPracticeResponseDto);
         } catch (Exception e) {
             log.error(e.getMessage());
             Sentry.captureException(e);
@@ -50,7 +50,24 @@ public class ProblemPracticeController {
     ) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            List<ProblemPracticeResponseDto> problemPracticeResponseDtoList = problemPracticeService.findAllPracticeThumbnailsByUser(userId);
+            List<ProblemPracticeResponseDto> problemPracticeResponseDtoList = problemPracticeService.findAllPracticesByUser(userId);
+
+            log.info("userId: " + userId + " get all problem practice");
+            return ResponseEntity.ok(problemPracticeResponseDtoList);
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            Sentry.captureException(e);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
+    }
+
+    @GetMapping("/all")
+    public ResponseEntity<?> getAllPracticeDetail(
+            Authentication authentication
+    ) {
+        try {
+            Long userId = (Long) authentication.getPrincipal();
+            List<ProblemPracticeResponseDto> problemPracticeResponseDtoList = problemPracticeService.findAllPracticesByUser(userId);
 
             log.info("userId: " + userId + " get all problem practice");
             return ResponseEntity.ok(problemPracticeResponseDtoList);

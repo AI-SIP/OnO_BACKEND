@@ -2,17 +2,13 @@ package com.aisip.OnO.backend.service;
 
 import com.aisip.OnO.backend.Dto.Problem.ProblemPractice.ProblemPracticeRegisterDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemPractice.ProblemPracticeResponseDto;
+import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.converter.ProblemPracticeConverter;
 import com.aisip.OnO.backend.entity.Problem.Problem;
 import com.aisip.OnO.backend.entity.Problem.ProblemPractice;
 import com.aisip.OnO.backend.entity.User.User;
-import com.aisip.OnO.backend.exception.ProblemNotFoundException;
 import com.aisip.OnO.backend.exception.ProblemPracticeNotFoundException;
-import com.aisip.OnO.backend.exception.UserNotAuthorizedException;
-import com.aisip.OnO.backend.exception.UserNotFoundException;
 import com.aisip.OnO.backend.repository.ProblemPracticeRepository;
-import com.aisip.OnO.backend.repository.ProblemRepository;
-import com.aisip.OnO.backend.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,46 +26,49 @@ import java.util.stream.Collectors;
 @Transactional
 public class ProblemPracticeServiceImpl implements ProblemPracticeService{
 
-    private final UserRepository userRepository;
+    private final UserService userService;
 
-    private final ProblemRepository problemRepository;
+    private final ProblemService problemService;
 
     private final ProblemPracticeRepository problemPracticeRepository;
 
     @Override
+    public ProblemPractice getPracticeEntity(Long practiceId){
+        Optional<ProblemPractice> optionalProblemPractice = problemPracticeRepository.findById(practiceId);
+
+        if(optionalProblemPractice.isPresent()) {
+            return optionalProblemPractice.get();
+        }
+
+        throw new ProblemPracticeNotFoundException("복습 리스트를 찾을 수 없습니다!");
+    }
+
+    @Override
     public boolean createPractice(Long userId, ProblemPracticeRegisterDto problemPracticeRegisterDto) {
 
-        Optional<User> optionalUserEntity = userRepository.findById(userId);
-        if(optionalUserEntity.isPresent()){
-            ProblemPractice practice = ProblemPractice.builder()
-                    .practiceCount(0L)
-                    .user(optionalUserEntity.get())
-                    .build();
+        User user = userService.getUserEntity(userId);
+        ProblemPractice practice = ProblemPractice.builder()
+                .practiceCount(0L)
+                .user(user)
+                .build();
 
-            ProblemPractice resultPractice = problemPracticeRepository.save(practice);
-            log.info(resultPractice.getId().toString());
+        ProblemPractice resultPractice = problemPracticeRepository.save(practice);
+        log.info(resultPractice.getId().toString());
 
-            if(problemPracticeRegisterDto.getPracticeTitle() != null){
-                resultPractice.setTitle(problemPracticeRegisterDto.getPracticeTitle());
-            }
-
-            if(problemPracticeRegisterDto.getRegisterProblemIds() != null && !problemPracticeRegisterDto.getRegisterProblemIds().isEmpty()){
-                List<Long> problemIds = problemPracticeRegisterDto.getRegisterProblemIds();
-
-                List<Problem> problems = problemIds.stream()
-                        .map(problemRepository::findById)  // Optional<Problem> 반환
-                        .filter(optionalProblem -> optionalProblem.isPresent() &&
-                                optionalProblem.get().getUser().equals(optionalUserEntity.get()))  // 조건을 만족하는 Optional<Problem>만 남김
-                        .map(Optional::get)  // Optional<Problem>을 Problem으로 변환
-                        .toList();
-
-                resultPractice.setProblems(problems);
-            }
-
-            return true;
-        } else{
-            throw new UserNotFoundException("유저를 찾을 수 없습니다!");
+        if(problemPracticeRegisterDto.getPracticeTitle() != null){
+            resultPractice.setTitle(problemPracticeRegisterDto.getPracticeTitle());
         }
+
+        if(problemPracticeRegisterDto.getRegisterProblemIds() != null && !problemPracticeRegisterDto.getRegisterProblemIds().isEmpty()){
+            List<Long> problemIds = problemPracticeRegisterDto.getRegisterProblemIds();
+
+            List<Problem> problems = problemIds.stream()
+                    .map(problemService::getProblemEntity).collect(Collectors.toList());
+
+            resultPractice.setProblems(problems);
+        }
+
+        return true;
     }
 
     @Override
@@ -77,8 +76,7 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
         ProblemPractice practice = problemPracticeRepository.findById(practiceId)
                 .orElseThrow(() -> new ProblemPracticeNotFoundException("Invalid practice practiceId: " + practiceId));
 
-        Problem problem = problemRepository.findById(problemId)
-                        .orElseThrow(() -> new ProblemNotFoundException("문제를 찾을 수 없습니다! problemId: " + problemId));
+        Problem problem = problemService.getProblemEntity(problemId);
 
         Set<Long> existingProblemIds = practice.getProblems().stream()
                 .map(Problem::getId)
@@ -91,30 +89,16 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
         problemPracticeRepository.save(practice);
     }
 
-    public ProblemPractice findPracticeEntity(Long practiceId) {
-
-        return problemPracticeRepository.findById(practiceId)
-                .orElseThrow(() -> new ProblemPracticeNotFoundException("Invalid practice practiceId: " + practiceId));
+    public ProblemPracticeResponseDto findPractice(Long practiceId) {
+        return getPracticeResponseDto(getPracticeEntity(practiceId));
     }
 
     @Override
-    public List<ProblemPracticeResponseDto> findAllPracticeThumbnailsByUser(Long userId){
+    public List<ProblemPracticeResponseDto> findAllPracticesByUser(Long userId){
         List<ProblemPractice> problemPracticeList = problemPracticeRepository.findAllByUserId(userId);
 
         return problemPracticeList.stream().map(
-                problemPractice -> {
-                    ProblemPracticeResponseDto problemPracticeResponseDto = ProblemPracticeConverter.convertToResponseDto(problemPractice);
-                    problemPracticeResponseDto.setPracticeSize((long) problemPracticeRepository.countProblemsByPracticeId(problemPractice.getId()));
-
-                    List<Problem> problems = problemPractice.getProblems();
-                    List<Long> problemIds = (problems != null)
-                            ? problems.stream().map(Problem::getId).toList()
-                            : null;
-
-                    problemPracticeResponseDto.setProblemIds(problemIds);
-
-                    return problemPracticeResponseDto;
-                }
+                this::getPracticeResponseDto
         ).collect(Collectors.toList());
     }
 
@@ -133,9 +117,7 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
     @Override
     public boolean updatePractice(ProblemPracticeRegisterDto problemPracticeRegisterDto){
         Long practiceId = problemPracticeRegisterDto.getPracticeId();
-
-        ProblemPractice practice = problemPracticeRepository.findById(practiceId)
-                .orElseThrow(() -> new ProblemPracticeNotFoundException("Invalid practice practiceId: " + practiceId));
+        ProblemPractice practice = getPracticeEntity(practiceId);
 
         // 제목 업데이트
         if (problemPracticeRegisterDto.getPracticeTitle() != null) {
@@ -168,9 +150,7 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
 
     @Override
     public void deletePractice(Long practiceId) {
-        ProblemPractice practice = problemPracticeRepository.findById(practiceId)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid practice ID: " + practiceId));
-
+        ProblemPractice practice = getPracticeEntity(practiceId);
         // 연관 관계 제거
         practice.getProblems().clear();
         problemPracticeRepository.save(practice);
@@ -185,12 +165,18 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
     }
 
     @Override
+    public void deleteAllPracticesByUser(Long userId) {
+        List<ProblemPractice> practiceList = problemPracticeRepository.findAllByUserId(userId);
+
+        problemPracticeRepository.deleteAll(practiceList);
+    }
+
+    @Override
     public void removeProblemFromPractice(Long practiceId, Long problemId) {
         ProblemPractice practice = problemPracticeRepository.findById(practiceId)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid practice ID"));
 
-        Problem problem = problemRepository.findById(problemId)
-                .orElseThrow(() -> new ProblemNotFoundException("문제를 찾을 수 없습니다! problemId: " + problemId));
+        Problem problem = problemService.getProblemEntity(problemId);
 
         Set<Long> existingProblemIds = practice.getProblems().stream()
                 .map(Problem::getId)
@@ -205,21 +191,29 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
 
     @Override
     public void deleteProblemFromAllPractice(Long problemId) {
-        Optional<Problem> optionalProblem = problemRepository.findById(problemId);
+        Problem problemToRemove = problemService.getProblemEntity(problemId);
 
-        if (optionalProblem.isPresent()) {
-            Problem problemToRemove = optionalProblem.get();
+        // 해당 문제를 포함하고 있는 모든 ProblemPractice 가져오기
+        List<ProblemPractice> practicesContainingProblem = problemPracticeRepository.findAllByProblemsContaining(problemToRemove);
 
-            // 해당 문제를 포함하고 있는 모든 ProblemPractice 가져오기
-            List<ProblemPractice> practicesContainingProblem = problemPracticeRepository.findAllByProblemsContaining(problemToRemove);
+        for (ProblemPractice practice : practicesContainingProblem) {
+            practice.getProblems().remove(problemToRemove);
 
-            for (ProblemPractice practice : practicesContainingProblem) {
-                practice.getProblems().remove(problemToRemove);
-
-                problemPracticeRepository.save(practice);
-            }
-
-            problemRepository.delete(problemToRemove);
+            problemPracticeRepository.save(practice);
         }
+    }
+
+    private ProblemPracticeResponseDto getPracticeResponseDto(ProblemPractice problemPractice){
+        ProblemPracticeResponseDto problemPracticeResponseDto = ProblemPracticeConverter.convertToResponseDto(problemPractice);
+        problemPracticeResponseDto.setPracticeSize((long) problemPracticeRepository.countProblemsByPracticeId(problemPractice.getId()));
+
+        List<Problem> problemList = problemPractice.getProblems();
+        List<ProblemResponseDto> problemResponseDtoList = problemList.stream().map(
+                problemService::convertToProblemResponse
+        ).toList();
+
+        problemPracticeResponseDto.setProblems(problemResponseDtoList);
+
+        return problemPracticeResponseDto;
     }
 }

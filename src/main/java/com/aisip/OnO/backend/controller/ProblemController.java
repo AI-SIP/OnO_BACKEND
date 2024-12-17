@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.exception.ProblemNotFoundException;
 import com.aisip.OnO.backend.exception.ProblemRegisterException;
+import com.aisip.OnO.backend.service.ProblemPracticeService;
 import com.aisip.OnO.backend.service.ProblemService;
 import io.sentry.Sentry;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,8 @@ public class ProblemController {
     }
 
     private final ProblemService problemService;
+
+    private final ProblemPracticeService problemPracticeService;
 
     @GetMapping("/{problemId}")
     public ResponseEntity<?> getProblem(
@@ -146,6 +149,7 @@ public class ProblemController {
     ) {
         try {
             Long userId = (Long) authentication.getPrincipal();
+            problemPracticeService.deleteProblemFromAllPractice(problemId);
             problemService.deleteProblem(userId, problemId);
 
             log.info("userId: " + userId + " success for delete problem");

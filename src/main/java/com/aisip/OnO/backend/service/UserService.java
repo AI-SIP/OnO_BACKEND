@@ -2,11 +2,14 @@ package com.aisip.OnO.backend.service;
 
 import com.aisip.OnO.backend.Dto.User.UserRegisterDto;
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
+import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.entity.User.UserType;
 
 import java.util.List;
 
 public interface UserService {
+
+    User getUserEntity(Long userId);
 
     UserResponseDto registerGuestUser();
 

@@ -20,16 +20,4 @@ public class ProblemPracticeConverter {
                 .lastSolvedAt(problemPractice.getLastSolvedAt())
                 .build();
     }
-
-    public static ProblemPracticeResponseDto setPracticeSize(ProblemPracticeResponseDto problemPracticeResponseDto, Long practiceSize) {
-        problemPracticeResponseDto.setPracticeSize(practiceSize);
-
-        return problemPracticeResponseDto;
-    }
-
-    public static ProblemPracticeResponseDto setProblemIds(ProblemPracticeResponseDto problemPracticeResponseDto, List<Long> problemIds) {
-        problemPracticeResponseDto.setProblemIds(problemIds);
-
-        return problemPracticeResponseDto;
-    }
 }
