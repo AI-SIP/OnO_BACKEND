@@ -30,5 +30,5 @@ public interface ProblemPracticeService {
 
     void removeProblemFromPractice(Long practiceId, Long problemId);
 
-    void deleteProblemFromAllPractice(Long problemId);
+    void deleteProblemsFromAllPractice(List<Long> deleteProblemIdList);
 }

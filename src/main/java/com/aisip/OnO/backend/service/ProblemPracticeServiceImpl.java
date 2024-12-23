@@ -189,17 +189,19 @@ public class ProblemPracticeServiceImpl implements ProblemPracticeService{
     }
 
     @Override
-    public void deleteProblemFromAllPractice(Long problemId) {
-        Problem problemToRemove = problemService.getProblemEntity(problemId);
+    public void deleteProblemsFromAllPractice(List<Long> deleteProblemIdList) {
+        deleteProblemIdList.forEach(deleteProblemId -> {
+            Problem problemToRemove = problemService.getProblemEntity(deleteProblemId);
 
-        // 해당 문제를 포함하고 있는 모든 ProblemPractice 가져오기
-        List<ProblemPractice> practicesContainingProblem = problemPracticeRepository.findAllByProblemsContaining(problemToRemove);
+            // 해당 문제를 포함하고 있는 모든 ProblemPractice 가져오기
+            List<ProblemPractice> practicesContainingProblem = problemPracticeRepository.findAllByProblemsContaining(problemToRemove);
 
-        for (ProblemPractice practice : practicesContainingProblem) {
-            practice.getProblems().remove(problemToRemove);
+            for (ProblemPractice practice : practicesContainingProblem) {
+                practice.getProblems().remove(problemToRemove);
 
-            problemPracticeRepository.save(practice);
-        }
+                problemPracticeRepository.save(practice);
+            }
+        });
     }
 
     private ProblemPracticeResponseDto getPracticeResponseDto(ProblemPractice problemPractice){

@@ -27,5 +27,7 @@ public interface FolderService {
 
     FolderResponseDto deleteFolder(Long userId, Long folderId);
 
+    void deleteFolderList(Long userId, List<Long> folderIdList);
+
     void deleteAllUserFolder(Long userId);
 }

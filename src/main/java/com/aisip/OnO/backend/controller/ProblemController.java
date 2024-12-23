@@ -143,16 +143,16 @@ public class ProblemController {
     }
 
     @DeleteMapping("")
-    public ResponseEntity<?> deleteProblem(
+    public ResponseEntity<?> deleteProblems(
             Authentication authentication,
-            @RequestHeader("problemId") Long problemId
+            @RequestParam List<Long> deleteProblemIdList
     ) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            problemPracticeService.deleteProblemFromAllPractice(problemId);
-            problemService.deleteProblem(userId, problemId);
+            log.info("userId: " + userId + " try to delete folders, id list: " + deleteProblemIdList.toString());
+            problemPracticeService.deleteProblemsFromAllPractice(deleteProblemIdList);
+            problemService.deleteProblemList(userId, deleteProblemIdList);
 
-            log.info("userId: " + userId + " success for delete problem");
             return ResponseEntity.ok("삭제를 완료했습니다.");
         } catch (Exception e) {
             log.warn(e.getMessage());

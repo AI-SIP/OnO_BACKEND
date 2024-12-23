@@ -163,6 +163,13 @@ public class FolderServiceImpl implements FolderService {
         }
     }
 
+    @Override
+    public void deleteFolderList(Long userId, List<Long> folderIdList) {
+        folderIdList.forEach(folderId -> {
+            deleteFolder(userId, folderId);
+        });
+    }
+
     private void deleteSubFolders(Long userId, Folder folder) {
         // 하위 폴더들을 먼저 삭제
         if (folder.getSubFolders() != null && !folder.getSubFolders().isEmpty()) {

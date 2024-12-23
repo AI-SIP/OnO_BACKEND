@@ -35,6 +35,7 @@ public interface ProblemService {
 
     void deleteProblem(Long userId, Long problemId);
 
+    void deleteProblemList(Long userId, List<Long> problemIdList);
     void deleteUserProblems(Long userId);
 
     Long getProblemCountByUser(Long userId);

@@ -11,6 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @Slf4j
 @RestController
 @RequiredArgsConstructor
@@ -110,13 +112,16 @@ public class FolderController {
         }
     }
 
-    @DeleteMapping("/{folderId}")
-    public ResponseEntity<?> deleteFolder(Authentication authentication, @PathVariable Long folderId) {
+    @DeleteMapping("")
+    public ResponseEntity<?> deleteFolders(
+            Authentication authentication,
+            @RequestParam List<Long> deleteFolderIdList) {
         try {
             Long userId = (Long) authentication.getPrincipal();
-            log.info("userId: " + userId + " try to delete folderId: " + folderId);
+            log.info("userId: " + userId + " try to delete folders, id list: " + deleteFolderIdList.toString());
 
-            return ResponseEntity.ok(folderService.deleteFolder(userId, folderId));
+            folderService.deleteFolderList(userId, deleteFolderIdList);
+            return ResponseEntity.ok("삭제가 완료되었습니다.");
         } catch (Exception e) {
             log.warn(e.getMessage());
             Sentry.captureException(e);

@@ -215,6 +215,13 @@ public class ProblemServiceImpl implements ProblemService {
     }
 
     @Override
+    public void deleteProblemList(Long userId, List<Long> problemIdList) {
+        problemIdList.forEach(problemId -> {
+            deleteProblem(userId, problemId);
+        });
+    }
+
+    @Override
     public void deleteUserProblems(Long userId) {
         List<Problem> problemList = problemRepository.findAllByUserId(userId);
         problemList.forEach(problem -> {
