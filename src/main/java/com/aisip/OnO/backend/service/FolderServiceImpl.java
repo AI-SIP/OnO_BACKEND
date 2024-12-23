@@ -26,6 +26,8 @@ public class FolderServiceImpl implements FolderService {
 
     private final ProblemService problemService;
 
+    private final ProblemPracticeService problemPracticeService;
+
     private final FolderRepository folderRepository;
 
     @Override
@@ -143,7 +145,7 @@ public class FolderServiceImpl implements FolderService {
     }
 
     @Override
-    public FolderResponseDto deleteFolder(Long userId, Long folderId) {
+    public void deleteFolder(Long userId, Long folderId) {
         Folder folder = getFolderEntity(folderId);
         Long parentFolderId = folder.getParentFolder().getId();
 
@@ -156,8 +158,6 @@ public class FolderServiceImpl implements FolderService {
             folderRepository.deleteById(folderId);
 
             log.info("root folder id: " + parentFolderId);
-
-            return findFolder(userId, parentFolderId);
         } else {
             throw new FolderNotFoundException("메인 폴더는 삭제할 수 없습니다.");
         }
@@ -180,6 +180,7 @@ public class FolderServiceImpl implements FolderService {
 
         if (folder.getProblems() != null && !folder.getProblems().isEmpty()) {
             for (Problem problem : folder.getProblems()) {
+                problemPracticeService.deleteProblemsFromAllPractice(List.of(problem.getId()));
                 problemService.deleteProblem(userId, problem.getId());
             }
         }

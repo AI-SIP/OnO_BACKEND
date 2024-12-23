@@ -25,7 +25,7 @@ public interface FolderService {
 
     FolderResponseDto updateProblemPath(Long userId, Long problemId, Long folderId);
 
-    FolderResponseDto deleteFolder(Long userId, Long folderId);
+    void deleteFolder(Long userId, Long folderId);
 
     void deleteFolderList(Long userId, List<Long> folderIdList);
 

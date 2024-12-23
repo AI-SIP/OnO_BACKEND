@@ -208,6 +208,7 @@ public class ProblemServiceImpl implements ProblemService {
             List<ProblemRepeat> problemRepeats = getProblemRepeats(problemId);
             problemRepeatRepository.deleteAll(problemRepeats);
 
+
             problemRepository.delete(problem);
         } else {
             throw new UserNotAuthorizedException("문제 작성자와 유저가 불일치합니다!");
