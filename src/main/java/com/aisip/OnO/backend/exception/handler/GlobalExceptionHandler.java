@@ -43,6 +43,21 @@ public class GlobalExceptionHandler {
         return createErrorResponse(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
+    // UNAUTHORIZED (401) 예외
+    @ExceptionHandler({
+            InvalidTokenException.class,
+            ExpiredTokenException.class
+    })
+    public ResponseEntity<Map<String, Object>> handleUnauthorizedTokenExceptions(TokenException ex) {
+        return createErrorResponse(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
+    // Bad Request (400) 예외
+    @ExceptionHandler(MissingTokenException.class)
+    public ResponseEntity<Map<String, Object>> handleBadRequestTokenExceptions(MissingTokenException ex) {
+        return createErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
     // 📌 기타 모든 예외 처리 (예상하지 못한 예외)
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneralException(Exception ex) {

@@ -10,10 +10,9 @@ import com.aisip.OnO.backend.service.FileUploadService;
 import com.aisip.OnO.backend.service.FolderService;
 import com.aisip.OnO.backend.service.ProblemService;
 import com.aisip.OnO.backend.service.UserService;
-import io.sentry.Sentry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -66,33 +65,21 @@ public class AdminController {
 
     @PostMapping("/user/{userId}")
     public String updateUserInfo(@PathVariable Long userId, @ModelAttribute UserRegisterDto userRegisterDto, Model model) {
+        UserResponseDto userResponseDto = userService.updateUser(userId, userRegisterDto);
+        model.addAttribute("user", userResponseDto);
+        List<ProblemResponseDto> problems = problemService.findUserProblems(userId);
+        model.addAttribute("problems", problems);
 
-        try {
-            UserResponseDto userResponseDto = userService.updateUser(userId, userRegisterDto);
-            if (userResponseDto != null) {
-                model.addAttribute("user", userResponseDto);
-                List<ProblemResponseDto> problems = problemService.findUserProblems(userId);
-                model.addAttribute("problems", problems);
-                return "user";
-            } else {
-                throw new Exception("can't find user!");
-                //return "users";
-            }
-        } catch (Exception e) {
-            log.warn(e.getMessage());
-            Sentry.captureException(e);
-            return "users";
-        }
+        return "user";
     }
 
+    @ResponseStatus(HttpStatus.OK)
     @DeleteMapping("/user/{userId}")
-    public ResponseEntity<?> deleteUserInfo(@PathVariable Long userId) {
+    public void deleteUserInfo(@PathVariable Long userId) {
 
         problemService.deleteUserProblems(userId);
         folderService.deleteAllUserFolder(userId);
         userService.deleteUserById(userId);
-
-        return ResponseEntity.ok().body("delete complete");
     }
 
     @GetMapping("/problems")
