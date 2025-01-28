@@ -2,13 +2,10 @@ package com.aisip.OnO.backend.controller;
 
 import com.aisip.OnO.backend.Dto.Problem.ProblemPractice.ProblemPracticeRegisterDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemPractice.ProblemPracticeResponseDto;
-import com.aisip.OnO.backend.exception.ProblemPracticeNotFoundException;
 import com.aisip.OnO.backend.service.ProblemPracticeService;
-import io.sentry.Sentry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,136 +19,72 @@ public class ProblemPracticeController {
 
     private final ProblemPracticeService problemPracticeService;
 
+    // ✅ 특정 복습 리스트 조회
+    @ResponseStatus(HttpStatus.OK)
     @GetMapping("/{practiceId}")
-    public ResponseEntity<?> getPracticeDetail(
-            Authentication authentication,
-            @PathVariable("practiceId") Long practiceId
-    ) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-
-            ProblemPracticeResponseDto problemPracticeResponseDto = problemPracticeService.findPractice(practiceId);
-
-            log.info("userId: " + userId + " get problem  practice for practice id: " + practiceId);
-            return ResponseEntity.ok(problemPracticeResponseDto);
-        } catch (Exception e) {
-            log.error(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
+    public ProblemPracticeResponseDto getPracticeDetail(Authentication authentication, @PathVariable Long practiceId) {
+        Long userId = (Long) authentication.getPrincipal();
+        log.info("userId: {} get problem practice for practice id: {}", userId, practiceId);
+        return problemPracticeService.findPractice(practiceId);
     }
 
+    // ✅ 사용자의 모든 복습 리스트 썸네일 조회
+    @ResponseStatus(HttpStatus.OK)
     @GetMapping("/thumbnail/all")
-    public ResponseEntity<?> getAllPracticeThumbnail(
-            Authentication authentication
-    ) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            List<ProblemPracticeResponseDto> problemPracticeResponseDtoList = problemPracticeService.findAllPracticesByUser(userId);
-
-            log.info("userId: " + userId + " get all problem practice");
-            return ResponseEntity.ok(problemPracticeResponseDtoList);
-        } catch (Exception e) {
-            log.error(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
+    public List<ProblemPracticeResponseDto> getAllPracticeThumbnail(Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        log.info("userId: {} get all problem practice thumbnails", userId);
+        return problemPracticeService.findAllPracticesByUser(userId);
     }
 
+    // ✅ 사용자의 모든 복습 리스트 상세 조회
+    @ResponseStatus(HttpStatus.OK)
     @GetMapping("/all")
-    public ResponseEntity<?> getAllPracticeDetail(
-            Authentication authentication
-    ) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            List<ProblemPracticeResponseDto> problemPracticeResponseDtoList = problemPracticeService.findAllPracticesByUser(userId);
-
-            log.info("userId: " + userId + " get all problem practice");
-            return ResponseEntity.ok(problemPracticeResponseDtoList);
-        } catch (Exception e) {
-            log.error(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
+    public List<ProblemPracticeResponseDto> getAllPracticeDetail(Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        log.info("userId: {} get all problem practices", userId);
+        return problemPracticeService.findAllPracticesByUser(userId);
     }
 
+    // ✅ 복습 리스트 등록
+    @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("")
-    public ResponseEntity<?> registerPractice(
-            Authentication authentication,
-            @RequestBody ProblemPracticeRegisterDto problemPracticeRegisterDto
-            ) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            ProblemPracticeResponseDto problemPracticeResponseDto = problemPracticeService.createPractice(userId, problemPracticeRegisterDto);
-
-            log.info("userId: " + userId + " register problem  practice");
-            return ResponseEntity.ok(problemPracticeResponseDto);
-        } catch (Exception e) {
-            log.error(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
+    public ProblemPracticeResponseDto registerPractice(Authentication authentication, @RequestBody ProblemPracticeRegisterDto problemPracticeRegisterDto) {
+        Long userId = (Long) authentication.getPrincipal();
+        ProblemPracticeResponseDto response = problemPracticeService.createPractice(userId, problemPracticeRegisterDto);
+        log.info("userId: {} registered problem practice", userId);
+        return response;
     }
 
+    // ✅ 복습 완료 횟수 증가
+    @ResponseStatus(HttpStatus.OK)
     @PatchMapping("/complete/{practiceId}")
-    public ResponseEntity<?> addPracticeCount(
-            Authentication authentication,
-            @PathVariable("practiceId") Long practiceId
-    ) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            boolean isUpdated = problemPracticeService.addPracticeCount(practiceId);
+    public String addPracticeCount(Authentication authentication, @PathVariable Long practiceId) {
+        Long userId = (Long) authentication.getPrincipal();
+        problemPracticeService.addPracticeCount(practiceId);
 
-            if(isUpdated){
-                log.info("userId: " + userId + " complete problem practice");
-                return ResponseEntity.ok("복습을 완료했습니다.");
-            } else{
-                throw new ProblemPracticeNotFoundException("복습 완료에 실패했습니다.");
-            }
-        } catch (Exception e) {
-            log.error(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
+        log.info("userId: {} completed problem practice with practiceId: {}", userId, practiceId);
+        return "복습을 완료했습니다.";
     }
 
+    // ✅ 복습 리스트 수정
+    @ResponseStatus(HttpStatus.OK)
     @PatchMapping("")
-    public ResponseEntity<?> updatePractice(
-            Authentication authentication,
-            @RequestBody ProblemPracticeRegisterDto problemPracticeRegisterDto
-    ) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            boolean isUpdated = problemPracticeService.updatePractice(problemPracticeRegisterDto);
+    public String updatePractice(Authentication authentication, @RequestBody ProblemPracticeRegisterDto problemPracticeRegisterDto) {
+        Long userId = (Long) authentication.getPrincipal();
+        problemPracticeService.updatePractice(problemPracticeRegisterDto);
 
-            if(isUpdated){
-                log.info("userId: " + userId + " register problem  practice");
-                return ResponseEntity.ok("복습 리스트 수정을 완료했습니다.");
-            } else{
-                throw new ProblemPracticeNotFoundException("복습 리스트 생성 과정에서 문제가 발생했습니다.");
-            }
-        } catch (Exception e) {
-            log.error(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
+        log.info("userId: {} updated problem practice", userId);
+        return "복습 리스트 수정을 완료했습니다.";
     }
 
+    // ✅ 복습 리스트 삭제 (204 No Content 반환)
+    @ResponseStatus(HttpStatus.OK)
     @DeleteMapping("")
-    public ResponseEntity<?> deletePractices(
-            Authentication authentication,
-            @RequestParam List<Long> deletePracticeIds
-    ) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            problemPracticeService.deletePractices(deletePracticeIds);
+    public void deletePractices(Authentication authentication, @RequestParam List<Long> deletePracticeIds) {
+        Long userId = (Long) authentication.getPrincipal();
+        problemPracticeService.deletePractices(deletePracticeIds);
 
-            log.info("userId: " + userId + " delete problem  practice ids: " + deletePracticeIds.toString());
-            return ResponseEntity.ok("복습 리스트 삭제를 완료했습니다.");
-        } catch (Exception e) {
-            log.error(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
+        log.info("userId: {} deleted problem practice ids: {}", userId, deletePracticeIds);
     }
 }

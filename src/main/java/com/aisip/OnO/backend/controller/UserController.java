@@ -1,18 +1,14 @@
 package com.aisip.OnO.backend.controller;
 
-import com.aisip.OnO.backend.Dto.ErrorResponseDto;
 import com.aisip.OnO.backend.Dto.User.UserRegisterDto;
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
-import com.aisip.OnO.backend.exception.UserNotFoundException;
 import com.aisip.OnO.backend.service.FolderService;
 import com.aisip.OnO.backend.service.ProblemPracticeService;
 import com.aisip.OnO.backend.service.ProblemService;
 import com.aisip.OnO.backend.service.UserService;
-import io.sentry.Sentry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,79 +19,46 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
-
     private final ProblemService problemService;
-
     private final FolderService folderService;
-
     private final ProblemPracticeService problemPracticeService;
 
+    // ✅ 사용자 정보 조회
+    @ResponseStatus(HttpStatus.OK)
     @GetMapping("")
-    public ResponseEntity<?> getUserInfo(Authentication authentication) {
+    public UserResponseDto getUserInfo(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
-        UserResponseDto userResponseDto = userService.getUserById(userId);
-        try {
-            if (userResponseDto != null) {
-                log.info("userId: " + userId + " get user info");
-                return ResponseEntity.ok(userResponseDto);
-            } else {
-                throw new UserNotFoundException("userId: " + userId + " not found");
-            }
-        } catch (UserNotFoundException e) {
-            Sentry.captureException(e);
-            return ResponseEntity.status(404).body(new ErrorResponseDto("User not found"));
-        }
+        log.info("userId: {} get user info", userId);
+        return userService.getUserById(userId);
     }
 
+    // ✅ 사용자 정보 수정
+    @ResponseStatus(HttpStatus.OK)
     @PatchMapping("")
-    public ResponseEntity<?> updateUserInfo(Authentication authentication, @RequestBody UserRegisterDto userRegisterDto) {
+    public UserResponseDto updateUserInfo(Authentication authentication, @RequestBody UserRegisterDto userRegisterDto) {
         Long userId = (Long) authentication.getPrincipal();
-        UserResponseDto userResponseDto = userService.updateUser(userId, userRegisterDto);
-        try{
-            if (userResponseDto != null) {
-                log.info("userId: " + userId + " update user info");
-                return ResponseEntity.ok(userResponseDto);
-            } else {
-                throw new UserNotFoundException("userId: " + userId + " not found");
-            }
-        } catch (UserNotFoundException e) {
-            Sentry.captureException(e);
-            return ResponseEntity.status(404).body(new ErrorResponseDto("User not found"));
-        }
+        log.info("userId: {} update user info", userId);
+        return userService.updateUser(userId, userRegisterDto);
     }
 
+    // ✅ 사용자의 문제 개수 조회
+    @ResponseStatus(HttpStatus.OK)
     @GetMapping("/problemCount")
-    public ResponseEntity<?> getUserProblemCount(Authentication authentication) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            Long userProblemCount = problemService.getProblemCountByUser(userId);
-
-            return ResponseEntity.ok(userProblemCount);
-        } catch (Exception e) {
-            log.error("error for get user problem count : " + e);
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    "Error get user problem count: " + e.getMessage()
-            );
-        }
+    public Long getUserProblemCount(Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        log.info("userId: {} get user problem count", userId);
+        return problemService.getProblemCountByUser(userId);
     }
 
+    // ✅ 사용자 계정 삭제 (204 No Content 반환)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("")
-    public ResponseEntity<?> deleteUserInfo(Authentication authentication) {
+    public void deleteUserInfo(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
-        try{
-            problemPracticeService.deleteAllPracticesByUser(userId);
-            problemService.deleteUserProblems(userId);
-            folderService.deleteAllUserFolder(userId);
-            userService.deleteUserById(userId);
-
-            log.info("userId: " + userId + " has deleted");
-            return ResponseEntity.ok().body("delete complete");
-        } catch(Exception e){
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    "Error delete user: " + e.getMessage()
-            );
-        }
+        problemPracticeService.deleteAllPracticesByUser(userId);
+        problemService.deleteUserProblems(userId);
+        folderService.deleteAllUserFolder(userId);
+        userService.deleteUserById(userId);
+        log.info("userId: {} has been deleted", userId);
     }
 }

@@ -2,16 +2,12 @@ package com.aisip.OnO.backend.controller;
 
 import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
-import com.aisip.OnO.backend.exception.ProblemNotFoundException;
-import com.aisip.OnO.backend.exception.ProblemRegisterException;
 import com.aisip.OnO.backend.service.ProblemPracticeService;
 import com.aisip.OnO.backend.service.ProblemService;
-import io.sentry.Sentry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.propertyeditors.CustomNumberEditor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
@@ -31,154 +27,73 @@ public class ProblemController {
     }
 
     private final ProblemService problemService;
-
     private final ProblemPracticeService problemPracticeService;
 
+    // ✅ 특정 문제 조회
+    @ResponseStatus(HttpStatus.OK)
     @GetMapping("/{problemId}")
-    public ResponseEntity<?> getProblem(
-            Authentication authentication,
-            @PathVariable("problemId") Long problemId
-    ) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            ProblemResponseDto problemResponseDto = problemService.findProblem(userId, problemId);
+    public ProblemResponseDto getProblem(Authentication authentication, @PathVariable Long problemId) {
+        Long userId = (Long) authentication.getPrincipal();
+        ProblemResponseDto problemResponseDto = problemService.findProblem(userId, problemId);
 
-            log.info("userId: " + userId + " get problem for problemId: " + problemResponseDto.getProblemId());
-            return ResponseEntity.ok(problemResponseDto);
-        } catch (ProblemNotFoundException e) {
-            log.error(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-        }
+        log.info("userId: {} get problem for problemId: {}", userId, problemResponseDto.getProblemId());
+        return problemResponseDto;
     }
 
+    // ✅ 유저가 등록한 모든 문제 조회
+    @ResponseStatus(HttpStatus.OK)
     @GetMapping("/all")
-    public ResponseEntity<?> getProblemsByUserId(Authentication authentication) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            List<ProblemResponseDto> problems = problemService.findUserProblems(userId);
-
-            log.info("userId: " + userId + " get all problems");
-            return ResponseEntity.ok(problems);
-        } catch (Exception e) {
-            log.error(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("문제 조회에 실패했습니다.");
-        }
+    public List<ProblemResponseDto> getProblemsByUserId(Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        log.info("userId: {} get all problems", userId);
+        return problemService.findUserProblems(userId);
     }
 
+    // ✅ 문제 등록 (V1)
+    @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("")
-    public ResponseEntity<?> registerProblem(
-            Authentication authentication,
-            @ModelAttribute ProblemRegisterDto problemRegisterDto
-    ) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            boolean isSaved = problemService.createProblem(userId, problemRegisterDto);
+    public String registerProblem(Authentication authentication, @ModelAttribute ProblemRegisterDto problemRegisterDto) {
+        Long userId = (Long) authentication.getPrincipal();
+        problemService.createProblem(userId, problemRegisterDto);
 
-            if (isSaved) {
-                log.info("userId: " + userId + " success for register problem");
-                return ResponseEntity.ok().body("문제가 등록되었습니다.");
-            } else {
-                throw new ProblemRegisterException("userId: " + userId + " failed for register problem");
-            }
-
-        } catch (Exception e) {
-            log.error(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    "Error Register Problem: " + e.getMessage()
-            );
-        }
+        log.info("userId: {} success for register problem", userId);
+        return "문제가 등록되었습니다.";
     }
 
-    @PostMapping("/V2")
-    public ResponseEntity<?> registerProblemV2(
-            Authentication authentication,
-            @ModelAttribute ProblemRegisterDto problemRegisterDto
-    ) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            boolean isSaved = problemService.createProblem(userId, problemRegisterDto);
-
-            if (isSaved) {
-                log.info("userId: " + userId + " success for register problem");
-                return ResponseEntity.ok().body("문제가 등록되었습니다.");
-            } else {
-                throw new ProblemRegisterException("userId: " + userId + " failed for register problem");
-            }
-
-        } catch (Exception e) {
-            log.error(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    "Error Register Problem: " + e.getMessage()
-            );
-        }
-    }
-
+    // ✅ 문제 수정
+    @ResponseStatus(HttpStatus.OK)
     @PatchMapping("")
-    public ResponseEntity<?> updateProblem(
-            Authentication authentication, @ModelAttribute ProblemRegisterDto problemRegisterDto
-    ) {
-        try {
+    public String updateProblem(Authentication authentication, @ModelAttribute ProblemRegisterDto problemRegisterDto) {
+        Long userId = (Long) authentication.getPrincipal();
+        problemService.updateProblem(userId, problemRegisterDto);
 
-            Long userId = (Long) authentication.getPrincipal();
-            boolean isUpdated = problemService.updateProblem(userId, problemRegisterDto);
-
-            if (isUpdated) {
-                log.info("userId: " + userId + " success for update problem");
-                return ResponseEntity.ok().body("문제가 수정되었습니다.");
-            } else {
-                throw new ProblemRegisterException("userId: " + userId + " failed for update problem");
-            }
-
-        } catch (Exception e) {
-            log.error(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    "Error Processing Problem: " + e.getMessage()
-            );
-        }
+        log.info("userId: {} success for update problem", userId);
+        return "문제가 수정되었습니다.";
     }
 
+    // ✅ 문제 삭제 (204 No Content 반환)
+    @ResponseStatus(HttpStatus.OK)
     @DeleteMapping("")
-    public ResponseEntity<?> deleteProblems(
-            Authentication authentication,
-            @RequestParam List<Long> deleteProblemIdList
-    ) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            log.info("userId: " + userId + " try to delete folders, id list: " + deleteProblemIdList.toString());
-            problemPracticeService.deleteProblemsFromAllPractice(deleteProblemIdList);
-            problemService.deleteProblemList(userId, deleteProblemIdList);
+    public void deleteProblems(Authentication authentication, @RequestParam List<Long> deleteProblemIdList) {
+        Long userId = (Long) authentication.getPrincipal();
+        log.info("userId: {} try to delete problems, id list: {}", userId, deleteProblemIdList);
 
-            return ResponseEntity.ok("삭제를 완료했습니다.");
-        } catch (Exception e) {
-            log.warn(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(e.getMessage());
-        }
+        problemPracticeService.deleteProblemsFromAllPractice(deleteProblemIdList);
+        problemService.deleteProblemList(userId, deleteProblemIdList);
     }
 
+    // ✅ 문제 반복 풀이 추가
+    @ResponseStatus(HttpStatus.OK)
     @PostMapping("/repeat")
-    public ResponseEntity<?> addRepeatCount(
+    public String addRepeatCount(
             Authentication authentication,
             @RequestHeader("problemId") Long problemId,
             @RequestParam(value = "solveImage", required = false) MultipartFile solveImage
-            ){
-        try{
-            Long userId = (Long) authentication.getPrincipal();
-            problemService.addRepeatCount(problemId, solveImage);
+    ) {
+        Long userId = (Long) authentication.getPrincipal();
+        problemService.addRepeatCount(problemId, solveImage);
 
-            log.info("userId: " + userId + " repeat problemId : " + problemId);
-            return ResponseEntity.ok("삭제를 완료했습니다.");
-        } catch (Exception e) {
-            log.warn(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(e.getMessage());
-        }
+        log.info("userId: {} repeat problemId: {}", userId, problemId);
+        return "문제 반복 풀이가 추가되었습니다.";
     }
 }

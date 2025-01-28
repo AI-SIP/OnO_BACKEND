@@ -3,11 +3,9 @@ package com.aisip.OnO.backend.controller;
 import com.aisip.OnO.backend.Dto.Folder.FolderRegisterDto;
 import com.aisip.OnO.backend.Dto.Folder.FolderResponseDto;
 import com.aisip.OnO.backend.service.FolderService;
-import io.sentry.Sentry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,111 +19,66 @@ public class FolderController {
 
     private final FolderService folderService;
 
+    // ✅ 모든 폴더 조회
+    @ResponseStatus(HttpStatus.OK)
     @GetMapping("")
-    public ResponseEntity<?> getAllFolders(Authentication authentication) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            log.info("userId: " + userId + " try to get all folder");
-
-            return ResponseEntity.ok(folderService.findAllFolders(userId));
-        } catch (Exception e) {
-            log.warn(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 탐색에 실패했습니다.");
-        }
+    public List<FolderResponseDto> getAllFolders(Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        log.info("userId: {} 요청 - 모든 폴더 조회", userId);
+        return folderService.findAllFolders(userId);
     }
 
+    // ✅ 루트 폴더 조회
+    @ResponseStatus(HttpStatus.OK)
     @GetMapping("/root")
-    public ResponseEntity<?> getRootFolder(Authentication authentication) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            log.info("userId: " + userId + " try to get root folder");
-
-            return ResponseEntity.ok(folderService.findRootFolder(userId));
-        } catch (Exception e) {
-            log.warn(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 탐색에 실패했습니다.");
-        }
+    public FolderResponseDto getRootFolder(Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        log.info("userId: {} 요청 - 루트 폴더 조회", userId);
+        return folderService.findRootFolder(userId);
     }
 
+    // ✅ 특정 폴더 조회
+    @ResponseStatus(HttpStatus.OK)
     @GetMapping("/{folderId}")
-    public ResponseEntity<?> getFolder(Authentication authentication, @PathVariable Long folderId) {
-
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            log.info("userId: " + userId + " try to get folderId: " + folderId);
-
-            return ResponseEntity.ok(folderService.findFolder(userId, folderId));
-        } catch (Exception e) {
-            log.warn(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 탐색에 실패했습니다.");
-        }
+    public FolderResponseDto getFolder(Authentication authentication, @PathVariable Long folderId) {
+        Long userId = (Long) authentication.getPrincipal();
+        log.info("userId: {} 요청 - folderId: {} 조회", userId, folderId);
+        return folderService.findFolder(userId, folderId);
     }
 
-    @PostMapping()
-    public ResponseEntity<?> createFolder(Authentication authentication, @RequestBody FolderRegisterDto folderRegisterDto) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            log.info("userId: " + userId + " try to create folder");
-
-            FolderResponseDto folderResponseDto = folderService.createFolder(userId, folderRegisterDto.getFolderName(), folderRegisterDto.getParentFolderId());
-
-            return ResponseEntity.ok(folderResponseDto);
-        } catch (Exception e) {
-            log.warn(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 생성에 실패했습니다.");
-        }
+    // ✅ 폴더 생성
+    @ResponseStatus(HttpStatus.CREATED)
+    @PostMapping
+    public FolderResponseDto createFolder(Authentication authentication, @RequestBody FolderRegisterDto folderRegisterDto) {
+        Long userId = (Long) authentication.getPrincipal();
+        log.info("userId: {} 요청 - 폴더 생성", userId);
+        return folderService.createFolder(userId, folderRegisterDto.getFolderName(), folderRegisterDto.getParentFolderId());
     }
 
+    // ✅ 폴더 수정
+    @ResponseStatus(HttpStatus.OK)
     @PatchMapping("/{folderId}")
-    public ResponseEntity<?> updateFolder(Authentication authentication, @PathVariable Long folderId, @RequestBody FolderRegisterDto folderRegisterDto) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            log.info("userId: " + userId + " try to update folderId: " + folderId);
-
-            FolderResponseDto folderResponseDto = folderService.updateFolder(userId, folderId, folderRegisterDto.getFolderName(), folderRegisterDto.getParentFolderId());
-
-            return ResponseEntity.ok(folderResponseDto);
-        } catch (Exception e) {
-            log.warn(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 생성에 실패했습니다.");
-        }
+    public FolderResponseDto updateFolder(Authentication authentication, @PathVariable Long folderId, @RequestBody FolderRegisterDto folderRegisterDto) {
+        Long userId = (Long) authentication.getPrincipal();
+        log.info("userId: {} 요청 - 폴더 수정: folderId: {}", userId, folderId);
+        return folderService.updateFolder(userId, folderId, folderRegisterDto.getFolderName(), folderRegisterDto.getParentFolderId());
     }
 
+    // ✅ 문제 경로 수정
+    @ResponseStatus(HttpStatus.OK)
     @PatchMapping("/problem")
-    public ResponseEntity<?> updateProblemPath(Authentication authentication, @RequestBody Long problemId, @RequestBody Long folderId) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            log.info("userId: " + userId + " try to update folderId: " + folderId);
-
-            FolderResponseDto folderResponseDto = folderService.updateProblemPath(userId, problemId, folderId);
-
-            return ResponseEntity.ok(folderResponseDto);
-        } catch (Exception e) {
-            log.warn(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("문제 경로 변경에 실패했습니다.");
-        }
+    public FolderResponseDto updateProblemPath(Authentication authentication, @RequestParam Long problemId, @RequestParam Long folderId) {
+        Long userId = (Long) authentication.getPrincipal();
+        log.info("userId: {} 요청 - 문제 경로 수정: folderId: {}, problemId: {}", userId, folderId, problemId);
+        return folderService.updateProblemPath(userId, problemId, folderId);
     }
 
+    // ✅ 폴더 삭제
+    @ResponseStatus(HttpStatus.OK)
     @DeleteMapping("")
-    public ResponseEntity<?> deleteFolders(
-            Authentication authentication,
-            @RequestParam List<Long> deleteFolderIdList) {
-        try {
-            Long userId = (Long) authentication.getPrincipal();
-            log.info("userId: " + userId + " try to delete folders, id list: " + deleteFolderIdList.toString());
-
-            folderService.deleteFolderList(userId, deleteFolderIdList);
-            return ResponseEntity.ok("삭제가 완료되었습니다.");
-        } catch (Exception e) {
-            log.warn(e.getMessage());
-            Sentry.captureException(e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("폴더 삭제에 실패했습니다.");
-        }
+    public void deleteFolders(Authentication authentication, @RequestParam List<Long> deleteFolderIdList) {
+        Long userId = (Long) authentication.getPrincipal();
+        log.info("userId: {} 요청 - 폴더 삭제: {}", userId, deleteFolderIdList);
+        folderService.deleteFolderList(userId, deleteFolderIdList);
     }
 }

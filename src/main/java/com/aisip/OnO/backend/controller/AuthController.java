@@ -22,7 +22,7 @@ public class AuthController {
     private final JwtTokenService jwtTokenService;
     private final UserService userService;
 
-    // 게스트 로그인
+    // ✅ 게스트 로그인
     @ResponseStatus(HttpStatus.OK)
     @PostMapping("/login/guest")
     public TokenResponseDto guestLogin() {
@@ -30,7 +30,7 @@ public class AuthController {
         return jwtTokenService.generateTokens(user);
     }
 
-    // 소셜 로그인
+    // ✅ 소셜 로그인
     @ResponseStatus(HttpStatus.OK)
     @PostMapping("/login/social")
     public TokenResponseDto socialLogin(@RequestBody UserRegisterDto userRegisterDto) {
@@ -39,7 +39,7 @@ public class AuthController {
         return jwtTokenService.generateTokens(user);
     }
 
-    // Access Token 검증
+    // ✅ Access Token 검증
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/verifyAccessToken")
     public String verifyAccessToken(@RequestHeader("Authorization") String authorizationHeader) {
@@ -47,7 +47,7 @@ public class AuthController {
         return "Token is valid";
     }
 
-    // Refresh Token을 이용한 Access Token 재발급
+    // ✅ Refresh Token을 이용한 Access Token 재발급
     @ResponseStatus(HttpStatus.OK)
     @PostMapping("/refresh")
     public TokenResponseDto refreshToken(@RequestBody TokenRequestDto tokenRequestDto) {

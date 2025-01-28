@@ -236,7 +236,7 @@ public class ProblemService {
         return problemRepeatRepository.findAllByProblemId(problemId);
     }
 
-    public void addRepeatCount(Long problemId, MultipartFile solveImage) throws IOException {
+    public void addRepeatCount(Long problemId, MultipartFile solveImage) {
         Problem problem = getProblemEntity(problemId);
         ProblemRepeat problemRepeat = ProblemRepeat.builder()
                 .problem(problem)

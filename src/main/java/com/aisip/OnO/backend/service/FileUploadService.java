@@ -39,7 +39,7 @@ public class FileUploadService {
     @Value("${external.api.fastApiUrl}")
     private String fastApiUrl;
 
-    public String uploadFileToS3(MultipartFile file, Problem problem, ImageType imageType) throws IOException {
+    public String uploadFileToS3(MultipartFile file, Problem problem, ImageType imageType) {
         String fileName = createFileName(file, problem, imageType);
         String fileUrl = getFileUrl(fileName);
 
