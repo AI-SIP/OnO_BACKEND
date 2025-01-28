@@ -2,28 +2,151 @@ package com.aisip.OnO.backend.service;
 
 import com.aisip.OnO.backend.Dto.User.UserRegisterDto;
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
+import com.aisip.OnO.backend.converter.UserConverter;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.entity.User.UserType;
+import com.aisip.OnO.backend.exception.UserNotFoundException;
+import com.aisip.OnO.backend.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
-public interface UserService {
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class UserService {
 
-    User getUserEntity(Long userId);
+    private final UserRepository userRepository;
 
-    UserResponseDto registerGuestUser();
+    public User getUserEntity(Long userId){
+        Optional<User> optionalUser = userRepository.findById(userId);
 
-    UserResponseDto registerOrLoginUser(UserRegisterDto userRegisterDto, UserType userType);
+        if(optionalUser.isPresent()){
+            return optionalUser.get();
+        } else{
+            throw new UserNotFoundException("유저를 찾을 수 없습니다!");
+        }
+    }
 
-    UserResponseDto getUserById(Long userId);
+    public UserResponseDto registerGuestUser() {
+        User user = new User();
+        user.setName(makeGuestName());
+        user.setEmail(makeGuestEmail());
+        user.setIdentifier(makeGuestIdentifier());
+        user.setPlatform("GUEST");
+        user.setType(UserType.GUEST);
 
-    UserResponseDto getUserDetailsById(Long userId);
+        User resultUser = userRepository.save(user);
+        return UserConverter.convertToResponseDto(resultUser, true);
+    }
 
-    List<UserResponseDto> findAllUsers();
+    public UserResponseDto registerOrLoginUser(UserRegisterDto userRegisterDto, UserType userType) {
+        Optional<User> optionalUser = userRepository.findByIdentifier(userRegisterDto.getIdentifier());
 
-    Long findAllUserTypeCountByUserType(UserType userType);
+        if (optionalUser.isEmpty()) {
+            if(userType.equals(UserType.GUEST)){
+                userRegisterDto = makeGuestUser();
+            }
 
-    UserResponseDto updateUser(Long userId, UserRegisterDto userRegisterDto);
+            User user = new User();
+            user.setName(userRegisterDto.getName());
+            user.setEmail(userRegisterDto.getEmail());
+            user.setIdentifier(userRegisterDto.getIdentifier());
+            user.setPlatform(userRegisterDto.getPlatform());
+            user.setType(userType);
 
-    void deleteUserById(Long userId);
+            User resultUser = userRepository.save(user);
+            return UserConverter.convertToResponseDto(resultUser, true);
+        }
+
+        return UserConverter.convertToResponseDto(optionalUser.get());
+    }
+
+    public UserResponseDto getUserById(Long userId) {
+
+        Optional<User> optionalUser = userRepository.findById(userId);
+
+        if(optionalUser.isPresent()){
+
+            User user = optionalUser.get();
+            return UserConverter.convertToResponseDto(user);
+        }
+
+        return null;
+    }
+
+    public UserResponseDto getUserDetailsById(Long userId) {
+        User user = getUserEntity(userId);
+        return UserConverter.convertToResponseDto(user);
+    }
+
+    public List<UserResponseDto> findAllUsers() {
+        List<User> userList = userRepository.findAll();
+        return userList.stream().map(UserConverter::convertToResponseDto).collect(Collectors.toList());
+    }
+
+    public Long findAllUserTypeCountByUserType(UserType userType) {
+        return userRepository.countUserByType(userType);
+    }
+
+    public UserResponseDto updateUser(Long userId, UserRegisterDto userRegisterDto) {
+
+        User user = getUserEntity(userId);
+        System.out.println("userId :" + user.getId() + " update");
+
+        if(userRegisterDto.getName() != null){
+            user.setName(userRegisterDto.getName());
+        }
+
+        if (userRegisterDto.getEmail() != null) {
+            user.setEmail(userRegisterDto.getEmail());
+        }
+
+        if (userRegisterDto.getIdentifier() != null) {
+            user.setIdentifier(userRegisterDto.getIdentifier());
+        }
+
+        if (userRegisterDto.getType() != null) {
+            user.setType(userRegisterDto.getType());
+        }
+
+        User saveUser = userRepository.save(user);
+
+        return UserConverter.convertToResponseDto(saveUser);
+    }
+
+    public void deleteUserById(Long userId) {
+        userRepository.deleteById(userId);
+    }
+
+    private UserRegisterDto makeGuestUser(){
+        String name = makeGuestName();
+        String email = makeGuestEmail();
+        String identifier = makeGuestIdentifier();
+
+        UserRegisterDto userRegisterDto = new UserRegisterDto();
+        userRegisterDto.setName(name);
+        userRegisterDto.setEmail(email);
+        userRegisterDto.setIdentifier(identifier);
+        userRegisterDto.setPlatform("GUEST");
+
+        return userRegisterDto;
+    }
+
+    private String makeGuestName() {
+        return "Guest" + UUID.randomUUID().toString().substring(0, 8);
+    }
+
+    private String makeGuestEmail() {
+        return "guest_" + UUID.randomUUID() + "@ono.com";
+    }
+
+    private String makeGuestIdentifier() {
+        return UUID.randomUUID().toString();
+    }
 }

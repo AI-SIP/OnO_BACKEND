@@ -2,7 +2,6 @@ package com.aisip.OnO.backend.controller;
 
 import com.aisip.OnO.backend.Dto.Problem.ProblemPractice.ProblemPracticeRegisterDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemPractice.ProblemPracticeResponseDto;
-import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
 import com.aisip.OnO.backend.exception.ProblemPracticeNotFoundException;
 import com.aisip.OnO.backend.service.ProblemPracticeService;
 import io.sentry.Sentry;

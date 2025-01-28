@@ -1,5 +1,6 @@
-package com.aisip.OnO.backend.exception;
+package com.aisip.OnO.backend.exception.handler;
 
+import com.aisip.OnO.backend.exception.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
