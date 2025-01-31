@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.Dto.Process.ImageProcessRegisterDto;
 import com.aisip.OnO.backend.entity.Image.ImageData;
 import com.aisip.OnO.backend.entity.Image.ImageType;
 import com.aisip.OnO.backend.entity.Problem.Problem;
+import com.aisip.OnO.backend.exception.ProblemRegisterException;
 import com.aisip.OnO.backend.repository.ImageDataRepository;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.ObjectMetadata;
@@ -117,7 +118,7 @@ public class FileUploadService {
         } catch (Exception e) {
             log.info(e.getMessage());
             Sentry.captureException(e);
-            throw new RuntimeException("Failed to parse response", e);
+            throw new ProblemRegisterException();
         }
     }
 
@@ -150,7 +151,7 @@ public class FileUploadService {
         } catch (Exception e) {
             log.info(e.getMessage());
             Sentry.captureException(e);
-            throw new RuntimeException("Failed to parse response", e);
+            throw new ProblemRegisterException();
         }
     }
 
@@ -188,28 +189,31 @@ public class FileUploadService {
         }
     }
 
-    public String updateImage(MultipartFile file, Problem problem, ImageType imageType) throws IOException {
+    public String updateImage(MultipartFile file, Problem problem, ImageType imageType) {
+        try {
+            Optional<ImageData> beforeImageData = imageDataRepository.findByProblemIdAndImageType(problem.getId(), imageType);
+            beforeImageData.ifPresent(this::deleteImage);
 
-        Optional<ImageData> beforeImageData = imageDataRepository.findByProblemIdAndImageType(problem.getId(), imageType);
-        beforeImageData.ifPresent(this::deleteImage);
+            if (imageType.equals(ImageType.PROBLEM_IMAGE)) {
+                Optional<ImageData> processImageData = imageDataRepository.findByProblemIdAndImageType(problem.getId(), ImageType.PROCESS_IMAGE);
+                processImageData.ifPresent(this::deleteImage);
+            }
 
-        if (imageType.equals(ImageType.PROBLEM_IMAGE)) {
-            Optional<ImageData> processImageData = imageDataRepository.findByProblemIdAndImageType(problem.getId(), ImageType.PROCESS_IMAGE);
-            processImageData.ifPresent(this::deleteImage);
+            String fileName = createFileName(file, problem, imageType);
+            String fileUrl = getFileUrl(fileName);
+
+            ObjectMetadata objectMetadata = new ObjectMetadata();
+            objectMetadata.setContentType(file.getContentType());
+            objectMetadata.setContentLength(file.getSize());
+
+            amazonS3Client.putObject(bucket, fileName, file.getInputStream(), objectMetadata);
+            saveImageData(fileUrl, problem, imageType);
+
+            log.info("file url : " + fileUrl + " successfully updated");
+            return fileUrl;
+        } catch (IOException e) {
+            throw new ProblemRegisterException();
         }
-
-        String fileName = createFileName(file, problem, imageType);
-        String fileUrl = getFileUrl(fileName);
-
-        ObjectMetadata objectMetadata = new ObjectMetadata();
-        objectMetadata.setContentType(file.getContentType());
-        objectMetadata.setContentLength(file.getSize());
-
-        amazonS3Client.putObject(bucket, fileName, file.getInputStream(), objectMetadata);
-        saveImageData(fileUrl, problem, imageType);
-
-        log.info("file url : " + fileUrl + " successfully updated");
-        return fileUrl;
     }
 
     @Transactional(readOnly = true)

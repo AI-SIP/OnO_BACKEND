@@ -30,25 +30,16 @@ public class FolderService {
 
     private final FolderRepository folderRepository;
 
-    public Folder getFolderEntity(Long folderId) {
-        Optional<Folder> optionalFolder = folderRepository.findById(folderId);
-
-        if(optionalFolder.isPresent()){
-            return optionalFolder.get();
-        } else{
-            throw new FolderNotFoundException("폴더를 찾을 수 없습니다!");
-        }
+    private Folder getFolderEntity(Long folderId) {
+        return folderRepository.findById(folderId)
+                .orElseThrow(() -> new FolderNotFoundException(folderId));
     }
 
     public List<FolderResponseDto> findAllFolders(Long userId) {
-
         List<Folder> folders = folderRepository.findAllByUserId(userId);
-        if(folders.isEmpty()){
-            return List.of(findRootFolder(userId));
-        }
-
-        return folders.stream()
-                .map(this::getFolderResponseDto).toList();
+        return folders.isEmpty()
+                ? List.of(findRootFolder(userId))
+                : folders.stream().map(this::getFolderResponseDto).toList();
     }
 
     public FolderResponseDto findFolder(Long userId, Long folderId) {

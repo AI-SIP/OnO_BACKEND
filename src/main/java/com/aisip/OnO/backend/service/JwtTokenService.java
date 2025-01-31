@@ -36,12 +36,12 @@ public class JwtTokenService {
      */
     public void verifyAccessToken(String authorizationHeader) {
         if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
-            throw new MissingTokenException("Authorization header missing or invalid");
+            throw new MissingTokenException();
         }
 
         String accessToken = authorizationHeader.substring(7);
         if (!jwtTokenProvider.validateToken(accessToken)) {
-            throw new InvalidTokenException("Invalid or expired access token");
+            throw new InvalidTokenException();
         }
     }
 
@@ -50,7 +50,7 @@ public class JwtTokenService {
      */
     public TokenResponseDto refreshAccessToken(String refreshToken) {
         if (!jwtTokenProvider.validateToken(refreshToken)) {
-            throw new ExpiredTokenException("Invalid or expired refresh token");
+            throw new ExpiredTokenException();
         }
 
         Long userId = Long.parseLong(jwtTokenProvider.getSubjectFromToken(refreshToken));

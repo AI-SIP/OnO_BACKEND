@@ -24,13 +24,8 @@ public class UserService {
     private final UserRepository userRepository;
 
     public User getUserEntity(Long userId){
-        Optional<User> optionalUser = userRepository.findById(userId);
-
-        if(optionalUser.isPresent()){
-            return optionalUser.get();
-        } else{
-            throw new UserNotFoundException("유저를 찾을 수 없습니다!");
-        }
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException(userId));
     }
 
     public UserResponseDto registerGuestUser() {
@@ -97,27 +92,14 @@ public class UserService {
     public UserResponseDto updateUser(Long userId, UserRegisterDto userRegisterDto) {
 
         User user = getUserEntity(userId);
-        System.out.println("userId :" + user.getId() + " update");
+        log.info("userId: {} update", user.getId());
 
-        if(userRegisterDto.getName() != null){
-            user.setName(userRegisterDto.getName());
-        }
+        Optional.ofNullable(userRegisterDto.getName()).ifPresent(user::setName);
+        Optional.ofNullable(userRegisterDto.getEmail()).ifPresent(user::setEmail);
+        Optional.ofNullable(userRegisterDto.getIdentifier()).ifPresent(user::setIdentifier);
+        Optional.ofNullable(userRegisterDto.getType()).ifPresent(user::setType);
 
-        if (userRegisterDto.getEmail() != null) {
-            user.setEmail(userRegisterDto.getEmail());
-        }
-
-        if (userRegisterDto.getIdentifier() != null) {
-            user.setIdentifier(userRegisterDto.getIdentifier());
-        }
-
-        if (userRegisterDto.getType() != null) {
-            user.setType(userRegisterDto.getType());
-        }
-
-        User saveUser = userRepository.save(user);
-
-        return UserConverter.convertToResponseDto(saveUser);
+        return UserConverter.convertToResponseDto(user);
     }
 
     public void deleteUserById(Long userId) {

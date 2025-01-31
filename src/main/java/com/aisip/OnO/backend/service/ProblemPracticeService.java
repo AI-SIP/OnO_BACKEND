@@ -32,14 +32,10 @@ public class ProblemPracticeService {
 
     private final ProblemPracticeRepository problemPracticeRepository;
 
-    public ProblemPractice getPracticeEntity(Long practiceId){
-        Optional<ProblemPractice> optionalProblemPractice = problemPracticeRepository.findById(practiceId);
+    private ProblemPractice getPracticeEntity(Long practiceId){
 
-        if(optionalProblemPractice.isPresent()) {
-            return optionalProblemPractice.get();
-        }
-
-        throw new ProblemPracticeNotFoundException("복습 리스트를 찾을 수 없습니다!");
+        return problemPracticeRepository.findById(practiceId)
+                .orElseThrow(() -> new ProblemPracticeNotFoundException(practiceId));
     }
 
     public ProblemPracticeResponseDto createPractice(Long userId, ProblemPracticeRegisterDto problemPracticeRegisterDto) {
@@ -70,7 +66,7 @@ public class ProblemPracticeService {
 
     public void addProblemToPractice(Long practiceId, Long problemId) {
         ProblemPractice practice = problemPracticeRepository.findById(practiceId)
-                .orElseThrow(() -> new ProblemPracticeNotFoundException("Invalid practice practiceId: " + practiceId));
+                .orElseThrow(() -> new ProblemPracticeNotFoundException(practiceId));
 
         Problem problem = problemService.getProblemEntity(problemId);
 
@@ -99,7 +95,7 @@ public class ProblemPracticeService {
 
     public boolean addPracticeCount(Long practiceId) {
         ProblemPractice practice = problemPracticeRepository.findById(practiceId)
-                .orElseThrow(() -> new ProblemPracticeNotFoundException("Invalid practice practiceId: " + practiceId));
+                .orElseThrow(() -> new ProblemPracticeNotFoundException(practiceId));
 
         practice.setPracticeCount(practice.getPracticeCount() + 1);
         practice.setLastSolvedAt(LocalDateTime.now());
