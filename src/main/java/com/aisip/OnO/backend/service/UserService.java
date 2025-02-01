@@ -6,7 +6,7 @@ import com.aisip.OnO.backend.converter.UserConverter;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.entity.User.UserType;
 import com.aisip.OnO.backend.exception.UserNotFoundException;
-import com.aisip.OnO.backend.repository.UserRepository;
+import com.aisip.OnO.backend.repository.User.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

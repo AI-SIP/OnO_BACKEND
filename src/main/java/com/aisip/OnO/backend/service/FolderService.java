@@ -7,7 +7,7 @@ import com.aisip.OnO.backend.entity.Folder;
 import com.aisip.OnO.backend.entity.Problem.Problem;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.exception.FolderNotFoundException;
-import com.aisip.OnO.backend.repository.FolderRepository;
+import com.aisip.OnO.backend.repository.Folder.FolderRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

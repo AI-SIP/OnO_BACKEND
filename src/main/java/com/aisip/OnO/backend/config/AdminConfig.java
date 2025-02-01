@@ -2,7 +2,7 @@ package com.aisip.OnO.backend.config;
 
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.entity.User.UserType;
-import com.aisip.OnO.backend.repository.UserRepository;
+import com.aisip.OnO.backend.repository.User.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;

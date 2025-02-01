@@ -1,4 +1,4 @@
-package com.aisip.OnO.backend.repository;
+package com.aisip.OnO.backend.repository.User;
 
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.entity.User.UserType;

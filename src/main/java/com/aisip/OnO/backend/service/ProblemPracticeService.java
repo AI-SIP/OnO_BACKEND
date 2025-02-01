@@ -8,7 +8,7 @@ import com.aisip.OnO.backend.entity.Problem.Problem;
 import com.aisip.OnO.backend.entity.Problem.ProblemPractice;
 import com.aisip.OnO.backend.entity.User.User;
 import com.aisip.OnO.backend.exception.ProblemPracticeNotFoundException;
-import com.aisip.OnO.backend.repository.ProblemPracticeRepository;
+import com.aisip.OnO.backend.repository.Practice.ProblemPracticeRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
