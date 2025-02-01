@@ -26,7 +26,7 @@ public class FolderService {
 
     private final ProblemService problemService;
 
-    private final ProblemPracticeService problemPracticeService;
+    private final PracticeService practiceService;
 
     private final FolderRepository folderRepository;
 
@@ -48,7 +48,8 @@ public class FolderService {
 
     public FolderResponseDto findRootFolder(Long userId) {
 
-        Optional<Folder> optionalRootFolder = folderRepository.findByUserIdAndParentFolderIsNull(userId);
+        //folderRepository.findByUserIdAndParentFolderIsNull(userId);
+        Optional<Folder> optionalRootFolder = folderRepository.findRootFolder(userId);
 
         if (optionalRootFolder.isPresent()) {
 
@@ -160,7 +161,7 @@ public class FolderService {
 
         if (folder.getProblems() != null && !folder.getProblems().isEmpty()) {
             for (Problem problem : folder.getProblems()) {
-                problemPracticeService.deleteProblemsFromAllPractice(List.of(problem.getId()));
+                practiceService.deleteProblemsFromAllPractice(List.of(problem.getId()));
                 problemService.deleteProblem(userId, problem.getId());
             }
         }

@@ -3,7 +3,7 @@ package com.aisip.OnO.backend.controller;
 import com.aisip.OnO.backend.Dto.User.UserRegisterDto;
 import com.aisip.OnO.backend.Dto.User.UserResponseDto;
 import com.aisip.OnO.backend.service.FolderService;
-import com.aisip.OnO.backend.service.ProblemPracticeService;
+import com.aisip.OnO.backend.service.PracticeService;
 import com.aisip.OnO.backend.service.ProblemService;
 import com.aisip.OnO.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +21,7 @@ public class UserController {
     private final UserService userService;
     private final ProblemService problemService;
     private final FolderService folderService;
-    private final ProblemPracticeService problemPracticeService;
+    private final PracticeService practiceService;
 
     // ✅ 사용자 정보 조회
     @ResponseStatus(HttpStatus.OK)
@@ -55,7 +55,7 @@ public class UserController {
     @DeleteMapping("")
     public void deleteUserInfo(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
-        problemPracticeService.deleteAllPracticesByUser(userId);
+        practiceService.deleteAllPracticesByUser(userId);
         problemService.deleteUserProblems(userId);
         folderService.deleteAllUserFolder(userId);
         userService.deleteUserById(userId);

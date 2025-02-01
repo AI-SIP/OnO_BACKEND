@@ -46,4 +46,7 @@ public class Problem extends BaseEntity {
 
     @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<ImageData> images;
+
+    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProblemPracticeMapping> problemPracticeMappings;
 }

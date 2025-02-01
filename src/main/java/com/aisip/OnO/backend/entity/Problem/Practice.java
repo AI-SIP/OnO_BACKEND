@@ -15,7 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ProblemPractice extends BaseEntity {
+public class Practice extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -31,11 +31,6 @@ public class ProblemPractice extends BaseEntity {
 
     private LocalDateTime lastSolvedAt;
 
-    @ManyToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    @JoinTable(
-            name = "problem_practice_problems", // 중간 테이블 이름
-            joinColumns = @JoinColumn(name = "problem_practice_id"), // ProblemPractice 엔티티의 외래 키
-            inverseJoinColumns = @JoinColumn(name = "problem_id") // Problem 엔티티의 외래 키
-    )
-    private List<Problem> problems;  // 복습에 포함된 문제 목록
+    @OneToMany(mappedBy = "problemPractice", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProblemPracticeMapping> problemPracticeMappings;
 }

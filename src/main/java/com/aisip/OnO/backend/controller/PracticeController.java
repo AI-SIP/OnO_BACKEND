@@ -2,7 +2,7 @@ package com.aisip.OnO.backend.controller;
 
 import com.aisip.OnO.backend.Dto.Problem.ProblemPractice.ProblemPracticeRegisterDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemPractice.ProblemPracticeResponseDto;
-import com.aisip.OnO.backend.service.ProblemPracticeService;
+import com.aisip.OnO.backend.service.PracticeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -15,9 +15,9 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/problem/practice")
-public class ProblemPracticeController {
+public class PracticeController {
 
-    private final ProblemPracticeService problemPracticeService;
+    private final PracticeService practiceService;
 
     // ✅ 특정 복습 리스트 조회
     @ResponseStatus(HttpStatus.OK)
@@ -25,7 +25,7 @@ public class ProblemPracticeController {
     public ProblemPracticeResponseDto getPracticeDetail(Authentication authentication, @PathVariable Long practiceId) {
         Long userId = (Long) authentication.getPrincipal();
         log.info("userId: {} get problem practice for practice id: {}", userId, practiceId);
-        return problemPracticeService.findPractice(practiceId);
+        return practiceService.findPractice(practiceId);
     }
 
     // ✅ 사용자의 모든 복습 리스트 썸네일 조회
@@ -34,7 +34,7 @@ public class ProblemPracticeController {
     public List<ProblemPracticeResponseDto> getAllPracticeThumbnail(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
         log.info("userId: {} get all problem practice thumbnails", userId);
-        return problemPracticeService.findAllPracticesByUser(userId);
+        return practiceService.findAllPracticesByUser(userId);
     }
 
     // ✅ 사용자의 모든 복습 리스트 상세 조회
@@ -43,7 +43,7 @@ public class ProblemPracticeController {
     public List<ProblemPracticeResponseDto> getAllPracticeDetail(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
         log.info("userId: {} get all problem practices", userId);
-        return problemPracticeService.findAllPracticesByUser(userId);
+        return practiceService.findAllPracticesByUser(userId);
     }
 
     // ✅ 복습 리스트 등록
@@ -51,7 +51,7 @@ public class ProblemPracticeController {
     @PostMapping("")
     public ProblemPracticeResponseDto registerPractice(Authentication authentication, @RequestBody ProblemPracticeRegisterDto problemPracticeRegisterDto) {
         Long userId = (Long) authentication.getPrincipal();
-        ProblemPracticeResponseDto response = problemPracticeService.createPractice(userId, problemPracticeRegisterDto);
+        ProblemPracticeResponseDto response = practiceService.createPractice(userId, problemPracticeRegisterDto);
         log.info("userId: {} registered problem practice", userId);
         return response;
     }
@@ -61,7 +61,7 @@ public class ProblemPracticeController {
     @PatchMapping("/complete/{practiceId}")
     public String addPracticeCount(Authentication authentication, @PathVariable Long practiceId) {
         Long userId = (Long) authentication.getPrincipal();
-        problemPracticeService.addPracticeCount(practiceId);
+        practiceService.addPracticeCount(practiceId);
 
         log.info("userId: {} completed problem practice with practiceId: {}", userId, practiceId);
         return "복습을 완료했습니다.";
@@ -72,7 +72,7 @@ public class ProblemPracticeController {
     @PatchMapping("")
     public String updatePractice(Authentication authentication, @RequestBody ProblemPracticeRegisterDto problemPracticeRegisterDto) {
         Long userId = (Long) authentication.getPrincipal();
-        problemPracticeService.updatePractice(problemPracticeRegisterDto);
+        practiceService.updatePractice(problemPracticeRegisterDto);
 
         log.info("userId: {} updated problem practice", userId);
         return "복습 리스트 수정을 완료했습니다.";
@@ -83,7 +83,7 @@ public class ProblemPracticeController {
     @DeleteMapping("")
     public void deletePractices(Authentication authentication, @RequestParam List<Long> deletePracticeIds) {
         Long userId = (Long) authentication.getPrincipal();
-        problemPracticeService.deletePractices(deletePracticeIds);
+        practiceService.deletePractices(deletePracticeIds);
 
         log.info("userId: {} deleted problem practice ids: {}", userId, deletePracticeIds);
     }

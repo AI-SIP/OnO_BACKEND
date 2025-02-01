@@ -2,7 +2,7 @@ package com.aisip.OnO.backend.controller;
 
 import com.aisip.OnO.backend.Dto.Problem.ProblemRegisterDto;
 import com.aisip.OnO.backend.Dto.Problem.ProblemResponseDto;
-import com.aisip.OnO.backend.service.ProblemPracticeService;
+import com.aisip.OnO.backend.service.PracticeService;
 import com.aisip.OnO.backend.service.ProblemService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +27,7 @@ public class ProblemController {
     }
 
     private final ProblemService problemService;
-    private final ProblemPracticeService problemPracticeService;
+    private final PracticeService practiceService;
 
     // ✅ 특정 문제 조회
     @ResponseStatus(HttpStatus.OK)
@@ -78,7 +78,7 @@ public class ProblemController {
         Long userId = (Long) authentication.getPrincipal();
         log.info("userId: {} try to delete problems, id list: {}", userId, deleteProblemIdList);
 
-        problemPracticeService.deleteProblemsFromAllPractice(deleteProblemIdList);
+        practiceService.deleteProblemsFromAllPractice(deleteProblemIdList);
         problemService.deleteProblemList(userId, deleteProblemIdList);
     }
 

@@ -17,8 +17,6 @@ public interface ProblemRepository extends JpaRepository<Problem, Long> {
     @EntityGraph(attributePaths = {"folder"})
     List<Problem> findAllByFolderId(Long folderId);
 
-    List<Problem>findAllByUserIdAndFolderIsNull(Long userId);
-
     Long countAllByTemplateTypeIsNull();
 
     Long countAllByTemplateType(TemplateType type);
