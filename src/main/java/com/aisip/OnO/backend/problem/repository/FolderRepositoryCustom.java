@@ -1,0 +1,10 @@
+package com.aisip.OnO.backend.problem.repository;
+
+import com.aisip.OnO.backend.problem.entity.Folder;
+
+import java.util.Optional;
+
+public interface FolderRepositoryCustom {
+
+    Optional<Folder> findRootFolder(Long userId);
+}
