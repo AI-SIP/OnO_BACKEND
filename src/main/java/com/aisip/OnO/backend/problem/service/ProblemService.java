@@ -27,13 +27,13 @@ public class ProblemService {
 
     private final ProblemImageDataRepository problemImageDataRepository;
 
-    public ProblemResponseDto findProblem(Long userId, Long problemId) {
-        Problem problem = getProblemEntity(userId, problemId);
+    public ProblemResponseDto findProblem(Long problemId, Long userId) {
+        Problem problem = findProblemEntity(problemId, userId);
 
         return ProblemResponseDto.from(problem);
     }
 
-    private Problem getProblemEntity(Long userId, Long problemId) {
+    private Problem findProblemEntity(Long problemId, Long userId) {
         Problem problem = problemRepository.findById(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
@@ -65,7 +65,7 @@ public class ProblemService {
                 .collect(Collectors.toList());
     }
 
-    public Long getProblemCountByUser(Long userId) {
+    public Long findProblemCountByUser(Long userId) {
         return problemRepository.countByUserId(userId);
     }
 
@@ -76,18 +76,21 @@ public class ProblemService {
 
         problemRegisterDto.imageDataList()
                 .forEach(problemImageDataRegisterDto -> {
-                    registerProblemImageData(problemImageDataRegisterDto, problem);
+                    ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
+                    problemImageDataRepository.save(problemImageData);
                 });
     }
 
-    public void registerProblemImageData(ProblemImageDataRegisterDto problemImageDataRegisterDto, Problem problem) {
+    public void registerProblemImageData(ProblemImageDataRegisterDto problemImageDataRegisterDto, Long userId) {
+        Problem problem = findProblemEntity(problemImageDataRegisterDto.problemId(), userId);
+
         ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
         problemImageDataRepository.save(problemImageData);
     }
 
     public void updateProblemInfo(ProblemRegisterDto problemRegisterDto, Long userId) {
 
-        Problem problem = getProblemEntity(problemRegisterDto.problemId(), userId);
+        Problem problem = findProblemEntity(problemRegisterDto.problemId(), userId);
 
         problem.updateProblem(problemRegisterDto);
     }
