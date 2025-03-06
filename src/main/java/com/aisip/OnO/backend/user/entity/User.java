@@ -23,10 +23,9 @@ public class User extends BaseEntity {
 
     private String identifier;
 
-    private String platform;
+    private String password;
 
-    @Enumerated(EnumType.STRING)
-    private UserType userType;
+    private String platform;
 
     public static User from(UserRegisterDto userRegisterDto) {
         return User.builder()
@@ -34,6 +33,7 @@ public class User extends BaseEntity {
                 .name(userRegisterDto.name())
                 .identifier(userRegisterDto.identifier())
                 .platform(userRegisterDto.platform())
+                .password(userRegisterDto.password())
                 .build();
     }
 
@@ -54,8 +54,8 @@ public class User extends BaseEntity {
             this.platform = userRegisterDto.platform();
         }
 
-        if (userRegisterDto.userType() != null) {
-            this.userType = userRegisterDto.userType();
+        if (userRegisterDto.password() != null && !userRegisterDto.password().isBlank()) {
+            this.password = userRegisterDto.password();
         }
     }
 }

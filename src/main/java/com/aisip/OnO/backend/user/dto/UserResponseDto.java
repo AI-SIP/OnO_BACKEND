@@ -1,7 +1,6 @@
 package com.aisip.OnO.backend.user.dto;
 
 import com.aisip.OnO.backend.user.entity.User;
-import com.aisip.OnO.backend.user.entity.UserType;
 
 import java.time.LocalDateTime;
 
@@ -10,7 +9,6 @@ public record UserResponseDto (
     String name,
     String email,
     String identifier,
-    UserType userType,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {
@@ -20,7 +18,6 @@ public record UserResponseDto (
                 user.getName(),
                 user.getEmail(),
                 user.getIdentifier(),
-                user.getUserType(),
                 user.getCreatedAt(),
                 user.getUpdatedAt()
         );

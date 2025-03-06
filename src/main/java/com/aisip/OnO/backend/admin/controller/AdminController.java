@@ -5,7 +5,6 @@ import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.entity.ProblemTemplateType;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
-import com.aisip.OnO.backend.user.entity.UserType;
 import com.aisip.OnO.backend.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.problem.service.FolderService;
 import com.aisip.OnO.backend.problem.service.ProblemService;
@@ -97,8 +96,6 @@ public class AdminController {
     public String getAllAnalysis(Model model, Authentication authentication) {
 
         int allUserCount = userService.findAllUsers().size();
-        Long guestMemberCount = userService.findAllUserTypeCountByUserType(UserType.GUEST);
-        Long memberCount = userService.findAllUserTypeCountByUserType(UserType.MEMBER);
 
         int allProblemCount = problemService.findAllProblems().size();
         Long nullTemplateCount = problemService.getTemplateTypeCount(null);
@@ -113,8 +110,6 @@ public class AdminController {
 
 
         model.addAttribute("allUserCount", allUserCount);
-        model.addAttribute("guestMemberCount", guestMemberCount);
-        model.addAttribute("memberCount", memberCount);
         model.addAttribute("allProblemCount", allProblemCount);
         model.addAttribute("nullTemplateCount", nullTemplateCount);
         model.addAttribute("simpleTemplateCount", simpleTemplateCount);

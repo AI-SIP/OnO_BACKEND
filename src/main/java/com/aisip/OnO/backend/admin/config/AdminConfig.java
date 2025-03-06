@@ -1,7 +1,7 @@
 package com.aisip.OnO.backend.admin.config;
 
+import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.entity.User;
-import com.aisip.OnO.backend.user.entity.UserType;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
@@ -30,12 +30,15 @@ public class AdminConfig {
     public CommandLineRunner initializeAdminUser() {
         return args -> {
             if (userRepository.findByIdentifier(adminIdentifier).isEmpty()) {
-                User adminUser = new User();
-                adminUser.setEmail("admin@ono.com");
-                adminUser.setName("Admin");
-                adminUser.setIdentifier(adminIdentifier);
-                adminUser.setPassword(passwordEncoder.encode(adminPassword));
-                adminUser.setType(UserType.ADMIN);
+                UserRegisterDto userRegisterDto = new UserRegisterDto(
+                        "admin@ono.com",
+                        "Admin",
+                        adminIdentifier,
+                        "ADMIN",
+                        passwordEncoder.encode(adminPassword)
+                );
+
+                User adminUser = User.from(userRegisterDto);
                 userRepository.save(adminUser);
             }
         };

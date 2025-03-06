@@ -3,8 +3,8 @@ package com.aisip.OnO.backend.auth.controller;
 import com.aisip.OnO.backend.auth.dto.TokenRequestDto;
 import com.aisip.OnO.backend.auth.dto.TokenResponseDto;
 import com.aisip.OnO.backend.common.response.CommonResponse;
-import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.auth.service.UserAuthService;
+import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
@@ -18,11 +18,14 @@ public class AuthController {
 
     private final UserAuthService userAuthService;
 
+    @PostMapping("/signup/guest")
+    public CommonResponse<TokenResponseDto> signUpGuest() {
+        return CommonResponse.success(userAuthService.signUpGuestUser());
+    }
 
-    // ✅ User Login
-    @PostMapping("/login")
-    public CommonResponse<TokenResponseDto> login(@RequestBody UserRegisterDto userRegisterDto) {
-        return CommonResponse.success(userAuthService.loginUser(userRegisterDto));
+    @PostMapping("/signup/member")
+    public CommonResponse<TokenResponseDto> signUpMember(@RequestBody UserRegisterDto userRegisterDto) {
+        return CommonResponse.success(userAuthService.signUpMemberUser(userRegisterDto));
     }
 
     // ✅ Refresh Token을 이용한 Access Token 재발급

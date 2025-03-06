@@ -6,7 +6,6 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TokenRequestDto {
-    private String idToken;
     private String accessToken;
     private String refreshToken;
 }

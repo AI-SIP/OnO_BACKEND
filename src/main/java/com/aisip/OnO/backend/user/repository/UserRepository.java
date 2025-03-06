@@ -1,7 +1,6 @@
 package com.aisip.OnO.backend.user.repository;
 
 import com.aisip.OnO.backend.user.entity.User;
-import com.aisip.OnO.backend.user.entity.UserType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,8 +13,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByIdentifier(String identifier);
 
     Optional<User> findByName(String name);
-
-    Long countUserByType(UserType type);
 
     Page<User> findAll(Pageable pageable);
 }

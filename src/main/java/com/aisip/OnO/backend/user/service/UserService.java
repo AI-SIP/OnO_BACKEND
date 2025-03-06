@@ -3,7 +3,6 @@ package com.aisip.OnO.backend.user.service;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.entity.User;
-import com.aisip.OnO.backend.user.entity.UserType;
 import com.aisip.OnO.backend.user.exception.UserErrorCase;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.user.repository.UserRepository;
@@ -34,43 +33,30 @@ public class UserService {
                 makeGuestEmail(),
                 makeGuestIdentifier(),
                 "GUEST",
-                UserType.GUEST
+                null
         );
 
         return User.from(userRegisterDto);
     }
 
-    private Long registerGuestUser() {
+    public UserResponseDto registerGuestUser() {
 
         User user = createGuestUser();
         userRepository.save(user);
 
-        return user.getId();
+        return UserResponseDto.from(user);
     }
 
-    private Long registerMemberUser(UserRegisterDto userRegisterDto) {
+    public UserResponseDto registerMemberUser(UserRegisterDto userRegisterDto) {
 
-        User user = User.from(userRegisterDto);
-        userRepository.save(user);
-
-        return user.getId();
-    }
-
-    private Long registerUser(UserRegisterDto userRegisterDto) {
-        if (userRegisterDto.userType().equals(UserType.MEMBER)) {
-            return registerMemberUser(userRegisterDto);
-        } else{
-            return registerGuestUser();
-        }
-    }
-
-    public Long loginUser(UserRegisterDto userRegisterDto) {
         Optional<User> optionalUser = userRepository.findByIdentifier(userRegisterDto.identifier());
-
         if (optionalUser.isPresent()) {
-            return optionalUser.get().getId();
+            return UserResponseDto.from(optionalUser.get());
         } else{
-            return registerUser(userRegisterDto);
+            User user = User.from(userRegisterDto);
+            userRepository.save(user);
+
+            return UserResponseDto.from(user);
         }
     }
 
@@ -82,10 +68,6 @@ public class UserService {
     public List<UserResponseDto> findAllUsers() {
         List<User> userList = userRepository.findAll();
         return userList.stream().map(UserResponseDto::from).collect(Collectors.toList());
-    }
-
-    public Long findAllUserTypeCountByUserType(UserType userType) {
-        return userRepository.countUserByType(userType);
     }
 
     public void updateUser(Long userId, UserRegisterDto userRegisterDto) {
