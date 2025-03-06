@@ -52,7 +52,7 @@ public class ProblemController {
     @PostMapping("")
     public CommonResponse<String> registerProblem(Authentication authentication, @ModelAttribute ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) authentication.getPrincipal();
-        problemService.createProblem(userId, problemRegisterDto);
+        problemService.registerProblem(problemRegisterDto, userId);
 
         return CommonResponse.success("문제가 등록되었습니다.");
     }
@@ -68,7 +68,7 @@ public class ProblemController {
     @PatchMapping("")
     public CommonResponse<String> updateProblem(Authentication authentication, @ModelAttribute ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) authentication.getPrincipal();
-        problemService.updateProblem(userId, problemRegisterDto);
+        problemService.updateProblemInfo(problemRegisterDto, userId);
 
         return CommonResponse.success("문제가 수정되었습니다.");
     }
@@ -79,7 +79,7 @@ public class ProblemController {
         Long userId = (Long) authentication.getPrincipal();
 
         practiceNoteService.deleteProblemsFromAllPractice(deleteProblemIdList);
-        problemService.deleteProblemList(userId, deleteProblemIdList);
+        problemService.deleteProblemList(deleteProblemIdList, userId);
 
         return CommonResponse.success("문제 삭제가 완료되었습니다.");
     }

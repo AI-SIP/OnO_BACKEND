@@ -23,9 +23,7 @@ public class Problem extends BaseEntity {
 
     private Long userId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "folder_id")
-    private Folder folder;
+    private Long folderId;
 
     private String memo;
 
@@ -33,7 +31,7 @@ public class Problem extends BaseEntity {
 
     private LocalDateTime solvedAt;
 
-    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProblemImageData> problemImageDataList;
 
     @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -46,5 +44,15 @@ public class Problem extends BaseEntity {
                 .reference(problemRegisterDto.reference())
                 .solvedAt(problemRegisterDto.solvedAt())
                 .build();
+    }
+
+    public void updateProblem(ProblemRegisterDto problemRegisterDto) {
+        if (problemRegisterDto.memo() != null && !problemRegisterDto.memo().isBlank()) {
+            this.memo = memo;
+        }
+
+        if (problemRegisterDto.reference() != null && !problemRegisterDto.reference().isBlank()) {
+            this.reference = reference;
+        }
     }
 }

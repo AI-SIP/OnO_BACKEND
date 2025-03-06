@@ -7,7 +7,7 @@ import com.aisip.OnO.backend.problem.entity.Folder;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
 import com.aisip.OnO.backend.user.entity.User;
-import com.aisip.OnO.backend.problem.repository.FolderRepository;
+import com.aisip.OnO.backend.problem.repository.folder.FolderRepository;
 import com.aisip.OnO.backend.user.service.UserService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -92,7 +92,7 @@ public class FolderService {
 
     public FolderResponseDto getFolderResponseDto(Folder folder) {
 
-        List<ProblemResponseDto> problemResponseDtoList = problemService.findAllProblemsByFolderId(folder.getId());
+        List<ProblemResponseDto> problemResponseDtoList = problemService.findFolderProblems(folder.getId());
 
         return FolderConverter.convertToResponseDto(folder, problemResponseDtoList);
     }

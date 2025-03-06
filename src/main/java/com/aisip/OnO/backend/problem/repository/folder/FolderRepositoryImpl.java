@@ -1,12 +1,10 @@
-package com.aisip.OnO.backend.problem.repository;
+package com.aisip.OnO.backend.problem.repository.folder;
 
 import com.aisip.OnO.backend.problem.entity.Folder;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
 
 import java.util.Optional;
-
-import static com.aisip.OnO.backend.entity.QFolder.folder;
 
 public class FolderRepositoryImpl implements FolderRepositoryCustom {
 

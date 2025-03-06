@@ -1,47 +1,46 @@
 package com.aisip.OnO.backend.problem.dto;
 
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import lombok.*;
+import com.aisip.OnO.backend.problem.entity.Problem;
+import lombok.AccessLevel;
+import lombok.Builder;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class ProblemResponseDto {
+@Builder(access = AccessLevel.PRIVATE)
+public record ProblemResponseDto (
 
-    private Long problemId;
+    Long problemId,
 
-    private String userName;
+    String memo,
 
-    private String problemImageUrl;
+    Long folderId,
 
-    private String processImageUrl;
+    String reference,
 
-    private String answerImageUrl;
+    LocalDateTime solvedAt,
 
-    private String solveImageUrl;
+    LocalDateTime createdAt,
 
-    private String memo;
+    LocalDateTime updateAt,
 
-    private Long folderId;
+    List<ProblemImageDataResponseDto> imageUrlList
+) {
+    public static ProblemResponseDto from(Problem problem) {
 
-    private String reference;
+        List<ProblemImageDataResponseDto> problemImageDataList = problem.getProblemImageDataList()
+                .stream().map(ProblemImageDataResponseDto::from).toList();
 
-    private String analysis;
-
-    private List<ProblemSolveDto> repeats;
-
-    @Enumerated(EnumType.STRING)
-    private Long templateType;
-
-    private LocalDateTime solvedAt;
-
-    private LocalDateTime createdAt;
-
-    private LocalDateTime updateAt;
+        return ProblemResponseDto.builder()
+                .problemId(problem.getId())
+                .folderId(problem.getFolderId())
+                .memo(problem.getMemo())
+                .reference(problem.getReference())
+                .solvedAt(problem.getSolvedAt())
+                .createdAt(problem.getCreatedAt())
+                .updateAt(problem.getUpdatedAt())
+                .imageUrlList(problemImageDataList)
+                .build();
+    }
 }
 

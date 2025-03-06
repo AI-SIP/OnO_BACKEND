@@ -4,7 +4,6 @@ import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.fileupload.service.FileUploadService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,51 +16,27 @@ import java.util.Map;
 @RequestMapping("/api/fileUpload")
 public class FileUploadController {
 
-    //private final ProblemService problemService;
-
     private final FileUploadService fileUploadService;
 
-    @ResponseStatus(HttpStatus.OK)
     @PostMapping("/image")
     public CommonResponse<Map<String, Object>> uploadImageFile(
             Authentication authentication,
             @RequestParam("image") MultipartFile file
     ) {
         //Long userId = (Long) authentication.getPrincipal();
-        //Problem problem = problemService.createProblem(userId);
         String imageUrl = fileUploadService.uploadFileToS3(file);
 
         return CommonResponse.success(Map.of("imageUrl", imageUrl));
     }
 
-    /*
-    // ✅ 이미지 분석 요청
-    @ResponseStatus(HttpStatus.OK)
-    @PostMapping("/analysis")
-    public Map<String, String> getProblemAnalysis(
+    @DeleteMapping("/image")
+    public CommonResponse<String> deleteImageFile(
             Authentication authentication,
-            @RequestBody Map<String, String> requestBody
+            @RequestParam("imageUrl") String imageUrl
     ) {
-        String problemImageUrl = requestBody.get("problemImageUrl");
-        String analysisResult = fileUploadService.getProblemAnalysis(problemImageUrl);
+        //Long userId = (Long) authentication.getPrincipal();
+        fileUploadService.deleteImageFileFromS3(imageUrl);
 
-        return Map.of("analysis", analysisResult);
+        return CommonResponse.success("이미지 삭제가 완료되었습니다.");
     }
-
-     */
-
-    /*
-    // ✅ 이미지 보정 요청
-    @ResponseStatus(HttpStatus.OK)
-    @PostMapping("/processImage")
-    public Map<String, String> getProcessImage(
-            Authentication authentication,
-            @RequestBody FileUploadRegisterDto fileUploadRegisterDto
-    ) {
-        String processImageUrl = fileUploadService.getProcessImage(fileUploadRegisterDto);
-
-        return Map.of("processImageUrl", processImageUrl);
-    }
-
-     */
 }

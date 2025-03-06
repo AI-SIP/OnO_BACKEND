@@ -1,4 +1,4 @@
-package com.aisip.OnO.backend.problem.repository;
+package com.aisip.OnO.backend.problem.repository.folder;
 
 import com.aisip.OnO.backend.problem.entity.Folder;
 

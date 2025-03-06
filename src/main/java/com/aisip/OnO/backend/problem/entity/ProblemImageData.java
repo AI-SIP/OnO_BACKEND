@@ -17,8 +17,9 @@ public class ProblemImageData extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "problem_id")
-    private Long problemId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "problem_id", nullable = false)
+    private Problem problem;
 
     @Column(name = "image_url")
     private String imageUrl;
@@ -27,9 +28,9 @@ public class ProblemImageData extends BaseEntity {
     @Column(name = "image_type")
     private ProblemImageType problemImageType;
 
-    public static ProblemImageData from(ProblemImageDataRegisterDto problemImageDataRegisterDto) {
+    public static ProblemImageData from(ProblemImageDataRegisterDto problemImageDataRegisterDto, Problem problem) {
         return ProblemImageData.builder()
-                .problemId(problemImageDataRegisterDto.problemId())
+                .problem(problem)
                 .imageUrl(problemImageDataRegisterDto.imageUrl())
                 .problemImageType(problemImageDataRegisterDto.problemImageType())
                 .build();
