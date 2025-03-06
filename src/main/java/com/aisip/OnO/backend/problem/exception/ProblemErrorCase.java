@@ -1,4 +1,4 @@
-package com.aisip.OnO.backend.user.exception;
+package com.aisip.OnO.backend.problem.exception;
 
 import com.aisip.OnO.backend.common.exception.ErrorCase;
 import lombok.Getter;
@@ -6,9 +6,11 @@ import lombok.RequiredArgsConstructor;
 
 @Getter
 @RequiredArgsConstructor
-public enum UserErrorCase implements ErrorCase {
+public enum ProblemErrorCase implements ErrorCase {
 
-    USER_NOT_FOUND(400, 1001, "사용자를 찾을 수 없습니다.");
+    PROBLEM_NOT_FOUND(400, 1001, "문제를 찾을 수 없습니다."),
+
+    PROBLEM_USER_UNMATCHED(400, 1002, "문제 작성자가 아닙니다.");
 
     private final Integer httpStatusCode;
     private final Integer errorCode;

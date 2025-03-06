@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.problem.controller;
 
+import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
@@ -30,87 +31,77 @@ public class ProblemController {
     private final PracticeNoteService practiceNoteService;
 
     // ✅ 특정 문제 조회
-    @ResponseStatus(HttpStatus.OK)
     @GetMapping("/{problemId}")
-    public ProblemResponseDto getProblem(Authentication authentication, @PathVariable Long problemId) {
+    public CommonResponse<ProblemResponseDto> getProblem(Authentication authentication, @PathVariable Long problemId) {
         Long userId = (Long) authentication.getPrincipal();
         ProblemResponseDto problemResponseDto = problemService.findProblem(userId, problemId);
 
-        log.info("userId: {} get problem for problemId: {}", userId, problemResponseDto.getProblemId());
-        return problemResponseDto;
+        return CommonResponse.success(problemResponseDto);
     }
 
     // ✅ 유저가 등록한 모든 문제 조회
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/all")
-    public List<ProblemResponseDto> getProblemsByUserId(Authentication authentication) {
+    public CommonResponse<List<ProblemResponseDto>> getProblemsByUserId(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
-        log.info("userId: {} get all problems", userId);
-        return problemService.findUserProblems(userId);
+
+        return CommonResponse.success(problemService.findUserProblems(userId));
     }
 
-    // ✅ 문제 등록 (V1)
-    @ResponseStatus(HttpStatus.CREATED)
+    // ✅ 문제 등록 (V1))
     @PostMapping("")
-    public String registerProblem(Authentication authentication, @ModelAttribute ProblemRegisterDto problemRegisterDto) {
+    public CommonResponse<String> registerProblem(Authentication authentication, @ModelAttribute ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) authentication.getPrincipal();
         problemService.createProblem(userId, problemRegisterDto);
 
-        log.info("userId: {} success for register problem", userId);
-        return "문제가 등록되었습니다.";
+        return CommonResponse.success("문제가 등록되었습니다.");
     }
 
     // ✅ 사용자의 문제 개수 조회
-    @ResponseStatus(HttpStatus.OK)
     @GetMapping("/problemCount")
-    public Long getUserProblemCount(Authentication authentication) {
+    public CommonResponse<Long> getUserProblemCount(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
-        return problemService.getProblemCountByUser(userId);
+        return CommonResponse.success(problemService.getProblemCountByUser(userId));
     }
 
     // ✅ 문제 수정
-    @ResponseStatus(HttpStatus.OK)
     @PatchMapping("")
-    public String updateProblem(Authentication authentication, @ModelAttribute ProblemRegisterDto problemRegisterDto) {
+    public CommonResponse<String> updateProblem(Authentication authentication, @ModelAttribute ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) authentication.getPrincipal();
         problemService.updateProblem(userId, problemRegisterDto);
 
-        log.info("userId: {} success for update problem", userId);
-        return "문제가 수정되었습니다.";
+        return CommonResponse.success("문제가 수정되었습니다.");
     }
 
     // ✅ 문제 삭제 (204 No Content 반환)
-    @ResponseStatus(HttpStatus.OK)
     @DeleteMapping("")
-    public void deleteProblems(Authentication authentication, @RequestParam List<Long> deleteProblemIdList) {
+    public CommonResponse<String> deleteProblems(Authentication authentication, @RequestParam List<Long> deleteProblemIdList) {
         Long userId = (Long) authentication.getPrincipal();
-        log.info("userId: {} try to delete problems, id list: {}", userId, deleteProblemIdList);
 
         practiceNoteService.deleteProblemsFromAllPractice(deleteProblemIdList);
         problemService.deleteProblemList(userId, deleteProblemIdList);
+
+        return CommonResponse.success("문제 삭제가 완료되었습니다.");
     }
 
-    @ResponseStatus(HttpStatus.OK)
     @DeleteMapping("/all")
-    public void deleteAllUserProblems(Authentication authentication, @RequestParam List<Long> deleteProblemIdList) {
+    public CommonResponse<String> deleteAllUserProblems(Authentication authentication, @RequestParam List<Long> deleteProblemIdList) {
         Long userId = (Long) authentication.getPrincipal();
-        log.info("userId: {} try to delete problems, id list: {}", userId, deleteProblemIdList);
 
         problemService.deleteUserProblems(userId);
+        return CommonResponse.success("유저의 모든 문제가 삭제되었습니다.");
     }
 
     // ✅ 문제 반복 풀이 추가
-    @ResponseStatus(HttpStatus.OK)
-    @PostMapping("/repeat")
-    public String addRepeatCount(
+    @PostMapping("/solve")
+    public CommonResponse<String> addSolveCount(
             Authentication authentication,
             @RequestHeader("problemId") Long problemId,
             @RequestParam(value = "solveImage", required = false) MultipartFile solveImage
     ) {
         Long userId = (Long) authentication.getPrincipal();
-        problemService.addRepeatCount(problemId, solveImage);
+        problemService.addSolveCount(problemId, solveImage);
 
-        log.info("userId: {} repeat problemId: {}", userId, problemId);
-        return "문제 반복 풀이가 추가되었습니다.";
+        return CommonResponse.success("문제 반복 풀이가 추가되었습니다.");
     }
 }

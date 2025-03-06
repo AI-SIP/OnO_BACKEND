@@ -1,10 +1,12 @@
 package com.aisip.OnO.backend.problem.service;
 
+import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.problem.entity.ProblemSolve;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.entity.ProblemTemplateType;
 import com.aisip.OnO.backend.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.problem.repository.FolderRepository;
@@ -13,9 +15,7 @@ import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.ProblemConverter;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.entity.Problem;
-import com.aisip.OnO.backend.problem.exception.ProblemNotFoundException;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
-import com.aisip.OnO.backend.user.service.UserService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,8 +32,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional
 public class ProblemService {
-
-    private final UserService userService;
     private final ProblemRepository problemRepository;
 
     private final ProblemSolveRepository problemSolveRepository;
@@ -50,7 +48,7 @@ public class ProblemService {
 
     public Problem getProblemEntity(Long problemId) {
         return problemRepository.findById(problemId)
-                .orElseThrow(() -> new ProblemNotFoundException(problemId));
+                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
     }
 
     public void saveProblemEntity(Problem problem) {
@@ -86,7 +84,6 @@ public class ProblemService {
     }
 
     public Problem createProblem(Long userId) {
-        User user = userService.findUserEntity(userId);
 
         Problem problem = Problem.builder()
                 .user(user)
@@ -156,7 +153,7 @@ public class ProblemService {
         if (problem.getUser().getId().equals(userId)) {
 
             List<ProblemImageData> images = fileUploadService.getProblemImages(problemId);
-            images.forEach(fileUploadService::deleteImage);
+            images.forEach(fileUploadService::deleteImageFileFromS3);
 
             List<ProblemSolve> problemSolves = getProblemRepeats(problemId);
             problemSolveRepository.deleteAll(problemSolves);
@@ -179,7 +176,7 @@ public class ProblemService {
         problemList.forEach(problem -> {
             Long problemId = problem.getId();
             List<ProblemImageData> images = fileUploadService.getProblemImages(problemId);
-            images.forEach(fileUploadService::deleteImage);
+            images.forEach(fileUploadService::deleteImageFileFromS3);
 
             List<ProblemSolve> problemSolves = getProblemRepeats(problemId);
             problemSolveRepository.deleteAll(problemSolves);
@@ -200,7 +197,7 @@ public class ProblemService {
         return problemSolveRepository.findAllByProblemId(problemId);
     }
 
-    public void addRepeatCount(Long problemId, MultipartFile solveImage) {
+    public void addSolveCount(Long problemId, MultipartFile solveImage) {
         Problem problem = getProblemEntity(problemId);
         ProblemSolve problemSolve = ProblemSolve.builder()
                 .problem(problem)

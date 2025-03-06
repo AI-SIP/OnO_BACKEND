@@ -1,31 +1,19 @@
 package com.aisip.OnO.backend.problem.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.springframework.web.multipart.MultipartFile;
-
 import java.time.LocalDateTime;
+import java.util.List;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class ProblemRegisterDto {
+public record ProblemRegisterDto (
 
-    private Long problemId;
+    Long problemId,
+    String memo,
 
-    private MultipartFile problemImage;
+    String reference,
 
-    private MultipartFile answerImage;
+    Long folderId,
 
-    private MultipartFile solveImage;
+    LocalDateTime solvedAt,
 
-    private String memo;
-
-    private String reference;
-
-    private Long folderId;
-
-    private LocalDateTime solvedAt;
-}
+    List<ProblemImageDataRegisterDto> imageDataList
+) {}
 

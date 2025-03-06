@@ -1,10 +1,7 @@
 package com.aisip.OnO.backend.fileupload.controller;
 
-import com.aisip.OnO.backend.fileupload.dto.FileUploadRegisterDto;
+import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.fileupload.service.FileUploadService;
-import com.aisip.OnO.backend.problem.entity.ProblemImageType;
-import com.aisip.OnO.backend.problem.entity.Problem;
-import com.aisip.OnO.backend.problem.service.ProblemService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -17,26 +14,27 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/process")
+@RequestMapping("/api/fileUpload")
 public class FileUploadController {
 
-    private final ProblemService problemService;
+    //private final ProblemService problemService;
 
     private final FileUploadService fileUploadService;
 
     @ResponseStatus(HttpStatus.OK)
-    @PostMapping("/problemImage")
-    public Map<String, Object> registerProblemImage(
+    @PostMapping("/image")
+    public CommonResponse<Map<String, Object>> uploadImageFile(
             Authentication authentication,
-            @RequestParam("problemImage") MultipartFile problemImage
+            @RequestParam("image") MultipartFile file
     ) {
-        Long userId = (Long) authentication.getPrincipal();
-        Problem problem = problemService.createProblem(userId);
-        String problemImageUrl = fileUploadService.uploadFileToS3(problemImage, problem, ProblemImageType.PROBLEM_IMAGE);
+        //Long userId = (Long) authentication.getPrincipal();
+        //Problem problem = problemService.createProblem(userId);
+        String imageUrl = fileUploadService.uploadFileToS3(file);
 
-        return Map.of("problemId", problem.getId(), "problemImageUrl", problemImageUrl);
+        return CommonResponse.success(Map.of("imageUrl", imageUrl));
     }
 
+    /*
     // ✅ 이미지 분석 요청
     @ResponseStatus(HttpStatus.OK)
     @PostMapping("/analysis")
@@ -50,6 +48,9 @@ public class FileUploadController {
         return Map.of("analysis", analysisResult);
     }
 
+     */
+
+    /*
     // ✅ 이미지 보정 요청
     @ResponseStatus(HttpStatus.OK)
     @PostMapping("/processImage")
@@ -61,4 +62,6 @@ public class FileUploadController {
 
         return Map.of("processImageUrl", processImageUrl);
     }
+
+     */
 }

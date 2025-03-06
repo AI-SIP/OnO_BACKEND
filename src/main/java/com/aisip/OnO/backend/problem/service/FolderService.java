@@ -7,7 +7,6 @@ import com.aisip.OnO.backend.problem.entity.Folder;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
 import com.aisip.OnO.backend.user.entity.User;
-import com.aisip.OnO.backend.problem.exception.FolderNotFoundException;
 import com.aisip.OnO.backend.problem.repository.FolderRepository;
 import com.aisip.OnO.backend.user.service.UserService;
 import jakarta.transaction.Transactional;

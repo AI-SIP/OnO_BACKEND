@@ -2,7 +2,7 @@ package com.aisip.OnO.backend.problem.entity;
 
 import com.aisip.OnO.backend.common.entity.BaseEntity;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
-import com.aisip.OnO.backend.user.entity.User;
+import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -11,20 +11,17 @@ import java.util.List;
 
 @Entity
 @Getter
-@Setter
+@Builder(access = AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "problem")
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class Problem extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", referencedColumnName = "id")
-    private User user;
+    private Long userId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "folder_id")
@@ -36,16 +33,18 @@ public class Problem extends BaseEntity {
 
     private LocalDateTime solvedAt;
 
-    @Column(columnDefinition = "LONGTEXT")
-    private String analysis;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "template_type")
-    private ProblemTemplateType problemTemplateType;
-
     @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<ProblemImageData> images;
+    private List<ProblemImageData> problemImageDataList;
 
     @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProblemPracticeNoteMapping> problemPracticeNoteMappings;
+
+    public static Problem from(ProblemRegisterDto problemRegisterDto, Long userId) {
+        return Problem.builder()
+                .userId(userId)
+                .memo(problemRegisterDto.memo())
+                .reference(problemRegisterDto.reference())
+                .solvedAt(problemRegisterDto.solvedAt())
+                .build();
+    }
 }
