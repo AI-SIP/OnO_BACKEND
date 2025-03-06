@@ -205,8 +205,8 @@
           'Content-Type': 'application/json'
         }
       })
-              .then(response => {
-                if (response.ok) {
+              .then(commonResponse => {
+                if (commonResponse.ok) {
                   alert("유저를 성공적으로 삭제했습니다.");
                   window.location.href = "/admin/users";
                 } else {

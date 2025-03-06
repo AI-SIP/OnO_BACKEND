@@ -1,4 +1,4 @@
-package com.aisip.OnO.backend.auth.filter;
+package com.aisip.OnO.backend.common.auth;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.JWTVerifier;

@@ -1,30 +1,28 @@
 package com.aisip.OnO.backend.user.dto;
 
+import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.entity.UserType;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import lombok.*;
 
 import java.time.LocalDateTime;
 
-@Data
-@Builder
-public class UserResponseDto {
-
-    private Long userId;
-
-    private String userName;
-
-    private String userEmail;
-
-    private String userIdentifier;
-
-    @Enumerated(EnumType.STRING)
-    private UserType userType;
-
-    private boolean firstLogin;
-
-    private LocalDateTime createdAt;
-
-    private LocalDateTime updatedAt;
+public record UserResponseDto (
+    Long userId,
+    String name,
+    String email,
+    String identifier,
+    UserType userType,
+    LocalDateTime createdAt,
+    LocalDateTime updatedAt
+) {
+    public static UserResponseDto from(User user) {
+        return new UserResponseDto(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getIdentifier(),
+                user.getUserType(),
+                user.getCreatedAt(),
+                user.getUpdatedAt()
+        );
+    }
 }

@@ -87,4 +87,13 @@ public class PracticeNoteController {
 
         log.info("userId: {} deleted problem practice ids: {}", userId, deletePracticeIds);
     }
+
+    @ResponseStatus(HttpStatus.OK)
+    @DeleteMapping("/all")
+    public void deleteAllUserPractices(Authentication authentication, @RequestParam List<Long> deletePracticeIds) {
+        Long userId = (Long) authentication.getPrincipal();
+        practiceNoteService.deleteAllPracticesByUser(userId);
+
+        log.info("userId: {} deleted problem practice ids: {}", userId, deletePracticeIds);
+    }
 }

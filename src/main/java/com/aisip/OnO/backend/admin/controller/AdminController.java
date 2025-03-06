@@ -46,7 +46,7 @@ public class AdminController {
 
     @GetMapping("/user/{userId}")
     public String getUserDetailsById(@PathVariable Long userId, Model model) {
-        UserResponseDto user = userService.getUserDetailsById(userId);
+        UserResponseDto user = userService.findUser(userId);
         model.addAttribute("user", user);
 
         List<ProblemResponseDto> problems = problemService.findUserProblems(userId);
@@ -65,7 +65,9 @@ public class AdminController {
 
     @PostMapping("/user/{userId}")
     public String updateUserInfo(@PathVariable Long userId, @ModelAttribute UserRegisterDto userRegisterDto, Model model) {
-        UserResponseDto userResponseDto = userService.updateUser(userId, userRegisterDto);
+        userService.updateUser(userId, userRegisterDto);
+
+        UserResponseDto userResponseDto = userService.findUser(userId);
         model.addAttribute("user", userResponseDto);
         List<ProblemResponseDto> problems = problemService.findUserProblems(userId);
         model.addAttribute("problems", problems);

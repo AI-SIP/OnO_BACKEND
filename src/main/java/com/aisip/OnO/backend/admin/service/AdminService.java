@@ -25,7 +25,7 @@ public class AdminService implements UserDetailsService {
         User user = userRepository.findByIdentifier(identifier)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + identifier));
 
-        if (!user.getType().equals(UserType.ADMIN)) {
+        if (!user.getUserType().equals(UserType.ADMIN)) {
             throw new UsernameNotFoundException("User does not have admin privileges");
         }
 

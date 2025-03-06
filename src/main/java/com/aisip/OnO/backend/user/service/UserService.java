@@ -1,11 +1,11 @@
 package com.aisip.OnO.backend.user.service;
 
-import com.aisip.OnO.backend.user.UserConverter;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.entity.UserType;
-import com.aisip.OnO.backend.user.exception.UserNotFoundException;
+import com.aisip.OnO.backend.user.exception.UserErrorCase;
+import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,101 +23,81 @@ public class UserService {
 
     private final UserRepository userRepository;
 
-    public User getUserEntity(Long userId){
+    private User findUserEntity(Long userId){
         return userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException(userId));
+                .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
     }
 
-    public UserResponseDto registerGuestUser() {
-        User user = new User();
-        user.setName(makeGuestName());
-        user.setEmail(makeGuestEmail());
-        user.setIdentifier(makeGuestIdentifier());
-        user.setPlatform("GUEST");
-        user.setType(UserType.GUEST);
+    private User createGuestUser() {
+        UserRegisterDto userRegisterDto = new UserRegisterDto(
+                makeGuestName(),
+                makeGuestEmail(),
+                makeGuestIdentifier(),
+                "GUEST",
+                UserType.GUEST
+        );
 
-        User resultUser = userRepository.save(user);
-        return UserConverter.convertToResponseDto(resultUser, true);
+        return User.from(userRegisterDto);
     }
 
-    public UserResponseDto registerOrLoginUser(UserRegisterDto userRegisterDto, UserType userType) {
-        Optional<User> optionalUser = userRepository.findByIdentifier(userRegisterDto.getIdentifier());
+    private Long registerGuestUser() {
 
-        if (optionalUser.isEmpty()) {
-            if(userType.equals(UserType.GUEST)){
-                userRegisterDto = makeGuestUser();
-            }
+        User user = createGuestUser();
+        userRepository.save(user);
 
-            User user = new User();
-            user.setName(userRegisterDto.getName());
-            user.setEmail(userRegisterDto.getEmail());
-            user.setIdentifier(userRegisterDto.getIdentifier());
-            user.setPlatform(userRegisterDto.getPlatform());
-            user.setType(userType);
+        return user.getId();
+    }
 
-            User resultUser = userRepository.save(user);
-            return UserConverter.convertToResponseDto(resultUser, true);
+    private Long registerMemberUser(UserRegisterDto userRegisterDto) {
+
+        User user = User.from(userRegisterDto);
+        userRepository.save(user);
+
+        return user.getId();
+    }
+
+    private Long registerUser(UserRegisterDto userRegisterDto) {
+        if (userRegisterDto.userType().equals(UserType.MEMBER)) {
+            return registerMemberUser(userRegisterDto);
+        } else{
+            return registerGuestUser();
         }
-
-        return UserConverter.convertToResponseDto(optionalUser.get());
     }
 
-    public UserResponseDto getUserById(Long userId) {
+    public Long loginUser(UserRegisterDto userRegisterDto) {
+        Optional<User> optionalUser = userRepository.findByIdentifier(userRegisterDto.identifier());
 
-        Optional<User> optionalUser = userRepository.findById(userId);
-
-        if(optionalUser.isPresent()){
-
-            User user = optionalUser.get();
-            return UserConverter.convertToResponseDto(user);
+        if (optionalUser.isPresent()) {
+            return optionalUser.get().getId();
+        } else{
+            return registerUser(userRegisterDto);
         }
-
-        return null;
     }
 
-    public UserResponseDto getUserDetailsById(Long userId) {
-        User user = getUserEntity(userId);
-        return UserConverter.convertToResponseDto(user);
+    public UserResponseDto findUser(Long userId) {
+        User user = findUserEntity(userId);
+        return UserResponseDto.from(user);
     }
 
     public List<UserResponseDto> findAllUsers() {
         List<User> userList = userRepository.findAll();
-        return userList.stream().map(UserConverter::convertToResponseDto).collect(Collectors.toList());
+        return userList.stream().map(UserResponseDto::from).collect(Collectors.toList());
     }
 
     public Long findAllUserTypeCountByUserType(UserType userType) {
         return userRepository.countUserByType(userType);
     }
 
-    public UserResponseDto updateUser(Long userId, UserRegisterDto userRegisterDto) {
+    public void updateUser(Long userId, UserRegisterDto userRegisterDto) {
 
-        User user = getUserEntity(userId);
+        User user = findUserEntity(userId);
+        user.updateUser(userRegisterDto);
+
         log.info("userId: {} update", user.getId());
-
-        Optional.ofNullable(userRegisterDto.getName()).ifPresent(user::setName);
-        Optional.ofNullable(userRegisterDto.getEmail()).ifPresent(user::setEmail);
-        Optional.ofNullable(userRegisterDto.getIdentifier()).ifPresent(user::setIdentifier);
-        Optional.ofNullable(userRegisterDto.getType()).ifPresent(user::setType);
-
-        return UserConverter.convertToResponseDto(user);
     }
 
     public void deleteUserById(Long userId) {
         userRepository.deleteById(userId);
-    }
-
-    private UserRegisterDto makeGuestUser(){
-        String name = makeGuestName();
-        String email = makeGuestEmail();
-        String identifier = makeGuestIdentifier();
-
-        UserRegisterDto userRegisterDto = new UserRegisterDto();
-        userRegisterDto.setName(name);
-        userRegisterDto.setEmail(email);
-        userRegisterDto.setIdentifier(identifier);
-        userRegisterDto.setPlatform("GUEST");
-
-        return userRegisterDto;
     }
 
     private String makeGuestName() {

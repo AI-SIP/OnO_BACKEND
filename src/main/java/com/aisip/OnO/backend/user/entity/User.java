@@ -1,18 +1,18 @@
 package com.aisip.OnO.backend.user.entity;
 
 import com.aisip.OnO.backend.common.entity.BaseEntity;
-import com.aisip.OnO.backend.problem.entity.Folder;
-import com.aisip.OnO.backend.problem.entity.Problem;
+import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
-import java.util.List;
+import lombok.*;
 
 @Getter
-@Setter
 @Entity
+@Builder(access = AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(name = "user")
 public class User extends BaseEntity {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -25,15 +25,38 @@ public class User extends BaseEntity {
 
     private String platform;
 
-    private String password;
-
     @Enumerated(EnumType.STRING)
-    private UserType type;
+    private UserType userType;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Problem> problems;
+    public static User from(UserRegisterDto userRegisterDto) {
+        return User.builder()
+                .email(userRegisterDto.email())
+                .name(userRegisterDto.name())
+                .identifier(userRegisterDto.identifier())
+                .platform(userRegisterDto.platform())
+                .build();
+    }
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Folder> folders;
+    public void updateUser(UserRegisterDto userRegisterDto) {
+        if (userRegisterDto.email() != null && !userRegisterDto.email().isBlank()) {
+            this.email = userRegisterDto.email();
+        }
+
+        if (userRegisterDto.name() != null && !userRegisterDto.name().isBlank()) {
+            this.name = userRegisterDto.name();
+        }
+
+        if (userRegisterDto.identifier() != null && !userRegisterDto.identifier().isBlank()) {
+            this.identifier = userRegisterDto.identifier();
+        }
+
+        if (userRegisterDto.platform() != null && !userRegisterDto.platform().isBlank()) {
+            this.platform = userRegisterDto.platform();
+        }
+
+        if (userRegisterDto.userType() != null) {
+            this.userType = userRegisterDto.userType();
+        }
+    }
 }
 

@@ -1,10 +1,8 @@
 package com.aisip.OnO.backend.auth.service;
 
 import com.aisip.OnO.backend.auth.dto.TokenResponseDto;
-import com.aisip.OnO.backend.user.dto.UserResponseDto;
-import com.aisip.OnO.backend.auth.exception.ExpiredTokenException;
-import com.aisip.OnO.backend.auth.exception.InvalidTokenException;
-import com.aisip.OnO.backend.auth.exception.MissingTokenException;
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.interfaces.DecodedJWT;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,40 +17,23 @@ public class JwtTokenService {
     /**
      * ✅ 유저 정보를 기반으로 새로운 액세스/리프레시 토큰 생성
      */
-    public TokenResponseDto generateTokens(UserResponseDto user) {
-        String accessToken = jwtTokenProvider.createAccessToken(user.getUserId());
-        String refreshToken = jwtTokenProvider.createRefreshToken(user.getUserId());
-
-        log.info("AccessToken: {}", accessToken);
-        log.info("RefreshToken: {}", refreshToken);
-        log.info("User {} (ID: {}) has logged in", user.getUserName(), user.getUserId());
+    public TokenResponseDto generateTokens(Long userId) {
+        String accessToken = jwtTokenProvider.createAccessToken(userId);
+        String refreshToken = jwtTokenProvider.createRefreshToken(userId);
 
         return new TokenResponseDto(accessToken, refreshToken);
     }
 
-    /**
-     * ✅ 액세스 토큰 검증
-     */
-    public void verifyAccessToken(String authorizationHeader) {
-        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
-            throw new MissingTokenException();
-        }
-
-        String accessToken = authorizationHeader.substring(7);
-        if (!jwtTokenProvider.validateToken(accessToken)) {
-            throw new InvalidTokenException();
-        }
+    public String getSubjectFromToken(String token) {
+        DecodedJWT jwt = JWT.decode(token);
+        return jwt.getSubject();
     }
 
     /**
      * ✅ 리프레시 토큰을 이용한 액세스 토큰 갱신
      */
     public TokenResponseDto refreshAccessToken(String refreshToken) {
-        if (!jwtTokenProvider.validateToken(refreshToken)) {
-            throw new ExpiredTokenException();
-        }
-
-        Long userId = Long.parseLong(jwtTokenProvider.getSubjectFromToken(refreshToken));
+        Long userId = Long.parseLong(getSubjectFromToken(refreshToken));
         String newAccessToken = jwtTokenProvider.createAccessToken(userId);
         String newRefreshToken = jwtTokenProvider.createRefreshToken(userId);
 

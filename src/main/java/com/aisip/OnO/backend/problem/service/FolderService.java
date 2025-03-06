@@ -66,7 +66,7 @@ public class FolderService {
     }
 
     public FolderResponseDto createRootFolder(Long userId, String folderName) {
-        User user = userService.getUserEntity(userId);
+        User user = userService.findUserEntity(userId);
         Folder rootFolder = Folder.builder().name(folderName).user(user).build();
 
         folderRepository.save(rootFolder);
@@ -77,7 +77,7 @@ public class FolderService {
     public FolderResponseDto createFolder(Long userId, String folderName, Long parentFolderId) {
         log.info("create folder for folderName: " + folderName + " parentFolderId : " + parentFolderId);
 
-        User user = userService.getUserEntity(userId);
+        User user = userService.findUserEntity(userId);
         Folder folder = Folder.builder()
                 .name(folderName)
                 .user(user)
@@ -99,7 +99,7 @@ public class FolderService {
     }
 
     public FolderResponseDto updateFolder(Long userId, Long folderId, String folderName, Long parentFolderId) {
-        User user = userService.getUserEntity(userId);
+        User user = userService.findUserEntity(userId);
         Folder folder = getFolderEntity(folderId);
         Optional<Folder> optionalFolder = folderRepository.findById(folderId);
 
@@ -119,7 +119,7 @@ public class FolderService {
 
     public FolderResponseDto updateProblemPath(Long userId, Long problemId, Long folderId) {
 
-        User user = userService.getUserEntity(userId);
+        User user = userService.findUserEntity(userId);
         Problem problem = problemService.getProblemEntity(problemId);
         Folder folder = getFolderEntity(folderId);
 

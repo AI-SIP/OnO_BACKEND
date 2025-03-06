@@ -1,10 +1,7 @@
 package com.aisip.OnO.backend.auth.service;
 
 import com.auth0.jwt.JWT;
-import com.auth0.jwt.JWTVerifier;
 import com.auth0.jwt.algorithms.Algorithm;
-import com.auth0.jwt.exceptions.JWTVerificationException;
-import com.auth0.jwt.interfaces.DecodedJWT;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -36,24 +33,5 @@ public class JwtTokenProvider {
                 .withIssuedAt(new Date())
                 .withExpiresAt(new Date(System.currentTimeMillis() + refreshExpirationTime))
                 .sign(Algorithm.HMAC512(secret.getBytes()));
-    }
-
-    public boolean validateToken(String token) {
-        try {
-            Algorithm algorithm = Algorithm.HMAC512(secret.getBytes());
-            JWTVerifier verifier = JWT.require(algorithm).build();
-            DecodedJWT jwt = verifier.verify(token);
-
-            //log.info("jwt validate success");
-            return true;
-        } catch (JWTVerificationException exception) {
-            log.warn("token validate failure : " + exception.getMessage());
-            return false;
-        }
-    }
-
-    public String getSubjectFromToken(String token) {
-        DecodedJWT jwt = JWT.decode(token);
-        return jwt.getSubject();
     }
 }

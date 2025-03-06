@@ -14,7 +14,6 @@ import com.aisip.OnO.backend.problem.ProblemConverter;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.exception.ProblemNotFoundException;
-import com.aisip.OnO.backend.user.exception.UserNotAuthorizedException;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.user.service.UserService;
 import jakarta.transaction.Transactional;
@@ -67,7 +66,7 @@ public class ProblemService {
     }
 
     public List<ProblemResponseDto> findUserProblems(Long userId) {
-        User user = userService.getUserEntity(userId);
+        User user = userService.findUserEntity(userId);
         return problemRepository.findAllByUserId(user.getId())
                 .stream()
                 .map(this::convertToProblemResponse)
@@ -87,7 +86,7 @@ public class ProblemService {
     }
 
     public Problem createProblem(Long userId) {
-        User user = userService.getUserEntity(userId);
+        User user = userService.findUserEntity(userId);
 
         Problem problem = Problem.builder()
                 .user(user)
@@ -97,7 +96,7 @@ public class ProblemService {
     }
 
     public void createProblem(Long userId, ProblemRegisterDto problemRegisterDto) {
-        User user = userService.getUserEntity(userId);
+        User user = userService.findUserEntity(userId);
 
         Problem problem = Optional.ofNullable(problemRegisterDto.getProblemId())
                 .flatMap(problemRepository::findById)
@@ -194,7 +193,7 @@ public class ProblemService {
     }
 
     public List<Long> getAllUsersProblemCount(List<UserResponseDto> userList) {
-        return userList.stream().map(user -> getProblemCountByUser(user.getUserId())).collect(Collectors.toList());
+        return userList.stream().map(user -> getProblemCountByUser(user.userId())).collect(Collectors.toList());
     }
 
     public List<ProblemSolve> getProblemRepeats(Long problemId){

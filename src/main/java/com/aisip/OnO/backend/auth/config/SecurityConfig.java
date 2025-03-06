@@ -1,7 +1,7 @@
 package com.aisip.OnO.backend.auth.config;
 
 import com.aisip.OnO.backend.admin.service.CustomAdminService;
-import com.aisip.OnO.backend.auth.filter.JwtTokenFilter;
+import com.aisip.OnO.backend.common.auth.JwtTokenFilter;
 import com.aisip.OnO.backend.auth.service.JwtTokenProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

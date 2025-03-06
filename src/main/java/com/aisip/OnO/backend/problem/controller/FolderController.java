@@ -81,4 +81,13 @@ public class FolderController {
         log.info("userId: {} 요청 - 폴더 삭제: {}", userId, deleteFolderIdList);
         folderService.deleteFolderList(userId, deleteFolderIdList);
     }
+
+    @ResponseStatus(HttpStatus.OK)
+    @DeleteMapping("/all")
+    public void deleteAllUserFolders(Authentication authentication, @RequestParam List<Long> deleteFolderIdList) {
+        Long userId = (Long) authentication.getPrincipal();
+        log.info("userId: {} 요청 - 폴더 삭제: {}", userId, deleteFolderIdList);
+
+        folderService.deleteAllUserFolder(userId);
+    }
 }

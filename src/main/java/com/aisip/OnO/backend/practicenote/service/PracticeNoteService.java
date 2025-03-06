@@ -41,7 +41,7 @@ public class PracticeNoteService {
 
     public PracticeNoteResponseDto createPractice(Long userId, PracticeNoteRegisterDto practiceNoteRegisterDto) {
 
-        User user = userService.getUserEntity(userId);
+        User user = userService.findUserEntity(userId);
         PracticeNote practiceNote = PracticeNote.builder()
                 .practiceCount(0L)
                 .user(user)

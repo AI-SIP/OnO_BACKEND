@@ -60,6 +60,14 @@ public class ProblemController {
         return "문제가 등록되었습니다.";
     }
 
+    // ✅ 사용자의 문제 개수 조회
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/problemCount")
+    public Long getUserProblemCount(Authentication authentication) {
+        Long userId = (Long) authentication.getPrincipal();
+        return problemService.getProblemCountByUser(userId);
+    }
+
     // ✅ 문제 수정
     @ResponseStatus(HttpStatus.OK)
     @PatchMapping("")
@@ -80,6 +88,15 @@ public class ProblemController {
 
         practiceNoteService.deleteProblemsFromAllPractice(deleteProblemIdList);
         problemService.deleteProblemList(userId, deleteProblemIdList);
+    }
+
+    @ResponseStatus(HttpStatus.OK)
+    @DeleteMapping("/all")
+    public void deleteAllUserProblems(Authentication authentication, @RequestParam List<Long> deleteProblemIdList) {
+        Long userId = (Long) authentication.getPrincipal();
+        log.info("userId: {} try to delete problems, id list: {}", userId, deleteProblemIdList);
+
+        problemService.deleteUserProblems(userId);
     }
 
     // ✅ 문제 반복 풀이 추가
