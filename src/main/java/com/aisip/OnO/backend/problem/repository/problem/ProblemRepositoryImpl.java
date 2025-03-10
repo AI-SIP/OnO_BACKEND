@@ -31,7 +31,7 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
         return queryFactory
                 .selectFrom(problem)
                 .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
-                .where(problem.folderId.eq(folderId))
+                .where(problem.folder.id.eq(folderId))
                 .fetch();
     }
 

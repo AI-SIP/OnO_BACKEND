@@ -43,7 +43,7 @@ public class FolderController {
     public FolderResponseDto getFolder(Authentication authentication, @PathVariable Long folderId) {
         Long userId = (Long) authentication.getPrincipal();
         log.info("userId: {} 요청 - folderId: {} 조회", userId, folderId);
-        return folderService.findFolder(userId, folderId);
+        return folderService.findFolder(folderId);
     }
 
     // ✅ 폴더 생성

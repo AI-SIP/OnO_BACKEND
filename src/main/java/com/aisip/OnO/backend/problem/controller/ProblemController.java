@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
+import com.aisip.OnO.backend.problem.service.FolderProblemFacadeService;
 import com.aisip.OnO.backend.problem.service.ProblemService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,8 @@ import java.util.List;
 public class ProblemController {
 
     private final ProblemService problemService;
+
+    private final FolderProblemFacadeService folderProblemFacadeService;
 
     @InitBinder
     public void initBinder(WebDataBinder binder) {
@@ -57,7 +60,7 @@ public class ProblemController {
     @PostMapping("")
     public CommonResponse<String> registerProblem(@RequestBody ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        problemService.registerProblem(problemRegisterDto, userId);
+        folderProblemFacadeService.registerProblem(problemRegisterDto, userId);
 
         return CommonResponse.success("문제가 등록되었습니다.");
     }
@@ -85,7 +88,7 @@ public class ProblemController {
     public CommonResponse<String> deleteProblems(@RequestParam("deleteProblemIdList") List<Long> deleteProblemIdList) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        problemService.deleteProblemList(deleteProblemIdList, userId);
+        problemService.deleteProblemList(deleteProblemIdList);
 
         return CommonResponse.success("문제 삭제가 완료되었습니다.");
     }

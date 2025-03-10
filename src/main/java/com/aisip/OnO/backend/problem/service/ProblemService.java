@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.problem.service;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
+import com.aisip.OnO.backend.problem.entity.Folder;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.problem.repository.problem.ProblemImageDataRepository;
@@ -51,7 +52,7 @@ public class ProblemService {
                 .collect(Collectors.toList());
     }
 
-    public List<ProblemResponseDto> findFolderProblems(Long folderId) {
+    public List<ProblemResponseDto> findFolderProblemList(Long folderId) {
         return problemRepository.findAllByFolderId(folderId)
                 .stream()
                 .map(ProblemResponseDto::from)
@@ -69,9 +70,9 @@ public class ProblemService {
         return problemRepository.countByUserId(userId);
     }
 
-    public void registerProblem(ProblemRegisterDto problemRegisterDto, Long userId) {
+    public void registerProblem(ProblemRegisterDto problemRegisterDto, Folder folder, Long userId) {
 
-        Problem problem = Problem.from(problemRegisterDto, userId);
+        Problem problem = Problem.from(problemRegisterDto, userId, folder);
         problemRepository.save(problem);
 
         problemRegisterDto.imageDataList()
@@ -95,7 +96,13 @@ public class ProblemService {
         problem.updateProblem(problemRegisterDto);
     }
 
-    public void deleteProblem(Long problemId, Long userId) {
+    public void updateProblemFolder(Long problemId, Folder folder, Long userId) {
+        Problem problem = findProblemEntity(problemId, userId);
+
+        problem.updateFolder(folder);
+    }
+
+    public void deleteProblem(Long problemId) {
         problemImageDataRepository.deleteAllByProblemId(problemId);
         problemRepository.deleteById(problemId);
     }
@@ -104,16 +111,21 @@ public class ProblemService {
         problemImageDataRepository.deleteByImageUrl(imageUrl);
     }
 
-    public void deleteProblemList(List<Long> problemIdList, Long userId) {
-        problemIdList.forEach(problemId -> {
-            deleteProblem(problemId, userId);
-        });
+    public void deleteProblemList(List<Long> problemIdList) {
+        problemIdList.forEach(this::deleteProblem);
+    }
+
+    public void deleteFolderProblems(Long folderId) {
+        problemRepository.findAllByFolderId(folderId)
+                .forEach(problem -> {
+                    deleteProblem(problem.getId());
+                });
     }
 
     public void deleteUserProblems(Long userId) {
         problemRepository.findAllByUserId(userId)
                 .forEach(problem -> {
-                    deleteProblem(problem.getId(), userId);
+                    deleteProblem(problem.getId());
                 });
     }
 }

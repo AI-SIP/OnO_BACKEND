@@ -4,7 +4,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public record ProblemRegisterDto (
-
     Long problemId,
     String memo,
 

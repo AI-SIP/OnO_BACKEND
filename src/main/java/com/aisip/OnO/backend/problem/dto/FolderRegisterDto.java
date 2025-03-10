@@ -1,15 +1,10 @@
 package com.aisip.OnO.backend.problem.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+public record FolderRegisterDto (
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class FolderRegisterDto {
+    String folderName,
 
-    private String folderName;
+    Long folderId,
 
-    private Long parentFolderId;
-}
+    Long parentFolderId
+) {}

@@ -1,7 +1,7 @@
 package com.aisip.OnO.backend.problem.entity;
 
 import com.aisip.OnO.backend.common.entity.BaseEntity;
-import com.aisip.OnO.backend.user.entity.User;
+import com.aisip.OnO.backend.problem.dto.FolderRegisterDto;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -10,11 +10,10 @@ import java.util.List;
 
 @Entity
 @Getter
-@Setter
+@Builder(access = AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "folder")
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class Folder extends BaseEntity {
 
     @Id
@@ -24,17 +23,33 @@ public class Folder extends BaseEntity {
     @Column(nullable = false)
     private String name;
 
+    @Column(nullable = false)
+    private Long userId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_folder_id")
     private Folder parentFolder;
 
     @OneToMany(mappedBy = "parentFolder", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Folder> subFolders = new ArrayList<>();
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    private List<Folder> subFolderList = new ArrayList<>();
 
     @OneToMany(mappedBy = "folder", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Problem> problems = new ArrayList<>();
+    private List<Problem> problemList = new ArrayList<>();
+    public static Folder from(FolderRegisterDto folderRegisterDto, Folder parentFolder, Long userId) {
+        return Folder.builder()
+                .name(folderRegisterDto.folderName())
+                .userId(userId)
+                .parentFolder(parentFolder)
+                .build();
+    }
+
+    public void updateFolderInfo(FolderRegisterDto folderRegisterDto) {
+        if (folderRegisterDto.folderName() != null) {
+            this.name = folderRegisterDto.folderName();
+        }
+    }
+
+    public void updateParentFolder(Folder parentFolder) {
+        this.parentFolder = parentFolder;
+    }
 }

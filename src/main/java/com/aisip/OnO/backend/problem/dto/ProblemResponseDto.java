@@ -14,8 +14,6 @@ public record ProblemResponseDto (
 
     String memo,
 
-    Long folderId,
-
     String reference,
 
     LocalDateTime solvedAt,
@@ -33,7 +31,6 @@ public record ProblemResponseDto (
 
         return ProblemResponseDto.builder()
                 .problemId(problem.getId())
-                .folderId(problem.getFolderId())
                 .memo(problem.getMemo())
                 .reference(problem.getReference())
                 .solvedAt(problem.getSolvedAt())
