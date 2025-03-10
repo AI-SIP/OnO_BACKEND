@@ -81,7 +81,7 @@ public class ProblemController {
     }
 
     // ✅ 문제 삭제
-    @DeleteMapping("/some")
+    @DeleteMapping("")
     public CommonResponse<String> deleteProblems(@RequestParam("deleteProblemIdList") List<Long> deleteProblemIdList) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
@@ -104,7 +104,7 @@ public class ProblemController {
     public CommonResponse<String> deleteAllUserProblems() {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        problemService.deleteUserProblems(userId);
+        problemService.deleteAllUserProblems(userId);
         return CommonResponse.success("유저의 모든 문제가 삭제되었습니다.");
     }
 }

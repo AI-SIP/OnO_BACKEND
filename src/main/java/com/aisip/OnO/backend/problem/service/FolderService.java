@@ -24,7 +24,7 @@ public class FolderService {
     private final FolderRepository folderRepository;
 
     public FolderResponseDto findFolder(Long folderId) {
-        Folder folder = folderRepository.findWithAllData(folderId)
+        Folder folder = folderRepository.findFolderWithDetailsByFolderId(folderId)
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
 
         return FolderResponseDto.from(folder);
@@ -44,7 +44,7 @@ public class FolderService {
     }
 
     public List<FolderResponseDto> findAllFolders(Long userId) {
-        List<Folder> folders = folderRepository.findAllByUserId(userId);
+        List<Folder> folders = folderRepository.findAllFoldersWithDetailsByUserId(userId);
         return folders.isEmpty()
                 ? List.of(findRootFolder(userId))
                 : folders.stream().map(FolderResponseDto::from).toList();
@@ -125,7 +125,7 @@ public class FolderService {
         folderRepository.deleteAllByIdIn(folderIds);
     }
 
-    public void deleteAllUserFolder(Long userId) {
+    public void deleteAllUserFolders(Long userId) {
         List<Folder> folderList = folderRepository.findAllByUserId(userId);
 
         folderRepository.deleteAll(folderList);

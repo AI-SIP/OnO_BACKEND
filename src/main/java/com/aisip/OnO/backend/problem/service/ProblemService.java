@@ -127,7 +127,7 @@ public class ProblemService {
         folderIds.forEach(this::deleteFolderProblems);
     }
 
-    public void deleteUserProblems(Long userId) {
+    public void deleteAllUserProblems(Long userId) {
         problemRepository.findAllByUserId(userId)
                 .forEach(problem -> {
                     deleteProblem(problem.getId());

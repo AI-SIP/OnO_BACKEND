@@ -7,6 +7,7 @@ import com.aisip.OnO.backend.problem.entity.QProblemImageData;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
 
+import java.util.List;
 import java.util.Optional;
 
 import static com.aisip.OnO.backend.problem.entity.QFolder.folder;
@@ -31,7 +32,7 @@ public class FolderRepositoryImpl implements FolderRepositoryCustom {
     }
 
     @Override
-    public Optional<Folder> findWithAllData(Long folderId) {
+    public Optional<Folder> findFolderWithDetailsByFolderId(Long folderId) {
         Folder folder = queryFactory.selectFrom(QFolder.folder)
                 .leftJoin(QFolder.folder.problemList, QProblem.problem).fetchJoin()
                 .leftJoin(QProblem.problem.problemImageDataList, QProblemImageData.problemImageData).fetchJoin()
@@ -41,5 +42,17 @@ public class FolderRepositoryImpl implements FolderRepositoryCustom {
                 .fetchOne();
 
         return Optional.ofNullable(folder);
+    }
+
+    @Override
+    public List<Folder> findAllFoldersWithDetailsByUserId(Long userId) {
+        return queryFactory.selectDistinct(folder)
+                .from(folder)
+                .leftJoin(folder.problemList, QProblem.problem).fetchJoin()
+                .leftJoin(QProblem.problem.problemImageDataList, QProblemImageData.problemImageData).fetchJoin()
+                .leftJoin(folder.subFolderList, new QFolder("subFolder")).fetchJoin()
+                .leftJoin(folder.parentFolder, new QFolder("parentFolder")).fetchJoin()
+                .where(folder.userId.eq(userId))
+                .fetch();
     }
 }

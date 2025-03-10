@@ -37,10 +37,15 @@ public class FolderProblemFacadeService {
         // 삭제할 모든 폴더의 ID 조회 (하위 폴더 포함)
         Set<Long> allFolderIds = folderService.getAllFolderIdsIncludingSubFolders(folderIds);
 
-        // 문제 삭제 (벌크)
         problemService.deleteAllByFolderIds(allFolderIds);
 
-        // 폴더 삭제 (벌크)
         folderService.deleteAllByFolderIds(allFolderIds);
+    }
+
+    public void deleteAllUserFoldersWithProblems(Long userId) {
+
+        problemService.deleteAllUserProblems(userId);
+
+        folderService.deleteAllUserFolders(userId);
     }
 }

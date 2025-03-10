@@ -78,8 +78,8 @@ public class AdminController {
     @DeleteMapping("/user/{userId}")
     public void deleteUserInfo(@PathVariable Long userId) {
 
-        problemService.deleteUserProblems(userId);
-        folderService.deleteAllUserFolder(userId);
+        problemService.deleteAllUserProblems(userId);
+        folderService.deleteAllUserFolders(userId);
         userService.deleteUserById(userId);
     }
 
@@ -98,7 +98,7 @@ public class AdminController {
         int allUserCount = userService.findAllUsers().size();
 
         int allProblemCount = problemService.findAllProblems().size();
-        Long nullTemplateCount = problemService.getTemplateTypeCount(null);
+        Long nullTemplateCount = problemService.현getTemplateTypeCount(null);
         Long simpleTemplateCount = problemService.getTemplateTypeCount(ProblemTemplateType.SIMPLE_TEMPLATE);
         Long cleanTemplateCount = problemService.getTemplateTypeCount(ProblemTemplateType.CLEAN_TEMPLATE);
         Long specialTemplateCount = problemService.getTemplateTypeCount(ProblemTemplateType.SPECIAL_TEMPLATE);
