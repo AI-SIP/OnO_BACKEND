@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.problem.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.entity.Folder;
@@ -28,6 +29,8 @@ public class ProblemService {
     private final ProblemRepository problemRepository;
 
     private final ProblemImageDataRepository problemImageDataRepository;
+
+    private final FileUploadService fileUploadService;
 
     public ProblemResponseDto findProblem(Long problemId, Long userId) {
         Problem problem = findProblemEntity(problemId, userId);
@@ -104,7 +107,14 @@ public class ProblemService {
     }
 
     public void deleteProblem(Long problemId) {
-        problemImageDataRepository.deleteAllByProblemId(problemId);
+
+        List<ProblemImageData> imageDataList= problemImageDataRepository.findAllByProblemId(problemId);
+
+        imageDataList.forEach(imageData -> {
+            fileUploadService.deleteImageFileFromS3(imageData.getImageUrl());
+            problemImageDataRepository.delete(imageData);
+        });
+
         problemRepository.deleteById(problemId);
     }
 

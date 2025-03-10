@@ -8,6 +8,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -27,6 +28,20 @@ public class FileUploadController {
         String imageUrl = fileUploadService.uploadFileToS3(file);
 
         return CommonResponse.success(Map.of("imageUrl", imageUrl));
+    }
+
+    @PostMapping("/images")
+    public CommonResponse<List<String>> uploadMultipleImageFiles(
+            Authentication authentication,
+            @RequestParam("images") List<MultipartFile> files
+    ) {
+        //Long userId = (Long) authentication.getPrincipal();
+
+        List<String> imageUrls = files.stream()
+                .map(fileUploadService::uploadFileToS3)
+                .toList();
+
+        return CommonResponse.success(imageUrls);
     }
 
     @DeleteMapping("/image")
