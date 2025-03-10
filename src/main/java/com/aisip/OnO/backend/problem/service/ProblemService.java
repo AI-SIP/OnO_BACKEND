@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -120,6 +121,10 @@ public class ProblemService {
                 .forEach(problem -> {
                     deleteProblem(problem.getId());
                 });
+    }
+
+    public void deleteAllByFolderIds(Collection<Long> folderIds) {
+        folderIds.forEach(this::deleteFolderProblems);
     }
 
     public void deleteUserProblems(Long userId) {

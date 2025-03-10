@@ -4,7 +4,6 @@ import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.problem.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.problem.dto.FolderResponseDto;
 import com.aisip.OnO.backend.problem.dto.FolderThumbnailResponseDto;
-import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.entity.Folder;
 import com.aisip.OnO.backend.problem.exception.FolderErrorCase;
 import com.aisip.OnO.backend.problem.repository.folder.FolderRepository;
@@ -13,7 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -23,8 +22,6 @@ import java.util.stream.Collectors;
 public class FolderService {
 
     private final FolderRepository folderRepository;
-
-    private final ProblemService problemService;
 
     public FolderResponseDto findFolder(Long folderId) {
         Folder folder = folderRepository.findWithAllData(folderId)
@@ -85,11 +82,6 @@ public class FolderService {
         folderRepository.save(folder);
     }
 
-    public void registerProblemToFolder(ProblemRegisterDto problemRegisterDto, Long userId) {
-        Folder folder = findFolderEntity(problemRegisterDto.folderId());
-        problemService.registerProblem(problemRegisterDto, folder, userId);
-    }
-
     public void updateFolder(FolderRegisterDto folderRegisterDto, Long userId) {
         Folder folder = findFolderEntity(folderRegisterDto.folderId());
 
@@ -101,47 +93,36 @@ public class FolderService {
         }
     }
 
-    public void updateFolderProblem(ProblemRegisterDto problemRegisterDto, Long userId) {
-        problemService.updateProblemInfo(problemRegisterDto, userId);
+    public Set<Long> getAllFolderIdsIncludingSubFolders(List<Long> folderIds) {
+        Set<Long> allFolderIds = new HashSet<>();
 
-        if (problemRegisterDto.folderId() != null) {
-            Folder folder = findFolderEntity(problemRegisterDto.folderId());
-            problemService.updateProblemFolder(problemRegisterDto.problemId(), folder, userId);
-        }
-    }
+        for (Long folderId : folderIds) {
+            Folder folder = folderRepository.findById(folderId)
+                    .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
 
-    public void deleteFolderWithProblem(Long folderId) {
-        Folder folder = findFolderEntity(folderId);
-        Long parentFolderId = folder.getParentFolder().getId();
-
-        if (parentFolderId == null) {
-            throw new ApplicationException(FolderErrorCase.ROOT_FOLDER_CANNOT_REMOVE);
-        }
-
-        // 재귀적으로 하위 폴더를 삭제
-        deleteSubFolders(folder);
-    }
-
-    public void deleteFolderList(List<Long> folderIdList) {
-        folderIdList.forEach(this::deleteFolderWithProblem);
-    }
-
-    private void deleteSubFolders(Folder folder) {
-        // 하위 폴더들을 먼저 삭제
-        if (folder.getSubFolderList() != null && !folder.getSubFolderList().isEmpty()) {
-            for (Folder subFolder : folder.getSubFolderList()) {
-                deleteSubFolders(subFolder); // 재귀적으로 하위 폴더 삭제
+            if (folder.getParentFolder() == null) {
+                throw new ApplicationException(FolderErrorCase.ROOT_FOLDER_CANNOT_REMOVE);
             }
+            allFolderIds.add(folder.getId());
+            allFolderIds.addAll(getSubFolderIdsRecursive(folder));
         }
 
-        if (folder.getProblemList() != null && !folder.getProblemList().isEmpty()) {
-            problemService.deleteFolderProblems(folder.getId());
+        return allFolderIds;
+    }
+
+    private Set<Long> getSubFolderIdsRecursive(Folder folder) {
+        Set<Long> subFolderIds = new HashSet<>();
+
+        for (Folder subFolder : folder.getSubFolderList()) {
+            subFolderIds.add(subFolder.getId());
+            subFolderIds.addAll(getSubFolderIdsRecursive(subFolder));
         }
 
-        folder.getSubFolderList().clear();
-        folder.getProblemList().clear();
+        return subFolderIds;
+    }
 
-        folderRepository.deleteById(folder.getId());
+    public void deleteAllByFolderIds(Collection<Long> folderIds) {
+        folderRepository.deleteAllByIdIn(folderIds);
     }
 
     public void deleteAllUserFolder(Long userId) {

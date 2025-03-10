@@ -23,8 +23,6 @@ public class ProblemController {
 
     private final ProblemService problemService;
 
-    private final FolderProblemFacadeService folderProblemFacadeService;
-
     @InitBinder
     public void initBinder(WebDataBinder binder) {
         binder.registerCustomEditor(Long.class, new CustomNumberEditor(Long.class, true));
@@ -59,7 +57,7 @@ public class ProblemController {
     @PostMapping("")
     public CommonResponse<String> registerProblem(@RequestBody ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        folderProblemFacadeService.registerProblem(problemRegisterDto, userId);
+        problemService.registerProblem(problemRegisterDto, null, userId);
 
         return CommonResponse.success("문제가 등록되었습니다.");
     }
@@ -75,7 +73,7 @@ public class ProblemController {
 
     // ✅ 문제 수정
     @PatchMapping("")
-    public CommonResponse<String> updateProblem(@RequestBody ProblemRegisterDto problemRegisterDto) {
+    public CommonResponse<String> updateProblemInfo(@RequestBody ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         problemService.updateProblemInfo(problemRegisterDto, userId);
 
