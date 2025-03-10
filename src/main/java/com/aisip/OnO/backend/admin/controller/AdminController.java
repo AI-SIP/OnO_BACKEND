@@ -1,14 +1,7 @@
 package com.aisip.OnO.backend.admin.controller;
 
-import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
-import com.aisip.OnO.backend.problem.entity.ProblemImageType;
-import com.aisip.OnO.backend.problem.entity.ProblemTemplateType;
+import com.aisip.OnO.backend.admin.service.AdminService;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
-import com.aisip.OnO.backend.user.dto.UserResponseDto;
-import com.aisip.OnO.backend.fileupload.service.FileUploadService;
-import com.aisip.OnO.backend.problem.service.FolderService;
-import com.aisip.OnO.backend.problem.service.ProblemService;
-import com.aisip.OnO.backend.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -25,12 +18,7 @@ import java.util.List;
 @RequestMapping("/admin")
 public class AdminController {
 
-    private final UserService userService;
-    private final ProblemService problemService;
-
-    private final FolderService folderService;
-
-    private final FileUploadService fileUploadService;
+    private final AdminService adminService;
 
     @GetMapping("/main")
     public String adminPage() {
@@ -45,25 +33,32 @@ public class AdminController {
 
     @GetMapping("/user/{userId}")
     public String getUserDetailsById(@PathVariable Long userId, Model model) {
+        /*
         UserResponseDto user = userService.findUser(userId);
         model.addAttribute("user", user);
 
         List<ProblemResponseDto> problems = problemService.findUserProblems(userId);
         model.addAttribute("problems", problems);
+
+         */
         return "user";
     }
 
     @GetMapping("/users")
     public String getAllUsers(Model model, Authentication authentication) {
+        /*
         List<UserResponseDto> users = userService.findAllUsers();
         List<Long> problemCounts = problemService.getAllUsersProblemCount(users);
         model.addAttribute("users", users);
         model.addAttribute("problemCounts", problemCounts);
+
+         */
         return "users";
     }
 
     @PostMapping("/user/{userId}")
     public String updateUserInfo(@PathVariable Long userId, @ModelAttribute UserRegisterDto userRegisterDto, Model model) {
+        /*
         userService.updateUser(userId, userRegisterDto);
 
         UserResponseDto userResponseDto = userService.findUser(userId);
@@ -71,23 +66,31 @@ public class AdminController {
         List<ProblemResponseDto> problems = problemService.findUserProblems(userId);
         model.addAttribute("problems", problems);
 
+         */
+
         return "user";
     }
 
     @ResponseStatus(HttpStatus.OK)
     @DeleteMapping("/user/{userId}")
     public void deleteUserInfo(@PathVariable Long userId) {
+        /*
 
         problemService.deleteAllUserProblems(userId);
         folderService.deleteAllUserFolders(userId);
         userService.deleteUserById(userId);
+
+         */
     }
 
     @GetMapping("/problems")
     public String getAllProblems(Model model, Authentication authentication) {
 
+        /*
         List<ProblemResponseDto> problems = problemService.findAllProblems();
         model.addAttribute("problems", problems);
+
+         */
 
         return "problems";
     }
@@ -95,6 +98,7 @@ public class AdminController {
     @GetMapping("/analysis")
     public String getAllAnalysis(Model model, Authentication authentication) {
 
+        /*
         int allUserCount = userService.findAllUsers().size();
 
         int allProblemCount = problemService.findAllProblems().size();
@@ -119,6 +123,8 @@ public class AdminController {
         model.addAttribute("answerImageCount", answerImageCount);
         model.addAttribute("solveImageCount", solveImageCount);
         model.addAttribute("processImageCount", processImageCount);
+
+         */
 
         return "analysis";
     }

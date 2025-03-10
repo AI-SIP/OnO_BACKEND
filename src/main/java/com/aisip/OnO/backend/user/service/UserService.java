@@ -27,6 +27,11 @@ public class UserService {
                 .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
     }
 
+    public User findUserEntityByIdentifier(String identifier){
+        return userRepository.findByIdentifier(identifier)
+                .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
+    }
+
     private User createGuestUser() {
         UserRegisterDto userRegisterDto = new UserRegisterDto(
                 makeGuestName(),
