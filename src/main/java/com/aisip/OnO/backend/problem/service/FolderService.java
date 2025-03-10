@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.problem.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.problem.dto.FolderResponseDto;
 import com.aisip.OnO.backend.problem.dto.FolderThumbnailResponseDto;
+import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.entity.Folder;
 import com.aisip.OnO.backend.problem.exception.FolderErrorCase;
 import com.aisip.OnO.backend.problem.repository.folder.FolderRepository;
@@ -22,6 +23,8 @@ import java.util.stream.Collectors;
 public class FolderService {
 
     private final FolderRepository folderRepository;
+
+    private final ProblemService problemService;
 
     public FolderResponseDto findFolder(Long folderId) {
         Folder folder = folderRepository.findWithAllData(folderId)
@@ -82,6 +85,11 @@ public class FolderService {
         folderRepository.save(folder);
     }
 
+    public void registerProblemToFolder(ProblemRegisterDto problemRegisterDto, Long userId) {
+        Folder folder = findFolderEntity(problemRegisterDto.folderId());
+        problemService.registerProblem(problemRegisterDto, folder, userId);
+    }
+
     public void updateFolder(FolderRegisterDto folderRegisterDto, Long userId) {
         Folder folder = findFolderEntity(folderRegisterDto.folderId());
 
@@ -93,9 +101,47 @@ public class FolderService {
         }
     }
 
-    public void deleteFolder(Long folderId) {
-        folderRepository.deleteById(folderId);
-        folderRepository.flush();
+    public void updateFolderProblem(ProblemRegisterDto problemRegisterDto, Long userId) {
+        problemService.updateProblemInfo(problemRegisterDto, userId);
+
+        if (problemRegisterDto.folderId() != null) {
+            Folder folder = findFolderEntity(problemRegisterDto.folderId());
+            problemService.updateProblemFolder(problemRegisterDto.problemId(), folder, userId);
+        }
+    }
+
+    public void deleteFolderWithProblem(Long folderId) {
+        Folder folder = findFolderEntity(folderId);
+        Long parentFolderId = folder.getParentFolder().getId();
+
+        if (parentFolderId == null) {
+            throw new ApplicationException(FolderErrorCase.ROOT_FOLDER_CANNOT_REMOVE);
+        }
+
+        // 재귀적으로 하위 폴더를 삭제
+        deleteSubFolders(folder);
+    }
+
+    public void deleteFolderList(List<Long> folderIdList) {
+        folderIdList.forEach(this::deleteFolderWithProblem);
+    }
+
+    private void deleteSubFolders(Folder folder) {
+        // 하위 폴더들을 먼저 삭제
+        if (folder.getSubFolderList() != null && !folder.getSubFolderList().isEmpty()) {
+            for (Folder subFolder : folder.getSubFolderList()) {
+                deleteSubFolders(subFolder); // 재귀적으로 하위 폴더 삭제
+            }
+        }
+
+        if (folder.getProblemList() != null && !folder.getProblemList().isEmpty()) {
+            problemService.deleteFolderProblems(folder.getId());
+        }
+
+        folder.getSubFolderList().clear();
+        folder.getProblemList().clear();
+
+        folderRepository.deleteById(folder.getId());
     }
 
     public void deleteAllUserFolder(Long userId) {

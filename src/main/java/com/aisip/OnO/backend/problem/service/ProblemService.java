@@ -34,7 +34,7 @@ public class ProblemService {
         return ProblemResponseDto.from(problem);
     }
 
-    private Problem findProblemEntity(Long problemId, Long userId) {
+    public Problem findProblemEntity(Long problemId, Long userId) {
         Problem problem = problemRepository.findById(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
