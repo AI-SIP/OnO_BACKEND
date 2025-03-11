@@ -2,11 +2,14 @@ package com.aisip.OnO.backend.problem.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.entity.Folder;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
+import com.aisip.OnO.backend.problem.exception.FolderErrorCase;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
+import com.aisip.OnO.backend.problem.repository.folder.FolderRepository;
 import com.aisip.OnO.backend.problem.repository.problem.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
@@ -29,6 +32,8 @@ public class ProblemService {
     private final ProblemRepository problemRepository;
 
     private final ProblemImageDataRepository problemImageDataRepository;
+
+    private final FolderRepository folderRepository;
 
     private final FileUploadService fileUploadService;
 
@@ -74,7 +79,10 @@ public class ProblemService {
         return problemRepository.countByUserId(userId);
     }
 
-    public void registerProblem(ProblemRegisterDto problemRegisterDto, Folder folder, Long userId) {
+    public void registerProblem(ProblemRegisterDto problemRegisterDto, Long userId) {
+
+        Folder folder = folderRepository.findById(problemRegisterDto.folderId())
+                .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
 
         Problem problem = Problem.from(problemRegisterDto, userId, folder);
         problemRepository.save(problem);
@@ -100,10 +108,38 @@ public class ProblemService {
         problem.updateProblem(problemRegisterDto);
     }
 
-    public void updateProblemFolder(Long problemId, Folder folder, Long userId) {
-        Problem problem = findProblemEntity(problemId, userId);
+    public void updateProblemFolder(ProblemRegisterDto problemRegisterDto, Long userId) {
+        Problem problem = findProblemEntity(problemRegisterDto.problemId(), userId);
 
-        problem.updateFolder(folder);
+        if (problemRegisterDto.folderId() != null) {
+            Folder folder = folderRepository.findById(problemRegisterDto.folderId())
+                    .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
+
+            problem.updateFolder(folder);
+        }
+
+    }
+
+    @Transactional
+    public void deleteProblems(ProblemDeleteRequestDto deleteRequestDto) {
+        Long userId = deleteRequestDto.userId();
+        List<Long> problemIdList = deleteRequestDto.problemIdList();
+        List<Long> folderIdList = deleteRequestDto.folderIdList();
+
+        if (userId != null) {
+            // 유저 ID가 있으면 해당 유저의 모든 문제 삭제
+            deleteAllUserProblems(userId);
+        }
+
+        if (problemIdList != null && !problemIdList.isEmpty()) {
+            // 특정 problemId 리스트에 해당하는 문제 삭제
+            deleteProblemList(problemIdList);
+        }
+
+        if (folderIdList != null && !folderIdList.isEmpty()) {
+            // 특정 folderId 리스트에 포함된 모든 문제 삭제
+            deleteAllByFolderIds(folderIdList);
+        }
     }
 
     public void deleteProblem(Long problemId) {

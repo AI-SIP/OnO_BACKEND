@@ -23,6 +23,8 @@ public class FolderService {
 
     private final FolderRepository folderRepository;
 
+    private final ProblemService problemService;
+
     public FolderResponseDto findFolder(Long folderId) {
         Folder folder = folderRepository.findFolderWithDetailsByFolderId(folderId)
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
@@ -91,6 +93,23 @@ public class FolderService {
             Folder parentFolder = findFolderEntity(folderRegisterDto.parentFolderId());
             folder.updateParentFolder(parentFolder);
         }
+    }
+
+    public void deleteFoldersWithProblems(List<Long> folderIds, Long userId) {
+
+        // 삭제할 모든 폴더의 ID 조회 (하위 폴더 포함)
+        Set<Long> allFolderIds = getAllFolderIdsIncludingSubFolders(folderIds);
+
+        problemService.deleteAllByFolderIds(allFolderIds);
+
+        deleteAllByFolderIds(allFolderIds);
+    }
+
+    public void deleteAllUserFoldersWithProblems(Long userId) {
+
+        problemService.deleteAllUserProblems(userId);
+
+        deleteAllUserFolders(userId);
     }
 
     public Set<Long> getAllFolderIdsIncludingSubFolders(List<Long> folderIds) {

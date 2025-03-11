@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.problem.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
+import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
@@ -53,11 +54,12 @@ public class ProblemController {
         return CommonResponse.success(problemService.findProblemCountByUser(userId));
     }
 
+
     // ✅ 문제 등록
     @PostMapping("")
     public CommonResponse<String> registerProblem(@RequestBody ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        problemService.registerProblem(problemRegisterDto, null, userId);
+        problemService.registerProblem(problemRegisterDto, userId);
 
         return CommonResponse.success("문제가 등록되었습니다.");
     }
@@ -72,7 +74,7 @@ public class ProblemController {
     }
 
     // ✅ 문제 수정
-    @PatchMapping("")
+    @PatchMapping("/info")
     public CommonResponse<String> updateProblemInfo(@RequestBody ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         problemService.updateProblemInfo(problemRegisterDto, userId);
@@ -80,13 +82,20 @@ public class ProblemController {
         return CommonResponse.success("문제가 수정되었습니다.");
     }
 
-    // ✅ 문제 삭제
-    @DeleteMapping("")
-    public CommonResponse<String> deleteProblems(@RequestParam("deleteProblemIdList") List<Long> deleteProblemIdList) {
+    // ✅ 문제 경로 변경
+    @PatchMapping("/path")
+    public CommonResponse<String> updateProblemPath(@RequestBody ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        problemService.updateProblemFolder(problemRegisterDto, userId);
 
-        problemService.deleteProblemList(deleteProblemIdList);
+        return CommonResponse.success("문제가 수정되었습니다.");
+    }
 
+    @DeleteMapping("")
+    public CommonResponse<String> deleteProblems(
+            @RequestBody ProblemDeleteRequestDto deleteRequestDto
+    ) {
+        problemService.deleteProblems(deleteRequestDto);
         return CommonResponse.success("문제 삭제가 완료되었습니다.");
     }
 
@@ -97,14 +106,5 @@ public class ProblemController {
         problemService.deleteProblemImageData(imageUrl);
 
         return CommonResponse.success("문제 이미지 데이터 삭제가 완료되었습니다.");
-    }
-
-    // ✅ 특정 유저의 모든 문제 삭제
-    @DeleteMapping("/all")
-    public CommonResponse<String> deleteAllUserProblems() {
-        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
-        problemService.deleteAllUserProblems(userId);
-        return CommonResponse.success("유저의 모든 문제가 삭제되었습니다.");
     }
 }
