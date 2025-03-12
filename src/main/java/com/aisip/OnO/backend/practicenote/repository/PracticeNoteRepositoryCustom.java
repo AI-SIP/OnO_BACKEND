@@ -1,15 +1,21 @@
 package com.aisip.OnO.backend.practicenote.repository;
 
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
-import com.aisip.OnO.backend.problem.entity.Problem;
 
 import java.util.List;
+import java.util.Set;
 
 public interface PracticeNoteRepositoryCustom {
 
-    List<PracticeNote> findAllByProblemsContaining(Problem problem);
+    boolean checkProblemAlreadyMatchingWithPractice(Long practiceNoteId, Long problemId);
 
-    List<Problem> findAllProblemsByPracticeId(Long practiceId);
+    PracticeNote findPracticeNoteWithDetails(Long practiceId);
 
-    int countProblemsByPracticeId(Long practiceId);
+    Set<Long> findProblemIdListByPracticeNoteId(Long practiceNoteId);
+
+    List<PracticeNote> findPracticesByProblem(Long problemId);
+
+    void deleteProblemFromPractice(Long practiceId, Long problemId);
+
+    void deleteProblemsFromAllPractice(List<Long> deleteProblemIdList);
 }

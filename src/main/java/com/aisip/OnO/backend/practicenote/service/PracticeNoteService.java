@@ -1,24 +1,26 @@
 package com.aisip.OnO.backend.practicenote.service;
 
+import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
+import com.aisip.OnO.backend.practicenote.dto.PracticeNoteThumbnailResponseDto;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteResponseDto;
+import com.aisip.OnO.backend.practicenote.exception.PracticeNoteErrorCase;
+import com.aisip.OnO.backend.practicenote.repository.ProblemPracticeNoteMappingRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
-import com.aisip.OnO.backend.practicenote.converter.PracticeConverter;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
-import com.aisip.OnO.backend.problem.service.ProblemService;
-import com.aisip.OnO.backend.user.entity.User;
-import com.aisip.OnO.backend.practicenote.exception.PracticeNotFoundException;
+import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
+import com.aisip.OnO.backend.problem.repository.problem.ProblemRepository;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
-import com.aisip.OnO.backend.user.service.UserService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -27,116 +29,91 @@ import java.util.stream.Collectors;
 @Transactional
 public class PracticeNoteService {
 
-    private final UserService userService;
-
-    private final ProblemService problemService;
+    private final ProblemRepository problemRepository;
 
     private final PracticeNoteRepository practiceNoteRepository;
+
+    private final ProblemPracticeNoteMappingRepository problemPracticeNoteMappingRepository;
 
     private PracticeNote getPracticeEntity(Long practiceId){
 
         return practiceNoteRepository.findById(practiceId)
-                .orElseThrow(() -> new PracticeNotFoundException(practiceId));
+                .orElseThrow(() -> new ApplicationException(PracticeNoteErrorCase.PRACTICE_NOTE_NOT_FOUND));
     }
 
-    public PracticeNoteResponseDto createPractice(Long userId, PracticeNoteRegisterDto practiceNoteRegisterDto) {
+    public void registerPractice(PracticeNoteRegisterDto practiceNoteRegisterDto, Long userId) {
 
-        User user = userService.findUserEntity(userId);
-        PracticeNote practiceNote = PracticeNote.builder()
-                .practiceCount(0L)
-                .user(user)
-                .title(practiceNoteRegisterDto.getPracticeTitle())
-                .build();
-
-        PracticeNote savedPracticeNote = practiceNoteRepository.save(practiceNote);
-
-        if (practiceNoteRegisterDto.getRegisterProblemIds() != null) {
-            practiceNoteRegisterDto.getRegisterProblemIds().forEach(problemId ->
-                    addProblemToPractice(savedPracticeNote, problemId));
-        }
-
-        return findPractice(savedPracticeNote.getId());
-    }
-
-    public void addProblemToPractice(PracticeNote practiceNote, Long problemId) {
-        Problem problem = problemService.getProblemEntity(problemId);
-
-        boolean alreadyExists = practiceNote.getProblemPracticeNoteMappings().stream()
-                .anyMatch(mapping -> mapping.getProblem().getId().equals(problemId));
-
-        if (!alreadyExists) {
-            ProblemPracticeNoteMapping mapping = ProblemPracticeNoteMapping.builder()
-                    .practiceNote(practiceNote)
-                    .problem(problem)
-                    .build();
-
-            practiceNote.getProblemPracticeNoteMappings().add(mapping);
-        }
-
+        PracticeNote practiceNote = PracticeNote.from(practiceNoteRegisterDto, userId);
         practiceNoteRepository.save(practiceNote);
+
+        if (practiceNoteRegisterDto.problemIdList() != null) {
+            practiceNoteRegisterDto.problemIdList().forEach(problemId ->
+                    addProblemToPractice(practiceNote, problemId));
+        }
     }
 
-    public PracticeNoteResponseDto findPractice(Long practiceId) {
-        return getPracticeResponseDto(getPracticeEntity(practiceId));
+    public PracticeNoteDetailResponseDto findPracticeNoteDetail(Long practiceId){
+        PracticeNote practiceNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceId);
+        List<Problem> problemList = problemRepository.findAllProblemsByPracticeId(practiceId);
+        List<ProblemResponseDto> problemResponseDtoList = problemList.stream().map(
+                ProblemResponseDto::from
+        ).toList();
+
+        return PracticeNoteDetailResponseDto.from(practiceNote, problemResponseDtoList);
     }
 
-    public List<PracticeNoteResponseDto> findAllPracticesByUser(Long userId){
+    public List<PracticeNoteThumbnailResponseDto> findAllPracticeThumbnailsByUser(Long userId){
         List<PracticeNote> practiceNoteList = practiceNoteRepository.findAllByUserId(userId);
 
         return practiceNoteList.stream().map(
-                this::getPracticeResponseDto
+                PracticeNoteThumbnailResponseDto::from
         ).collect(Collectors.toList());
     }
 
-    public boolean addPracticeCount(Long practiceId) {
-        PracticeNote practiceNote = practiceNoteRepository.findById(practiceId)
-                .orElseThrow(() -> new PracticeNotFoundException(practiceId));
-
-        practiceNote.setPracticeCount(practiceNote.getPracticeCount() + 1);
-        practiceNote.setLastSolvedAt(LocalDateTime.now());
-        practiceNoteRepository.save(practiceNote);
-
-        return true;
+    public void updatePracticeNoteCount(Long practiceId) {
+        PracticeNote practiceNote = getPracticeEntity(practiceId);
+        practiceNote.updatePracticeNoteCount();
     }
 
-    public boolean updatePractice(PracticeNoteRegisterDto practiceNoteRegisterDto) {
-        Long practiceId = practiceNoteRegisterDto.getPracticeId();
+    public void updatePracticeInfo(PracticeNoteRegisterDto practiceNoteRegisterDto) {
+        Long practiceId = practiceNoteRegisterDto.practiceNoteId();
         PracticeNote practiceNote = getPracticeEntity(practiceId);
 
-        if (practiceNoteRegisterDto.getPracticeTitle() != null) {
-            practiceNote.setTitle(practiceNoteRegisterDto.getPracticeTitle());
-        }
+        practiceNote.updateTitle(practiceNoteRegisterDto.practiceTitle());
 
-        // ✅ 기존 문제 리스트 가져오기 (매핑을 통해 문제 가져오기)
-        List<Long> existingProblemIds = practiceNote.getProblemPracticeNoteMappings().stream()
-                .map(mapping -> mapping.getProblem().getId())
-                .toList();
+        // ✅ 기존 문제 ID 목록 가져오기 (DB에서 한 번에 조회)
+        Set<Long> existingProblemIds = practiceNoteRepository.findProblemIdListByPracticeNoteId(practiceId);
 
-        List<Long> newProblemIds = practiceNoteRegisterDto.getRegisterProblemIds();
+        // ✅ 새로운 문제 ID 목록
+        Set<Long> newProblemIds = new HashSet<>(practiceNoteRegisterDto.problemIdList());
 
         // ✅ 추가해야 할 문제 찾기
-        List<Long> problemsToAdd = newProblemIds.stream()
-                .filter(problemId -> !existingProblemIds.contains(problemId))
-                .toList();
+        Set<Long> problemsToAdd = new HashSet<>(newProblemIds);
+        problemsToAdd.removeAll(existingProblemIds);
 
         // ✅ 삭제해야 할 문제 찾기
-        List<Long> problemsToRemove = existingProblemIds.stream()
-                .filter(problemId -> !newProblemIds.contains(problemId))
-                .toList();
+        Set<Long> problemsToRemove = new HashSet<>(existingProblemIds);
+        problemsToRemove.removeAll(newProblemIds);
 
         // ✅ 문제 추가
-        problemsToAdd.forEach(problemId -> addProblemToPractice(practiceNote, problemId));
+        if (!problemsToAdd.isEmpty()) {
+            problemsToAdd.forEach(problemId -> {
+                addProblemToPractice(practiceNote, problemId);
+            });
+        }
 
         // ✅ 문제 삭제
-        problemsToRemove.forEach(problemId -> removeProblemFromPractice(practiceId, problemId));
-
-        practiceNoteRepository.save(practiceNote);
-        return true;
+        if (!problemsToRemove.isEmpty()) {
+            problemsToRemove.forEach(problemId -> {
+                deleteProblemFromPractice(practiceId, problemId);
+            });
+        }
     }
 
     public void deletePractice(Long practiceId) {
         PracticeNote practiceNote = getPracticeEntity(practiceId);
-        practiceNote.getProblemPracticeNoteMappings().clear();  // 매핑 삭제
+        practiceNote.getProblemPracticeNoteMappingList().clear();  // 매핑 삭제
+
         practiceNoteRepository.delete(practiceNote);
     }
 
@@ -150,47 +127,24 @@ public class PracticeNoteService {
         practiceNoteRepository.deleteAll(practiceNoteList);
     }
 
-    public void removeProblemFromPractice(Long practiceId, Long problemId) {
-        PracticeNote practiceNote = getPracticeEntity(practiceId);
-        Problem problem = problemService.getProblemEntity(problemId);
+    private void addProblemToPractice(PracticeNote practiceNote, Long problemId) {
 
-        // 연관된 매핑 엔티티 찾기
-        practiceNote.getProblemPracticeNoteMappings().removeIf(mapping ->
-                mapping.getProblem().getId().equals(problemId)
-        );
+        boolean exists = practiceNoteRepository.checkProblemAlreadyMatchingWithPractice(practiceNote.getId(), problemId);
 
-        practiceNoteRepository.save(practiceNote);
+        if (!exists) {
+            Problem problem = problemRepository.findById(problemId)
+                    .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
+
+            ProblemPracticeNoteMapping mapping = ProblemPracticeNoteMapping.from(practiceNote, problem);
+            problemPracticeNoteMappingRepository.save(mapping);
+        }
+    }
+
+    private void deleteProblemFromPractice(Long practiceId, Long problemId) {
+        practiceNoteRepository.deleteProblemFromPractice(practiceId, problemId);
     }
 
     public void deleteProblemsFromAllPractice(List<Long> deleteProblemIdList) {
-        deleteProblemIdList.forEach(deleteProblemId -> {
-            Problem problemToRemove = problemService.getProblemEntity(deleteProblemId);
-
-            // ✅ 해당 문제를 포함하고 있는 모든 Practice 가져오기
-            List<PracticeNote> practicesContainingProblem = practiceNoteRepository.findAllByProblemsContaining(problemToRemove);
-
-            for (PracticeNote practiceNote : practicesContainingProblem) {
-                // ✅ 기존 코드: practice.getProblems().remove(problemToRemove);
-                practiceNote.getProblemPracticeNoteMappings().removeIf(mapping -> mapping.getProblem().equals(problemToRemove));
-                practiceNoteRepository.save(practiceNote);
-            }
-        });
-    }
-
-    private PracticeNoteResponseDto getPracticeResponseDto(PracticeNote practiceNote) {
-        PracticeNoteResponseDto practiceNoteResponseDto = PracticeConverter.convertToResponseDto(practiceNote);
-        practiceNoteResponseDto.setPracticeSize((long) practiceNoteRepository.countProblemsByPracticeId(practiceNote.getId()));
-
-        // ✅ 문제 리스트 가져오기 (매핑을 통해 문제 추출)
-        List<Problem> problemList = practiceNote.getProblemPracticeNoteMappings().stream()
-                .map(ProblemPracticeNoteMapping::getProblem)
-                .toList();
-
-        List<ProblemResponseDto> problemResponseDtoList = problemList.stream()
-                .map(problemService::convertToProblemResponse)
-                .toList();
-
-        practiceNoteResponseDto.setProblems(problemResponseDtoList);
-        return practiceNoteResponseDto;
+        practiceNoteRepository.deleteProblemsFromAllPractice(deleteProblemIdList);
     }
 }

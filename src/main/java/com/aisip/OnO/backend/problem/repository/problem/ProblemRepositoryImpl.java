@@ -6,6 +6,8 @@ import jakarta.persistence.EntityManager;
 
 import java.util.List;
 
+import static com.aisip.OnO.backend.practicenote.entity.QPracticeNote.practiceNote;
+import static com.aisip.OnO.backend.practicenote.entity.QProblemPracticeNoteMapping.problemPracticeNoteMapping;
 import static com.aisip.OnO.backend.problem.entity.QProblem.problem;
 import static com.aisip.OnO.backend.problem.entity.QProblemImageData.problemImageData;
 
@@ -40,6 +42,17 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
         return queryFactory
                 .selectFrom(problem)
                 .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
+                .fetch();
+    }
+
+    @Override
+    public List<Problem> findAllProblemsByPracticeId(Long practiceId) {
+        return queryFactory
+                .select(problem)
+                .from(problem)
+                .join(problemPracticeNoteMapping).on(problem.id.eq(problemPracticeNoteMapping.problem.id))
+                .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
+                .where(practiceNote.id.eq(practiceId))
                 .fetch();
     }
 }

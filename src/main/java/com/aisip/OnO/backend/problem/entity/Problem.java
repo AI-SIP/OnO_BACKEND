@@ -36,8 +36,8 @@ public class Problem extends BaseEntity {
     @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProblemImageData> problemImageDataList;
 
-    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ProblemPracticeNoteMapping> problemPracticeNoteMappings;
+    @OneToMany(mappedBy = "practiceNote", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProblemPracticeNoteMapping> problemPracticeNoteMappingList;
 
     public static Problem from(ProblemRegisterDto problemRegisterDto, Long userId, Folder folder) {
         return Problem.builder()

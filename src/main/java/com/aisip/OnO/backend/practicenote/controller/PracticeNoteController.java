@@ -1,7 +1,7 @@
 package com.aisip.OnO.backend.practicenote.controller;
 
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteResponseDto;
+import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,7 +14,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/problem/practice")
+@RequestMapping("/api/practiceNote")
 public class PracticeNoteController {
 
     private final PracticeNoteService practiceNoteService;
@@ -22,7 +22,7 @@ public class PracticeNoteController {
     // ✅ 특정 복습 리스트 조회
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/{practiceId}")
-    public PracticeNoteResponseDto getPracticeDetail(Authentication authentication, @PathVariable Long practiceId) {
+    public PracticeNoteDetailResponseDto getPracticeDetail(Authentication authentication, @PathVariable Long practiceId) {
         Long userId = (Long) authentication.getPrincipal();
         log.info("userId: {} get problem practice for practice id: {}", userId, practiceId);
         return practiceNoteService.findPractice(practiceId);
@@ -31,27 +31,27 @@ public class PracticeNoteController {
     // ✅ 사용자의 모든 복습 리스트 썸네일 조회
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/thumbnail/all")
-    public List<PracticeNoteResponseDto> getAllPracticeThumbnail(Authentication authentication) {
+    public List<PracticeNoteDetailResponseDto> getAllPracticeThumbnail(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
         log.info("userId: {} get all problem practice thumbnails", userId);
-        return practiceNoteService.findAllPracticesByUser(userId);
+        return practiceNoteService.findAllPracticeThumbnailsByUser(userId);
     }
 
     // ✅ 사용자의 모든 복습 리스트 상세 조회
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/all")
-    public List<PracticeNoteResponseDto> getAllPracticeDetail(Authentication authentication) {
+    public List<PracticeNoteDetailResponseDto> getAllPracticeDetail(Authentication authentication) {
         Long userId = (Long) authentication.getPrincipal();
         log.info("userId: {} get all problem practices", userId);
-        return practiceNoteService.findAllPracticesByUser(userId);
+        return practiceNoteService.findAllPracticeThumbnailsByUser(userId);
     }
 
     // ✅ 복습 리스트 등록
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("")
-    public PracticeNoteResponseDto registerPractice(Authentication authentication, @RequestBody PracticeNoteRegisterDto practiceNoteRegisterDto) {
+    public PracticeNoteDetailResponseDto registerPractice(Authentication authentication, @RequestBody PracticeNoteRegisterDto practiceNoteRegisterDto) {
         Long userId = (Long) authentication.getPrincipal();
-        PracticeNoteResponseDto response = practiceNoteService.createPractice(userId, practiceNoteRegisterDto);
+        PracticeNoteDetailResponseDto response = practiceNoteService.registerPractice(userId, practiceNoteRegisterDto);
         log.info("userId: {} registered problem practice", userId);
         return response;
     }
@@ -61,9 +61,9 @@ public class PracticeNoteController {
     @PatchMapping("/complete/{practiceId}")
     public String addPracticeCount(Authentication authentication, @PathVariable Long practiceId) {
         Long userId = (Long) authentication.getPrincipal();
-        practiceNoteService.addPracticeCount(practiceId);
+        practiceNoteService.updatePracticeNoteCount(practiceId);
 
-        log.info("userId: {} completed problem practice with practiceId: {}", userId, practiceId);
+        log.info("userId: {} completed problem practice with practiceNoteId: {}", userId, practiceId);
         return "복습을 완료했습니다.";
     }
 
@@ -72,7 +72,7 @@ public class PracticeNoteController {
     @PatchMapping("")
     public String updatePractice(Authentication authentication, @RequestBody PracticeNoteRegisterDto practiceNoteRegisterDto) {
         Long userId = (Long) authentication.getPrincipal();
-        practiceNoteService.updatePractice(practiceNoteRegisterDto);
+        practiceNoteService.updatePracticeInfo(practiceNoteRegisterDto);
 
         log.info("userId: {} updated problem practice", userId);
         return "복습 리스트 수정을 완료했습니다.";

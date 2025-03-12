@@ -1,12 +1,15 @@
 package com.aisip.OnO.backend.practicenote.repository;
 
-import com.aisip.OnO.backend.entity.Problem.*;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
-import com.aisip.OnO.backend.problem.entity.Problem;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+
+import static com.aisip.OnO.backend.practicenote.entity.QPracticeNote.practiceNote;
+import static com.aisip.OnO.backend.practicenote.entity.QProblemPracticeNoteMapping.problemPracticeNoteMapping;
 
 public class PracticeNoteRepositoryImpl implements PracticeNoteRepositoryCustom {
 
@@ -17,42 +20,61 @@ public class PracticeNoteRepositoryImpl implements PracticeNoteRepositoryCustom 
     }
 
     @Override
-    public List<PracticeNote> findAllByProblemsContaining(Problem problem) {
-        QPractice practice = QPractice.practice;
-        QProblemPracticeMapping practiceProblemMapping = QProblemPracticeMapping.problemPracticeMapping;
+    public boolean checkProblemAlreadyMatchingWithPractice(Long practiceNoteId, Long problemId) {
+        return queryFactory
+                .selectOne()
+                .from(problemPracticeNoteMapping)
+                .where(problemPracticeNoteMapping.practiceNote.id.eq(practiceNoteId)
+                        .and(problemPracticeNoteMapping.problem.id.eq(problemId)))
+                .fetchFirst() != null;
+    }
+
+    @Override
+    public PracticeNote findPracticeNoteWithDetails(Long practiceNoteId) {
+        return queryFactory
+                .select(practiceNote)
+                .from(practiceNote)
+                .join(problemPracticeNoteMapping).on(practiceNote.id.eq(problemPracticeNoteMapping.practiceNote.id))
+                .join(problemPracticeNoteMapping.practiceNote, practiceNote)
+                .where(practiceNote.id.eq(practiceNoteId))
+                .fetchOne();
+    }
+
+    @Override
+    public Set<Long> findProblemIdListByPracticeNoteId(Long practiceNoteId) {
+        return new HashSet<>(queryFactory
+                .select(problemPracticeNoteMapping.problem.id)
+                .from(problemPracticeNoteMapping)
+                .where(problemPracticeNoteMapping.practiceNote.id.eq(practiceNoteId))
+                .fetch());
+    }
+
+    @Override
+    public List<PracticeNote> findPracticesByProblem(Long problemId) {
 
         return queryFactory
-                .select(practice)
-                .from(practice)
-                .join(practice.problemPracticeMappings, practiceProblemMapping) // 중간 매핑 테이블 조인
-                .where(practiceProblemMapping.problem.eq(problem))
+                .select(practiceNote)
+                .from(practiceNote)
+                .join(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping) // 중간 매핑 테이블 조인
+                .where(problemPracticeNoteMapping.problem.id.eq(problemId))
                 .fetch();
     }
 
     @Override
-    public List<Problem> findAllProblemsByPracticeId(Long practiceId) {
-        QPractice practice = QPractice.practice;
-        QProblemPracticeMapping practiceProblemMapping = QProblemPracticeMapping.problemPracticeMapping;
-        QProblem problem = QProblem.problem;
-
-        return queryFactory
-                .select(problem)
-                .from(problem)
-                .join(practiceProblemMapping).on(problem.id.eq(practiceProblemMapping.problem.id))
-                .join(practiceProblemMapping.practice, practice)
-                .where(practice.id.eq(practiceId))
-                .fetch();
+    public void deleteProblemFromPractice(Long practiceNoteId, Long problemId) {
+        queryFactory
+                .delete(problemPracticeNoteMapping)
+                .where(problemPracticeNoteMapping.practiceNote.id.eq(practiceNoteId)
+                        .and(problemPracticeNoteMapping.problem.id.eq(problemId)))
+                .execute();
     }
 
     @Override
-    public int countProblemsByPracticeId(Long practiceId) {
-        QPractice practice = QPractice.practice;
-        QProblemPracticeMapping practiceProblemMapping = QProblemPracticeMapping.problemPracticeMapping;
-
-        return Math.toIntExact(queryFactory
-                .select(practiceProblemMapping.count()) // 문제 개수 카운트
-                .from(practiceProblemMapping)
-                .where(practiceProblemMapping.practice.id.eq(practiceId))
-                .fetchOne());
+    public void deleteProblemsFromAllPractice(List<Long> deleteProblemIdList) {
+        // 1. 삭제할 문제 ID 리스트에 해당하는 모든 매핑 삭제 (벌크 삭제)
+        queryFactory
+                .delete(problemPracticeNoteMapping)
+                .where(problemPracticeNoteMapping.problem.id.in(deleteProblemIdList))
+                .execute();
     }
 }

@@ -7,11 +7,10 @@ import lombok.*;
 
 @Entity
 @Getter
-@Setter
-@Table(name = "problem_practice_mapping")
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Builder(access = AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(name = "problem_practice_note_mapping")
 public class ProblemPracticeNoteMapping extends BaseEntity {
 
     @Id
@@ -19,13 +18,17 @@ public class ProblemPracticeNoteMapping extends BaseEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "problem_practice_id", referencedColumnName = "id", nullable = false)
+    @JoinColumn(name = "practice_note_id", nullable = false)
     private PracticeNote practiceNote;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "problem_id", referencedColumnName = "id", nullable = false)
     private Problem problem;
 
-    // 중간 테이블이므로 추가적인 컬럼을 넣을 수도 있음
-    private Long practiceCount;
+    public static ProblemPracticeNoteMapping from(PracticeNote practiceNote, Problem problem) {
+        return ProblemPracticeNoteMapping.builder()
+                .practiceNote(practiceNote)
+                .problem(problem)
+                .build();
+    }
 }

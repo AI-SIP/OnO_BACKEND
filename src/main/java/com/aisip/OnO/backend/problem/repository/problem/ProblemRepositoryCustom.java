@@ -11,4 +11,6 @@ public interface ProblemRepositoryCustom {
     List<Problem> findAllByFolderId(Long folderId);
 
     List<Problem> findAll();
+
+    List<Problem> findAllProblemsByPracticeId(Long practiceId);
 }
