@@ -1,12 +1,14 @@
 package com.aisip.OnO.backend.practicenote.controller;
 
+import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
+import com.aisip.OnO.backend.practicenote.dto.PracticeNoteThumbnailResponseDto;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,80 +22,68 @@ public class PracticeNoteController {
     private final PracticeNoteService practiceNoteService;
 
     // ✅ 특정 복습 리스트 조회
-    @ResponseStatus(HttpStatus.OK)
     @GetMapping("/{practiceId}")
-    public PracticeNoteDetailResponseDto getPracticeDetail(Authentication authentication, @PathVariable Long practiceId) {
-        Long userId = (Long) authentication.getPrincipal();
+    public CommonResponse<PracticeNoteDetailResponseDto> getPracticeDetail(@PathVariable Long practiceId) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} get problem practice for practice id: {}", userId, practiceId);
-        return practiceNoteService.findPractice(practiceId);
+
+        return CommonResponse.success(practiceNoteService.findPracticeNoteDetail(practiceId));
     }
 
     // ✅ 사용자의 모든 복습 리스트 썸네일 조회
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/thumbnail/all")
-    public List<PracticeNoteDetailResponseDto> getAllPracticeThumbnail(Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
+    public CommonResponse<List<PracticeNoteThumbnailResponseDto>> getAllPracticeThumbnail() {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} get all problem practice thumbnails", userId);
-        return practiceNoteService.findAllPracticeThumbnailsByUser(userId);
-    }
 
-    // ✅ 사용자의 모든 복습 리스트 상세 조회
-    @ResponseStatus(HttpStatus.OK)
-    @GetMapping("/all")
-    public List<PracticeNoteDetailResponseDto> getAllPracticeDetail(Authentication authentication) {
-        Long userId = (Long) authentication.getPrincipal();
-        log.info("userId: {} get all problem practices", userId);
-        return practiceNoteService.findAllPracticeThumbnailsByUser(userId);
+        return CommonResponse.success(practiceNoteService.findAllPracticeThumbnailsByUser(userId));
     }
 
     // ✅ 복습 리스트 등록
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("")
-    public PracticeNoteDetailResponseDto registerPractice(Authentication authentication, @RequestBody PracticeNoteRegisterDto practiceNoteRegisterDto) {
-        Long userId = (Long) authentication.getPrincipal();
-        PracticeNoteDetailResponseDto response = practiceNoteService.registerPractice(userId, practiceNoteRegisterDto);
+    public CommonResponse<String> registerPractice(@RequestBody PracticeNoteRegisterDto practiceNoteRegisterDto) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        practiceNoteService.registerPractice(practiceNoteRegisterDto, userId);
         log.info("userId: {} registered problem practice", userId);
-        return response;
+
+        return CommonResponse.success("복습 노트가 성공적으로 생성되었습니다.");
     }
 
     // ✅ 복습 완료 횟수 증가
-    @ResponseStatus(HttpStatus.OK)
     @PatchMapping("/complete/{practiceId}")
-    public String addPracticeCount(Authentication authentication, @PathVariable Long practiceId) {
-        Long userId = (Long) authentication.getPrincipal();
+    public CommonResponse<String> addPracticeCount(@PathVariable Long practiceId) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         practiceNoteService.updatePracticeNoteCount(practiceId);
 
         log.info("userId: {} completed problem practice with practiceNoteId: {}", userId, practiceId);
-        return "복습을 완료했습니다.";
+        return CommonResponse.success("복습을 완료했습니다.");
     }
 
     // ✅ 복습 리스트 수정
-    @ResponseStatus(HttpStatus.OK)
     @PatchMapping("")
-    public String updatePractice(Authentication authentication, @RequestBody PracticeNoteRegisterDto practiceNoteRegisterDto) {
-        Long userId = (Long) authentication.getPrincipal();
+    public CommonResponse<String> updatePractice(@RequestBody PracticeNoteRegisterDto practiceNoteRegisterDto) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         practiceNoteService.updatePracticeInfo(practiceNoteRegisterDto);
 
-        log.info("userId: {} updated problem practice", userId);
-        return "복습 리스트 수정을 완료했습니다.";
+        return CommonResponse.success("복습 리스트가 성공적으로 수정되었습니다.");
     }
 
     // ✅ 복습 리스트 삭제 (204 No Content 반환)
-    @ResponseStatus(HttpStatus.OK)
     @DeleteMapping("")
-    public void deletePractices(Authentication authentication, @RequestParam List<Long> deletePracticeIds) {
-        Long userId = (Long) authentication.getPrincipal();
+    public CommonResponse<String> deletePractices(@RequestParam List<Long> deletePracticeIds) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         practiceNoteService.deletePractices(deletePracticeIds);
 
-        log.info("userId: {} deleted problem practice ids: {}", userId, deletePracticeIds);
+        return CommonResponse.success("선택한 복습 노트가 삭제되었습니다.");
     }
 
-    @ResponseStatus(HttpStatus.OK)
     @DeleteMapping("/all")
-    public void deleteAllUserPractices(Authentication authentication, @RequestParam List<Long> deletePracticeIds) {
-        Long userId = (Long) authentication.getPrincipal();
+    public CommonResponse<String> deleteAllUserPractices() {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         practiceNoteService.deleteAllPracticesByUser(userId);
 
-        log.info("userId: {} deleted problem practice ids: {}", userId, deletePracticeIds);
+        return CommonResponse.success("유저의 모든 복습 노트가 삭제되었습니다.");
     }
 }
