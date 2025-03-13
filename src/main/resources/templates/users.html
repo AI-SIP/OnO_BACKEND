@@ -37,7 +37,7 @@
       <td th:text="${user.userEmail}">user@example.com</td>
       -->
       <td th:text="${user.userIdentifier}">identifier</td>
-      <td th:text="${user.userType}">GUEST</td>
+      <td th:text="${user.authority}">GUEST</td>
       <td th:text="${problemCounts[stat.index]}"></td>
       <td th:text="${@dateFormatter.format(user.createdAt)}">2024년 08월 20일 18시 32분 51초</td>
       <td th:text="${@dateFormatter.format(user.updatedAt)}">2024년 08월 20일 18시 32분 51초</td>
