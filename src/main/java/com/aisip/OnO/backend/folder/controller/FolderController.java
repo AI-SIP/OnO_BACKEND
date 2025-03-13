@@ -1,10 +1,10 @@
-package com.aisip.OnO.backend.problem.controller;
+package com.aisip.OnO.backend.folder.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
-import com.aisip.OnO.backend.problem.dto.FolderRegisterDto;
-import com.aisip.OnO.backend.problem.dto.FolderResponseDto;
-import com.aisip.OnO.backend.problem.dto.FolderThumbnailResponseDto;
-import com.aisip.OnO.backend.problem.service.FolderService;
+import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
+import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
+import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
+import com.aisip.OnO.backend.folder.service.FolderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;

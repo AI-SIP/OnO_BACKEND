@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.problem.entity;
 
 import com.aisip.OnO.backend.common.entity.BaseEntity;
+import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import jakarta.persistence.*;

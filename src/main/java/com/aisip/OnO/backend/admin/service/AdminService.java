@@ -1,7 +1,7 @@
 package com.aisip.OnO.backend.admin.service;
 
 import com.aisip.OnO.backend.fileupload.service.FileUploadService;
-import com.aisip.OnO.backend.problem.service.FolderService;
+import com.aisip.OnO.backend.folder.service.FolderService;
 import com.aisip.OnO.backend.problem.service.ProblemService;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.service.UserService;

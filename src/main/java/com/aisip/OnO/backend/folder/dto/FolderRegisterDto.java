@@ -1,4 +1,4 @@
-package com.aisip.OnO.backend.problem.dto;
+package com.aisip.OnO.backend.folder.dto;
 
 public record FolderRegisterDto (
 

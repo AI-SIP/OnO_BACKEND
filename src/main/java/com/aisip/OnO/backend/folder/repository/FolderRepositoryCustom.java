@@ -1,6 +1,6 @@
-package com.aisip.OnO.backend.problem.repository.folder;
+package com.aisip.OnO.backend.folder.repository;
 
-import com.aisip.OnO.backend.problem.entity.Folder;
+import com.aisip.OnO.backend.folder.entity.Folder;
 
 import java.util.List;
 import java.util.Optional;

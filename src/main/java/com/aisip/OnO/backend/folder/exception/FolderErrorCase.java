@@ -1,4 +1,4 @@
-package com.aisip.OnO.backend.problem.exception;
+package com.aisip.OnO.backend.folder.exception;
 
 import com.aisip.OnO.backend.common.exception.ErrorCase;
 import lombok.Getter;

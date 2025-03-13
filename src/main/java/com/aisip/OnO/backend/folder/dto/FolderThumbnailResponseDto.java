@@ -1,6 +1,6 @@
-package com.aisip.OnO.backend.problem.dto;
+package com.aisip.OnO.backend.folder.dto;
 
-import com.aisip.OnO.backend.problem.entity.Folder;
+import com.aisip.OnO.backend.folder.entity.Folder;
 import lombok.AccessLevel;
 import lombok.Builder;
 

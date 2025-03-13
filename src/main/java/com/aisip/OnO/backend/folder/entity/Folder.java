@@ -1,7 +1,8 @@
-package com.aisip.OnO.backend.problem.entity;
+package com.aisip.OnO.backend.folder.entity;
 
 import com.aisip.OnO.backend.common.entity.BaseEntity;
-import com.aisip.OnO.backend.problem.dto.FolderRegisterDto;
+import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
+import com.aisip.OnO.backend.problem.entity.Problem;
 import jakarta.persistence.*;
 import lombok.*;
 

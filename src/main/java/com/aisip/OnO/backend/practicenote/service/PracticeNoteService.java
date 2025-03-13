@@ -11,7 +11,7 @@ import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
-import com.aisip.OnO.backend.problem.repository.problem.ProblemRepository;
+import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;

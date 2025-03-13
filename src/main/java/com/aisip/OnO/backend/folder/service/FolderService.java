@@ -1,12 +1,13 @@
-package com.aisip.OnO.backend.problem.service;
+package com.aisip.OnO.backend.folder.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
-import com.aisip.OnO.backend.problem.dto.FolderRegisterDto;
-import com.aisip.OnO.backend.problem.dto.FolderResponseDto;
-import com.aisip.OnO.backend.problem.dto.FolderThumbnailResponseDto;
-import com.aisip.OnO.backend.problem.entity.Folder;
-import com.aisip.OnO.backend.problem.exception.FolderErrorCase;
-import com.aisip.OnO.backend.problem.repository.folder.FolderRepository;
+import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
+import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
+import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
+import com.aisip.OnO.backend.folder.entity.Folder;
+import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
+import com.aisip.OnO.backend.folder.repository.FolderRepository;
+import com.aisip.OnO.backend.problem.service.ProblemService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -1,4 +1,4 @@
-package com.aisip.OnO.backend.problem.repository.problem;
+package com.aisip.OnO.backend.problem.repository;
 
 import com.aisip.OnO.backend.problem.entity.Problem;
 
