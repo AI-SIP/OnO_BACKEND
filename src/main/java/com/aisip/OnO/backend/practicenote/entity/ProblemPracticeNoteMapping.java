@@ -4,12 +4,16 @@ import com.aisip.OnO.backend.common.entity.BaseEntity;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Getter
 @Builder(access = AccessLevel.PRIVATE)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SQLDelete(sql = "UPDATE problem_practice_note_mapping SET deleted_at = now() WHERE id = ?")
+@SQLRestriction("deleted_at IS NULL")
 @Table(name = "problem_practice_note_mapping")
 public class ProblemPracticeNoteMapping extends BaseEntity {
 

@@ -4,6 +4,8 @@ import com.aisip.OnO.backend.common.entity.BaseEntity;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -14,6 +16,8 @@ import java.util.List;
 @Builder(access = AccessLevel.PRIVATE)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@SQLDelete(sql = "UPDATE practice_note SET deleted_at = now() WHERE id = ?")
+@SQLRestriction("deleted_at IS NULL")
 @Table(name = "practice_note")
 public class PracticeNote extends BaseEntity {
 
