@@ -64,12 +64,14 @@ public class SecurityConfig {
 
         http.authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
-                                .requestMatchers("/", "/robots.txt", "/home","/images/**", "/api/auth/**", "/login", "/css/**", "/js/**").permitAll()
+                                .requestMatchers("/", "/robots.txt", "/home","/images/**", "/api/auth/**", "/login", "/css/**", "/js/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                                 .requestMatchers("/api/auth/**").permitAll()
                                 .requestMatchers("/admin/**").hasRole("ADMIN")
                                 .requestMatchers("/api/user/**").hasAnyRole("GUEST", "MEMBER", "ADMIN")
                                 .requestMatchers("/api/problem/**").hasAnyRole("GUEST", "MEMBER", "ADMIN")
                                 .requestMatchers("/api/folder/**").hasAnyRole("GUEST", "MEMBER", "ADMIN")
+                                .requestMatchers("/api/fileUpload/**").hasAnyRole("GUEST", "MEMBER", "ADMIN")
+                                .requestMatchers("/api/practiceNote/**").hasAnyRole("GUEST", "MEMBER", "ADMIN")
                                 .anyRequest().authenticated()
                 )
                 .formLogin(formLogin -> formLogin

@@ -1,7 +1,7 @@
 package com.aisip.OnO.backend.folder.repository;
 
 import com.aisip.OnO.backend.folder.entity.Folder;
-import com.aisip.OnO.backend.problem.entity.QFolder;
+import com.aisip.OnO.backend.folder.entity.QFolder;
 import com.aisip.OnO.backend.problem.entity.QProblem;
 import com.aisip.OnO.backend.problem.entity.QProblemImageData;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -10,7 +10,7 @@ import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Optional;
 
-import static com.aisip.OnO.backend.problem.entity.QFolder.folder;
+import static com.aisip.OnO.backend.folder.entity.QFolder.folder;
 
 public class FolderRepositoryImpl implements FolderRepositoryCustom {
 
