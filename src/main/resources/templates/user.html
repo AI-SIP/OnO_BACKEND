@@ -60,7 +60,7 @@
         </tr>
         <tr>
           <th>유저 유형</th>
-          <td class="user-type" th:text="${user.userType}">GUEST</td>
+          <td class="user-type" th:text="${user.authority}">GUEST</td>
         </tr>
         <tr>
           <th>Created At</th>
@@ -106,7 +106,7 @@
                   <select class="form-select" id="type" name="type" required>
                     <option th:each="type : ${T(com.aisip.OnO.backend.entity.User.UserType).values()}"
                             th:value="${type}" th:text="${type}"
-                            th:selected="${user.userType == type}">GUEST</option>
+                            th:selected="${user.authority == type}">GUEST</option>
                   </select>
                 </div>
               </div>
@@ -154,7 +154,7 @@
           <tr th:each="problem : ${problems}">
             <td th:text="${problem.problemId}">problemId</td>
             <td th:text="${problem.userName}">userName</td>
-            <td th:text="${problem.templateType}">templateType</td>
+            <td th:text="${problem.problemTemplateType}">problemTemplateType</td>
             <td th:text="${problem.folderId}">folderId</td>
             <td th:text="${problem.reference}">Reference</td>
             <td th:text="${problem.memo}">memo</td>
@@ -205,8 +205,8 @@
           'Content-Type': 'application/json'
         }
       })
-              .then(response => {
-                if (response.ok) {
+              .then(commonResponse => {
+                if (commonResponse.ok) {
                   alert("유저를 성공적으로 삭제했습니다.");
                   window.location.href = "/admin/users";
                 } else {
