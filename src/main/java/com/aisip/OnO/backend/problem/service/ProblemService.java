@@ -40,6 +40,7 @@ public class ProblemService {
     public ProblemResponseDto findProblem(Long problemId, Long userId) {
         Problem problem = findProblemEntity(problemId, userId);
 
+        log.info("userId: {} find problemId: {}", userId, problemId);
         return ProblemResponseDto.from(problem);
     }
 
@@ -55,6 +56,8 @@ public class ProblemService {
     }
 
     public List<ProblemResponseDto> findUserProblems(Long userId) {
+        log.info("userId: {} find all user problems", userId);
+
         return problemRepository.findAllByUserId(userId)
                 .stream()
                 .map(ProblemResponseDto::from)
@@ -76,6 +79,7 @@ public class ProblemService {
     }
 
     public Long findProblemCountByUser(Long userId) {
+        log.info("userId: {} find problem count", userId);
         return problemRepository.countByUserId(userId);
     }
 
@@ -92,6 +96,8 @@ public class ProblemService {
                     ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
                     problemImageDataRepository.save(problemImageData);
                 });
+
+        log.info("userId: {} register problemId: {}", userId, problem.getId());
     }
 
     public void registerProblemImageData(ProblemImageDataRegisterDto problemImageDataRegisterDto, Long userId) {
@@ -99,6 +105,8 @@ public class ProblemService {
 
         ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
         problemImageDataRepository.save(problemImageData);
+
+        log.info("userId: {} register problem image data for problemId: {}", userId, problem.getId());
     }
 
     public void updateProblemInfo(ProblemRegisterDto problemRegisterDto, Long userId) {
@@ -106,6 +114,8 @@ public class ProblemService {
         Problem problem = findProblemEntity(problemRegisterDto.problemId(), userId);
 
         problem.updateProblem(problemRegisterDto);
+
+        log.info("userId: {} update problemId: {}", userId, problem.getId());
     }
 
     public void updateProblemFolder(ProblemRegisterDto problemRegisterDto, Long userId) {
@@ -116,8 +126,11 @@ public class ProblemService {
                     .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
 
             problem.updateFolder(folder);
+
+            log.info("userId: {} update problem folder, problemId: {}, folderId: {}", userId, problem.getId(), folder.getId());
         }
 
+        log.info("userId: {} failed update problem", userId);
     }
 
     @Transactional
@@ -140,6 +153,8 @@ public class ProblemService {
             // 특정 folderId 리스트에 포함된 모든 문제 삭제
             deleteAllByFolderIds(folderIdList);
         }
+
+        log.info("userId: {} delete problems", userId);
     }
 
     public void deleteProblem(Long problemId) {
@@ -152,6 +167,8 @@ public class ProblemService {
         });
 
         problemRepository.deleteById(problemId);
+
+        log.info("problemId: {} has deleted", problemId);
     }
 
     public void deleteProblemImageData(String imageUrl) {
@@ -167,6 +184,8 @@ public class ProblemService {
                 .forEach(problem -> {
                     deleteProblem(problem.getId());
                 });
+
+        log.info("problem in folderId: {} has deleted", folderId);
     }
 
     public void deleteAllByFolderIds(Collection<Long> folderIds) {
@@ -178,5 +197,7 @@ public class ProblemService {
                 .forEach(problem -> {
                     deleteProblem(problem.getId());
                 });
+
+        log.info("userId: {} delete all user problems", userId);
     }
 }

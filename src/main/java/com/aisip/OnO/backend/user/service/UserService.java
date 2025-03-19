@@ -80,11 +80,13 @@ public class UserService {
         User user = findUserEntity(userId);
         user.updateUser(userRegisterDto);
 
-        log.info("userId: {} update", user.getId());
+        log.info("userId: {} has updated", userId);
     }
 
     public void deleteUserById(Long userId) {
         userRepository.deleteById(userId);
+
+        log.info("userId: {} has deleted", userId);
     }
 
     private String makeGuestName() {

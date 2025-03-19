@@ -30,6 +30,7 @@ public class FolderService {
         Folder folder = folderRepository.findFolderWithDetailsByFolderId(folderId)
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
 
+        log.info("");
         return FolderResponseDto.from(folder);
     }
 
@@ -48,6 +49,8 @@ public class FolderService {
 
     public List<FolderResponseDto> findAllFolders(Long userId) {
         List<Folder> folders = folderRepository.findAllFoldersWithDetailsByUserId(userId);
+
+        log.info("userId : {} find All folders", userId);
         return folders.isEmpty()
                 ? List.of(findRootFolder(userId))
                 : folders.stream().map(FolderResponseDto::from).toList();
@@ -56,11 +59,11 @@ public class FolderService {
     public FolderResponseDto findRootFolder(Long userId) {
         return folderRepository.findRootFolder(userId)
                 .map(rootFolder -> {
-                    log.info("find root folder id: {}", rootFolder.getId());
+                    log.info("userId : {} find root folder id: {}", userId, rootFolder.getId());
                     return FolderResponseDto.from(rootFolder);
                 })
                 .orElseGet(() -> {
-                    log.info("create root folder for userId: {}", userId);
+                    log.info("userId : {} create root folder", userId);
                     return createRootFolder(userId);
                 });
     }
@@ -75,6 +78,7 @@ public class FolderService {
         Folder rootFolder = Folder.from(folderRegisterDto, null, userId);
         folderRepository.save(rootFolder);
 
+        log.info("userId : {} create root folder id: {}", userId, rootFolder.getId());
         return FolderResponseDto.from(rootFolder);
     }
 
@@ -83,6 +87,8 @@ public class FolderService {
 
         Folder folder = Folder.from(folderRegisterDto, parentFolder, userId);
         folderRepository.save(folder);
+
+        log.info("userId : {} create folder id: {}", userId, folder.getId());
     }
 
     public void updateFolder(FolderRegisterDto folderRegisterDto, Long userId) {
@@ -94,6 +100,8 @@ public class FolderService {
             Folder parentFolder = findFolderEntity(folderRegisterDto.parentFolderId());
             folder.updateParentFolder(parentFolder);
         }
+
+        log.info("userId : {} update folder id: {}", userId, folder.getId());
     }
 
     public void deleteFoldersWithProblems(List<Long> folderIds, Long userId) {
@@ -104,6 +112,8 @@ public class FolderService {
         problemService.deleteAllByFolderIds(allFolderIds);
 
         deleteAllByFolderIds(allFolderIds);
+
+        log.info("userId : {} delete folder With Problems", userId);
     }
 
     public void deleteAllUserFoldersWithProblems(Long userId) {
@@ -111,6 +121,8 @@ public class FolderService {
         problemService.deleteAllUserProblems(userId);
 
         deleteAllUserFolders(userId);
+
+        log.info("userId : {} delete all user folder With Problems", userId);
     }
 
     public Set<Long> getAllFolderIdsIncludingSubFolders(List<Long> folderIds) {
@@ -149,5 +161,6 @@ public class FolderService {
         List<Folder> folderList = folderRepository.findAllByUserId(userId);
 
         folderRepository.deleteAll(folderList);
+        log.info("userId : {} delete all user folders", userId);
     }
 }
