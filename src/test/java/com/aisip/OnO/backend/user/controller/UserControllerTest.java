@@ -15,13 +15,15 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -55,10 +57,14 @@ class UserControllerTest {
 
     @Test
     @DisplayName("사용자 정보 조회")
-    @WithMockUser(username = "1", roles = "MEMBER")
     void getUserInfo() throws Exception {
         // Given
-        given(userService.findUser(any(Long.class))).willReturn(mockUserResponse);
+        Long userId = 1L;
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(userId, null, List.of(new SimpleGrantedAuthority("ROLE_MEMBER")))
+        );
+
+        given(userService.findUser(userId)).willReturn(mockUserResponse);
 
         // When & Then
         mockMvc.perform(get("/api/user")
@@ -70,9 +76,13 @@ class UserControllerTest {
 
     @Test
     @DisplayName("사용자 정보 수정")
-    @WithMockUser(username = "testUser", roles = "MEMBER")
     void updateUserInfo() throws Exception {
         // Given
+        Long userId = 1L;
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(userId, null, List.of(new SimpleGrantedAuthority("ROLE_MEMBER")))
+        );
+
         UserRegisterDto updateRequest = new UserRegisterDto("updated@example.com", "UpdatedUser", "updatedIdentifier", "USER", null);
 
         // When & Then
@@ -85,13 +95,19 @@ class UserControllerTest {
 
     @Test
     @DisplayName("사용자 계정 삭제")
-    @WithMockUser(username = "testUser", roles = "MEMBER")
     void deleteUserInfo() throws Exception {
+        // Given
+        Long userId = 1L;
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(userId, null, List.of(new SimpleGrantedAuthority("ROLE_MEMBER")))
+        );
+
         // When & Then
         mockMvc.perform(delete("/api/user")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
-        Mockito.verify(userService, Mockito.times(1)).deleteUserById(any(Long.class));
+        // userService.deleteUserById(userId)가 1번 호출되었는지 확인
+        Mockito.verify(userService, Mockito.times(1)).deleteUserById(userId);
     }
 }
