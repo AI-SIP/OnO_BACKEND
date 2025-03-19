@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.user.entity;
 
 import com.aisip.OnO.backend.common.entity.BaseEntity;
+import com.aisip.OnO.backend.common.service.CryptoConverter;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import jakarta.persistence.*;
 import lombok.*;
@@ -25,6 +26,7 @@ public class User extends BaseEntity {
 
     private String name;
 
+    @Convert(converter = CryptoConverter.class)
     private String identifier;
 
     private String password;
