@@ -34,8 +34,8 @@ public class UserService {
 
     private User createGuestUser() {
         UserRegisterDto userRegisterDto = new UserRegisterDto(
-                makeGuestName(),
                 makeGuestEmail(),
+                makeGuestName(),
                 makeGuestIdentifier(),
                 "GUEST",
                 null
