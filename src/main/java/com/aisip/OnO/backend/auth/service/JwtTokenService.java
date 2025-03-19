@@ -29,6 +29,8 @@ public class JwtTokenService {
         String refreshToken = jwtTokenizer.createRefreshToken(String.valueOf(userId), Map.of("authority", authority));
 
         saveRefreshToken(userId, authority, refreshToken);
+
+        log.info("userId: {} has : generate token with authority: {}", userId, authority);
         return new TokenResponseDto(accessToken, refreshToken);
     }
 
@@ -45,10 +47,13 @@ public class JwtTokenService {
         RefreshToken storedToken = findRefreshToken(userId, authority);
         validateRefreshTokenMatch(storedToken, refreshToken);
 
+        log.info("userId: {} has : refresh access token", userId);
         return generateTokens(userId, authority);
     }
 
     private RefreshToken findRefreshToken(Long userId, Authority authority) {
+        log.info("userId: {} has find refresh token", userId);
+
         return refreshTokenRepository.findByUserId(userId)
                 .orElseThrow(() -> new ApplicationException(AuthErrorCase.REFRESH_TOKEN_NOT_FOUND));
     }

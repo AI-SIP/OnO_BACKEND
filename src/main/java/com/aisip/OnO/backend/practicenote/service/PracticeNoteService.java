@@ -50,6 +50,8 @@ public class PracticeNoteService {
             practiceNoteRegisterDto.problemIdList().forEach(problemId ->
                     addProblemToPractice(practiceNote, problemId));
         }
+
+        log.info("userId: {} register practiceId: {}", userId, practiceNote.getId());
     }
 
     public PracticeNoteDetailResponseDto findPracticeNoteDetail(Long practiceId){
@@ -59,11 +61,14 @@ public class PracticeNoteService {
                 ProblemResponseDto::from
         ).toList();
 
+        log.info("find detail for practiceId: {}", practiceNote.getId());
         return PracticeNoteDetailResponseDto.from(practiceNote, problemResponseDtoList);
     }
 
     public List<PracticeNoteThumbnailResponseDto> findAllPracticeThumbnailsByUser(Long userId){
         List<PracticeNote> practiceNoteList = practiceNoteRepository.findAllByUserId(userId);
+
+        log.info("userId: {} find all practice thumbnails", userId);
 
         return practiceNoteList.stream().map(
                 PracticeNoteThumbnailResponseDto::from
@@ -73,6 +78,8 @@ public class PracticeNoteService {
     public void updatePracticeNoteCount(Long practiceId) {
         PracticeNote practiceNote = getPracticeEntity(practiceId);
         practiceNote.updatePracticeNoteCount();
+
+        log.info("practiceId: {} count has updated", practiceId);
     }
 
     public void updatePracticeInfo(PracticeNoteRegisterDto practiceNoteRegisterDto) {
@@ -108,6 +115,8 @@ public class PracticeNoteService {
                 deleteProblemFromPractice(practiceId, problemId);
             });
         }
+
+        log.info("practiceId: {} has updated", practiceId);
     }
 
     public void deletePractice(Long practiceId) {
@@ -115,6 +124,7 @@ public class PracticeNoteService {
         practiceNote.getProblemPracticeNoteMappingList().clear();  // 매핑 삭제
 
         practiceNoteRepository.delete(practiceNote);
+        log.info("practiceId: {} has deleted", practiceId);
     }
 
     public void deletePractices(List<Long> practiceIds) {
@@ -125,6 +135,7 @@ public class PracticeNoteService {
         List<PracticeNote> practiceNoteList = practiceNoteRepository.findAllByUserId(userId);
 
         practiceNoteRepository.deleteAll(practiceNoteList);
+        log.info("userId: {} has delete all practices", userId);
     }
 
     private void addProblemToPractice(PracticeNote practiceNote, Long problemId) {
@@ -142,6 +153,7 @@ public class PracticeNoteService {
 
     private void deleteProblemFromPractice(Long practiceId, Long problemId) {
         practiceNoteRepository.deleteProblemFromPractice(practiceId, problemId);
+        log.info("problemId: {} has deleted from practiceId: {}", problemId, practiceId);
     }
 
     public void deleteProblemsFromAllPractice(List<Long> deleteProblemIdList) {
