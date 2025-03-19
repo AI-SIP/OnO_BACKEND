@@ -22,12 +22,16 @@ public class UserAuthService {
     public TokenResponseDto signUpGuestUser() {
 
         UserResponseDto userResponseDto = userService.registerGuestUser();
+        log.info("userId : {} has sign up", userResponseDto.userId());
+
         return jwtTokenService.generateTokens(userResponseDto.userId(), Authority.GUEST);
     }
 
     public TokenResponseDto signUpMemberUser(UserRegisterDto userRegisterDto) {
 
         UserResponseDto userResponseDto = userService.registerMemberUser(userRegisterDto);
+        log.info("userId : {} user has sign up", userResponseDto.userId());
+
         return jwtTokenService.generateTokens(userResponseDto.userId(), Authority.MEMBER);
     }
 
