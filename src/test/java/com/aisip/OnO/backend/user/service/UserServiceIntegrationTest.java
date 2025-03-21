@@ -1,6 +1,6 @@
 package com.aisip.OnO.backend.user.service;
 
-import com.aisip.OnO.backend.auth.service.UserAuthService;
+import com.aisip.OnO.backend.auth.WithMockCustomUser;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
@@ -28,62 +28,50 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT) // 랜덤 포트로 애플리케이션 실행
 @AutoConfigureMockMvc
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class) // 테스트 순서 지정 가능
-public class UserAuthServiceIntegrationTest {
+public class UserServiceIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private UserAuthService userAuthService;
-
-    @Autowired
     private UserService userService;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Autowired
     private ObjectMapper objectMapper;
 
-    private static Long userId; // 생성된 유저 ID 저장
+    private Long userId;
 
     @BeforeEach
     void setUp() {
+        // 유저 등록 (식별자 중복 피하려고 시간 기반 추가)
+        String uniqueIdentifier = "testIdentifier_" + System.currentTimeMillis();
+        UserRegisterDto registerDto = new UserRegisterDto(
+                "test@example.com", "testUser", uniqueIdentifier, "MEMBER", null
+        );
+        userService.registerMemberUser(registerDto);
+        User savedUser = userService.findUserEntityByIdentifier(uniqueIdentifier);
+        userId = savedUser.getId();
 
+        // 인증 설정
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        userId, null, List.of(new SimpleGrantedAuthority("ROLE_MEMBER"))
+                )
+        );
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+        userRepository.deleteAll();
     }
 
     @Test
-    @Order(1)
-    @DisplayName(" 유저 회원가입 - 성공")
-    void registerUser() throws Exception {
-        // Given
-        UserRegisterDto requestDto = new UserRegisterDto("test@example.com", "testUser", "testIdentifier", "MEMBER", null);
-
-        // When & Then
-        mockMvc.perform(post("/api/auth/signup/member")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(requestDto)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.accessToken").exists()) // 토큰 발급 확인
-                .andExpect(jsonPath("$.data.refreshToken").exists());
-
-        // 저장된 유저 확인
-        User savedUser = userService.findUserEntityByIdentifier("testIdentifier");
-        assertThat(savedUser).isNotNull();
-        assertThat(savedUser.getId()).isNotNull();
-        userId = savedUser.getId(); // 이후 테스트를 위해 userId 저장
-    }
-
-    @Test
-    @Order(2)
     @DisplayName("유저 정보 조회 - 성공")
     void getUserInfo() throws Exception {
-        // Given (유저 데이터 미리 저장)
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(userId, null, List.of(new SimpleGrantedAuthority("ROLE_MEMBER")))
-        );
-
         // When & Then
         mockMvc.perform(get("/api/user")
                         .contentType(MediaType.APPLICATION_JSON))
@@ -93,14 +81,9 @@ public class UserAuthServiceIntegrationTest {
     }
 
     @Test
-    @Order(3)
     @DisplayName("유저 정보 수정 - 성공")
     void updateUserInfo() throws Exception {
         // Given
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(userId, null, List.of(new SimpleGrantedAuthority("ROLE_MEMBER")))
-        );
-
         UserRegisterDto updateRequest = new UserRegisterDto("updated@example.com", "UpdatedUser", "updatedIdentifier", "MEMBER", null);
 
         // When & Then
@@ -117,14 +100,9 @@ public class UserAuthServiceIntegrationTest {
     }
 
     @Test
-    @Order(4)
     @DisplayName("유저 삭제 - 성공")
+    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
     void deleteUserInfo() throws Exception {
-        // Given
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(userId, null, List.of(new SimpleGrantedAuthority("ROLE_MEMBER")))
-        );
-
         // When & Then
         mockMvc.perform(delete("/api/user")
                         .contentType(MediaType.APPLICATION_JSON))
