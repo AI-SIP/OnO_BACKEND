@@ -120,18 +120,57 @@ class ProblemServiceTest {
 
     @Test
     void findUserProblems() {
+        //given
+        when(problemRepository.findAllByUserId(userId)).thenReturn(problemList);
+
+        //when
+        List<ProblemResponseDto> problemResponseDtoList = problemService.findUserProblems(userId);
+
+        //then
+        assertThat(problemResponseDtoList.get(0)).isNotNull();
+        assertThat(problemResponseDtoList.size()).isEqualTo(5);
+        assertThat(problemResponseDtoList.get(0).imageUrlList().size()).isEqualTo(2);
     }
 
     @Test
     void findFolderProblemList() {
+        //given
+        Long folderId = 1L;
+        when(problemRepository.findAllByFolderId(folderId)).thenReturn(List.of(problemList.get(0), problemList.get(1), problemList.get(2)));
+
+        //when
+        List<ProblemResponseDto> problemResponseDtoList = problemService.findFolderProblemList(folderId);
+
+        //then
+        assertThat(problemResponseDtoList.get(0)).isNotNull();
+        assertThat(problemResponseDtoList.size()).isEqualTo(3);
+        assertThat(problemResponseDtoList.get(0).imageUrlList().size()).isEqualTo(2);
     }
 
     @Test
     void findAllProblems() {
+        //given
+        when(problemRepository.findAll()).thenReturn(problemList);
+
+        //when
+        List<ProblemResponseDto> problemResponseDtoList = problemService.findAllProblems();
+
+        //then
+        assertThat(problemResponseDtoList.get(0)).isNotNull();
+        assertThat(problemResponseDtoList.size()).isEqualTo(5);
+        assertThat(problemResponseDtoList.get(0).imageUrlList().size()).isEqualTo(2);
     }
 
     @Test
     void findProblemCountByUser() {
+        //given
+        when(problemRepository.countByUserId(userId)).thenReturn((long) problemList.size());
+
+        //when
+        Long problemCount = problemService.findProblemCountByUser(userId);
+
+        //then
+        assertThat(problemCount).isEqualTo(5L);
     }
 
     @Test
