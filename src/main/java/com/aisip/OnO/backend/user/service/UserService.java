@@ -81,10 +81,12 @@ public class UserService {
         user.updateUser(userRegisterDto);
 
         log.info("userId: {} has updated", userId);
+        userRepository.save(user);
     }
 
     public void deleteUserById(Long userId) {
         userRepository.deleteById(userId);
+        userRepository.flush();
 
         log.info("userId: {} has deleted", userId);
     }
