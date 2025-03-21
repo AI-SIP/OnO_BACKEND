@@ -51,41 +51,52 @@ class ProblemServiceTest {
     @Mock
     private FileUploadService fileUploadService;
 
-    private Long userId = 1L;
-    private Folder existFolder;
-    private Problem existProblem;
+    private final Long userId = 1L;
+    private List<Problem> problemList;
 
-    private List<ProblemImageData> existImageDataList;
+    private List<Folder> folderList;
 
     @BeforeEach
     void setUp() {
 
-        FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
-            "folder",
-            null,
-            null
-        );
-        existFolder = Folder.from(folderRegisterDto, null, userId);
+        problemList = new ArrayList<>();
+        folderList = new ArrayList<>();
 
-        ProblemRegisterDto problemRegisterDto = new ProblemRegisterDto(
-                200L,
-                "memo",
-                "reference",
-                null,
-                LocalDateTime.now(),
-                new ArrayList<>()
-        );
-        existProblem = Problem.from(problemRegisterDto, userId, existFolder);
+        // 폴더 2개 생성
+        for (int f = 1; f <= 2; f++) {
+            Folder folder = Folder.from(
+                    new FolderRegisterDto("folder" + f, null, null),
+                    null,
+                    userId
+            );
+            folderList.add(folder);
+        }
 
-        List<ProblemImageDataRegisterDto> imageDataRegisterDtoList = List.of(
-                new ProblemImageDataRegisterDto(null, "imageUrl1", ProblemImageType.valueOf(1)),
-                new ProblemImageDataRegisterDto(null, "imageUrl2", ProblemImageType.valueOf(2))
-        );
+        // 문제 5개 생성 (폴더 1번에 3개, 폴더 2번에 2개)
+        for (int i = 1; i <= 5; i++) {
+            Folder folder = (i <= 3) ? folderList.get(0) : folderList.get(1);
+            Problem problem = Problem.from(
+                    new ProblemRegisterDto(
+                            (long) i,
+                            "memo" + i,
+                            "reference" + i,
+                            null,
+                            LocalDateTime.now(),
+                            new ArrayList<>()
+                    ),
+                    userId,
+                    folder
+            );
 
-        existImageDataList = imageDataRegisterDtoList.stream()
-                .map(imageData -> ProblemImageData.from(imageData, existProblem)).toList();
+            // 이미지 2개씩 추가
+            List<ProblemImageData> imageDataList = List.of(
+                    ProblemImageData.from(new ProblemImageDataRegisterDto(null, "url" + i + "_1", ProblemImageType.PROBLEM_IMAGE), problem),
+                    ProblemImageData.from(new ProblemImageDataRegisterDto(null, "url" + i + "_2", ProblemImageType.ANSWER_IMAGE), problem)
+            );
+            problem.updateImageDataList(imageDataList);
 
-        existProblem.updateImageDataList(existImageDataList);
+            problemList.add(problem);
+        }
     }
 
     @AfterEach
@@ -96,14 +107,14 @@ class ProblemServiceTest {
     void findProblem() {
         // given
         Long problemId = 200L;
-        when(problemRepository.findProblemWithImageData(problemId)).thenReturn(Optional.of(existProblem));
+        when(problemRepository.findProblemWithImageData(problemId)).thenReturn(Optional.of(problemList.get(0)));
 
         // when
         ProblemResponseDto problemResponseDto = problemService.findProblem(problemId, userId);
 
         // then
-        assertThat(problemResponseDto.memo()).isEqualTo("memo");
-        assertThat(problemResponseDto.reference()).isEqualTo("reference");
+        assertThat(problemResponseDto.memo()).isEqualTo("memo1");
+        assertThat(problemResponseDto.reference()).isEqualTo("reference1");
         assertThat(problemResponseDto.imageUrlList().size()).isEqualTo(2);
     }
 
@@ -131,7 +142,7 @@ class ProblemServiceTest {
                 null,
                 "memo",
                 "reference",
-                existFolder.getId(),
+                1L,
                 LocalDateTime.now(),
                 List.of(
                         new ProblemImageDataRegisterDto(null, "imageUrl1", ProblemImageType.valueOf(1)),
@@ -139,8 +150,8 @@ class ProblemServiceTest {
                 )
         );
 
-        when(folderRepository.findById(existFolder.getId())).thenReturn(Optional.of(existFolder));
-        when(problemRepository.save(any(Problem.class))).thenReturn(existProblem);
+        when(folderRepository.findById(1L)).thenReturn(Optional.of(folderList.get(0)));
+        when(problemRepository.save(any(Problem.class))).thenReturn(problemList.get(0));
 
         // When
         problemService.registerProblem(dto, userId);
@@ -196,7 +207,7 @@ class ProblemServiceTest {
 
         List<ProblemImageData> imageDataList = imageDataRegisterDtoList.stream()
                 .map(imageData -> {
-                    return ProblemImageData.from(imageData, existProblem);
+                    return ProblemImageData.from(imageData, problemList.get(0));
                 }).collect(Collectors.toList());
 
         when(problemImageDataRepository.findAllByProblemId(problemId)).thenReturn(imageDataList);
