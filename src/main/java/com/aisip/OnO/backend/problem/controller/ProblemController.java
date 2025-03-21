@@ -91,6 +91,15 @@ public class ProblemController {
         return CommonResponse.success("문제가 수정되었습니다.");
     }
 
+    // ✅ 문제 수정
+    @PatchMapping("/imageData")
+    public CommonResponse<String> updateProblemImageData(@RequestBody ProblemRegisterDto problemRegisterDto) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        problemService.updateProblemImageData(problemRegisterDto, userId);
+
+        return CommonResponse.success("문제가 수정되었습니다.");
+    }
+
     @DeleteMapping("")
     public CommonResponse<String> deleteProblems(
             @RequestBody ProblemDeleteRequestDto deleteRequestDto

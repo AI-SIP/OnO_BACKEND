@@ -38,7 +38,8 @@ public class ProblemService {
     private final FileUploadService fileUploadService;
 
     public ProblemResponseDto findProblem(Long problemId, Long userId) {
-        Problem problem = findProblemEntity(problemId, userId);
+        Problem problem = problemRepository.findProblemWithImageData(problemId)
+                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
         log.info("userId: {} find problemId: {}", userId, problemId);
         return ProblemResponseDto.from(problem);
@@ -91,7 +92,7 @@ public class ProblemService {
         Problem problem = Problem.from(problemRegisterDto, userId, folder);
         problemRepository.save(problem);
 
-        problemRegisterDto.imageDataList()
+        problemRegisterDto.imageDataDtoList()
                 .forEach(problemImageDataRegisterDto -> {
                     ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
                     problemImageDataRepository.save(problemImageData);
@@ -115,6 +116,7 @@ public class ProblemService {
 
         problem.updateProblem(problemRegisterDto);
 
+
         log.info("userId: {} update problemId: {}", userId, problem.getId());
     }
 
@@ -131,6 +133,21 @@ public class ProblemService {
         }
 
         log.info("userId: {} failed update problem", userId);
+    }
+
+    public void updateProblemImageData(ProblemRegisterDto problemRegisterDto, Long userId) {
+        Problem problem = findProblemEntity(problemRegisterDto.problemId(), userId);
+
+        if (problemRegisterDto.imageDataDtoList() != null) {
+            List<ProblemImageData> imageDataList = problemRegisterDto.imageDataDtoList().stream()
+                    .map(problemImageDataRegisterDto -> {
+                        return ProblemImageData.from(problemImageDataRegisterDto, problem);
+                    }).toList();
+
+            problem.updateImageDataList(imageDataList);
+        }
+
+        log.info("userId: {} update problem Image Data", userId);
     }
 
     @Transactional

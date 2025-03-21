@@ -6,6 +6,7 @@ import lombok.Builder;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Builder(access = AccessLevel.PRIVATE)
 public record ProblemResponseDto (
@@ -26,7 +27,8 @@ public record ProblemResponseDto (
 ) {
     public static ProblemResponseDto from(Problem problem) {
 
-        List<ProblemImageDataResponseDto> problemImageDataList = problem.getProblemImageDataList()
+        List<ProblemImageDataResponseDto> problemImageDataList = Optional.ofNullable(problem.getProblemImageDataList())
+                .orElse(List.of())
                 .stream().map(ProblemImageDataResponseDto::from).toList();
 
         return ProblemResponseDto.builder()
