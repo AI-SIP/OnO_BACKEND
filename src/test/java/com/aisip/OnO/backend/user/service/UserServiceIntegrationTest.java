@@ -1,6 +1,5 @@
 package com.aisip.OnO.backend.user.service;
 
-import com.aisip.OnO.backend.auth.WithMockCustomUser;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
@@ -101,7 +100,6 @@ public class UserServiceIntegrationTest {
 
     @Test
     @DisplayName("유저 삭제 - 성공")
-    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
     void deleteUserInfo() throws Exception {
         // When & Then
         mockMvc.perform(delete("/api/user")
