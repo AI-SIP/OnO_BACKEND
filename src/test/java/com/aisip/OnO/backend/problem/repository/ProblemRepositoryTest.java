@@ -3,6 +3,11 @@ package com.aisip.OnO.backend.problem.repository;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
+import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
+import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
+import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
+import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
+import com.aisip.OnO.backend.practicenote.repository.ProblemPracticeNoteMappingRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
@@ -39,10 +44,16 @@ class ProblemRepositoryTest {
     @Autowired private ProblemImageDataRepository problemImageDataRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private FolderRepository folderRepository;
+
+    @Autowired private PracticeNoteRepository practiceNoteRepository;
+
+    @Autowired private ProblemPracticeNoteMappingRepository problemPracticeNoteMappingRepository;
     @Autowired private EntityManager em;
 
     private User savedUser;
     private Folder savedFolder;
+
+    private PracticeNote savedPracticeNote;
 
     @BeforeEach
     void setUp() {
@@ -68,6 +79,16 @@ class ProblemRepositoryTest {
                 savedUser.getId()
         ));
 
+        PracticeNoteRegisterDto practiceNoteRegisterDto = new PracticeNoteRegisterDto(
+                null,
+                "practiceTitle",
+                List.of(1L, 2L, 3L, 4L, 5L)
+        );
+        savedPracticeNote = practiceNoteRepository.save(PracticeNote.from(
+                practiceNoteRegisterDto,
+                savedUser.getId()
+        ));
+
         for (int i = 1; i <= 5; i++) {
             ProblemRegisterDto problemRegisterDto = new ProblemRegisterDto(
                     (long) i,
@@ -81,6 +102,10 @@ class ProblemRepositoryTest {
                     problemRegisterDto,
                     savedUser.getId(),
                     savedFolder
+            ));
+
+            ProblemPracticeNoteMapping problemPracticeNoteMapping = problemPracticeNoteMappingRepository.save(ProblemPracticeNoteMapping.from(
+                    savedPracticeNote, problem
             ));
 
             // 연관된 이미지 추가
@@ -109,6 +134,24 @@ class ProblemRepositoryTest {
     @DisplayName("userId로 문제 조회 - 성공")
     void findAllByUserId_success() {
         List<Problem> problems = problemRepository.findAllByUserId(savedUser.getId());
+
+        assertThat(problems).hasSize(5);
+        assertThat(problems.get(0).getProblemImageDataList()).hasSize(3); // fetch join 확인
+    }
+
+    @Test
+    @DisplayName("folderId로 문제 조회 - 실패")
+    void findAllByFolderId_success() {
+        List<Problem> problems = problemRepository.findAllByFolderId(savedFolder.getId());
+
+        assertThat(problems).hasSize(5);
+        assertThat(problems.get(0).getProblemImageDataList()).hasSize(3); // fetch join 확인
+    }
+
+    @Test
+    @DisplayName("practiceId로 문제 조회 - 실패")
+    void findAllByPracticeId_success() {
+        List<Problem> problems = problemRepository.findAllProblemsByPracticeId(savedPracticeNote.getId());
 
         assertThat(problems).hasSize(5);
         assertThat(problems.get(0).getProblemImageDataList()).hasSize(3); // fetch join 확인
