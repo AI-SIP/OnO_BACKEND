@@ -236,22 +236,44 @@ class ProblemServiceTest {
                 )
         );
 
+        Problem target = problemList.get(0);
+
         //when
         problemService.updateProblemInfo(updateDto, userId);
 
         //then
-        Optional<Problem> optionalProblem = problemRepository.findById(problemId);
-        if (optionalProblem.isPresent()) {
-            Problem problem = optionalProblem.get();
-            assertThat(problem.getMemo()).isEqualTo("update memo");
-            assertThat(problem.getReference()).isEqualTo("update reference");
-        } else{
-            assertThat(true).isEqualTo(false);
-        }
+        assertThat(target.getMemo()).isEqualTo("update memo");
+        assertThat(target.getReference()).isEqualTo("update reference");
     }
 
     @Test
     void updateProblemFolder() {
+        Long problemId = 1L;
+        Long folderId = 2L;
+
+        // Given
+        when(problemRepository.findById(problemId)).thenReturn(Optional.of(problemList.get(0)));
+        when(folderRepository.findById(folderId)).thenReturn(Optional.of(folderList.get(1)));
+
+        ProblemRegisterDto updateDto = new ProblemRegisterDto(
+                problemId,
+                "update memo",
+                "update reference",
+                2L,
+                LocalDateTime.now(),
+                List.of(
+                        new ProblemImageDataRegisterDto(null, "imageUrl1", ProblemImageType.valueOf(1)),
+                        new ProblemImageDataRegisterDto(null, "imageUrl2", ProblemImageType.valueOf(2))
+                )
+        );
+
+        Problem target = problemList.get(0);
+
+        //when
+        problemService.updateProblemFolder(updateDto, userId);
+
+        // Then
+        assertThat(target.getFolder()).isEqualTo(folderList.get(1));
     }
 
     @Test

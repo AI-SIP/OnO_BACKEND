@@ -130,8 +130,6 @@ public class ProblemService {
 
             log.info("userId: {} update problem folder, problemId: {}, folderId: {}", userId, problem.getId(), folder.getId());
         }
-
-        log.info("userId: {} failed update problem", userId);
     }
 
     public void updateProblemImageData(ProblemRegisterDto problemRegisterDto, Long userId) {
