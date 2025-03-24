@@ -418,7 +418,15 @@ class ProblemServiceTest {
     }
 
     @Test
+    @DisplayName("deleteProblemImageData - 특정 이미지 URL로 이미지 삭제")
     void deleteProblemImageData() {
+        // given
+        String imageUrl = "https://s3.amazonaws.com/bucket/problem_image_123.jpg";
 
+        // when
+        problemService.deleteProblemImageData(imageUrl);
+
+        // then
+        verify(problemImageDataRepository, times(1)).deleteByImageUrl(imageUrl);
     }
 }
