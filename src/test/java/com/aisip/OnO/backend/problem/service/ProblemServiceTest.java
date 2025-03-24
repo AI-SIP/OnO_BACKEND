@@ -277,6 +277,36 @@ class ProblemServiceTest {
     }
 
     @Test
+    void updateProblemImageData() {
+        // Given
+        Long problemId = 1L;
+
+        when(problemRepository.findById(problemId)).thenReturn(Optional.of(problemList.get(0)));
+
+        ProblemRegisterDto updateDto = new ProblemRegisterDto(
+                problemId,
+                "update memo",
+                "update reference",
+                2L,
+                LocalDateTime.now(),
+                List.of(
+                        new ProblemImageDataRegisterDto(problemId, "imageUrl1 update", ProblemImageType.valueOf(1)),
+                        new ProblemImageDataRegisterDto(problemId, "imageUrl2 update", ProblemImageType.valueOf(2))
+                )
+        );
+
+        Problem target = problemList.get(0);
+
+        //when
+        problemService.updateProblemImageData(updateDto, userId);
+
+        //then
+        assertThat(target.getProblemImageDataList().size()).isEqualTo(2);
+        assertThat(target.getProblemImageDataList().get(0).getImageUrl()).isEqualTo("imageUrl1 update");
+        assertThat(target.getProblemImageDataList().get(1).getImageUrl()).isEqualTo("imageUrl2 update");
+    }
+
+    @Test
     void deleteProblems() {
     }
 
@@ -292,9 +322,7 @@ class ProblemServiceTest {
         );
 
         List<ProblemImageData> imageDataList = imageDataRegisterDtoList.stream()
-                .map(imageData -> {
-                    return ProblemImageData.from(imageData, problemList.get(0));
-                }).collect(Collectors.toList());
+                .map(imageData -> ProblemImageData.from(imageData, problemList.get(0))).collect(Collectors.toList());
 
         when(problemImageDataRepository.findAllByProblemId(problemId)).thenReturn(imageDataList);
 
