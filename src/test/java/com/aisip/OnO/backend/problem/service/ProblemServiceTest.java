@@ -6,6 +6,7 @@ import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
+import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
@@ -32,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.util.ReflectionTestUtils.setField;
 
 @SpringBootTest
 class ProblemServiceTest {
@@ -69,6 +71,7 @@ class ProblemServiceTest {
                     null,
                     userId
             );
+            setField(folder, "id", (long) f);
             folderList.add(folder);
         }
 
@@ -87,6 +90,7 @@ class ProblemServiceTest {
                     userId,
                     folder
             );
+            setField(problem, "id", (long) i);
 
             // 이미지 2개씩 추가
             List<ProblemImageData> imageDataList = List.of(
@@ -307,10 +311,6 @@ class ProblemServiceTest {
     }
 
     @Test
-    void deleteProblems() {
-    }
-
-    @Test
     @DisplayName("deleteProblem - 정상 케이스")
     void deleteProblem_success() {
         // Given
@@ -336,22 +336,89 @@ class ProblemServiceTest {
     }
 
     @Test
+    @DisplayName("deleteProblems - 특정 유저의 모든 문제 삭제하기")
+    void deleteProblems_userId() {
+        // given
+        ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
+                userId,
+                null,
+                null
+        );
+
+        when(problemRepository.findAllByUserId(userId)).thenReturn(problemList);
+        for (int i = 0; i < problemList.size(); i++) {
+            Long problemId = (long) i + 1;
+            when(problemImageDataRepository.findAllByProblemId(problemId)).thenReturn(problemList.get(i).getProblemImageDataList());
+        }
+
+        // when
+        problemService.deleteProblems(problemDeleteRequestDto);
+
+        // then
+        verify(problemRepository).findAllByUserId(userId);
+        verify(fileUploadService, times(2 * problemList.size())).deleteImageFileFromS3(anyString());
+        verify(problemImageDataRepository, times(2 * problemList.size())).delete(any(ProblemImageData.class));
+        verify(problemRepository, times(problemList.size())).deleteById(anyLong());
+    }
+
+    @Test
+    @DisplayName("deleteProblems - 삭제할 문제 목록을 전달받아 삭제하기")
+    void deleteProblems_problemIdList() {
+        // given
+        List<Long> problemIdList = List.of(1L, 2L, 3L);
+
+        ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
+                null,
+                problemIdList,
+                null
+        );
+
+        for (int i = 0; i < problemList.size(); i++) {
+            Long problemId = (long) i + 1;
+            when(problemImageDataRepository.findAllByProblemId(problemId)).thenReturn(problemList.get(i).getProblemImageDataList());
+        }
+
+        // when
+        problemService.deleteProblems(problemDeleteRequestDto);
+
+        // then
+        verify(fileUploadService, times(2 * problemIdList.size())).deleteImageFileFromS3(anyString());
+        verify(problemImageDataRepository, times(2 * problemIdList.size())).delete(any(ProblemImageData.class));
+        verify(problemRepository, times(problemIdList.size())).deleteById(anyLong());
+    }
+
+    @Test
+    @DisplayName("deleteProblems - 삭제할 폴더 목록을 전달받아 삭제하기")
+    void deleteProblems_folderIdList() {
+        // given
+        List<Long> folderIdList = List.of(1L, 2L);
+
+        ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
+                null,
+                null,
+                folderIdList
+        );
+
+        when(problemRepository.findAllByFolderId(1L)).thenReturn(List.of(problemList.get(0), problemList.get(1), problemList.get(2)));
+        when(problemRepository.findAllByFolderId(2L)).thenReturn(List.of(problemList.get(3), problemList.get(4)));
+        for (int i = 0; i < problemList.size(); i++) {
+            Long problemId = (long) i + 1;
+            when(problemImageDataRepository.findAllByProblemId(problemId)).thenReturn(problemList.get(i).getProblemImageDataList());
+        }
+
+        // when
+        problemService.deleteProblems(problemDeleteRequestDto);
+
+        // then
+        verify(problemRepository).findAllByFolderId(1L);
+        verify(problemRepository).findAllByFolderId(2L);
+        verify(fileUploadService, times(2 * 5)).deleteImageFileFromS3(anyString());
+        verify(problemImageDataRepository, times(2 * 5)).delete(any(ProblemImageData.class));
+        verify(problemRepository, times(5)).deleteById(anyLong());
+    }
+
+    @Test
     void deleteProblemImageData() {
-    }
 
-    @Test
-    void deleteProblemList() {
-    }
-
-    @Test
-    void deleteFolderProblems() {
-    }
-
-    @Test
-    void deleteAllByFolderIds() {
-    }
-
-    @Test
-    void deleteAllUserProblems() {
     }
 }
