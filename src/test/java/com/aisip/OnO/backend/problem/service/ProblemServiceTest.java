@@ -108,6 +108,7 @@ class ProblemServiceTest {
     }
 
     @Test
+    @DisplayName("problemId를 사용해 특정 문제 조회하기")
     void findProblem() {
         // given
         Long problemId = 200L;
@@ -123,6 +124,7 @@ class ProblemServiceTest {
     }
 
     @Test
+    @DisplayName("특정 유저의 모든 문제 목록 조회하기")
     void findUserProblems() {
         //given
         when(problemRepository.findAllByUserId(userId)).thenReturn(problemList);
@@ -137,6 +139,7 @@ class ProblemServiceTest {
     }
 
     @Test
+    @DisplayName("특정 폴더의 모든 문제 목록 조회하기")
     void findFolderProblemList() {
         //given
         Long folderId = 1L;
@@ -152,6 +155,7 @@ class ProblemServiceTest {
     }
 
     @Test
+    @DisplayName("모든 문제 목록 조회하기")
     void findAllProblems() {
         //given
         when(problemRepository.findAll()).thenReturn(problemList);
@@ -166,6 +170,7 @@ class ProblemServiceTest {
     }
 
     @Test
+    @DisplayName("유저의 문제 수 조회하기")
     void findProblemCountByUser() {
         //given
         when(problemRepository.countByUserId(userId)).thenReturn((long) problemList.size());
@@ -178,7 +183,7 @@ class ProblemServiceTest {
     }
 
     @Test
-    @DisplayName("registerProblem - 정상 케이스")
+    @DisplayName("문제 등록하기 - 정상 케이스")
     void registerProblem_success() {
         // Given
         ProblemRegisterDto dto = new ProblemRegisterDto(
@@ -205,7 +210,7 @@ class ProblemServiceTest {
     }
 
     @Test
-    @DisplayName("registerProblem - 존재하지 않는 폴더 예외")
+    @DisplayName("문제 등록하기 - 존재하지 않는 폴더 예외")
     void registerProblem_folderNotFound() {
         // Given
         ProblemRegisterDto dto = new ProblemRegisterDto(
@@ -222,6 +227,7 @@ class ProblemServiceTest {
     }
 
     @Test
+    @DisplayName("문제 정보(memo, reference) 수정")
     void updateProblemInfo() {
         Long problemId = 1L;
 
@@ -251,6 +257,7 @@ class ProblemServiceTest {
     }
 
     @Test
+    @DisplayName("문제 폴더 수정")
     void updateProblemFolder() {
         Long problemId = 1L;
         Long folderId = 2L;
@@ -281,6 +288,7 @@ class ProblemServiceTest {
     }
 
     @Test
+    @DisplayName("문제 이미지 데이터 수정")
     void updateProblemImageData() {
         // Given
         Long problemId = 1L;
@@ -311,7 +319,7 @@ class ProblemServiceTest {
     }
 
     @Test
-    @DisplayName("deleteProblem - 정상 케이스")
+    @DisplayName("특정 문제 삭제 - 정상 케이스")
     void deleteProblem_success() {
         // Given
         Long problemId = 123L;
@@ -336,7 +344,7 @@ class ProblemServiceTest {
     }
 
     @Test
-    @DisplayName("deleteProblems - 특정 유저의 모든 문제 삭제하기")
+    @DisplayName("특정 유저의 모든 문제 삭제하기")
     void deleteProblems_userId() {
         // given
         ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
@@ -362,7 +370,7 @@ class ProblemServiceTest {
     }
 
     @Test
-    @DisplayName("deleteProblems - 삭제할 문제 목록을 전달받아 삭제하기")
+    @DisplayName("삭제할 문제 목록을 전달받아 삭제하기")
     void deleteProblems_problemIdList() {
         // given
         List<Long> problemIdList = List.of(1L, 2L, 3L);
@@ -388,7 +396,7 @@ class ProblemServiceTest {
     }
 
     @Test
-    @DisplayName("deleteProblems - 삭제할 폴더 목록을 전달받아 삭제하기")
+    @DisplayName("삭제할 폴더 목록을 전달받아 삭제하기")
     void deleteProblems_folderIdList() {
         // given
         List<Long> folderIdList = List.of(1L, 2L);
@@ -418,7 +426,7 @@ class ProblemServiceTest {
     }
 
     @Test
-    @DisplayName("deleteProblemImageData - 특정 이미지 URL로 이미지 삭제")
+    @DisplayName("특정 이미지 URL로 이미지 삭제")
     void deleteProblemImageData() {
         // given
         String imageUrl = "https://s3.amazonaws.com/bucket/problem_image_123.jpg";
