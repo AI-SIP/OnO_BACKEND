@@ -218,11 +218,36 @@ class ProblemServiceTest {
     }
 
     @Test
-    void registerProblemImageData() {
-    }
-
-    @Test
     void updateProblemInfo() {
+        Long problemId = 1L;
+
+        // Given
+        when(problemRepository.findById(problemId)).thenReturn(Optional.of(problemList.get(0)));
+
+        ProblemRegisterDto updateDto = new ProblemRegisterDto(
+                problemId,
+                "update memo",
+                "update reference",
+                1L,
+                LocalDateTime.now(),
+                List.of(
+                        new ProblemImageDataRegisterDto(null, "imageUrl1", ProblemImageType.valueOf(1)),
+                        new ProblemImageDataRegisterDto(null, "imageUrl2", ProblemImageType.valueOf(2))
+                )
+        );
+
+        //when
+        problemService.updateProblemInfo(updateDto, userId);
+
+        //then
+        Optional<Problem> optionalProblem = problemRepository.findById(problemId);
+        if (optionalProblem.isPresent()) {
+            Problem problem = optionalProblem.get();
+            assertThat(problem.getMemo()).isEqualTo("update memo");
+            assertThat(problem.getReference()).isEqualTo("update reference");
+        } else{
+            assertThat(true).isEqualTo(false);
+        }
     }
 
     @Test

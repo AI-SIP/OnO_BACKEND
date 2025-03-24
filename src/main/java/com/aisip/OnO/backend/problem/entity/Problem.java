@@ -59,11 +59,11 @@ public class Problem extends BaseEntity {
 
     public void updateProblem(ProblemRegisterDto problemRegisterDto) {
         if (problemRegisterDto.memo() != null && !problemRegisterDto.memo().isBlank()) {
-            this.memo = memo;
+            this.memo = problemRegisterDto.memo();
         }
 
         if (problemRegisterDto.reference() != null && !problemRegisterDto.reference().isBlank()) {
-            this.reference = reference;
+            this.reference = problemRegisterDto.reference();
         }
     }
 

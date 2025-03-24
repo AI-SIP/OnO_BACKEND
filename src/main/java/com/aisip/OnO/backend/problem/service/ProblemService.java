@@ -116,7 +116,6 @@ public class ProblemService {
 
         problem.updateProblem(problemRegisterDto);
 
-
         log.info("userId: {} update problemId: {}", userId, problem.getId());
     }
 
