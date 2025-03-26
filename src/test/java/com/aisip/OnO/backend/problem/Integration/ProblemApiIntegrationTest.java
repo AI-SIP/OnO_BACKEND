@@ -13,6 +13,7 @@ import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -154,7 +156,7 @@ public class ProblemApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("특정 유저의 문제 개수 조회")
+    @DisplayName("특정 유저의 문제 개수 조회 API 테스트")
     @WithMockCustomUser()
     void findUserProblemCount() throws Exception {
         // given
@@ -164,5 +166,78 @@ public class ProblemApiIntegrationTest {
         mockMvc.perform(MockMvcRequestBuilders.get("/api/problem/problemCount"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(count));
+    }
+
+    @Test
+    @DisplayName("문제 등록 API 테스트")
+    @WithMockCustomUser()
+    void registerProblem() throws Exception {
+        // given
+        List<ProblemImageDataRegisterDto> problemImageDataRegisterDtoList = List.of(
+                new ProblemImageDataRegisterDto(
+                        null,
+                        "problemImageUrl",
+                        ProblemImageType.PROBLEM_IMAGE
+                ),
+                new ProblemImageDataRegisterDto(
+                        null,
+                        "answerImageUrl",
+                        ProblemImageType.ANSWER_IMAGE
+                ),
+                new ProblemImageDataRegisterDto(
+                        null,
+                        "solveImageUrl",
+                        ProblemImageType.SOLVE_IMAGE
+                )
+        );
+        ProblemRegisterDto problemRegisterDto = new ProblemRegisterDto(
+                null,
+                "memo",
+                "reference",
+                folderRepository.findAllByUserId(userId).get(0).getId(),
+                LocalDateTime.now(),
+                problemImageDataRegisterDtoList
+        );
+
+        // when & then
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/problem")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(problemRegisterDto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("문제가 등록되었습니다.")); // 또는 반환값에 맞게 수정
+
+        Problem problem = problemRepository.findAllByUserId(userId).get((int) (problemRepository.countByUserId(userId) - 1));
+
+        Assertions.assertThat(problem.getMemo()).isEqualTo(problemRegisterDto.memo());
+        Assertions.assertThat(problem.getReference()).isEqualTo(problemRegisterDto.reference());
+        Assertions.assertThat(problem.getProblemImageDataList().size()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("문제 이미지 등록 API 테스트")
+    @WithMockCustomUser()
+    void registerProblemImageData() throws Exception {
+        // given
+        List<Problem> problemList = problemRepository.findAllByUserId(userId);
+        Long problemId = problemList.get(0).getId();
+        ProblemImageDataRegisterDto problemImageDataRegisterDto = new ProblemImageDataRegisterDto(
+                problemId,
+                "solveImageUrl",
+                ProblemImageType.SOLVE_IMAGE
+        );
+
+        // when & then
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/problem/imageData")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(problemImageDataRegisterDto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("문제가 등록되었습니다.")); // 또는 반환값에 맞게 수정
+
+        problemList = problemRepository.findAllByUserId(userId);
+        Problem problem = problemList.get(0);
+        List<ProblemImageData> problemImageDataList = problem.getProblemImageDataList();
+
+        Assertions.assertThat(problemImageDataList.size()).isEqualTo(3);
+        Assertions.assertThat(problemImageDataList.get(problemImageDataList.size() - 1).getImageUrl()).isEqualTo("solveImageUrl");
     }
 }
