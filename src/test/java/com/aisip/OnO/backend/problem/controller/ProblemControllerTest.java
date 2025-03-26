@@ -77,28 +77,52 @@ class ProblemControllerTest {
     @Test
     @DisplayName("특정 문제 조회")
     @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
-    void getProblem() throws Exception{
+    void getProblem() throws Exception {
         //given
         Long problemId = 1L;
         given(problemService.findProblem(problemId, 1L)).willReturn(problemResponseDtoList.get(0));
 
         // When & Then
-        mockMvc.perform(get("/api/problem/"+problemId)
+        mockMvc.perform(get("/api/problem/" + problemId)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.problemId").value(1L))
                 .andExpect(jsonPath("$.data.memo").value("memo1"))
                 .andExpect(jsonPath("$.data.reference").value("reference1"))
+                .andExpect(jsonPath("$.data.imageUrlList.size()").value(3))
                 .andExpect(jsonPath("$.data.imageUrlList[0].imageUrl").value("imageUrl_1_1"))
                 .andExpect(jsonPath("$.data.imageUrlList[0].problemImageType").value("PROBLEM_IMAGE"));
     }
 
     @Test
-    void getProblemsByUserId() {
+    @DisplayName("특정 유저의 문제 전체 조회")
+    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    void getProblemsByUserId() throws Exception {
+        given(problemService.findUserProblems(1L)).willReturn(problemResponseDtoList);
+
+        // When & Then
+        mockMvc.perform(get("/api/problem/all")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.size()").value(5))
+                .andExpect(jsonPath("$.data[0].memo").value("memo1"))
+                .andExpect(jsonPath("$.data[0].reference").value("reference1"))
+                .andExpect(jsonPath("$.data[0].imageUrlList.size()").value(3))
+                .andExpect(jsonPath("$.data[0].imageUrlList[0].imageUrl").value("imageUrl_1_1"))
+                .andExpect(jsonPath("$.data[0].imageUrlList[0].problemImageType").value("PROBLEM_IMAGE"));
     }
 
     @Test
-    void getUserProblemCount() {
+    @DisplayName("특정 유저의 문제 개수 조회")
+    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    void getUserProblemCount() throws Exception {
+        given(problemService.findProblemCountByUser(1L)).willReturn((long) problemResponseDtoList.size());
+
+        // When & Then
+        mockMvc.perform(get("/api/problem/problemCount")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(5));
     }
 
     @Test
