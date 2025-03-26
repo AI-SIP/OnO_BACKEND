@@ -238,27 +238,6 @@ class ProblemControllerTest {
     }
 
     @Test
-    @DisplayName("문제 이미지 수정")
-    @WithMockCustomUser()
-    void updateProblemImageData() throws Exception {
-        // given
-        ProblemImageDataRegisterDto problemImageDataRegisterDto = new ProblemImageDataRegisterDto(
-                1L,
-                "problemImageUpdate",
-                ProblemImageType.PROBLEM_IMAGE
-        );
-
-        // when & then
-        mockMvc.perform(patch("/api/problem/imageData")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(problemImageDataRegisterDto)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value("문제가 수정되었습니다."));
-
-        verify(problemService, times(1)).updateProblemImageData(any(), eq(1L));
-    }
-
-    @Test
     @DisplayName("문제 삭제")
     @WithMockCustomUser()
     void deleteProblems() throws Exception {

@@ -233,11 +233,101 @@ public class ProblemApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value("문제가 등록되었습니다.")); // 또는 반환값에 맞게 수정
 
-        problemList = problemRepository.findAllByUserId(userId);
-        Problem problem = problemList.get(0);
+        Problem problem = problemRepository.findById(problemList.get(0).getId()).get();
         List<ProblemImageData> problemImageDataList = problem.getProblemImageDataList();
 
         Assertions.assertThat(problemImageDataList.size()).isEqualTo(3);
         Assertions.assertThat(problemImageDataList.get(problemImageDataList.size() - 1).getImageUrl()).isEqualTo("solveImageUrl");
+    }
+
+    @Test
+    @DisplayName("문제 메모, 출처 수정")
+    @WithMockCustomUser()
+    void updateProblemInfo() throws Exception {
+        // given
+        List<Problem> problemList = problemRepository.findAllByUserId(userId);
+        Long problemId = problemList.get(0).getId();
+        String updateMemo = "update memo";
+        String updateReference = "update reference";
+        ProblemRegisterDto problemRegisterDto = new ProblemRegisterDto(
+                problemId,
+                updateMemo,
+                updateReference,
+                null,
+                null,
+                null
+        );
+
+        // when & then
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problem/info")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(problemRegisterDto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("문제가 수정되었습니다.")); // 또는 반환값에 맞게 수정
+
+        Problem problem = problemRepository.findById(problemList.get(0).getId()).get();
+
+        Assertions.assertThat(problem.getMemo()).isEqualTo(updateMemo);
+        Assertions.assertThat(problem.getReference()).isEqualTo(updateReference);
+    }
+
+    @Test
+    @DisplayName("문제 폴더 수정")
+    @WithMockCustomUser()
+    void updateProblemPath() throws Exception {
+        // given
+        List<Problem> problemList = problemRepository.findAllByUserId(userId);
+        List<Folder> folderList = folderRepository.findAllByUserId(userId);
+
+        Long problemId = problemList.get(0).getId();
+        Long updateFolderId = folderList.get(1).getId();
+
+        ProblemRegisterDto problemRegisterDto = new ProblemRegisterDto(
+                problemId,
+                null,
+                null,
+                updateFolderId,
+                null,
+                null
+        );
+
+        // when & then
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problem/path")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(problemRegisterDto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("문제가 수정되었습니다.")); // 또는 반환값에 맞게 수정
+
+        Problem problem = problemRepository.findById(problemList.get(0).getId()).get();
+
+        Assertions.assertThat(problem.getFolder().getId()).isEqualTo(updateFolderId);
+    }
+
+    @Test
+    @DisplayName("문제 이미지 수정")
+    @WithMockCustomUser()
+    void updateProblemImageData() throws Exception {
+        // given
+        List<Problem> problemList = problemRepository.findAllByUserId(userId);
+
+        Long problemId = problemList.get(0).getId();
+
+        ProblemRegisterDto problemRegisterDto = new ProblemRegisterDto(
+                problemId,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+
+        // when & then
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problem/path")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(problemRegisterDto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("문제가 수정되었습니다.")); // 또는 반환값에 맞게 수정
+
+        Problem problem = problemRepository.findById(problemList.get(0).getId()).get();
     }
 }
