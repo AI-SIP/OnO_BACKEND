@@ -1,10 +1,13 @@
 package com.aisip.OnO.backend.problem.controller;
 
 import com.aisip.OnO.backend.auth.WithMockCustomUser;
+import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataResponseDto;
+import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.service.ProblemService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -22,8 +25,13 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -37,6 +45,9 @@ class ProblemControllerTest {
 
     @MockBean
     private ProblemService problemService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     private List<ProblemResponseDto> problemResponseDtoList;
 
@@ -126,11 +137,59 @@ class ProblemControllerTest {
     }
 
     @Test
-    void registerProblem() {
+    @DisplayName("문제 등록 기능")
+    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    void registerProblem() throws Exception {
+        // When & Then
+        mockMvc.perform(post("/api/problem")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ProblemRegisterDto(
+                                    1L,
+                                        "memo",
+                                        "reference",
+                                        1L,
+                                        LocalDateTime.now(),
+                                        List.of(
+                                                new ProblemImageDataRegisterDto(
+                                                        1L,
+                                                        "problemImage",
+                                                        ProblemImageType.PROBLEM_IMAGE
+                                                ),
+                                                new ProblemImageDataRegisterDto(
+                                                        1L,
+                                                        "answerImage",
+                                                        ProblemImageType.ANSWER_IMAGE
+                                                ),
+                                                new ProblemImageDataRegisterDto(
+                                                        1L,
+                                                        "solveImage",
+                                                        ProblemImageType.SOLVE_IMAGE
+                                                )
+                                        )
+
+                                ))))
+                .andExpect(status().isOk());
+
+        verify(problemService, times(1)).registerProblem(any(), eq(1L));  // userId가 1L인 것도 검증
     }
 
     @Test
-    void registerProblemImageData() {
+    @DisplayName("문제 이미지 등록")
+    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    void registerProblemImageData() throws Exception {
+        // When & Then
+        mockMvc.perform(post("/api/problem/imageData")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new ProblemImageDataRegisterDto(
+                                        1L,
+                                        "problemImage",
+                                        ProblemImageType.PROBLEM_IMAGE
+                                )
+                        )))
+                .andExpect(status().isOk());
+
+        verify(problemService, times(1)).registerProblemImageData(any(), eq(1L));  // userId가 1L인 것도 검증
     }
 
     @Test
