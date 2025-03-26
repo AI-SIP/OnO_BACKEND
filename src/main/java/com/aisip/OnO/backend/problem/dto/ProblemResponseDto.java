@@ -21,7 +21,7 @@ public record ProblemResponseDto (
 
     LocalDateTime createdAt,
 
-    LocalDateTime updateAt,
+    LocalDateTime updatedAt,
 
     List<ProblemImageDataResponseDto> imageUrlList
 ) {
@@ -37,7 +37,7 @@ public record ProblemResponseDto (
                 .reference(problem.getReference())
                 .solvedAt(problem.getSolvedAt())
                 .createdAt(problem.getCreatedAt())
-                .updateAt(problem.getUpdatedAt())
+                .updatedAt(problem.getUpdatedAt())
                 .imageUrlList(problemImageDataList)
                 .build();
     }
