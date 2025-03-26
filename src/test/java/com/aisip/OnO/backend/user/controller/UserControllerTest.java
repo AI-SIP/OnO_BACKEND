@@ -54,7 +54,7 @@ class UserControllerTest {
 
     @Test
     @DisplayName("사용자 정보 조회")
-    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    @WithMockCustomUser()
     void getUserInfo() throws Exception {
         // Given
         given(userService.findUser(1L)).willReturn(mockUserResponse);
@@ -69,7 +69,7 @@ class UserControllerTest {
 
     @Test
     @DisplayName("사용자 정보 수정")
-    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    @WithMockCustomUser()
     void updateUserInfo() throws Exception {
         // given
         UserRegisterDto updateRequest = new UserRegisterDto("updated@example.com", "UpdatedUser", "updatedIdentifier", "USER", null);
@@ -84,7 +84,7 @@ class UserControllerTest {
 
     @Test
     @DisplayName("사용자 계정 삭제")
-    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    @WithMockCustomUser()
     void deleteUserInfo() throws Exception {
         // when & then
         mockMvc.perform(delete("/api/user")

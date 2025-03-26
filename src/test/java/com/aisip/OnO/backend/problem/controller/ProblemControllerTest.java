@@ -84,7 +84,7 @@ class ProblemControllerTest {
 
     @Test
     @DisplayName("특정 문제 조회")
-    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    @WithMockCustomUser()
     void getProblem() throws Exception {
         //given
         Long problemId = 1L;
@@ -104,7 +104,7 @@ class ProblemControllerTest {
 
     @Test
     @DisplayName("특정 유저의 문제 전체 조회")
-    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    @WithMockCustomUser()
     void getProblemsByUserId() throws Exception {
         given(problemService.findUserProblems(1L)).willReturn(problemResponseDtoList);
 
@@ -122,7 +122,7 @@ class ProblemControllerTest {
 
     @Test
     @DisplayName("특정 유저의 문제 개수 조회")
-    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    @WithMockCustomUser()
     void getUserProblemCount() throws Exception {
         given(problemService.findProblemCountByUser(1L)).willReturn((long) problemResponseDtoList.size());
 
@@ -135,7 +135,7 @@ class ProblemControllerTest {
 
     @Test
     @DisplayName("문제 등록 기능")
-    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    @WithMockCustomUser()
     void registerProblem() throws Exception {
         // When & Then
         mockMvc.perform(post("/api/problem")
@@ -172,7 +172,7 @@ class ProblemControllerTest {
 
     @Test
     @DisplayName("문제 이미지 등록")
-    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    @WithMockCustomUser()
     void registerProblemImageData() throws Exception {
         // When & Then
         mockMvc.perform(post("/api/problem/imageData")
@@ -191,7 +191,7 @@ class ProblemControllerTest {
 
     @Test
     @DisplayName("문제 메모, 출처 수정")
-    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    @WithMockCustomUser()
     void updateProblemInfo() throws Exception {
         // given
         ProblemRegisterDto problemRegisterDto = new ProblemRegisterDto(
@@ -215,7 +215,7 @@ class ProblemControllerTest {
 
     @Test
     @DisplayName("문제 폴더 수정")
-    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    @WithMockCustomUser()
     void updateProblemPath() throws Exception {
         // given
         ProblemRegisterDto problemRegisterDto = new ProblemRegisterDto(
@@ -239,7 +239,7 @@ class ProblemControllerTest {
 
     @Test
     @DisplayName("문제 이미지 수정")
-    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    @WithMockCustomUser()
     void updateProblemImageData() throws Exception {
         // given
         ProblemImageDataRegisterDto problemImageDataRegisterDto = new ProblemImageDataRegisterDto(
@@ -260,7 +260,7 @@ class ProblemControllerTest {
 
     @Test
     @DisplayName("문제 삭제")
-    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    @WithMockCustomUser()
     void deleteProblems() throws Exception {
         // given
         ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
@@ -281,7 +281,7 @@ class ProblemControllerTest {
 
     @Test
     @DisplayName("문제 이미지 삭제")
-    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    @WithMockCustomUser()
     void deleteProblemImageData() throws Exception {
         // given
         String imageUrl = "imageUrl";
