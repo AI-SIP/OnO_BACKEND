@@ -1,10 +1,7 @@
 package com.aisip.OnO.backend.problem.controller;
 
 import com.aisip.OnO.backend.auth.WithMockCustomUser;
-import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
-import com.aisip.OnO.backend.problem.dto.ProblemImageDataResponseDto;
-import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
-import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
+import com.aisip.OnO.backend.problem.dto.*;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.service.ProblemService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -261,10 +259,38 @@ class ProblemControllerTest {
     }
 
     @Test
-    void deleteProblems() {
+    @DisplayName("문제 삭제")
+    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    void deleteProblems() throws Exception {
+        // given
+        ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
+                1L,
+                List.of(1L, 2L),
+                List.of(1L)
+        );
+
+
+        // when & then
+        mockMvc.perform(delete("/api/problem")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
+                .andExpect(status().isOk());
+
+        Mockito.verify(problemService, Mockito.times(1)).deleteProblems(problemDeleteRequestDto);
     }
 
     @Test
-    void deleteProblemImageData() {
+    @DisplayName("문제 이미지 삭제")
+    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    void deleteProblemImageData() throws Exception {
+        // given
+        String imageUrl = "imageUrl";
+
+        // when & then
+        mockMvc.perform(delete("/api/problem/imageData")
+                        .param("imageUrl", imageUrl))
+                .andExpect(status().isOk());
+
+        Mockito.verify(problemService, Mockito.times(1)).deleteProblemImageData(imageUrl);
     }
 }
