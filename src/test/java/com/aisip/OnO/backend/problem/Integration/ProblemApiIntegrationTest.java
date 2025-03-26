@@ -114,23 +114,21 @@ public class ProblemApiIntegrationTest {
     @WithMockCustomUser()
     void findProblem() throws Exception {
         // given
-        Problem problem = problemRepository.findAll().get(0);
-        List<ProblemImageData> problemImageData = problem.getProblemImageDataList();
-
-        Long problemId = problem.getId();
+        List<Problem> problemList = problemRepository.findAllByUserId(userId);
+        Long problemId = problemList.get(0).getId();
 
         // when & then - 해당 문제를 조회하는 API 호출
         mockMvc.perform(MockMvcRequestBuilders.get("/api/problem/{problemId}", problemId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.problemId").value(problemId))
-                .andExpect(jsonPath("$.data.memo").value(problem.getMemo()))
-                .andExpect(jsonPath("$.data.reference").value(problem.getReference()))
+                .andExpect(jsonPath("$.data.memo").value(problemList.get(0).getMemo()))
+                .andExpect(jsonPath("$.data.reference").value(problemList.get(0).getReference()))
                 .andExpect(jsonPath("$.data.solvedAt").isNotEmpty())
                 .andExpect(jsonPath("$.data.createdAt").isNotEmpty())
                 .andExpect(jsonPath("$.data.updatedAt").isNotEmpty())
                 .andExpect(jsonPath("$.data.imageUrlList.length()").value(2))
-                .andExpect(jsonPath("$.data.imageUrlList[0].imageUrl").value(problemImageData.get(0).getImageUrl()))
-                .andExpect(jsonPath("$.data.imageUrlList[1].imageUrl").value(problemImageData.get(1).getImageUrl()));
+                .andExpect(jsonPath("$.data.imageUrlList[0].imageUrl").value(problemList.get(0).getProblemImageDataList().get(0).getImageUrl()))
+                .andExpect(jsonPath("$.data.imageUrlList[1].imageUrl").value(problemList.get(0).getProblemImageDataList().get(1).getImageUrl()));
     }
 
     @Test
@@ -138,23 +136,33 @@ public class ProblemApiIntegrationTest {
     @WithMockCustomUser()
     void findAllUserProblems() throws Exception {
         // given
-        Problem problem = problemRepository.findAll().get(0);
-        List<ProblemImageData> problemImageData = problem.getProblemImageDataList();
-
-        Long problemId = problem.getId();
+        List<Problem> problemList = problemRepository.findAllByUserId(userId);
 
         // when & then - 해당 문제를 조회하는 API 호출
         mockMvc.perform(MockMvcRequestBuilders.get("/api/problem/all"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.size()").value(6))
-                .andExpect(jsonPath("$.data[0].problemId").value(problemId))
-                .andExpect(jsonPath("$.data[0].memo").value(problem.getMemo()))
-                .andExpect(jsonPath("$.data[0].reference").value(problem.getReference()))
+                .andExpect(jsonPath("$.data.size()").value(problemList.size()))
+                .andExpect(jsonPath("$.data[0].problemId").value(problemList.get(0).getId()))
+                .andExpect(jsonPath("$.data[0].memo").value(problemList.get(0).getMemo()))
+                .andExpect(jsonPath("$.data[0].reference").value(problemList.get(0).getReference()))
                 .andExpect(jsonPath("$.data[0].solvedAt").isNotEmpty())
                 .andExpect(jsonPath("$.data[0].createdAt").isNotEmpty())
                 .andExpect(jsonPath("$.data[0].updatedAt").isNotEmpty())
                 .andExpect(jsonPath("$.data[0].imageUrlList.length()").value(2))
-                .andExpect(jsonPath("$.data[0].imageUrlList[0].imageUrl").value(problemImageData.get(0).getImageUrl()))
-                .andExpect(jsonPath("$.data[0].imageUrlList[1].imageUrl").value(problemImageData.get(1).getImageUrl()));
+                .andExpect(jsonPath("$.data[0].imageUrlList[0].imageUrl").value(problemList.get(0).getProblemImageDataList().get(0).getImageUrl()))
+                .andExpect(jsonPath("$.data[0].imageUrlList[1].imageUrl").value(problemList.get(0).getProblemImageDataList().get(1).getImageUrl()));
+    }
+
+    @Test
+    @DisplayName("특정 유저의 문제 개수 조회")
+    @WithMockCustomUser()
+    void findUserProblemCount() throws Exception {
+        // given
+        Long count = problemRepository.countByUserId(userId);
+
+        // when & then - 해당 문제를 조회하는 API 호출
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/problem/problemCount"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(count));
     }
 }
