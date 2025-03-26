@@ -30,8 +30,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -193,15 +192,72 @@ class ProblemControllerTest {
     }
 
     @Test
-    void updateProblemInfo() {
+    @DisplayName("문제 메모, 출처 수정")
+    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    void updateProblemInfo() throws Exception {
+        // given
+        ProblemRegisterDto problemRegisterDto = new ProblemRegisterDto(
+                1L,
+                "memo update",
+                "reference update",
+                null,
+                null,
+                null
+        );
+
+        // when & then
+        mockMvc.perform(patch("/api/problem/info")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(problemRegisterDto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("문제가 수정되었습니다."));
+
+        verify(problemService, times(1)).updateProblemInfo(any(), eq(1L));
     }
 
     @Test
-    void updateProblemPath() {
+    @DisplayName("문제 폴더 수정")
+    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    void updateProblemPath() throws Exception {
+        // given
+        ProblemRegisterDto problemRegisterDto = new ProblemRegisterDto(
+                1L,
+                null,
+                null,
+                2L,
+                null,
+                null
+        );
+
+        // when & then
+        mockMvc.perform(patch("/api/problem/path")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(problemRegisterDto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("문제가 수정되었습니다."));
+
+        verify(problemService, times(1)).updateProblemFolder(any(), eq(1L));
     }
 
     @Test
-    void updateProblemImageData() {
+    @DisplayName("문제 이미지 수정")
+    @WithMockCustomUser(userId = 1L, role = "ROLE_MEMBER")
+    void updateProblemImageData() throws Exception {
+        // given
+        ProblemImageDataRegisterDto problemImageDataRegisterDto = new ProblemImageDataRegisterDto(
+                1L,
+                "problemImageUpdate",
+                ProblemImageType.PROBLEM_IMAGE
+        );
+
+        // when & then
+        mockMvc.perform(patch("/api/problem/imageData")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(problemImageDataRegisterDto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("문제가 수정되었습니다."));
+
+        verify(problemService, times(1)).updateProblemImageData(any(), eq(1L));
     }
 
     @Test
