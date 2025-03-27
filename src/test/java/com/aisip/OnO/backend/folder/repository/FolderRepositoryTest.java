@@ -12,6 +12,7 @@ import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -44,15 +48,16 @@ class FolderRepositoryTest {
 
     private final Long userId = 1L;
 
+    private List<Folder> folderList = new ArrayList<>();
+
     @BeforeEach
     void setUp() {
-        FolderRegisterDto rootFolderRegisterDto = new FolderRegisterDto(
-                "rootFolder",
-                null,
-                null
-        );
         Folder rootFolder = folderRepository.save(Folder.from(
-                rootFolderRegisterDto,
+                new FolderRegisterDto(
+                        "rootFolder",
+                        null,
+                        null
+                ),
                 null,
                 1L
         ));
@@ -101,22 +106,10 @@ class FolderRepositoryTest {
                 firstLevelFolder2,
                 1L
         ));
+        folderList.addAll(List.of(rootFolder, firstLevelFolder1, firstLevelFolder2, secondLevelFolder1, secondLevelFolder2, secondLevelFolder3));
 
-        for (int i = 1; i <= 14; i++) {
-            Folder targetFolder;
-            if (i <= 2) {
-                targetFolder = rootFolder;
-            } else if (i <= 4) {
-                targetFolder = firstLevelFolder1;
-            } else if (i <= 6){
-                targetFolder = firstLevelFolder2;
-            } else if (i <= 8) {
-                targetFolder = secondLevelFolder1;
-            } else if (i <= 10) {
-                targetFolder = secondLevelFolder2;
-            } else {
-                targetFolder = secondLevelFolder3;
-            }
+        for (int i = 0; i < 12; i++) {
+            Folder targetFolder = folderList.get(i / 2);
 
             Problem problem = problemRepository.save(
                     Problem.from(
@@ -155,10 +148,46 @@ class FolderRepositoryTest {
     @AfterEach
     void tearDown() {
         folderRepository.deleteAll();
+        folderList.clear();
     }
 
     @Test
-    void test() {
+    @DisplayName("root folder 찾기 테스트")
+    void findRootFolderTest() {
+        //given
 
+        //when
+        Optional<Folder> optionalFolder = folderRepository.findRootFolder(userId);
+
+        //then
+        if (optionalFolder.isPresent()) {
+            Folder rootFolder = optionalFolder.get();
+            assertThat(rootFolder.getId()).isNotNull();
+            assertThat(rootFolder.getName()).isEqualTo("rootFolder");
+        } else{
+            assertThat(0L).isEqualTo(1L);
+        }
+    }
+
+    @Test
+    @DisplayName("루트 폴더의 문제, 하위 폴더를 포함한 정보 찾기 테스트")
+    void findFolderWithDetailsByFolderIdTest() {
+        //given
+        Long folderId = folderList.get(0).getId();
+
+        //when
+        Optional<Folder> optionalFolder = folderRepository.findFolderWithDetailsByFolderId(folderId);
+
+        //then
+        if (optionalFolder.isPresent()) {
+            Folder folder = optionalFolder.get();
+            assertThat(folder.getId()).isNotNull();
+            assertThat(folder.getName()).isEqualTo("rootFolder");
+            assertThat(folder.getParentFolder()).isNull();
+            assertThat(folder.getSubFolderList().size()).isEqualTo(2);
+
+        } else{
+            assertThat(0L).isEqualTo(1L);
+        }
     }
 }
