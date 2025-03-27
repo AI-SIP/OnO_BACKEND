@@ -185,7 +185,7 @@ class FolderRepositoryTest {
             assertThat(folder.getName()).isEqualTo("rootFolder");
             assertThat(folder.getParentFolder()).isNull();
             assertThat(folder.getSubFolderList().size()).isEqualTo(2);
-
+            //assertThat(folder.getProblemList().size()).isEqualTo(2);
         } else{
             assertThat(0L).isEqualTo(1L);
         }
