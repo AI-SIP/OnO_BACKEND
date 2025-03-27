@@ -6,6 +6,7 @@ import lombok.Builder;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Builder(access = AccessLevel.PRIVATE)
 public record ProblemResponseDto (
@@ -20,13 +21,14 @@ public record ProblemResponseDto (
 
     LocalDateTime createdAt,
 
-    LocalDateTime updateAt,
+    LocalDateTime updatedAt,
 
     List<ProblemImageDataResponseDto> imageUrlList
 ) {
     public static ProblemResponseDto from(Problem problem) {
 
-        List<ProblemImageDataResponseDto> problemImageDataList = problem.getProblemImageDataList()
+        List<ProblemImageDataResponseDto> problemImageDataList = Optional.ofNullable(problem.getProblemImageDataList())
+                .orElse(List.of())
                 .stream().map(ProblemImageDataResponseDto::from).toList();
 
         return ProblemResponseDto.builder()
@@ -35,7 +37,7 @@ public record ProblemResponseDto (
                 .reference(problem.getReference())
                 .solvedAt(problem.getSolvedAt())
                 .createdAt(problem.getCreatedAt())
-                .updateAt(problem.getUpdatedAt())
+                .updatedAt(problem.getUpdatedAt())
                 .imageUrlList(problemImageDataList)
                 .build();
     }

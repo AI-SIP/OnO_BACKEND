@@ -10,6 +10,7 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -51,16 +52,31 @@ public class Problem extends BaseEntity {
                 .memo(problemRegisterDto.memo())
                 .reference(problemRegisterDto.reference())
                 .solvedAt(problemRegisterDto.solvedAt())
+                .problemImageDataList(new ArrayList<>())
+                .problemPracticeNoteMappingList(new ArrayList<>())
                 .build();
+    }
+
+    public void addImageDataList(List<ProblemImageData> imageDataList) {
+        problemImageDataList.addAll(imageDataList);
     }
 
     public void updateProblem(ProblemRegisterDto problemRegisterDto) {
         if (problemRegisterDto.memo() != null && !problemRegisterDto.memo().isBlank()) {
-            this.memo = memo;
+            this.memo = problemRegisterDto.memo();
         }
 
         if (problemRegisterDto.reference() != null && !problemRegisterDto.reference().isBlank()) {
-            this.reference = reference;
+            this.reference = problemRegisterDto.reference();
+        }
+    }
+
+    public void updateImageDataList(List<ProblemImageData> imageDataList) {
+        if (imageDataList != null) {
+            if (this.problemImageDataList != null) {
+                this.problemImageDataList.clear();
+                this.problemImageDataList.addAll(imageDataList);
+            }
         }
     }
 

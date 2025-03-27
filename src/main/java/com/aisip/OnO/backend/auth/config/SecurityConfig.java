@@ -64,7 +64,7 @@ public class SecurityConfig {
 
         http.authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
-                                .requestMatchers("/", "/robots.txt", "/home","/images/**", "/api/auth/**", "/login", "/css/**", "/js/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                                .requestMatchers("/", "/robots.txt", "/home","/images/**", "/login", "/css/**", "/js/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                                 .requestMatchers("/api/auth/**").permitAll()
                                 .requestMatchers("/admin/**").hasRole("ADMIN")
                                 .requestMatchers("/api/user/**").hasAnyRole("GUEST", "MEMBER", "ADMIN")
@@ -81,7 +81,7 @@ public class SecurityConfig {
                         .successHandler((request, response, authentication) -> {
                             CustomAdminService userDetails = (CustomAdminService) authentication.getPrincipal();
                             Long adminId = userDetails.getUserId();
-                            String token = jwtTokenizer.createAccessToken(String.valueOf(adminId), Map.of("authority", Authority.ADMIN));
+                            String token = jwtTokenizer.createAccessToken(String.valueOf(adminId), Map.of("authority", Authority.ROLE_ADMIN));
                             response.setHeader("Authorization", "Bearer " + token);
                             response.sendRedirect(siteUrl + "/admin/main"); // 성공 후 관리자 페이지로 이동
                         })

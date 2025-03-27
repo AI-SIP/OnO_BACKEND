@@ -13,6 +13,6 @@ public record ProblemRegisterDto (
 
     LocalDateTime solvedAt,
 
-    List<ProblemImageDataRegisterDto> imageDataList
+    List<ProblemImageDataRegisterDto> imageDataDtoList
 ) {}
 

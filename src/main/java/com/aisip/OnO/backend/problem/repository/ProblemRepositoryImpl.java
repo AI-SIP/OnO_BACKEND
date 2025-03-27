@@ -1,10 +1,12 @@
 package com.aisip.OnO.backend.problem.repository;
 
 import com.aisip.OnO.backend.problem.entity.Problem;
+import com.aisip.OnO.backend.problem.entity.QProblem;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
 
 import java.util.List;
+import java.util.Optional;
 
 import static com.aisip.OnO.backend.practicenote.entity.QPracticeNote.practiceNote;
 import static com.aisip.OnO.backend.practicenote.entity.QProblemPracticeNoteMapping.problemPracticeNoteMapping;
@@ -17,6 +19,17 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
 
     public ProblemRepositoryImpl(EntityManager entityManager) {
         this.queryFactory = new JPAQueryFactory(entityManager);
+    }
+
+    @Override
+    public Optional<Problem> findProblemWithImageData(Long problemId) {
+        Problem problem = queryFactory
+                .selectFrom(QProblem.problem)
+                .leftJoin(QProblem.problem.problemImageDataList, problemImageData).fetchJoin()
+                .where(QProblem.problem.id.eq(problemId))
+                .fetchOne();
+
+        return Optional.ofNullable(problem);
     }
 
     @Override
