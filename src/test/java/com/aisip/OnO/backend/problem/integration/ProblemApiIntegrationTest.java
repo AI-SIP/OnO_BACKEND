@@ -44,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT) // 랜덤 포트로 애플리케이션 실행
 @AutoConfigureMockMvc
-public class ProblemApiIntegrationTest {
+class ProblemApiIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -129,7 +129,7 @@ public class ProblemApiIntegrationTest {
         Long problemId = problemList.get(0).getId();
 
         // when & then - 해당 문제를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get("/api/problem/{problemId}", problemId))
+        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/problem/%d", problemId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.problemId").value(problemId))
                 .andExpect(jsonPath("$.data.memo").value(problemList.get(0).getMemo()))
@@ -150,7 +150,7 @@ public class ProblemApiIntegrationTest {
         List<Problem> problemList = problemRepository.findAllByUserId(userId);
 
         // when & then - 해당 문제를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get("/api/problem/all"))
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/problem/user"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.size()").value(problemList.size()))
                 .andExpect(jsonPath("$.data[0].problemId").value(problemList.get(0).getId()))
@@ -175,6 +175,29 @@ public class ProblemApiIntegrationTest {
         mockMvc.perform(MockMvcRequestBuilders.get("/api/problem/problemCount"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(count));
+    }
+
+    @Test
+    @DisplayName("특정 폴더의 모든 문제를 조회하는 API 테스트")
+    @WithMockCustomUser()
+    void findAllFolderProblems() throws Exception {
+        // given
+        List<Problem> problemList = problemRepository.findAllByUserId(userId);
+        Long folderId = folderRepository.findAllByUserId(userId).get(0).getId();
+
+        // when & then - 해당 문제를 조회하는 API 호출
+        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/problem/folder/%d", folderId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.size()").value(3L))
+                .andExpect(jsonPath("$.data[0].problemId").value(problemList.get(0).getId()))
+                .andExpect(jsonPath("$.data[0].memo").value(problemList.get(0).getMemo()))
+                .andExpect(jsonPath("$.data[0].reference").value(problemList.get(0).getReference()))
+                .andExpect(jsonPath("$.data[0].solvedAt").isNotEmpty())
+                .andExpect(jsonPath("$.data[0].createdAt").isNotEmpty())
+                .andExpect(jsonPath("$.data[0].updatedAt").isNotEmpty())
+                .andExpect(jsonPath("$.data[0].imageUrlList.length()").value(2))
+                .andExpect(jsonPath("$.data[0].imageUrlList[0].imageUrl").value(problemList.get(0).getProblemImageDataList().get(0).getImageUrl()))
+                .andExpect(jsonPath("$.data[0].imageUrlList[1].imageUrl").value(problemList.get(0).getProblemImageDataList().get(1).getImageUrl()));
     }
 
     @Test

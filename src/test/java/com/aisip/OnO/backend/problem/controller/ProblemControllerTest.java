@@ -124,6 +124,7 @@ class ProblemControllerTest {
     @DisplayName("특정 유저의 문제 개수 조회")
     @WithMockCustomUser()
     void getUserProblemCount() throws Exception {
+        //given
         given(problemService.findProblemCountByUser(1L)).willReturn((long) problemResponseDtoList.size());
 
         // When & Then
@@ -131,6 +132,25 @@ class ProblemControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(5));
+    }
+
+    @Test
+    @DisplayName("특정 폴더 내부 문제 개수 조회")
+    @WithMockCustomUser()
+    void getFolderProblems() throws Exception {
+        //given
+        given(problemService.findFolderProblemList(1L)).willReturn(problemResponseDtoList);
+
+        // When & Then
+        mockMvc.perform(get("/api/problem/folder/1")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.size()").value(5))
+                .andExpect(jsonPath("$.data[0].memo").value("memo1"))
+                .andExpect(jsonPath("$.data[0].reference").value("reference1"))
+                .andExpect(jsonPath("$.data[0].imageUrlList.size()").value(3))
+                .andExpect(jsonPath("$.data[0].imageUrlList[0].imageUrl").value("imageUrl_1_1"))
+                .andExpect(jsonPath("$.data[0].imageUrlList[0].problemImageType").value("PROBLEM_IMAGE"));
     }
 
     @Test

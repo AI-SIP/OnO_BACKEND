@@ -30,7 +30,7 @@ public class ProblemController {
 
     // ✅ 특정 문제 조회
     @GetMapping("/{problemId}")
-    public CommonResponse<ProblemResponseDto> getProblem(@PathVariable Long problemId) {
+    public CommonResponse<ProblemResponseDto> getProblem(@PathVariable("problemId") Long problemId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         ProblemResponseDto problemResponseDto = problemService.findProblem(problemId, userId);
 
@@ -47,7 +47,7 @@ public class ProblemController {
 
     // ✅ 특정 폴더 내부의 모든 문제 조회
     @GetMapping("/folder/{folderId}")
-    public CommonResponse<List<ProblemResponseDto>> getProblemsByUserId(@PathVariable Long folderId) {
+    public CommonResponse<List<ProblemResponseDto>> getProblemsByUserId(@PathVariable("folderId") Long folderId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         return CommonResponse.success(problemService.findFolderProblemList(folderId));
