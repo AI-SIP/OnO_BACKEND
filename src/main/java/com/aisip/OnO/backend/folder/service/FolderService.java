@@ -30,7 +30,6 @@ public class FolderService {
         Folder folder = folderRepository.findFolderWithDetailsByFolderId(folderId)
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
 
-        log.info("");
         return FolderResponseDto.from(folder);
     }
 

@@ -29,7 +29,7 @@ public class PracticeNote extends BaseEntity {
 
     private String title;
 
-    private Long practiceCount = 0L;
+    private Long practiceCount;
 
     private LocalDateTime lastSolvedAt;
 

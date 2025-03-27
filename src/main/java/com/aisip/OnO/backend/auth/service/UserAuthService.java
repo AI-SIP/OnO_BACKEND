@@ -24,7 +24,7 @@ public class UserAuthService {
         UserResponseDto userResponseDto = userService.registerGuestUser();
         log.info("userId : {} has sign up", userResponseDto.userId());
 
-        return jwtTokenService.generateTokens(userResponseDto.userId(), Authority.GUEST);
+        return jwtTokenService.generateTokens(userResponseDto.userId(), Authority.ROLE_GUEST);
     }
 
     public TokenResponseDto signUpMemberUser(UserRegisterDto userRegisterDto) {
@@ -32,7 +32,7 @@ public class UserAuthService {
         UserResponseDto userResponseDto = userService.registerMemberUser(userRegisterDto);
         log.info("userId : {} user has sign up", userResponseDto.userId());
 
-        return jwtTokenService.generateTokens(userResponseDto.userId(), Authority.MEMBER);
+        return jwtTokenService.generateTokens(userResponseDto.userId(), Authority.ROLE_MEMBER);
     }
 
     public TokenResponseDto refreshAccessToken(TokenRequestDto tokenRequestDto) {

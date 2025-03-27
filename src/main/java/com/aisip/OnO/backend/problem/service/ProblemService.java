@@ -38,7 +38,8 @@ public class ProblemService {
     private final FileUploadService fileUploadService;
 
     public ProblemResponseDto findProblem(Long problemId, Long userId) {
-        Problem problem = findProblemEntity(problemId, userId);
+        Problem problem = problemRepository.findProblemWithImageData(problemId)
+                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
         log.info("userId: {} find problemId: {}", userId, problemId);
         return ProblemResponseDto.from(problem);
@@ -91,7 +92,7 @@ public class ProblemService {
         Problem problem = Problem.from(problemRegisterDto, userId, folder);
         problemRepository.save(problem);
 
-        problemRegisterDto.imageDataList()
+        problemRegisterDto.imageDataDtoList()
                 .forEach(problemImageDataRegisterDto -> {
                     ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
                     problemImageDataRepository.save(problemImageData);
@@ -106,6 +107,7 @@ public class ProblemService {
         ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
         problemImageDataRepository.save(problemImageData);
 
+        problem.addImageDataList(List.of(problemImageData));
         log.info("userId: {} register problem image data for problemId: {}", userId, problem.getId());
     }
 
@@ -129,8 +131,33 @@ public class ProblemService {
 
             log.info("userId: {} update problem folder, problemId: {}, folderId: {}", userId, problem.getId(), folder.getId());
         }
+    }
 
-        log.info("userId: {} failed update problem", userId);
+    public void updateProblemImageData(ProblemRegisterDto problemRegisterDto, Long userId) {
+        Problem problem = findProblemEntity(problemRegisterDto.problemId(), userId);
+
+        if (problemRegisterDto.imageDataDtoList() != null) {
+            List<ProblemImageData> imageDataList = problemRegisterDto.imageDataDtoList().stream()
+                    .map(problemImageDataRegisterDto -> ProblemImageData.from(problemImageDataRegisterDto, problem)).toList();
+
+            problem.updateImageDataList(imageDataList);
+        }
+
+        log.info("userId: {} update problem Image Data", userId);
+    }
+
+    public void deleteProblem(Long problemId) {
+
+        List<ProblemImageData> imageDataList= problemImageDataRepository.findAllByProblemId(problemId);
+
+        imageDataList.forEach(imageData -> {
+            fileUploadService.deleteImageFileFromS3(imageData.getImageUrl());
+            problemImageDataRepository.delete(imageData);
+        });
+
+        problemRepository.deleteById(problemId);
+
+        log.info("problemId: {} has deleted", problemId);
     }
 
     @Transactional
@@ -155,20 +182,6 @@ public class ProblemService {
         }
 
         log.info("userId: {} delete problems", userId);
-    }
-
-    public void deleteProblem(Long problemId) {
-
-        List<ProblemImageData> imageDataList= problemImageDataRepository.findAllByProblemId(problemId);
-
-        imageDataList.forEach(imageData -> {
-            fileUploadService.deleteImageFileFromS3(imageData.getImageUrl());
-            problemImageDataRepository.delete(imageData);
-        });
-
-        problemRepository.deleteById(problemId);
-
-        log.info("problemId: {} has deleted", problemId);
     }
 
     public void deleteProblemImageData(String imageUrl) {
