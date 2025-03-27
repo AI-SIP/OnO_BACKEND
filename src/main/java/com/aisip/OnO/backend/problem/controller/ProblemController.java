@@ -9,7 +9,6 @@ import com.aisip.OnO.backend.problem.service.ProblemService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.propertyeditors.CustomNumberEditor;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
@@ -39,12 +38,19 @@ public class ProblemController {
     }
 
     // ✅ 유저가 등록한 모든 문제 조회
-    @ResponseStatus(HttpStatus.OK)
-    @GetMapping("/all")
+    @GetMapping("/user")
     public CommonResponse<List<ProblemResponseDto>> getProblemsByUserId() {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         return CommonResponse.success(problemService.findUserProblems(userId));
+    }
+
+    // ✅ 특정 폴더 내부의 모든 문제 조회
+    @GetMapping("/folder/{folderId}")
+    public CommonResponse<List<ProblemResponseDto>> getProblemsByUserId(@PathVariable Long folderId) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        return CommonResponse.success(problemService.findFolderProblemList(folderId));
     }
 
     // ✅ 사용자의 문제 개수 조회
@@ -53,7 +59,6 @@ public class ProblemController {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         return CommonResponse.success(problemService.findProblemCountByUser(userId));
     }
-
 
     // ✅ 문제 등록
     @PostMapping("")
@@ -91,6 +96,7 @@ public class ProblemController {
         return CommonResponse.success("문제가 수정되었습니다.");
     }
 
+    // ✅ 문제 삭제
     @DeleteMapping("")
     public CommonResponse<String> deleteProblems(
             @RequestBody ProblemDeleteRequestDto deleteRequestDto

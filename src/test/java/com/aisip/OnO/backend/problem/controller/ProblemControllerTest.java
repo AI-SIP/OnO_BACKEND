@@ -109,7 +109,7 @@ class ProblemControllerTest {
         given(problemService.findUserProblems(1L)).willReturn(problemResponseDtoList);
 
         // When & Then
-        mockMvc.perform(get("/api/problem/all")
+        mockMvc.perform(get("/api/problem/user")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.size()").value(5))
