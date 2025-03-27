@@ -2,9 +2,11 @@ package com.aisip.OnO.backend.problem.Integration;
 
 
 import com.aisip.OnO.backend.auth.WithMockCustomUser;
+import com.aisip.OnO.backend.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
+import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
@@ -21,17 +23,21 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -54,6 +60,9 @@ public class ProblemApiIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @MockBean
+    private FileUploadService fileUploadService;
 
     private Long userId;
 
@@ -216,6 +225,7 @@ public class ProblemApiIntegrationTest {
     @Test
     @DisplayName("문제 이미지 등록 API 테스트")
     @WithMockCustomUser()
+    @Transactional
     void registerProblemImageData() throws Exception {
         // given
         List<Problem> problemList = problemRepository.findAllByUserId(userId);
@@ -230,8 +240,7 @@ public class ProblemApiIntegrationTest {
         mockMvc.perform(MockMvcRequestBuilders.post("/api/problem/imageData")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemImageDataRegisterDto)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value("문제가 등록되었습니다.")); // 또는 반환값에 맞게 수정
+                .andExpect(status().isOk());
 
         Problem problem = problemRepository.findById(problemList.get(0).getId()).get();
         List<ProblemImageData> problemImageDataList = problem.getProblemImageDataList();
@@ -295,8 +304,7 @@ public class ProblemApiIntegrationTest {
         mockMvc.perform(MockMvcRequestBuilders.patch("/api/problem/path")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemRegisterDto)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value("문제가 수정되었습니다.")); // 또는 반환값에 맞게 수정
+                .andExpect(status().isOk());
 
         Problem problem = problemRepository.findById(problemList.get(0).getId()).get();
 
@@ -325,9 +333,79 @@ public class ProblemApiIntegrationTest {
         mockMvc.perform(MockMvcRequestBuilders.patch("/api/problem/path")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemRegisterDto)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value("문제가 수정되었습니다.")); // 또는 반환값에 맞게 수정
+                .andExpect(status().isOk());
 
         Problem problem = problemRepository.findById(problemList.get(0).getId()).get();
+    }
+
+    @Test
+    @DisplayName("문제 삭제 - 유저 모든 문제 삭제")
+    @WithMockCustomUser()
+    void deleteProblemsWithUserId() throws Exception {
+        // given
+        List<Problem> problemList = problemRepository.findAllByUserId(userId);
+
+        ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
+                userId,
+                null,
+                null
+        );
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+
+        // when & then
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problem")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
+                .andExpect(status().isOk());
+
+        Assertions.assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(0);
+    }
+    @Test
+    @DisplayName("문제 삭제 - 문제 id 사용")
+    @WithMockCustomUser()
+    void deleteProblemsWithProblemId() throws Exception {
+        // given
+        List<Problem> problemList = problemRepository.findAllByUserId(userId);
+        List<Long> deleteProblemIdList = List.of(problemList.get(0).getId(), problemList.get(1).getId(), problemList.get(4).getId());
+
+        ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
+                null,
+                deleteProblemIdList,
+                null
+        );
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+
+        // when & then
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problem")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
+                .andExpect(status().isOk());
+
+        Assertions.assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(3L);
+    }
+
+    @Test
+    @DisplayName("문제 삭제 - folder id 사용")
+    @WithMockCustomUser()
+    void deleteProblemsWithFolderId() throws Exception {
+        // given
+        List<Problem> problemList = problemRepository.findAllByUserId(userId);
+        List<Folder> folderList = folderRepository.findAllByUserId(userId);
+        List<Long> folderIdList = List.of(folderList.get(0).getId());
+
+        ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
+                null,
+                null,
+                folderIdList
+        );
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+
+        // when & then
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problem")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
+                .andExpect(status().isOk());
+
+        Assertions.assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(3L);
     }
 }

@@ -107,6 +107,7 @@ public class ProblemService {
         ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
         problemImageDataRepository.save(problemImageData);
 
+        problem.addImageDataList(List.of(problemImageData));
         log.info("userId: {} register problem image data for problemId: {}", userId, problem.getId());
     }
 

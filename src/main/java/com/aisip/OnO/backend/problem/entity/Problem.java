@@ -57,6 +57,10 @@ public class Problem extends BaseEntity {
                 .build();
     }
 
+    public void addImageDataList(List<ProblemImageData> imageDataList) {
+        problemImageDataList.addAll(imageDataList);
+    }
+
     public void updateProblem(ProblemRegisterDto problemRegisterDto) {
         if (problemRegisterDto.memo() != null && !problemRegisterDto.memo().isBlank()) {
             this.memo = problemRegisterDto.memo();
