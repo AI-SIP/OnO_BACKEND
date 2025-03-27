@@ -1,4 +1,4 @@
-package com.aisip.OnO.backend.problem.Integration;
+package com.aisip.OnO.backend.problem.integration;
 
 
 import com.aisip.OnO.backend.auth.WithMockCustomUser;
