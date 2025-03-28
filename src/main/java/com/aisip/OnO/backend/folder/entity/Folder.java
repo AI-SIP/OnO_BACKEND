@@ -58,6 +58,10 @@ public class Folder extends BaseEntity {
         subFolderList.add(folder);
     }
 
+    public void removeSubFolder(Folder folder) {
+        subFolderList.remove(folder);
+    }
+
     public void updateFolderInfo(FolderRegisterDto folderRegisterDto) {
         if (folderRegisterDto.folderName() != null) {
             this.name = folderRegisterDto.folderName();
