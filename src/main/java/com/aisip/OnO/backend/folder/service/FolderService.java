@@ -27,6 +27,19 @@ public class FolderService {
 
     private final ProblemService problemService;
 
+    public FolderResponseDto findRootFolder(Long userId) {
+        return folderRepository.findRootFolder(userId)
+                .map(rootFolder -> {
+                    log.info("userId : {} find root folder id: {}", userId, rootFolder.getId());
+                    List<ProblemResponseDto> problemResponseDtoList = problemService.findFolderProblemList(rootFolder.getId());
+                    return FolderResponseDto.from(rootFolder, problemResponseDtoList);
+                })
+                .orElseGet(() -> {
+                    log.info("userId : {} create root folder", userId);
+                    return createRootFolder(userId);
+                });
+    }
+
     public FolderResponseDto findFolder(Long folderId) {
         Folder folder = folderRepository.findFolderWithDetailsByFolderId(folderId)
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
@@ -40,7 +53,7 @@ public class FolderService {
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
     }
 
-    public List<FolderThumbnailResponseDto> findAllFolderThumbnails(Long userId) {
+    public List<FolderThumbnailResponseDto> findAllUserFolderThumbnails(Long userId) {
         List<Folder> folderList = folderRepository.findAllByUserId(userId);
 
         return folderList.isEmpty()
@@ -48,29 +61,16 @@ public class FolderService {
                 : folderList.stream().map(FolderThumbnailResponseDto::from).collect(Collectors.toList());
     }
 
-    public List<FolderResponseDto> findAllFolders(Long userId) {
+    public List<FolderResponseDto> findAllUserFolders(Long userId) {
         List<Folder> folders = folderRepository.findAllFoldersWithDetailsByUserId(userId);
 
-        log.info("userId : {} find All folders", userId);
+        log.info("userId : {} find All user folders", userId);
         return folders.isEmpty()
                 ? List.of(findRootFolder(userId))
                 : folders.stream().map(folder -> {
             List<ProblemResponseDto> problemResponseDtoList = problemService.findFolderProblemList(folder.getId());
             return FolderResponseDto.from(folder, problemResponseDtoList);
                 }).toList();
-    }
-
-    public FolderResponseDto findRootFolder(Long userId) {
-        return folderRepository.findRootFolder(userId)
-                .map(rootFolder -> {
-                    log.info("userId : {} find root folder id: {}", userId, rootFolder.getId());
-                    List<ProblemResponseDto> problemResponseDtoList = problemService.findFolderProblemList(rootFolder.getId());
-                    return FolderResponseDto.from(rootFolder, problemResponseDtoList);
-                })
-                .orElseGet(() -> {
-                    log.info("userId : {} create root folder", userId);
-                    return createRootFolder(userId);
-                });
     }
 
     public FolderResponseDto createRootFolder(Long userId) {

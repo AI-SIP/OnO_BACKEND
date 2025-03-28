@@ -25,7 +25,7 @@ public class FolderController {
     public CommonResponse<List<FolderResponseDto>> getAllUserFolderDetails() {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        return CommonResponse.success(folderService.findAllFolders(userId));
+        return CommonResponse.success(folderService.findAllUserFolders(userId));
     }
 
     // ✅ 모든 폴더 조회
@@ -33,7 +33,7 @@ public class FolderController {
     public CommonResponse<List<FolderThumbnailResponseDto>> getAllUserFolderThumbnails() {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        return CommonResponse.success(folderService.findAllFolderThumbnails(userId));
+        return CommonResponse.success(folderService.findAllUserFolderThumbnails(userId));
     }
 
     // ✅ 루트 폴더 조회

@@ -166,11 +166,11 @@ class FolderServiceTest {
     }
 
     @Test
-    void findAllFolderThumbnails() {
+    void findAllUserFolderThumbnails() {
     }
 
     @Test
-    void findAllFolders() {
+    void findAllUserFolders() {
     }
 
     @Test
