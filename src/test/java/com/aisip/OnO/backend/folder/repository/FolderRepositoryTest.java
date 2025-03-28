@@ -171,7 +171,7 @@ class FolderRepositoryTest {
 
     @Test
     @DisplayName("루트 폴더의 문제, 하위 폴더를 포함한 정보 찾기 테스트")
-    void findFolderWithDetailsByFolderIdTest() {
+    void findFolderWithDetailsByFolderIdTest_Root () {
         //given
         Long folderId = folderList.get(0).getId();
 
@@ -185,7 +185,66 @@ class FolderRepositoryTest {
             assertThat(folder.getName()).isEqualTo("rootFolder");
             assertThat(folder.getParentFolder()).isNull();
             assertThat(folder.getSubFolderList().size()).isEqualTo(2);
-            //assertThat(folder.getProblemList().size()).isEqualTo(2);
+        } else{
+            assertThat(0L).isEqualTo(1L);
+        }
+    }
+
+    @Test
+    @DisplayName("중간 폴더의 문제, 하위 폴더를 포함한 정보 찾기 테스트")
+    void findFolderWithDetailsByFolderIdTest_Internal () {
+        //given
+        Long folderId = folderList.get(1).getId();
+
+        //when
+        Optional<Folder> optionalFolder = folderRepository.findFolderWithDetailsByFolderId(folderId);
+
+        //then
+        if (optionalFolder.isPresent()) {
+            Folder folder = optionalFolder.get();
+            assertThat(folder.getId()).isNotNull();
+            assertThat(folder.getName()).isEqualTo("firstLevelFolder1");
+            assertThat(folder.getParentFolder().getId()).isEqualTo(folderList.get(0).getId());
+            assertThat(folder.getSubFolderList().size()).isEqualTo(2);
+        } else{
+            assertThat(0L).isEqualTo(1L);
+        }
+    }
+
+    @Test
+    @DisplayName("최하위 폴더의 문제, 하위 폴더를 포함한 정보 찾기 테스트")
+    void findFolderWithDetailsByFolderIdTest_Leaf () {
+        //given
+        Long folderId = folderList.get(folderList.size() - 1).getId();
+
+        //when
+        Optional<Folder> optionalFolder = folderRepository.findFolderWithDetailsByFolderId(folderId);
+
+        //then
+        if (optionalFolder.isPresent()) {
+            Folder folder = optionalFolder.get();
+            assertThat(folder.getId()).isNotNull();
+            assertThat(folder.getName()).isEqualTo("secondLevelFolder3");
+            assertThat(folder.getParentFolder().getId()).isEqualTo(folderList.get(2).getId());
+            assertThat(folder.getSubFolderList().size()).isEqualTo(0);
+        } else{
+            assertThat(0L).isEqualTo(1L);
+        }
+    }
+
+    @Test
+    @DisplayName("유저의 모든 폴더 조회 테스트")
+    void findAllFoldersWithDetailsByUserIdTest () {
+        //given
+
+        //when
+        List<Folder> userFolderList = folderRepository.findAllFoldersWithDetailsByUserId(userId);
+
+        //then
+        if (!userFolderList.isEmpty()) {
+            for (int i = 0; i < userFolderList.size(); i++) {
+                assertThat(userFolderList.get(i).getId()).isEqualTo(folderList.get(i).getId());
+            }
         } else{
             assertThat(0L).isEqualTo(1L);
         }
