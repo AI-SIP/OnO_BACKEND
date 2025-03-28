@@ -1,9 +1,11 @@
 package com.aisip.OnO.backend.folder.service;
 
+import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
 import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
+import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
@@ -23,6 +25,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.util.ReflectionTestUtils.setField;
 
@@ -147,7 +152,7 @@ class FolderServiceTest {
     }
 
     @Test
-    @DisplayName("folderId를 사용해 특정 폴더 조회하기 테스트")
+    @DisplayName("folderId를 사용해 특정 폴더 response dto 조회하기 테스트")
     void findFolder() {
         //given
         Long folderId = 1L;
@@ -168,6 +173,7 @@ class FolderServiceTest {
     }
 
     @Test
+    @DisplayName("folderId를 사용해 특정 폴더 엔티티 조회하기 테스트")
     void findFolderEntity() {
         //given
         Long folderId = 0L;
@@ -184,6 +190,7 @@ class FolderServiceTest {
     }
 
     @Test
+    @DisplayName("특정 유저의 모든 폴더 썸네일 조회하기 테스트")
     void findAllUserFolderThumbnails() {
         //given
         when(folderRepository.findAllByUserId(userId)).thenReturn(folderList);
@@ -199,6 +206,7 @@ class FolderServiceTest {
     }
 
     @Test
+    @DisplayName("특정 유저의 모든 폴더 조회하기 테스트")
     void findAllUserFolders() {
         //given
         when(folderRepository.findAllFoldersWithDetailsByUserId(userId)).thenReturn(folderList);
@@ -229,11 +237,51 @@ class FolderServiceTest {
     }
 
     @Test
+    @DisplayName("루트 폴더 생성 로직 테스트")
     void createRootFolder() {
+        //when
+        folderService.createRootFolder(userId);
+
+        verify(folderRepository).save(any(Folder.class));
     }
 
     @Test
-    void createFolder() {
+    @DisplayName("폴더 생성 테스트 - 정상 등록")
+    void createFolder_FolderExists() {
+        //given
+        Long parentFolderId = folderList.get(folderList.size() - 1).getId();
+        String folderName = "new folder";
+        FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
+                folderName,
+                null,
+                parentFolderId
+        );
+        when(folderRepository.findById(parentFolderId)).thenReturn(Optional.of(folderList.get(folderList.size() - 1)));
+
+        //when
+        folderService.createFolder(folderRegisterDto, userId);
+
+        verify(folderRepository).save(any(Folder.class));
+        assertThat(folderList.get(folderList.size() - 1).getSubFolderList().size()).isEqualTo(1);
+        assertThat(folderList.get(folderList.size() - 1).getSubFolderList().get(0).getName()).isEqualTo(folderName);
+    }
+
+    @Test
+    @DisplayName("폴더 생성 테스트 - 부모 폴더가 존재하지 않는 경우")
+    void createFolder_FolderNotExists() {
+        //given
+        Long parentFolderId = 200L;
+        FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
+                "new folder",
+                null,
+                parentFolderId
+        );
+        when(folderRepository.findById(parentFolderId)).thenReturn(Optional.empty());
+
+        //when & then
+        assertThatThrownBy(() -> folderService.createFolder(folderRegisterDto, userId))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessageContaining(FolderErrorCase.FOLDER_NOT_FOUND.getMessage());
     }
 
     @Test

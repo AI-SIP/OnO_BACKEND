@@ -92,6 +92,7 @@ public class FolderService {
 
         Folder folder = Folder.from(folderRegisterDto, parentFolder, userId);
         folderRepository.save(folder);
+        parentFolder.addSubFolder(folder);
 
         log.info("userId : {} create folder id: {}", userId, folder.getId());
     }
