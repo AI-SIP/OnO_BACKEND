@@ -240,9 +240,12 @@ class FolderServiceTest {
     @DisplayName("루트 폴더 생성 로직 테스트")
     void createRootFolder() {
         //when
-        folderService.createRootFolder(userId);
+        FolderResponseDto rootFolder = folderService.createRootFolder(userId);
 
         verify(folderRepository).save(any(Folder.class));
+        assertThat(rootFolder.folderName()).isEqualTo("메인");
+        assertThat(rootFolder.parentFolder()).isNull();
+        assertThat(rootFolder.subFolderList()).isEmpty();
     }
 
     @Test
