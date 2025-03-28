@@ -7,6 +7,7 @@ import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
+import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.service.ProblemService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +31,8 @@ public class FolderService {
         Folder folder = folderRepository.findFolderWithDetailsByFolderId(folderId)
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
 
-        return FolderResponseDto.from(folder);
+        List<ProblemResponseDto> problemResponseDtoList = problemService.findFolderProblemList(folderId);
+        return FolderResponseDto.from(folder, problemResponseDtoList);
     }
 
     public Folder findFolderEntity(Long folderId) {
@@ -52,14 +54,18 @@ public class FolderService {
         log.info("userId : {} find All folders", userId);
         return folders.isEmpty()
                 ? List.of(findRootFolder(userId))
-                : folders.stream().map(FolderResponseDto::from).toList();
+                : folders.stream().map(folder -> {
+            List<ProblemResponseDto> problemResponseDtoList = problemService.findFolderProblemList(folder.getId());
+            return FolderResponseDto.from(folder, problemResponseDtoList);
+                }).toList();
     }
 
     public FolderResponseDto findRootFolder(Long userId) {
         return folderRepository.findRootFolder(userId)
                 .map(rootFolder -> {
                     log.info("userId : {} find root folder id: {}", userId, rootFolder.getId());
-                    return FolderResponseDto.from(rootFolder);
+                    List<ProblemResponseDto> problemResponseDtoList = problemService.findFolderProblemList(rootFolder.getId());
+                    return FolderResponseDto.from(rootFolder, problemResponseDtoList);
                 })
                 .orElseGet(() -> {
                     log.info("userId : {} create root folder", userId);
@@ -78,7 +84,7 @@ public class FolderService {
         folderRepository.save(rootFolder);
 
         log.info("userId : {} create root folder id: {}", userId, rootFolder.getId());
-        return FolderResponseDto.from(rootFolder);
+        return FolderResponseDto.from(rootFolder, List.of());
     }
 
     public void createFolder(FolderRegisterDto folderRegisterDto, Long userId) {

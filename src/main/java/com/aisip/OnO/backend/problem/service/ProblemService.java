@@ -91,6 +91,7 @@ public class ProblemService {
 
         Problem problem = Problem.from(problemRegisterDto, userId, folder);
         problemRepository.save(problem);
+        folder.addProblem(problem);
 
         problemRegisterDto.imageDataDtoList()
                 .forEach(problemImageDataRegisterDto -> {

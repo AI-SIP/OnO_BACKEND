@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.folder.dto;
 
 import com.aisip.OnO.backend.folder.entity.Folder;
+import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import lombok.AccessLevel;
 import lombok.Builder;
 
@@ -18,11 +19,13 @@ public record FolderResponseDto (
 
     List<FolderThumbnailResponseDto> subFolderList,
 
+    List<ProblemResponseDto> problemList,
+
     LocalDateTime createdAt,
 
     LocalDateTime updateAt
 ) {
-    public static FolderResponseDto from(Folder folder) {
+    public static FolderResponseDto from(Folder folder, List<ProblemResponseDto> problemResponseDtoList) {
 
         FolderThumbnailResponseDto parentFolder = folder.getParentFolder() != null
                 ? FolderThumbnailResponseDto.from(folder.getParentFolder())
@@ -40,6 +43,7 @@ public record FolderResponseDto (
                 .folderName(folder.getName())
                 .parentFolder(parentFolder)
                 .subFolderList(subFolderList)
+                .problemList(problemResponseDtoList)
                 .createdAt(folder.getCreatedAt())
                 .updateAt(folder.getUpdatedAt())
                 .build();
