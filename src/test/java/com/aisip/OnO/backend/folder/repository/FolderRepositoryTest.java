@@ -125,6 +125,7 @@ class FolderRepositoryTest {
                             targetFolder
                     )
             );
+            targetFolder.addProblem(problem);
 
             List<ProblemImageData> imageDataList = new ArrayList<>();
             for (int j = 1; j <= 3; j++){
