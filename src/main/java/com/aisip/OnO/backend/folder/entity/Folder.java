@@ -54,6 +54,10 @@ public class Folder extends BaseEntity {
         problemList.add(problem);
     }
 
+    public void addSubFolder(Folder folder) {
+        subFolderList.add(folder);
+    }
+
     public void updateFolderInfo(FolderRegisterDto folderRegisterDto) {
         if (folderRegisterDto.folderName() != null) {
             this.name = folderRegisterDto.folderName();
