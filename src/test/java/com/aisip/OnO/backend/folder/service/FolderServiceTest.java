@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.folder.service;
 
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
+import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
@@ -11,10 +12,7 @@ import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.service.ProblemService;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -129,6 +127,26 @@ class FolderServiceTest {
     }
 
     @Test
+    void findRootFolder() {
+        //given
+        Long folderId = 0L;
+        when(folderRepository.findRootFolder(userId)).thenReturn(Optional.of(folderList.get(0)));
+        when(problemService.findFolderProblemList(folderId)).thenReturn(List.of(problemList.get(0), problemList.get(1)));
+
+        //when
+        FolderResponseDto folderResponseDto = folderService.findRootFolder(userId);
+
+        //then
+        assertThat(folderResponseDto.folderId()).isEqualTo(folderList.get(0).getId());
+        assertThat(folderResponseDto.folderName()).isEqualTo(folderList.get(0).getName());
+        assertThat(folderResponseDto.parentFolder()).isNull();
+        assertThat(folderResponseDto.subFolderList().get(0).folderId()).isEqualTo(folderList.get(1).getId());
+        assertThat(folderResponseDto.subFolderList().get(1).folderId()).isEqualTo(folderList.get(2).getId());
+        assertThat(folderResponseDto.problemList().get(0)).isEqualTo(problemList.get(0));
+        assertThat(folderResponseDto.problemList().get(1)).isEqualTo(problemList.get(1));
+    }
+
+    @Test
     @DisplayName("folderId를 사용해 특정 폴더 조회하기 테스트")
     void findFolder() {
         //given
@@ -167,14 +185,47 @@ class FolderServiceTest {
 
     @Test
     void findAllUserFolderThumbnails() {
+        //given
+        when(folderRepository.findAllByUserId(userId)).thenReturn(folderList);
+
+        //when
+        List<FolderThumbnailResponseDto> folderThumbnailResponseDtoList = folderService.findAllUserFolderThumbnails(userId);
+
+        //then
+        for (int i = 0; i < folderThumbnailResponseDtoList.size(); i++) {
+            assertThat(folderThumbnailResponseDtoList.get(i).folderId()).isEqualTo(folderList.get(i).getId());
+            assertThat(folderThumbnailResponseDtoList.get(i).folderName()).isEqualTo(folderList.get(i).getName());
+        }
     }
 
     @Test
     void findAllUserFolders() {
-    }
+        //given
+        when(folderRepository.findAllFoldersWithDetailsByUserId(userId)).thenReturn(folderList);
+        for (int i = 0; i < folderList.size(); i++) {
+            when(problemService.findFolderProblemList((long) i)).thenReturn(List.of(problemList.get(i), problemList.get(i + 1)));
+        }
 
-    @Test
-    void findRootFolder() {
+        //when
+        List<FolderResponseDto> userFolderList = folderService.findAllUserFolders(userId);
+
+        //then
+        assertThat(userFolderList.size()).isEqualTo(folderList.size());
+        for (int i = 0; i < userFolderList.size(); i++) {
+            assertThat(userFolderList.get(i).folderId()).isEqualTo(folderList.get(i).getId());
+            assertThat(userFolderList.get(i).folderName()).isEqualTo(folderList.get(i).getName());
+            if (i == 0) {
+                assertThat(userFolderList.get(i).parentFolder()).isNull();
+            } else{
+                assertThat(userFolderList.get(i).parentFolder().folderId()).isEqualTo(folderList.get(i).getParentFolder().getId());
+            }
+
+            if (i < 3) {
+                assertThat(userFolderList.get(i).subFolderList().get(0).folderId()).isEqualTo(folderList.get(i).getSubFolderList().get(0).getId());
+            } else{
+                assertThat(userFolderList.get(i).subFolderList()).isEmpty();
+            }
+        }
     }
 
     @Test
