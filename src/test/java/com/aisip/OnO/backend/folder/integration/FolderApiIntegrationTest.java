@@ -14,6 +14,8 @@ import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -22,10 +24,14 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT) // 랜덤 포트로 애플리케이션 실행
 @AutoConfigureMockMvc
@@ -51,6 +57,10 @@ public class FolderApiIntegrationTest {
 
     private Long userId;
 
+    private List<Folder> folderList;
+
+    private List<Problem> problemList;
+
     @BeforeEach
     void setUp() {
         userId = 1L;
@@ -61,8 +71,8 @@ public class FolderApiIntegrationTest {
                 )
         );
 
-        List<Folder> folderList = new ArrayList<>();
-        List<Problem> problemList = new ArrayList<>();
+        folderList = new ArrayList<>();
+        problemList = new ArrayList<>();
 
          /*
            0
@@ -80,7 +90,7 @@ public class FolderApiIntegrationTest {
                 null,
                 1L
         );
-        folderRepository.save(rootFolder);
+        rootFolder = folderRepository.save(rootFolder);
         folderList.add(rootFolder);
 
         for (int i = 0; i < 5; i++) {
@@ -93,9 +103,9 @@ public class FolderApiIntegrationTest {
                     folderList.get(i / 2),
                     userId
             );
+            folder = folderRepository.save(folder);
             folderList.add(folder);
             folderList.get(i / 2).addSubFolder(folder);
-            folderRepository.save(folder);
         }
 
         for (int i = 0; i < 12; i++) {
@@ -114,7 +124,8 @@ public class FolderApiIntegrationTest {
                     targetFolder
             );
             targetFolder.addProblem(problem);
-            problemRepository.save(problem);
+            problem = problemRepository.save(problem);
+            problemList.add(problem);
 
             List<ProblemImageData> imageDataList = new ArrayList<>();
             for (int j = 1; j <= 3; j++){
@@ -138,5 +149,76 @@ public class FolderApiIntegrationTest {
         problemImageDataRepository.deleteAll();
         problemRepository.deleteAll();
         folderRepository.deleteAll();
+
+        problemList.clear();
+        folderList.clear();
+    }
+
+    @Test
+    @DisplayName("getFolder() api 테스트 - root folder")
+    public void getFolderTest_Root() throws Exception {
+        //given
+        Folder folder = folderList.get(0);
+
+        // when & then - 해당 폴더를 조회하는 API 호출
+        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/folder/%d", folder.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.folderId").value(folder.getId()))
+                .andExpect(jsonPath("$.data.folderName").value(folder.getName()))
+                .andExpect(jsonPath("$.data.parentFolder").isEmpty())
+                .andExpect(jsonPath("$.data.subFolderList.length()").value(folder.getSubFolderList().size()))
+                .andExpect(jsonPath("$.data.subFolderList[0].folderId").value(folder.getSubFolderList().get(0).getId()))
+                .andExpect(jsonPath("$.data.subFolderList[0].folderName").value(folder.getSubFolderList().get(0).getName()))
+                .andExpect(jsonPath("$.data.subFolderList[1].folderId").value(folder.getSubFolderList().get(1).getId()))
+                .andExpect(jsonPath("$.data.subFolderList[1].folderName").value(folder.getSubFolderList().get(1).getName()))
+                .andExpect(jsonPath("$.data.problemList.length()").value(folder.getProblemList().size()))
+                .andExpect(jsonPath("$.data.problemList[0].problemId").value(folder.getProblemList().get(0).getId()))
+                .andExpect(jsonPath("$.data.problemList[0].imageUrlList.length()").value(folder.getProblemList().get(0).getProblemImageDataList().size()))
+                .andExpect(jsonPath("$.data.problemList[1].problemId").value(folder.getProblemList().get(1).getId()))
+                .andExpect(jsonPath("$.data.problemList[1].imageUrlList.length()").value(folder.getProblemList().get(1).getProblemImageDataList().size()));
+    }
+
+    @Test
+    @DisplayName("getFolder() api 테스트 - internal folder")
+    public void getFolderTest_Internal() throws Exception {
+        //given
+        Folder folder = folderList.get(1);
+
+        // when & then - 해당 폴더를 조회하는 API 호출
+        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/folder/%d", folder.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.folderId").value(folder.getId()))
+                .andExpect(jsonPath("$.data.folderName").value(folder.getName()))
+                .andExpect(jsonPath("$.data.parentFolder.folderId").value(folder.getParentFolder().getId()))
+                .andExpect(jsonPath("$.data.subFolderList.length()").value(folder.getSubFolderList().size()))
+                .andExpect(jsonPath("$.data.subFolderList[0].folderId").value(folder.getSubFolderList().get(0).getId()))
+                .andExpect(jsonPath("$.data.subFolderList[0].folderName").value(folder.getSubFolderList().get(0).getName()))
+                .andExpect(jsonPath("$.data.subFolderList[1].folderId").value(folder.getSubFolderList().get(1).getId()))
+                .andExpect(jsonPath("$.data.subFolderList[1].folderName").value(folder.getSubFolderList().get(1).getName()))
+                .andExpect(jsonPath("$.data.problemList.length()").value(folder.getProblemList().size()))
+                .andExpect(jsonPath("$.data.problemList[0].problemId").value(folder.getProblemList().get(0).getId()))
+                .andExpect(jsonPath("$.data.problemList[0].imageUrlList.length()").value(folder.getProblemList().get(0).getProblemImageDataList().size()))
+                .andExpect(jsonPath("$.data.problemList[1].problemId").value(folder.getProblemList().get(1).getId()))
+                .andExpect(jsonPath("$.data.problemList[1].imageUrlList.length()").value(folder.getProblemList().get(1).getProblemImageDataList().size()));
+    }
+
+    @Test
+    @DisplayName("getFolder() api 테스트 - external folder")
+    public void getFolderTest_External() throws Exception {
+        //given
+        Folder folder = folderList.get(folderList.size() - 1);
+
+        // when & then - 해당 폴더를 조회하는 API 호출
+        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/folder/%d", folder.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.folderId").value(folder.getId()))
+                .andExpect(jsonPath("$.data.folderName").value(folder.getName()))
+                .andExpect(jsonPath("$.data.parentFolder.folderId").value(folder.getParentFolder().getId()))
+                .andExpect(jsonPath("$.data.subFolderList.length()").value(0))
+                .andExpect(jsonPath("$.data.problemList.length()").value(folder.getProblemList().size()))
+                .andExpect(jsonPath("$.data.problemList[0].problemId").value(folder.getProblemList().get(0).getId()))
+                .andExpect(jsonPath("$.data.problemList[0].imageUrlList.length()").value(folder.getProblemList().get(0).getProblemImageDataList().size()))
+                .andExpect(jsonPath("$.data.problemList[1].problemId").value(folder.getProblemList().get(1).getId()))
+                .andExpect(jsonPath("$.data.problemList[1].imageUrlList.length()").value(folder.getProblemList().get(1).getProblemImageDataList().size()));
     }
 }

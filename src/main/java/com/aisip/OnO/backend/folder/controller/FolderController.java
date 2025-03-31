@@ -46,7 +46,7 @@ public class FolderController {
 
     // ✅ 특정 폴더 조회
     @GetMapping("/{folderId}")
-    public CommonResponse<FolderResponseDto> getFolder(@PathVariable Long folderId) {
+    public CommonResponse<FolderResponseDto> getFolder(@PathVariable("folderId") Long folderId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         return CommonResponse.success(folderService.findFolder(folderId));
@@ -63,7 +63,7 @@ public class FolderController {
 
     // ✅ 폴더 정보 수정
     @PatchMapping("/{folderId}")
-    public CommonResponse<String> updateFolderInfo(@RequestBody FolderRegisterDto folderRegisterDto) {
+    public CommonResponse<String> updateFolderInfo(@PathVariable("folderId") Long folderId, @RequestBody FolderRegisterDto folderRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         folderService.updateFolder(folderRegisterDto, userId);
