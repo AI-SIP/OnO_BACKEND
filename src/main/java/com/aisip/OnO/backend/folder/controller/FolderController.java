@@ -20,22 +20,6 @@ public class FolderController {
 
     private final FolderService folderService;
 
-    // ✅ 유저의 전체 폴더 상세 정보 조회
-    @GetMapping("/all")
-    public CommonResponse<List<FolderResponseDto>> getAllUserFolderDetails() {
-        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
-        return CommonResponse.success(folderService.findAllUserFolders(userId));
-    }
-
-    // ✅ 모든 폴더 조회
-    @GetMapping("/thumbnails")
-    public CommonResponse<List<FolderThumbnailResponseDto>> getAllUserFolderThumbnails() {
-        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
-        return CommonResponse.success(folderService.findAllUserFolderThumbnails(userId));
-    }
-
     // ✅ 루트 폴더 조회
     @GetMapping("/root")
     public CommonResponse<FolderResponseDto> getRootFolder() {
@@ -50,6 +34,22 @@ public class FolderController {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         return CommonResponse.success(folderService.findFolder(folderId));
+    }
+
+    // ✅ 모든 폴더 조회
+    @GetMapping("/thumbnails")
+    public CommonResponse<List<FolderThumbnailResponseDto>> getAllUserFolderThumbnails() {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        return CommonResponse.success(folderService.findAllUserFolderThumbnails(userId));
+    }
+
+    // ✅ 유저의 전체 폴더 상세 정보 조회
+    @GetMapping("/all")
+    public CommonResponse<List<FolderResponseDto>> getAllUserFolderDetails() {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        return CommonResponse.success(folderService.findAllUserFolders(userId));
     }
 
     // ✅ 폴더 생성

@@ -285,4 +285,40 @@ public class FolderApiIntegrationTest {
             assertThat(folder.getName()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].folderName"));
         }
     }
+
+    @Test
+    @DisplayName("getAllUserFolderDetails() api 테스트")
+    public void getAllUserFolderDetails_Test() throws Exception {
+        //given
+
+        // when
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/api/folder/all"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        // then
+        String content = result.getResponse().getContentAsString();
+
+        for (int i = 0; i < folderList.size(); i++) {
+            Folder folder = folderList.get(i);
+            assertThat(folder.getId().intValue()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].folderId"));
+            assertThat(folder.getName()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].folderName"));
+            if (folder.getParentFolder() != null) {
+                assertThat(folder.getParentFolder().getId().intValue()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].parentFolder.folderId"));
+            } else{
+                assertThat(folder.getParentFolder()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].parentFolder"));
+            }
+            assertThat(folder.getSubFolderList().size()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].subFolderList.length()"));
+            assertThat(folder.getProblemList().size()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].problemList.length()"));
+
+            for (int j = 0; j < folder.getProblemList().size(); j++) {
+                Problem problem = folder.getProblemList().get(j);
+                assertThat(problem.getId().intValue()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].problemList[" + j + "].problemId"));
+                assertThat(problem.getMemo()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].problemList[" + j + "].memo"));
+                assertThat(problem.getReference()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].problemList[" + j + "].reference"));
+                assertThat(problem.getSolvedAt()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].problemList[" + j + "].solvedAt"));
+                assertThat(problem.getProblemImageDataList().size()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].problemList[" + j + "].imageUrlList.length()"));
+            }
+        }
+    }
 }
