@@ -221,4 +221,45 @@ public class FolderApiIntegrationTest {
                 .andExpect(jsonPath("$.data.problemList[1].problemId").value(folder.getProblemList().get(1).getId()))
                 .andExpect(jsonPath("$.data.problemList[1].imageUrlList.length()").value(folder.getProblemList().get(1).getProblemImageDataList().size()));
     }
+
+    @Test
+    @DisplayName("getRootFolder() api 테스트 - 루트 폴더가 존재할 경우")
+    public void getRootFolderTest_Exist() throws Exception {
+        //given
+        Folder rootFolder = folderList.get(0);
+
+        // when & then - 해당 폴더를 조회하는 API 호출
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/folder/root"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.folderId").value(rootFolder.getId()))
+                .andExpect(jsonPath("$.data.folderName").value(rootFolder.getName()))
+                .andExpect(jsonPath("$.data.parentFolder").isEmpty())
+                .andExpect(jsonPath("$.data.subFolderList.length()").value(rootFolder.getSubFolderList().size()))
+                .andExpect(jsonPath("$.data.problemList.length()").value(rootFolder.getProblemList().size()))
+                .andExpect(jsonPath("$.data.subFolderList[0].folderId").value(rootFolder.getSubFolderList().get(0).getId()))
+                .andExpect(jsonPath("$.data.subFolderList[0].folderName").value(rootFolder.getSubFolderList().get(0).getName()))
+                .andExpect(jsonPath("$.data.subFolderList[1].folderId").value(rootFolder.getSubFolderList().get(1).getId()))
+                .andExpect(jsonPath("$.data.subFolderList[1].folderName").value(rootFolder.getSubFolderList().get(1).getName()))
+                .andExpect(jsonPath("$.data.problemList[0].problemId").value(rootFolder.getProblemList().get(0).getId()))
+                .andExpect(jsonPath("$.data.problemList[0].imageUrlList.length()").value(rootFolder.getProblemList().get(0).getProblemImageDataList().size()))
+                .andExpect(jsonPath("$.data.problemList[1].problemId").value(rootFolder.getProblemList().get(1).getId()))
+                .andExpect(jsonPath("$.data.problemList[1].imageUrlList.length()").value(rootFolder.getProblemList().get(1).getProblemImageDataList().size()));
+
+    }
+
+    @Test
+    @DisplayName("getRootFolder() api 테스트 - 루트 폴더가 존재하지 않을 경우")
+    public void getRootFolderTest_NotExist() throws Exception {
+        //given
+        folderRepository.deleteAll();
+
+        // when & then - 해당 폴더를 조회하는 API 호출
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/folder/root"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.folderId").isNotEmpty())
+                .andExpect(jsonPath("$.data.folderName").isNotEmpty())
+                .andExpect(jsonPath("$.data.parentFolder").isEmpty())
+                .andExpect(jsonPath("$.data.subFolderList.length()").value(0))
+                .andExpect(jsonPath("$.data.problemList.length()").value(0));
+    }
 }
