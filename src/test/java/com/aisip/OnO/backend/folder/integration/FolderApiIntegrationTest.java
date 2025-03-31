@@ -12,6 +12,7 @@ import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,12 +25,14 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -261,5 +264,25 @@ public class FolderApiIntegrationTest {
                 .andExpect(jsonPath("$.data.parentFolder").isEmpty())
                 .andExpect(jsonPath("$.data.subFolderList.length()").value(0))
                 .andExpect(jsonPath("$.data.problemList.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("getAllUserFolderThumbnails() api 테스트")
+    public void getAllUserFolderThumbnails_Test() throws Exception {
+        //given
+
+        // when
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/api/folder/thumbnails"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        // then
+        String content = result.getResponse().getContentAsString();
+
+        for (int i = 0; i < folderList.size(); i++) {
+            Folder folder = folderList.get(i);
+            assertThat(folder.getId().intValue()).isEqualTo( JsonPath.read(content, "$.data[" + i + "].folderId"));
+            assertThat(folder.getName()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].folderName"));
+        }
     }
 }
