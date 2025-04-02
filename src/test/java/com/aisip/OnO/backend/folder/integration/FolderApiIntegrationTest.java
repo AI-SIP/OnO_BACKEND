@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.folder.integration;
 
 import com.aisip.OnO.backend.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.folder.dto.FolderDeleteRequestDto;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
@@ -34,6 +35,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -393,5 +396,103 @@ public class FolderApiIntegrationTest {
         Folder folder = folderRepository.findById(folderId).get();
 
         assertThat(folder.getParentFolder().getId()).isEqualTo(newParentFolderId);
+    }
+
+    @Test
+    @DisplayName("deleteFolderWithProblems() api 테스트 - 중간 폴더 단일 삭제")
+    public void deleteFolderWithProblemsTest_SingleFolder() throws Exception {
+        //given
+        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
+                null,
+                List.of(folderList.get(1).getId())
+        );
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+
+        // when
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/folder")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(folderDeleteRequestDto)))
+                .andExpect(status().isOk());
+
+        // then
+        assertThat(folderRepository.findAll().size()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("deleteFolderWithProblems() api 테스트 - 중간 폴더 모두 삭제")
+    public void deleteFolderWithProblemsTest_MultipleFolder() throws Exception {
+        //given
+        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
+                null,
+                List.of(folderList.get(1).getId(), folderList.get(2).getId())
+        );
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+
+        // when
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/folder")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(folderDeleteRequestDto)))
+                .andExpect(status().isOk());
+
+        // then
+        assertThat(folderRepository.findAll().size()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("deleteFolderWithProblems() api 테스트 - 유저 폴더 모두 삭제")
+    public void deleteFolderWithProblemsTest_UserFolders() throws Exception {
+        //given
+        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
+                userId,
+                null
+        );
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+
+        // when
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/folder")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(folderDeleteRequestDto)))
+                .andExpect(status().isOk());
+
+        // then
+        assertThat(folderRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("deleteFolderWithProblems() api 테스트 - 유저 폴더와 리스트 모두 넘길 때")
+    public void deleteFolderWithProblemsTest_UserFoldersAndFolderList() throws Exception {
+        //given
+        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
+                userId,
+                List.of(folderList.get(1).getId(), folderList.get(2).getId())
+        );
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+
+        // when
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/folder")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(folderDeleteRequestDto)))
+                .andExpect(status().isOk());
+
+        // then
+        assertThat(folderRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("deleteFolderWithProblems() api 테스트 - 존재하지 않는 폴더를 제거할 떄")
+    public void deleteFolderWithProblemsTest_FolderNotExist() throws Exception {
+        //given
+        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
+                null,
+                List.of(999L)
+        );
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+
+        // when & then
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/folder")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(folderDeleteRequestDto)))
+                .andExpect(status().is4xxClientError());
+
     }
 }

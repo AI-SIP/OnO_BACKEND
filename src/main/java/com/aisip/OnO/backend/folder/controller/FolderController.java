@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.folder.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
+import com.aisip.OnO.backend.folder.dto.FolderDeleteRequestDto;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
 import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
@@ -72,19 +73,8 @@ public class FolderController {
 
     // ✅ 폴더 삭제 기능
     @DeleteMapping("")
-    public CommonResponse<String> deleteFoldersWithProblems(@RequestParam List<Long> deleteFolderIdList) {
-        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
-        folderService.deleteFoldersWithProblems(deleteFolderIdList, userId);
+    public CommonResponse<String> deleteFoldersWithProblems(@RequestBody FolderDeleteRequestDto folderDeleteRequestDto) {
+        folderService.deleteFolders(folderDeleteRequestDto);
         return CommonResponse.success("폴더가 성공적으로 삭제되었습니다.");
-    }
-
-    // ✅ 특정 유저의 모든 폴더 삭제
-    @DeleteMapping("/all")
-    public CommonResponse<String> deleteAllUserFolders() {
-        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
-        folderService.deleteAllUserFoldersWithProblems(userId);
-        return CommonResponse.success("유저의 모든 폴더가 삭제되었습니다.");
     }
 }
