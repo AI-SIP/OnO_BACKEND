@@ -66,6 +66,10 @@ class ProblemApiIntegrationTest {
 
     private Long userId;
 
+    private List<Folder> folderList;
+
+    private List<Problem> problemList;
+
     @BeforeEach
     void setUp() {
         userId = 1L;
@@ -76,6 +80,9 @@ class ProblemApiIntegrationTest {
                 )
         );
 
+        folderList = new ArrayList<>();
+        problemList = new ArrayList<>();
+
         for (int f = 1; f <= 2; f++) {
             Folder folder = Folder.from(
                     new FolderRegisterDto("folder" + f, null, null),
@@ -83,6 +90,7 @@ class ProblemApiIntegrationTest {
                     userId
             );
             folderRepository.save(folder);
+            folderList.add(folder);
 
             // 문제 5개 생성 (폴더 1번에 3개, 폴더 2번에 2개)
             for (int i = 1; i <= 3; i++) {
@@ -99,6 +107,7 @@ class ProblemApiIntegrationTest {
                         folder
                 );
                 problemRepository.save(problem);
+                problemList.add(problem);
 
                 // 이미지 2개씩 추가
                 List<ProblemImageData> imageDataList = List.of(
@@ -115,6 +124,9 @@ class ProblemApiIntegrationTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
+        problemList.clear();
+        folderList.clear();
+
         problemImageDataRepository.deleteAll();
         problemRepository.deleteAll();
         folderRepository.deleteAll();
@@ -125,7 +137,6 @@ class ProblemApiIntegrationTest {
     @WithMockCustomUser()
     void findProblem() throws Exception {
         // given
-        List<Problem> problemList = problemRepository.findAllByUserId(userId);
         Long problemId = problemList.get(0).getId();
 
         // when & then - 해당 문제를 조회하는 API 호출
@@ -147,7 +158,7 @@ class ProblemApiIntegrationTest {
     @WithMockCustomUser()
     void findAllUserProblems() throws Exception {
         // given
-        List<Problem> problemList = problemRepository.findAllByUserId(userId);
+        //List<Problem> problemList = problemRepository.findAllByUserId(userId);
 
         // when & then - 해당 문제를 조회하는 API 호출
         mockMvc.perform(MockMvcRequestBuilders.get("/api/problem/user"))
@@ -169,7 +180,7 @@ class ProblemApiIntegrationTest {
     @WithMockCustomUser()
     void findUserProblemCount() throws Exception {
         // given
-        Long count = problemRepository.countByUserId(userId);
+        int count = problemList.size();
 
         // when & then - 해당 문제를 조회하는 API 호출
         mockMvc.perform(MockMvcRequestBuilders.get("/api/problem/problemCount"))
@@ -251,7 +262,6 @@ class ProblemApiIntegrationTest {
     @Transactional
     void registerProblemImageData() throws Exception {
         // given
-        List<Problem> problemList = problemRepository.findAllByUserId(userId);
         Long problemId = problemList.get(0).getId();
         ProblemImageDataRegisterDto problemImageDataRegisterDto = new ProblemImageDataRegisterDto(
                 problemId,
@@ -277,7 +287,6 @@ class ProblemApiIntegrationTest {
     @WithMockCustomUser()
     void updateProblemInfo() throws Exception {
         // given
-        List<Problem> problemList = problemRepository.findAllByUserId(userId);
         Long problemId = problemList.get(0).getId();
         String updateMemo = "update memo";
         String updateReference = "update reference";
@@ -308,9 +317,6 @@ class ProblemApiIntegrationTest {
     @WithMockCustomUser()
     void updateProblemPath() throws Exception {
         // given
-        List<Problem> problemList = problemRepository.findAllByUserId(userId);
-        List<Folder> folderList = folderRepository.findAllByUserId(userId);
-
         Long problemId = problemList.get(0).getId();
         Long updateFolderId = folderList.get(1).getId();
 
@@ -339,8 +345,6 @@ class ProblemApiIntegrationTest {
     @WithMockCustomUser()
     void updateProblemImageData() throws Exception {
         // given
-        List<Problem> problemList = problemRepository.findAllByUserId(userId);
-
         Long problemId = problemList.get(0).getId();
 
         ProblemRegisterDto problemRegisterDto = new ProblemRegisterDto(
@@ -366,8 +370,6 @@ class ProblemApiIntegrationTest {
     @WithMockCustomUser()
     void deleteProblemsWithUserId() throws Exception {
         // given
-        List<Problem> problemList = problemRepository.findAllByUserId(userId);
-
         ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
                 userId,
                 null,
@@ -388,7 +390,6 @@ class ProblemApiIntegrationTest {
     @WithMockCustomUser()
     void deleteProblemsWithProblemId() throws Exception {
         // given
-        List<Problem> problemList = problemRepository.findAllByUserId(userId);
         List<Long> deleteProblemIdList = List.of(problemList.get(0).getId(), problemList.get(1).getId(), problemList.get(4).getId());
 
         ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
@@ -412,8 +413,6 @@ class ProblemApiIntegrationTest {
     @WithMockCustomUser()
     void deleteProblemsWithFolderId() throws Exception {
         // given
-        List<Problem> problemList = problemRepository.findAllByUserId(userId);
-        List<Folder> folderList = folderRepository.findAllByUserId(userId);
         List<Long> folderIdList = List.of(folderList.get(0).getId());
 
         ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
