@@ -21,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -320,5 +321,29 @@ public class FolderApiIntegrationTest {
                 assertThat(problem.getProblemImageDataList().size()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].problemList[" + j + "].imageUrlList.length()"));
             }
         }
+    }
+
+    @Test
+    @DisplayName("createFolder() api 테스트")
+    public void createFolderTest() throws Exception {
+        //given
+        String folderName = "new Folder";
+        FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
+                "new Folder",
+                null,
+                folderList.get(0).getId()
+        );
+
+        // when
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/folder")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(folderRegisterDto)))
+                .andExpect(status().isOk());
+
+        // then
+        List<Folder> folders = folderRepository.findAll();
+        Folder folder = folders.get(folders.size() - 1);
+        assertThat(folder.getName()).isEqualTo(folderName);
+        assertThat(folder.getParentFolder().getId()).isEqualTo(folderList.get(0).getId());
     }
 }
