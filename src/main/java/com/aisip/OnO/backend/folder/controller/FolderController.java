@@ -62,8 +62,8 @@ public class FolderController {
     }
 
     // ✅ 폴더 정보 수정
-    @PatchMapping("/{folderId}")
-    public CommonResponse<String> updateFolderInfo(@PathVariable("folderId") Long folderId, @RequestBody FolderRegisterDto folderRegisterDto) {
+    @PatchMapping("")
+    public CommonResponse<String> updateFolderInfo(@RequestBody FolderRegisterDto folderRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         folderService.updateFolder(folderRegisterDto, userId);

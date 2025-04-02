@@ -35,11 +35,12 @@ public class Folder extends BaseEntity {
     @JoinColumn(name = "parent_folder_id")
     private Folder parentFolder;
 
-    @OneToMany(mappedBy = "parentFolder", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "parentFolder", cascade = CascadeType.ALL, orphanRemoval = false)
     private List<Folder> subFolderList;
 
-    @OneToMany(mappedBy = "folder", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "folder", cascade = CascadeType.ALL, orphanRemoval = false)
     private List<Problem> problemList;
+
     public static Folder from(FolderRegisterDto folderRegisterDto, Folder parentFolder, Long userId) {
         return Folder.builder()
                 .name(folderRegisterDto.folderName())

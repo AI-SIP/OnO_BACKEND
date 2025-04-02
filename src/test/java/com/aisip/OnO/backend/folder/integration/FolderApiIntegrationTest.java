@@ -79,11 +79,11 @@ public class FolderApiIntegrationTest {
         problemList = new ArrayList<>();
 
          /*
-           0
+         root
         /    \
-        1     2
+        0     1
         | \   |
-        3, 4  5
+        2  3  4
          */
         Folder rootFolder = Folder.from(
                 new FolderRegisterDto(
@@ -329,7 +329,7 @@ public class FolderApiIntegrationTest {
         //given
         String folderName = "new Folder";
         FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
-                "new Folder",
+                folderName,
                 null,
                 folderList.get(0).getId()
         );
@@ -345,5 +345,53 @@ public class FolderApiIntegrationTest {
         Folder folder = folders.get(folders.size() - 1);
         assertThat(folder.getName()).isEqualTo(folderName);
         assertThat(folder.getParentFolder().getId()).isEqualTo(folderList.get(0).getId());
+    }
+
+    @Test
+    @DisplayName("updateFolder() api 테스트 - 이름 변경")
+    public void updateFolderTest_FolderName() throws Exception {
+        //given
+        Long folderId = folderList.get(0).getId();
+        String folderName = "new FolderName";
+        FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
+                folderName,
+                folderId,
+                null
+        );
+
+        // when
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/folder")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(folderRegisterDto)))
+                .andExpect(status().isOk());
+
+        // then
+        Folder folder = folderRepository.findById(folderId).get();
+        assertThat(folder.getName()).isEqualTo(folderName);
+    }
+
+    @Test
+    @DisplayName("updateFolder() api 테스트 - 부모 폴더 변경")
+    public void updateFolderTest_ParentFolder() throws Exception {
+        //given
+        Long oldParentFolderId = folderList.get(0).getId();
+        Long folderId = folderList.get(1).getId();
+        Long newParentFolderId = folderList.get(2).getId();
+        FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
+                null,
+                folderId,
+                newParentFolderId
+        );
+
+        // when
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/folder")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(folderRegisterDto)))
+                .andExpect(status().isOk());
+
+        // then
+        Folder folder = folderRepository.findById(folderId).get();
+
+        assertThat(folder.getParentFolder().getId()).isEqualTo(newParentFolderId);
     }
 }

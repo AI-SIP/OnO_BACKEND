@@ -106,9 +106,9 @@ public class FolderService {
             Folder oldParentFolder = folder.getParentFolder();
             Folder newParentFolder = findFolderEntity(folderRegisterDto.parentFolderId());
 
-            oldParentFolder.removeSubFolder(folder);
             folder.updateParentFolder(newParentFolder);
             newParentFolder.addSubFolder(folder);
+            oldParentFolder.removeSubFolder(folder);
         }
 
         log.info("userId : {} update folder id: {}", userId, folder.getId());
