@@ -91,7 +91,7 @@ class ProblemControllerTest {
         given(problemService.findProblem(problemId, 1L)).willReturn(problemResponseDtoList.get(0));
 
         // When & Then
-        mockMvc.perform(get("/api/problem/" + problemId)
+        mockMvc.perform(get("/api/problems/" + problemId)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.problemId").value(1L))
@@ -109,7 +109,7 @@ class ProblemControllerTest {
         given(problemService.findUserProblems(1L)).willReturn(problemResponseDtoList);
 
         // When & Then
-        mockMvc.perform(get("/api/problem/user")
+        mockMvc.perform(get("/api/problems/user")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.size()").value(5))
@@ -128,7 +128,7 @@ class ProblemControllerTest {
         given(problemService.findProblemCountByUser(1L)).willReturn((long) problemResponseDtoList.size());
 
         // When & Then
-        mockMvc.perform(get("/api/problem/problemCount")
+        mockMvc.perform(get("/api/problems/problemCount")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(5));
@@ -142,7 +142,7 @@ class ProblemControllerTest {
         given(problemService.findFolderProblemList(1L)).willReturn(problemResponseDtoList);
 
         // When & Then
-        mockMvc.perform(get("/api/problem/folder/1")
+        mockMvc.perform(get("/api/problems/folder/1")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.size()").value(5))
@@ -158,7 +158,7 @@ class ProblemControllerTest {
     @WithMockCustomUser()
     void registerProblem() throws Exception {
         // When & Then
-        mockMvc.perform(post("/api/problem")
+        mockMvc.perform(post("/api/problems")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new ProblemRegisterDto(
                                     1L,
@@ -195,7 +195,7 @@ class ProblemControllerTest {
     @WithMockCustomUser()
     void registerProblemImageData() throws Exception {
         // When & Then
-        mockMvc.perform(post("/api/problem/imageData")
+        mockMvc.perform(post("/api/problems/imageData")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new ProblemImageDataRegisterDto(
@@ -224,7 +224,7 @@ class ProblemControllerTest {
         );
 
         // when & then
-        mockMvc.perform(patch("/api/problem/info")
+        mockMvc.perform(patch("/api/problems/info")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemRegisterDto)))
                 .andExpect(status().isOk())
@@ -248,7 +248,7 @@ class ProblemControllerTest {
         );
 
         // when & then
-        mockMvc.perform(patch("/api/problem/path")
+        mockMvc.perform(patch("/api/problems/path")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemRegisterDto)))
                 .andExpect(status().isOk())
@@ -270,7 +270,7 @@ class ProblemControllerTest {
 
 
         // when & then
-        mockMvc.perform(delete("/api/problem")
+        mockMvc.perform(delete("/api/problems")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
                 .andExpect(status().isOk());
@@ -286,7 +286,7 @@ class ProblemControllerTest {
         String imageUrl = "imageUrl";
 
         // when & then
-        mockMvc.perform(delete("/api/problem/imageData")
+        mockMvc.perform(delete("/api/problems/imageData")
                         .param("imageUrl", imageUrl))
                 .andExpect(status().isOk());
 

@@ -26,7 +26,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
-
 @ExtendWith(SpringExtension.class)
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -60,7 +59,7 @@ class UserControllerTest {
         given(userService.findUser(1L)).willReturn(mockUserResponse);
 
         // When & Then
-        mockMvc.perform(get("/api/user")
+        mockMvc.perform(get("/api/users")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.name").value("testUser"))
@@ -75,7 +74,7 @@ class UserControllerTest {
         UserRegisterDto updateRequest = new UserRegisterDto("updated@example.com", "UpdatedUser", "updatedIdentifier", "USER", null);
 
         // when & then
-        mockMvc.perform(patch("/api/user")
+        mockMvc.perform(patch("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest)))
                 .andExpect(status().isOk())
@@ -87,7 +86,7 @@ class UserControllerTest {
     @WithMockCustomUser()
     void deleteUserInfo() throws Exception {
         // when & then
-        mockMvc.perform(delete("/api/user")
+        mockMvc.perform(delete("/api/users")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
         // userService.deleteUserById(userId)가 1번 호출되었는지 확인

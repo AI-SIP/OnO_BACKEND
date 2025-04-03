@@ -16,7 +16,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/practiceNote")
+@RequestMapping("/api/practiceNotes")
 public class PracticeNoteController {
 
     private final PracticeNoteService practiceNoteService;
@@ -32,7 +32,7 @@ public class PracticeNoteController {
 
     // ✅ 사용자의 모든 복습 리스트 썸네일 조회
     @ResponseStatus(HttpStatus.OK)
-    @GetMapping("/thumbnail/all")
+    @GetMapping("/thumbnail")
     public CommonResponse<List<PracticeNoteThumbnailResponseDto>> getAllPracticeThumbnail() {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} get all problem practice thumbnails", userId);

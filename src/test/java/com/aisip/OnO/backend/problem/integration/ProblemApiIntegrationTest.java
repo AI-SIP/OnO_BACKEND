@@ -140,7 +140,7 @@ class ProblemApiIntegrationTest {
         Long problemId = problemList.get(0).getId();
 
         // when & then - 해당 문제를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/problem/%d", problemId)))
+        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/problems/%d", problemId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.problemId").value(problemId))
                 .andExpect(jsonPath("$.data.memo").value(problemList.get(0).getMemo()))
@@ -158,10 +158,9 @@ class ProblemApiIntegrationTest {
     @WithMockCustomUser()
     void findAllUserProblems() throws Exception {
         // given
-        //List<Problem> problemList = problemRepository.findAllByUserId(userId);
 
         // when & then - 해당 문제를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get("/api/problem/user"))
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/problems/user"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.size()").value(problemList.size()))
                 .andExpect(jsonPath("$.data[0].problemId").value(problemList.get(0).getId()))
@@ -183,7 +182,7 @@ class ProblemApiIntegrationTest {
         int count = problemList.size();
 
         // when & then - 해당 문제를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get("/api/problem/problemCount"))
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/problems/problemCount"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(count));
     }
@@ -197,7 +196,7 @@ class ProblemApiIntegrationTest {
         Long folderId = folderRepository.findAllByUserId(userId).get(0).getId();
 
         // when & then - 해당 문제를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/problem/folder/%d", folderId)))
+        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/problems/folder/%d", folderId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.size()").value(3L))
                 .andExpect(jsonPath("$.data[0].problemId").value(problemList.get(0).getId()))
@@ -243,7 +242,7 @@ class ProblemApiIntegrationTest {
         );
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/problem")
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/problems")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemRegisterDto)))
                 .andExpect(status().isOk())
@@ -270,7 +269,7 @@ class ProblemApiIntegrationTest {
         );
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/problem/imageData")
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/problems/imageData")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemImageDataRegisterDto)))
                 .andExpect(status().isOk());
@@ -300,7 +299,7 @@ class ProblemApiIntegrationTest {
         );
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problem/info")
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problems/info")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemRegisterDto)))
                 .andExpect(status().isOk())
@@ -330,7 +329,7 @@ class ProblemApiIntegrationTest {
         );
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problem/path")
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problems/path")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemRegisterDto)))
                 .andExpect(status().isOk());
@@ -357,7 +356,7 @@ class ProblemApiIntegrationTest {
         );
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problem/path")
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problems/path")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemRegisterDto)))
                 .andExpect(status().isOk());
@@ -378,7 +377,7 @@ class ProblemApiIntegrationTest {
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problem")
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problems")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
                 .andExpect(status().isOk());
@@ -400,7 +399,7 @@ class ProblemApiIntegrationTest {
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problem")
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problems")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
                 .andExpect(status().isOk());
@@ -423,7 +422,7 @@ class ProblemApiIntegrationTest {
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problem")
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problems")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
                 .andExpect(status().isOk());
