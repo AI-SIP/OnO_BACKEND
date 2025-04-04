@@ -26,8 +26,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -145,7 +144,7 @@ class PracticeNoteRepositoryTest {
     }
 
     @Test
-    @DisplayName("문제가 복습 리스트에 존재하는지 체크 - 존재할 경우")
+    @DisplayName("문제가 복습 노트에 존재하는지 체크 - 존재할 경우")
     void checkProblemAlreadyMatchingWithPracticeTest_Exist() {
         // given
         Long practiceId = practiceNoteList.get(0).getId();
@@ -155,11 +154,11 @@ class PracticeNoteRepositoryTest {
         boolean alreadyMatching = practiceNoteRepository.checkProblemAlreadyMatchingWithPractice(practiceId, problemId);
 
         // then
-        assertTrue(alreadyMatching);
+        Assertions.assertTrue(alreadyMatching);
     }
 
     @Test
-    @DisplayName("문제가 복습 리스트에 존재하는지 체크 - 존재하지 않을 경우")
+    @DisplayName("문제가 복습 노트에 존재하는지 체크 - 존재하지 않을 경우")
     void checkProblemAlreadyMatchingWithPracticeTest_NotExist() {
         // given
         Long practiceId = practiceNoteList.get(0).getId();
@@ -169,6 +168,23 @@ class PracticeNoteRepositoryTest {
         boolean alreadyMatching = practiceNoteRepository.checkProblemAlreadyMatchingWithPractice(practiceId, problemId);
 
         // then
-        assertFalse(alreadyMatching);
+        Assertions.assertFalse(alreadyMatching);
+    }
+
+    @Test
+    @DisplayName("복습 노트 상세 정보 조회")
+    void findPracticeNoteWithDetailsTest(){
+        // given
+        PracticeNote practiceNote = practiceNoteList.get(0);
+        Long practiceId = practiceNote.getId();
+
+        // when
+        PracticeNote targetPracticeNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceId);
+
+        // then
+        assertThat(practiceNote.getId()).isEqualTo(targetPracticeNote.getId());
+        assertThat(practiceNote.getTitle()).isEqualTo(targetPracticeNote.getTitle());
+        assertThat(practiceNote.getProblemPracticeNoteMappingList().size()).isEqualTo(4);
+        assertThat(practiceNote.getProblemPracticeNoteMappingList().size()).isEqualTo(targetPracticeNote.getProblemPracticeNoteMappingList().size());
     }
 }

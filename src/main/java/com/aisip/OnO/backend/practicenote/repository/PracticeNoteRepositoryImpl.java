@@ -32,10 +32,8 @@ public class PracticeNoteRepositoryImpl implements PracticeNoteRepositoryCustom 
     @Override
     public PracticeNote findPracticeNoteWithDetails(Long practiceNoteId) {
         return queryFactory
-                .select(practiceNote)
-                .from(practiceNote)
-                .join(problemPracticeNoteMapping).on(practiceNote.id.eq(problemPracticeNoteMapping.practiceNote.id))
-                .join(problemPracticeNoteMapping.practiceNote, practiceNote)
+                .selectFrom(practiceNote)
+                .join(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping).fetchJoin()
                 .where(practiceNote.id.eq(practiceNoteId))
                 .fetchOne();
     }
