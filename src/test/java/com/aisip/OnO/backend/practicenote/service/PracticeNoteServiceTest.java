@@ -23,8 +23,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.util.ReflectionTestUtils.setField;
 
 @SpringBootTest
@@ -165,6 +169,29 @@ class PracticeNoteServiceTest {
 
     @Test
     void registerPractice() {
+        //given
+        PracticeNoteRegisterDto practiceNoteRegisterDto = new PracticeNoteRegisterDto(
+                null,
+                "new practice",
+                List.of(problemList.get(0).getId(), problemList.get(1).getId(), problemList.get(2).getId())
+        );
+
+        when(practiceNoteRepository.checkProblemAlreadyMatchingWithPractice(anyLong(), anyLong()))
+                .thenReturn(false);
+        for(int i = 0; i < problemList.size(); i++){
+            when(problemRepository.findById((long) i)).thenReturn(Optional.of(problemList.get(i)));
+        }
+
+        //when
+        practiceNoteService.registerPractice(practiceNoteRegisterDto, userId);
+
+        //then
+        verify(practiceNoteRepository).save(any(PracticeNote.class));
+        verify(problemPracticeNoteMappingRepository, times(3))
+                .save(any(ProblemPracticeNoteMapping.class));
+        verify(problemRepository).findById(problemList.get(0).getId());
+        verify(problemRepository).findById(problemList.get(1).getId());
+        verify(problemRepository).findById(problemList.get(2).getId());
     }
 
     @Test
