@@ -75,7 +75,7 @@ public class PracticeNoteService {
         ).collect(Collectors.toList());
     }
 
-    public void updatePracticeNoteCount(Long practiceId) {
+    public void addPracticeNoteCount(Long practiceId) {
         PracticeNote practiceNote = getPracticeEntity(practiceId);
         practiceNote.updatePracticeNoteCount();
 

@@ -240,7 +240,17 @@ class PracticeNoteServiceTest {
     }
 
     @Test
-    void updatePracticeNoteCount() {
+    void addPracticeNoteCount() {
+        //given
+        PracticeNote practiceNote = practiceNoteList.get(0);
+        Long practiceNoteId = practiceNote.getId();
+        when(practiceNoteRepository.findById(practiceNoteId)).thenReturn(Optional.of(practiceNote));
+
+        //when
+        practiceNoteService.addPracticeNoteCount(practiceNoteId);
+
+        //then
+        assertThat(practiceNote.getPracticeCount()).isEqualTo(1);
     }
 
     @Test
