@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
+import com.aisip.OnO.backend.practicenote.dto.PracticeNoteThumbnailResponseDto;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
@@ -14,9 +15,9 @@ import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -26,10 +27,8 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
@@ -172,6 +171,7 @@ class PracticeNoteServiceTest {
     }
 
     @Test
+    @DisplayName("복습 노트 등록 테스트")
     void registerPractice() {
         //given
         PracticeNoteRegisterDto practiceNoteRegisterDto = new PracticeNoteRegisterDto(
@@ -198,7 +198,9 @@ class PracticeNoteServiceTest {
         verify(problemRepository).findById(problemList.get(2).getId());
     }
 
+
     @Test
+    @DisplayName("복습 노트 상세 정보 조회 테스트")
     void findPracticeNoteDetail() {
         //given
         PracticeNote practiceNote = practiceNoteList.get(0);
@@ -221,7 +223,20 @@ class PracticeNoteServiceTest {
     }
 
     @Test
+    @DisplayName("유저의 복습 노트 썸네일 리스트 조회 테스트")
     void findAllPracticeThumbnailsByUser() {
+        //given
+        when(practiceNoteRepository.findAllByUserId(userId)).thenReturn(practiceNoteList);
+
+        //when
+        List<PracticeNoteThumbnailResponseDto> practiceNoteThumbnailResponseDtoList = practiceNoteService.findAllPracticeThumbnailsByUser(userId);
+
+        //then
+        assertThat(practiceNoteThumbnailResponseDtoList.size()).isEqualTo(practiceNoteList.size());
+        for(int i = 0; i < practiceNoteThumbnailResponseDtoList.size(); i++){
+            assertThat(practiceNoteList.get(i).getId()).isEqualTo(practiceNoteThumbnailResponseDtoList.get(i).practiceNoteId());
+            assertThat(practiceNoteList.get(i).getTitle()).isEqualTo(practiceNoteThumbnailResponseDtoList.get(i).practiceTitle());
+        }
     }
 
     @Test
