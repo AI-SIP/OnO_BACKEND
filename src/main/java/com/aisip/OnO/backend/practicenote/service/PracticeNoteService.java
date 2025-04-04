@@ -154,7 +154,7 @@ public class PracticeNoteService {
         }
     }
 
-    private void deleteProblemFromPractice(Long practiceId, Long problemId) {
+    public void deleteProblemFromPractice(Long practiceId, Long problemId) {
         practiceNoteRepository.deleteProblemFromPractice(practiceId, problemId);
         log.info("problemId: {} has deleted from practiceId: {}", problemId, practiceId);
     }

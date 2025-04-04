@@ -259,17 +259,46 @@ class PracticeNoteServiceTest {
 
     @Test
     void deletePractice() {
+        //given
+        PracticeNote practiceNote = practiceNoteList.get(0);
+        Long practiceNoteId = practiceNote.getId();
+        when(practiceNoteRepository.findById(practiceNoteId)).thenReturn(Optional.of(practiceNote));
     }
 
     @Test
     void deletePractices() {
+        // given
+        List<Long> ids = List.of(1L, 2L, 3L);
+        PracticeNote mockNote = mock(PracticeNote.class);
+        when(practiceNoteRepository.findById(anyLong())).thenReturn(Optional.of(mockNote));
+        when(mockNote.getProblemPracticeNoteMappingList()).thenReturn(new ArrayList<>());
+
+        // when
+        practiceNoteService.deletePractices(ids);
+
+        // then
+        verify(practiceNoteRepository, times(3)).delete(any());
     }
 
     @Test
     void deleteAllPracticesByUser() {
+        // given
+        List<PracticeNote> list = List.of(mock(PracticeNote.class), mock(PracticeNote.class));
+        when(practiceNoteRepository.findAllByUserId(userId)).thenReturn(list);
+
+        // when
+        practiceNoteService.deleteAllPracticesByUser(userId);
+
+        // then
+        verify(practiceNoteRepository).deleteAll(list);
     }
 
     @Test
-    void deleteProblemsFromAllPractice() {
+    void deleteProblemFromPractice() {
+        // when
+        practiceNoteService.deleteProblemFromPractice(1L, 2L);
+
+        // then
+        verify(practiceNoteRepository).deleteProblemFromPractice(1L, 2L);
     }
 }
