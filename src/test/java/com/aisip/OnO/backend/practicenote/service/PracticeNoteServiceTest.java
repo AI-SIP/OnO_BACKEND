@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.practicenote.service;
 
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
+import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
@@ -13,6 +14,7 @@ import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,7 +26,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -196,6 +200,24 @@ class PracticeNoteServiceTest {
 
     @Test
     void findPracticeNoteDetail() {
+        //given
+        PracticeNote practiceNote = practiceNoteList.get(0);
+        Long practiceNoteId = practiceNote.getId();
+        List<Problem> resultProblemList = problemList.subList(0, 4);
+
+        when(practiceNoteRepository.findPracticeNoteWithDetails(practiceNoteId)).thenReturn(practiceNote);
+        when(problemRepository.findAllProblemsByPracticeId(practiceNoteId)).thenReturn(resultProblemList);
+
+        //when
+        PracticeNoteDetailResponseDto practiceNoteDetailResponseDto = practiceNoteService.findPracticeNoteDetail(practiceNoteId);
+
+        //then
+        assertThat(practiceNote.getId()).isEqualTo(practiceNoteDetailResponseDto.practiceNoteId());
+        assertThat(practiceNote.getTitle()).isEqualTo(practiceNoteDetailResponseDto.practiceTitle());
+        for(int i = 0; i < 4; i++){
+            assertThat(problemList.get(i).getId()).isEqualTo(practiceNoteDetailResponseDto.problemResponseDtoList().get(i).problemId());
+            assertThat(problemList.get(i).getProblemImageDataList().size()).isEqualTo(practiceNoteDetailResponseDto.problemResponseDtoList().get(i).imageUrlList().size());
+        }
     }
 
     @Test
