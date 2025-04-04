@@ -105,6 +105,8 @@ class ProblemServiceTest {
 
     @AfterEach
     void tearDown() {
+        problemList.clear();
+        folderList.clear();
     }
 
     @Test

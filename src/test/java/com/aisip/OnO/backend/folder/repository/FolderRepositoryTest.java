@@ -48,10 +48,11 @@ class FolderRepositoryTest {
 
     private final Long userId = 1L;
 
-    private List<Folder> folderList = new ArrayList<>();
+    private List<Folder> folderList;
 
     @BeforeEach
     void setUp() {
+        folderList = new ArrayList<>();
         Folder rootFolder = folderRepository.save(Folder.from(
                 new FolderRegisterDto(
                         "rootFolder",

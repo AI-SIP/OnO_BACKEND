@@ -14,9 +14,7 @@ import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import jakarta.persistence.EntityManager;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -27,6 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -125,6 +126,7 @@ class PracticeNoteRepositoryTest {
                 ProblemPracticeNoteMapping problemPracticeNoteMapping = problemPracticeNoteMappingRepository.save(
                         ProblemPracticeNoteMapping.from(practiceNote, problemList.get(i * 4 + j))
                 );
+                problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
             }
 
             practiceNoteList.add(practiceNote);
@@ -143,12 +145,30 @@ class PracticeNoteRepositoryTest {
     }
 
     @Test
-    void test() {
+    @DisplayName("문제가 복습 리스트에 존재하는지 체크 - 존재할 경우")
+    void checkProblemAlreadyMatchingWithPracticeTest_Exist() {
+        // given
+        Long practiceId = practiceNoteList.get(0).getId();
+        Long problemId = problemList.get(0).getId();
 
+        // when
+        boolean alreadyMatching = practiceNoteRepository.checkProblemAlreadyMatchingWithPractice(practiceId, problemId);
+
+        // then
+        assertTrue(alreadyMatching);
     }
 
     @Test
-    void test2() {
+    @DisplayName("문제가 복습 리스트에 존재하는지 체크 - 존재하지 않을 경우")
+    void checkProblemAlreadyMatchingWithPracticeTest_NotExist() {
+        // given
+        Long practiceId = practiceNoteList.get(0).getId();
+        Long problemId = problemList.get(problemList.size() - 1).getId();
 
+        // when
+        boolean alreadyMatching = practiceNoteRepository.checkProblemAlreadyMatchingWithPractice(practiceId, problemId);
+
+        // then
+        assertFalse(alreadyMatching);
     }
 }
