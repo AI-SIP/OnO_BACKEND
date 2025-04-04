@@ -57,6 +57,14 @@ public class PracticeNoteRepositoryImpl implements PracticeNoteRepositoryCustom 
     }
 
     @Override
+    public void deleteProblemFromAllPractice(Long problemId) {
+        queryFactory
+                .delete(problemPracticeNoteMapping)
+                .where(problemPracticeNoteMapping.problem.id.eq(problemId))
+                .execute();
+    }
+
+    @Override
     public void deleteProblemsFromAllPractice(List<Long> deleteProblemIdList) {
         // 1. 삭제할 문제 ID 리스트에 해당하는 모든 매핑 삭제 (벌크 삭제)
         queryFactory

@@ -227,6 +227,22 @@ class PracticeNoteRepositoryTest {
     }
 
     @Test
+    @DisplayName("해당 문제를 모두 복습 노트에서 제거")
+    void deleteProblemFromAllPracticeTest(){
+        // given
+        PracticeNote practiceNote = practiceNoteList.get(0);
+        Long practiceId = practiceNote.getId();
+        Long problemId = problemList.get(0).getId();
+
+        // when
+        assertThat(problemPracticeNoteMappingRepository.findProblemPracticeNoteMappingByProblemIdAndPracticeNoteId(problemId, practiceId)).isNotEmpty();
+        practiceNoteRepository.deleteProblemFromAllPractice(problemId);
+
+        // then
+        assertThat(problemPracticeNoteMappingRepository.findProblemPracticeNoteMappingByProblemIdAndPracticeNoteId(problemId, practiceId)).isEmpty();
+    }
+
+    @Test
     @DisplayName("문제 리스트를 받아 해당 문제들을 모두 복습 노트에서 제거")
     void deleteProblemsFromAllPracticeTest(){
         // given
@@ -244,6 +260,5 @@ class PracticeNoteRepositoryTest {
         for(int i = 0; i < problemIdList.size(); i++){
             assertThat(problemPracticeNoteMappingRepository.findProblemPracticeNoteMappingByProblemIdAndPracticeNoteId(problemIdList.get(i), practiceId)).isEmpty();
         }
-
     }
 }
