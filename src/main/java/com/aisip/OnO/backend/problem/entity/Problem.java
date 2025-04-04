@@ -83,4 +83,8 @@ public class Problem extends BaseEntity {
     public void updateFolder(Folder folder) {
         this.folder = folder;
     }
+
+    public void addProblemToPractice(ProblemPracticeNoteMapping problemPracticeNoteMapping) {
+        problemPracticeNoteMappingList.add(problemPracticeNoteMapping);
+    }
 }

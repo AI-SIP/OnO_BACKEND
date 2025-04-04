@@ -146,8 +146,11 @@ public class PracticeNoteService {
             Problem problem = problemRepository.findById(problemId)
                     .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
-            ProblemPracticeNoteMapping mapping = ProblemPracticeNoteMapping.from(practiceNote, problem);
-            problemPracticeNoteMappingRepository.save(mapping);
+            ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from(practiceNote, problem);
+            problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
+
+            problem.addProblemToPractice(problemPracticeNoteMapping);
+            practiceNote.addProblemToPracticeNote(problemPracticeNoteMapping);
         }
     }
 

@@ -121,11 +121,14 @@ class PracticeNoteRepositoryTest {
                     )
             );
 
+
             for(int j = 0; j < 4; j++){
                 ProblemPracticeNoteMapping problemPracticeNoteMapping = problemPracticeNoteMappingRepository.save(
                         ProblemPracticeNoteMapping.from(practiceNote, problemList.get(i * 4 + j))
                 );
                 problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
+                problemList.get(i * 4 + j).addProblemToPractice(problemPracticeNoteMapping);
+                practiceNote.addProblemToPracticeNote(problemPracticeNoteMapping);
             }
 
             practiceNoteList.add(practiceNote);

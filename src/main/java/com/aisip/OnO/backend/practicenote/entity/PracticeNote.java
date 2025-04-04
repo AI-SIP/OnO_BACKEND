@@ -56,4 +56,8 @@ public class PracticeNote extends BaseEntity {
         this.practiceCount += 1;
         this.lastSolvedAt = LocalDateTime.now();
     }
+
+    public void addProblemToPracticeNote(ProblemPracticeNoteMapping problemPracticeNoteMapping) {
+        problemPracticeNoteMappingList.add(problemPracticeNoteMapping);
+    }
 }
