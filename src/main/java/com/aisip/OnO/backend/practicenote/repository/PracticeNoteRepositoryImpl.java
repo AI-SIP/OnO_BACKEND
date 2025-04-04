@@ -48,17 +48,6 @@ public class PracticeNoteRepositoryImpl implements PracticeNoteRepositoryCustom 
     }
 
     @Override
-    public List<PracticeNote> findPracticesByProblem(Long problemId) {
-
-        return queryFactory
-                .select(practiceNote)
-                .from(practiceNote)
-                .join(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping) // 중간 매핑 테이블 조인
-                .where(problemPracticeNoteMapping.problem.id.eq(problemId))
-                .fetch();
-    }
-
-    @Override
     public void deleteProblemFromPractice(Long practiceNoteId, Long problemId) {
         queryFactory
                 .delete(problemPracticeNoteMapping)
