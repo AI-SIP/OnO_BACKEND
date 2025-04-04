@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -189,5 +190,23 @@ class PracticeNoteRepositoryTest {
         assertThat(practiceNote.getTitle()).isEqualTo(targetPracticeNote.getTitle());
         assertThat(practiceNote.getProblemPracticeNoteMappingList().size()).isEqualTo(4);
         assertThat(practiceNote.getProblemPracticeNoteMappingList().size()).isEqualTo(targetPracticeNote.getProblemPracticeNoteMappingList().size());
+    }
+
+    @Test
+    @DisplayName("복습 노트 상세 정보 조회")
+    void findProblemIdListByPracticeNoteIdTest(){
+        // given
+        PracticeNote practiceNote = practiceNoteList.get(0);
+        Long practiceId = practiceNote.getId();
+
+        // when
+        Set<Long> problemIdList = practiceNoteRepository.findProblemIdListByPracticeNoteId(practiceId);
+
+        // then
+        assertThat(practiceNote.getProblemPracticeNoteMappingList().size()).isEqualTo(4);
+        assertThat(practiceNote.getProblemPracticeNoteMappingList().size()).isEqualTo(problemIdList.size());
+        for(int i = 0; i< problemIdList.size(); i++){
+            assertThat(problemIdList).contains(problemList.get(i).getId());
+        }
     }
 }
