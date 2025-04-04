@@ -210,5 +210,40 @@ class PracticeNoteRepositoryTest {
         }
     }
 
+    @Test
+    @DisplayName("특정 문제를 복습 노트에서 제거")
+    void deleteProblemFromPracticeTest(){
+        // given
+        PracticeNote practiceNote = practiceNoteList.get(0);
+        Long practiceId = practiceNote.getId();
+        Long problemId = problemList.get(0).getId();
 
+        // when
+        assertThat(problemPracticeNoteMappingRepository.findProblemPracticeNoteMappingByProblemIdAndPracticeNoteId(problemId, practiceId)).isNotEmpty();
+        practiceNoteRepository.deleteProblemFromPractice(practiceId, problemId);
+
+        // then
+        assertThat(problemPracticeNoteMappingRepository.findProblemPracticeNoteMappingByProblemIdAndPracticeNoteId(problemId, practiceId)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("문제 리스트를 받아 해당 문제들을 모두 복습 노트에서 제거")
+    void deleteProblemsFromAllPracticeTest(){
+        // given
+        PracticeNote practiceNote = practiceNoteList.get(0);
+        Long practiceId = practiceNote.getId();
+        List<Long> problemIdList = new ArrayList<>();
+        for(int i = 0; i < practiceNote.getProblemPracticeNoteMappingList().size(); i++){
+            problemIdList.add(problemList.get(i).getId());
+        }
+
+        // when
+        practiceNoteRepository.deleteProblemsFromAllPractice(problemIdList);
+
+        // then
+        for(int i = 0; i < problemIdList.size(); i++){
+            assertThat(problemPracticeNoteMappingRepository.findProblemPracticeNoteMappingByProblemIdAndPracticeNoteId(problemIdList.get(i), practiceId)).isEmpty();
+        }
+
+    }
 }
