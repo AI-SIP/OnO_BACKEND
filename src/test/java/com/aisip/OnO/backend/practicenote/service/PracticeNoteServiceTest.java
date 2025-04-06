@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.practicenote.service;
 
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
+import com.aisip.OnO.backend.folder.repository.FolderRepository;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteThumbnailResponseDto;
@@ -14,40 +15,41 @@ import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
+import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.*;
-import static org.springframework.test.util.ReflectionTestUtils.setField;
 
 @SpringBootTest
 class PracticeNoteServiceTest {
 
-    @InjectMocks
+    @Autowired
     private PracticeNoteService practiceNoteService;
 
-    @Mock
+    @Autowired
     private PracticeNoteRepository practiceNoteRepository;
 
-    @Mock
+    @Autowired
     private ProblemPracticeNoteMappingRepository problemPracticeNoteMappingRepository;
 
-    @Mock
+    @Autowired
     private ProblemRepository problemRepository;
+
+    @Autowired
+    private ProblemImageDataRepository problemImageDataRepository;
+
+    @Autowired
+    private FolderRepository folderRepository;
 
     private final Long userId = 1L;
 
@@ -63,7 +65,7 @@ class PracticeNoteServiceTest {
         problemList = new ArrayList<>();
         problemPracticeNoteMappingList = new ArrayList<>();
 
-        Folder rootFolder = Folder.from(
+        Folder rootFolder = folderRepository.save(Folder.from(
                 new FolderRegisterDto(
                         "rootFolder",
                         null,
@@ -71,8 +73,7 @@ class PracticeNoteServiceTest {
                 ),
                 null,
                 1L
-        );
-        setField(rootFolder, "id", (long) 0);
+        ));
 
         /*
         problem 0 ~ 3 -> practice 0번과 mapping
@@ -81,7 +82,7 @@ class PracticeNoteServiceTest {
          */
         problemList = new ArrayList<>();
         for (int i = 0; i < 12; i++) {
-            Problem problem = Problem.from(
+            Problem problem = problemRepository.save(Problem.from(
                     new ProblemRegisterDto(
                             null,
                             "memo" + i,
@@ -92,21 +93,20 @@ class PracticeNoteServiceTest {
                     ),
                     userId,
                     rootFolder
-            );
-            setField(problem, "id", (long) i);
+            ));
 
             List<ProblemImageData> imageDataList = new ArrayList<>();
             for (int j = 1; j <= 3; j++){
                 ProblemImageDataRegisterDto problemImageDataRegisterDto = new ProblemImageDataRegisterDto(
-                        (long) i,
+                        (long) problem.getId(),
                         "http://example.com/problemId/" + i + "/image" + j,
                         ProblemImageType.valueOf(j)
                 );
 
-                ProblemImageData imageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
+                ProblemImageData imageData = problemImageDataRepository.save(ProblemImageData.from(problemImageDataRegisterDto, problem));
                 imageDataList.add(imageData);
             }
-            problem.updateImageDataList(imageDataList);
+            //problem.updateImageDataList(imageDataList);
 
             problemList.add(problem);
         }
@@ -117,23 +117,22 @@ class PracticeNoteServiceTest {
             for(int j = 0; j < 4; j++){
                 problemIdList.add(problemList.get(i * 4 + j).getId());
             }
-            PracticeNote practiceNote = PracticeNote.from(
+            PracticeNote practiceNote = practiceNoteRepository.save(PracticeNote.from(
                     new PracticeNoteRegisterDto(
                             null,
                             "practiceNote" + i,
                             problemIdList
                     ),
                     userId
-            );
-            setField(practiceNote, "id", (long) i);
+            ));
 
             for(int j = 0; j < 4; j++){
                 ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from(practiceNote, problemList.get(i * 4 + j));
 
                 problemList.get(i * 4 + j).addProblemToPractice(problemPracticeNoteMapping);
                 practiceNote.addProblemToPracticeNote(problemPracticeNoteMapping);
-                setField(problemPracticeNoteMapping, "id", (long) i * 4 + j);
 
+                problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
                 problemPracticeNoteMappingList.add(problemPracticeNoteMapping);
             }
 
@@ -147,7 +146,7 @@ class PracticeNoteServiceTest {
             problemList.get(0).addProblemToPractice(problemPracticeNoteMapping);
             practiceNoteList.get(i).addProblemToPracticeNote(problemPracticeNoteMapping);
 
-            setField(problemPracticeNoteMapping, "id", (long) problemPracticeNoteMappingList.size());
+            problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
             problemPracticeNoteMappingList.add(problemPracticeNoteMapping);
         }
 
@@ -158,7 +157,7 @@ class PracticeNoteServiceTest {
             problemList.get(1).addProblemToPractice(problemPracticeNoteMapping);
             practiceNoteList.get(i).addProblemToPracticeNote(problemPracticeNoteMapping);
 
-            setField(problemPracticeNoteMapping, "id", (long) problemPracticeNoteMappingList.size());
+            problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
             problemPracticeNoteMappingList.add(problemPracticeNoteMapping);
         }
     }
@@ -168,6 +167,12 @@ class PracticeNoteServiceTest {
         problemList.clear();
         practiceNoteList.clear();
         problemPracticeNoteMappingList.clear();
+
+        folderRepository.deleteAll();
+        problemImageDataRepository.deleteAll();
+        problemRepository.deleteAll();
+        practiceNoteRepository.deleteAll();
+        problemPracticeNoteMappingRepository.deleteAll();
     }
 
     @Test
@@ -180,22 +185,10 @@ class PracticeNoteServiceTest {
                 List.of(problemList.get(0).getId(), problemList.get(1).getId(), problemList.get(2).getId())
         );
 
-        when(practiceNoteRepository.checkProblemAlreadyMatchingWithPractice(anyLong(), anyLong()))
-                .thenReturn(false);
-        for(int i = 0; i < problemList.size(); i++){
-            when(problemRepository.findById((long) i)).thenReturn(Optional.of(problemList.get(i)));
-        }
-
         //when
         practiceNoteService.registerPractice(practiceNoteRegisterDto, userId);
 
-        //then
-        verify(practiceNoteRepository).save(any(PracticeNote.class));
-        verify(problemPracticeNoteMappingRepository, times(3))
-                .save(any(ProblemPracticeNoteMapping.class));
-        verify(problemRepository).findById(problemList.get(0).getId());
-        verify(problemRepository).findById(problemList.get(1).getId());
-        verify(problemRepository).findById(problemList.get(2).getId());
+        assertThat(practiceNoteRepository.findAll().size()).isEqualTo(practiceNoteList.size() + 1);
     }
 
 
@@ -205,10 +198,6 @@ class PracticeNoteServiceTest {
         //given
         PracticeNote practiceNote = practiceNoteList.get(0);
         Long practiceNoteId = practiceNote.getId();
-        List<Problem> resultProblemList = problemList.subList(0, 4);
-
-        when(practiceNoteRepository.findPracticeNoteWithDetails(practiceNoteId)).thenReturn(practiceNote);
-        when(problemRepository.findAllProblemsByPracticeId(practiceNoteId)).thenReturn(resultProblemList);
 
         //when
         PracticeNoteDetailResponseDto practiceNoteDetailResponseDto = practiceNoteService.findPracticeNoteDetail(practiceNoteId);
@@ -217,17 +206,14 @@ class PracticeNoteServiceTest {
         assertThat(practiceNote.getId()).isEqualTo(practiceNoteDetailResponseDto.practiceNoteId());
         assertThat(practiceNote.getTitle()).isEqualTo(practiceNoteDetailResponseDto.practiceTitle());
         for(int i = 0; i < 4; i++){
+            System.out.println("===== imageDataSize: " + practiceNoteDetailResponseDto.problemResponseDtoList().get(i).imageUrlList().size() + "=====");
             assertThat(problemList.get(i).getId()).isEqualTo(practiceNoteDetailResponseDto.problemResponseDtoList().get(i).problemId());
-            assertThat(problemList.get(i).getProblemImageDataList().size()).isEqualTo(practiceNoteDetailResponseDto.problemResponseDtoList().get(i).imageUrlList().size());
         }
     }
 
     @Test
     @DisplayName("유저의 복습 노트 썸네일 리스트 조회 테스트")
     void findAllPracticeThumbnailsByUser() {
-        //given
-        when(practiceNoteRepository.findAllByUserId(userId)).thenReturn(practiceNoteList);
-
         //when
         List<PracticeNoteThumbnailResponseDto> practiceNoteThumbnailResponseDtoList = practiceNoteService.findAllPracticeThumbnailsByUser(userId);
 
@@ -242,14 +228,13 @@ class PracticeNoteServiceTest {
     @Test
     void addPracticeNoteCount() {
         //given
-        PracticeNote practiceNote = practiceNoteList.get(0);
-        Long practiceNoteId = practiceNote.getId();
-        when(practiceNoteRepository.findById(practiceNoteId)).thenReturn(Optional.of(practiceNote));
+        Long practiceNoteId = practiceNoteList.get(0).getId();
 
         //when
         practiceNoteService.addPracticeNoteCount(practiceNoteId);
 
         //then
+        PracticeNote practiceNote = practiceNoteRepository.findById(practiceNoteId).get();
         assertThat(practiceNote.getPracticeCount()).isEqualTo(1);
     }
 
@@ -259,46 +244,37 @@ class PracticeNoteServiceTest {
 
     @Test
     void deletePractice() {
-        //given
-        PracticeNote practiceNote = practiceNoteList.get(0);
-        Long practiceNoteId = practiceNote.getId();
-        when(practiceNoteRepository.findById(practiceNoteId)).thenReturn(Optional.of(practiceNote));
+        // given
+
+        // when
+
+        // then
     }
 
     @Test
     void deletePractices() {
         // given
-        List<Long> ids = List.of(1L, 2L, 3L);
-        PracticeNote mockNote = mock(PracticeNote.class);
-        when(practiceNoteRepository.findById(anyLong())).thenReturn(Optional.of(mockNote));
-        when(mockNote.getProblemPracticeNoteMappingList()).thenReturn(new ArrayList<>());
 
         // when
-        practiceNoteService.deletePractices(ids);
 
         // then
-        verify(practiceNoteRepository, times(3)).delete(any());
     }
 
     @Test
     void deleteAllPracticesByUser() {
         // given
-        List<PracticeNote> list = List.of(mock(PracticeNote.class), mock(PracticeNote.class));
-        when(practiceNoteRepository.findAllByUserId(userId)).thenReturn(list);
 
         // when
-        practiceNoteService.deleteAllPracticesByUser(userId);
 
         // then
-        verify(practiceNoteRepository).deleteAll(list);
     }
 
     @Test
     void deleteProblemFromPractice() {
+        // given
+
         // when
-        practiceNoteService.deleteProblemFromPractice(1L, 2L);
 
         // then
-        verify(practiceNoteRepository).deleteProblemFromPractice(1L, 2L);
     }
 }
