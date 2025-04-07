@@ -21,6 +21,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.LocalDateTime;
@@ -38,16 +39,16 @@ import static org.springframework.test.util.ReflectionTestUtils.setField;
 @SpringBootTest
 class ProblemServiceTest {
 
-    @InjectMocks
+    @Autowired
     private ProblemService problemService;
 
-    @Mock
+    @Autowired
     private ProblemRepository problemRepository;
 
-    @Mock
+    @Autowired
     private ProblemImageDataRepository problemImageDataRepository;
 
-    @Mock
+    @Autowired
     private FolderRepository folderRepository;
 
     @Mock
@@ -66,19 +67,18 @@ class ProblemServiceTest {
 
         // 폴더 2개 생성
         for (int f = 1; f <= 2; f++) {
-            Folder folder = Folder.from(
+            Folder folder = folderRepository.save(Folder.from(
                     new FolderRegisterDto("folder" + f, null, null),
                     null,
                     userId
-            );
-            setField(folder, "id", (long) f);
+            ));
             folderList.add(folder);
         }
 
         // 문제 5개 생성 (폴더 1번에 3개, 폴더 2번에 2개)
         for (int i = 1; i <= 5; i++) {
             Folder folder = (i <= 3) ? folderList.get(0) : folderList.get(1);
-            Problem problem = Problem.from(
+            Problem problem = problemRepository.save(Problem.from(
                     new ProblemRegisterDto(
                             (long) i,
                             "memo" + i,
@@ -89,13 +89,12 @@ class ProblemServiceTest {
                     ),
                     userId,
                     folder
-            );
-            setField(problem, "id", (long) i);
+            ));
 
             // 이미지 2개씩 추가
             List<ProblemImageData> imageDataList = List.of(
-                    ProblemImageData.from(new ProblemImageDataRegisterDto(null, "url" + i + "_1", ProblemImageType.PROBLEM_IMAGE), problem),
-                    ProblemImageData.from(new ProblemImageDataRegisterDto(null, "url" + i + "_2", ProblemImageType.ANSWER_IMAGE), problem)
+                    problemImageDataRepository.save(ProblemImageData.from(new ProblemImageDataRegisterDto(null, "url" + i + "_1", ProblemImageType.PROBLEM_IMAGE), problem)),
+                    problemImageDataRepository.save(ProblemImageData.from(new ProblemImageDataRegisterDto(null, "url" + i + "_2", ProblemImageType.ANSWER_IMAGE), problem))
             );
             problem.updateImageDataList(imageDataList);
 
@@ -107,21 +106,26 @@ class ProblemServiceTest {
     void tearDown() {
         problemList.clear();
         folderList.clear();
+
+        problemImageDataRepository.deleteAll();
+        problemRepository.deleteAll();
+        folderRepository.deleteAll();
     }
 
     @Test
     @DisplayName("problemId를 사용해 특정 문제 조회하기")
     void findProblem() {
         // given
-        Long problemId = 200L;
-        when(problemRepository.findProblemWithImageData(problemId)).thenReturn(Optional.of(problemList.get(0)));
+        Problem problem = problemList.get(0);
+        Long problemId = problem.getId();
 
         // when
         ProblemResponseDto problemResponseDto = problemService.findProblem(problemId, userId);
 
         // then
-        assertThat(problemResponseDto.memo()).isEqualTo("memo1");
-        assertThat(problemResponseDto.reference()).isEqualTo("reference1");
+        assertThat(problemResponseDto.memo()).isEqualTo(problem.getMemo());
+        assertThat(problemResponseDto.reference()).isEqualTo(problem.getReference());
+        assertThat(problemResponseDto.imageUrlList().size()).isEqualTo(problemImageDataRepository.findAllByProblemId(problemId).size());
         assertThat(problemResponseDto.imageUrlList().size()).isEqualTo(2);
     }
 
@@ -129,28 +133,42 @@ class ProblemServiceTest {
     @DisplayName("특정 유저의 모든 문제 목록 조회하기")
     void findUserProblems() {
         //given
-        when(problemRepository.findAllByUserId(userId)).thenReturn(problemList);
 
         //when
         List<ProblemResponseDto> problemResponseDtoList = problemService.findUserProblems(userId);
 
         //then
-        assertThat(problemResponseDtoList.get(0)).isNotNull();
-        assertThat(problemResponseDtoList.size()).isEqualTo(5);
-        assertThat(problemResponseDtoList.get(0).imageUrlList().size()).isEqualTo(2);
+        for(int i = 0; i<problemResponseDtoList.size(); i++){
+            Problem problem = problemList.get(i);
+            assertThat(problemResponseDtoList.get(i)).isNotNull();
+            assertThat(problemResponseDtoList.size()).isEqualTo(problemList.size());
+            assertThat(problemResponseDtoList.get(i).imageUrlList().size()).isEqualTo(2);
+            assertThat(problemResponseDtoList.get(i).problemId()).isEqualTo(problem.getId());
+            assertThat(problemResponseDtoList.get(i).memo()).isEqualTo(problem.getMemo());
+            assertThat(problemResponseDtoList.get(i).reference()).isEqualTo(problem.getReference());
+        }
     }
 
     @Test
     @DisplayName("특정 폴더의 모든 문제 목록 조회하기")
     void findFolderProblemList() {
         //given
-        Long folderId = 1L;
-        when(problemRepository.findAllByFolderId(folderId)).thenReturn(List.of(problemList.get(0), problemList.get(1), problemList.get(2)));
+        Folder folder = folderList.get(0);
+        Long folderId = folder.getId();
 
         //when
         List<ProblemResponseDto> problemResponseDtoList = problemService.findFolderProblemList(folderId);
 
         //then
+        assertThat(problemResponseDtoList.size()).isEqualTo(problemRepository.findAllByFolderId(folderId).size());
+        for(int i = 0; i<problemResponseDtoList.size(); i++){
+            Problem problem = problemList.get(i);
+            assertThat(problemResponseDtoList.get(i)).isNotNull();
+            assertThat(problemResponseDtoList.get(i).imageUrlList().size()).isEqualTo(problemImageDataRepository.findAllByProblemId(problem.getId()).size());
+            assertThat(problemResponseDtoList.get(i).problemId()).isEqualTo(problem.getId());
+            assertThat(problemResponseDtoList.get(i).memo()).isEqualTo(problem.getMemo());
+            assertThat(problemResponseDtoList.get(i).reference()).isEqualTo(problem.getReference());
+        }
         assertThat(problemResponseDtoList.get(0)).isNotNull();
         assertThat(problemResponseDtoList.size()).isEqualTo(3);
         assertThat(problemResponseDtoList.get(0).imageUrlList().size()).isEqualTo(2);
@@ -160,28 +178,33 @@ class ProblemServiceTest {
     @DisplayName("모든 문제 목록 조회하기")
     void findAllProblems() {
         //given
-        when(problemRepository.findAll()).thenReturn(problemList);
 
         //when
         List<ProblemResponseDto> problemResponseDtoList = problemService.findAllProblems();
 
         //then
-        assertThat(problemResponseDtoList.get(0)).isNotNull();
-        assertThat(problemResponseDtoList.size()).isEqualTo(5);
-        assertThat(problemResponseDtoList.get(0).imageUrlList().size()).isEqualTo(2);
+        assertThat(problemResponseDtoList.size()).isEqualTo(problemList.size());
+        for(int i = 0; i<problemResponseDtoList.size(); i++){
+            Problem problem = problemList.get(i);
+            assertThat(problemResponseDtoList.get(i)).isNotNull();
+            assertThat(problemResponseDtoList.get(i).imageUrlList().size()).isEqualTo(problemImageDataRepository.findAllByProblemId(problem.getId()).size());
+            assertThat(problemResponseDtoList.get(i).problemId()).isEqualTo(problem.getId());
+            assertThat(problemResponseDtoList.get(i).memo()).isEqualTo(problem.getMemo());
+            assertThat(problemResponseDtoList.get(i).reference()).isEqualTo(problem.getReference());
+        }
     }
 
     @Test
     @DisplayName("유저의 문제 수 조회하기")
     void findProblemCountByUser() {
         //given
-        when(problemRepository.countByUserId(userId)).thenReturn((long) problemList.size());
 
         //when
         Long problemCount = problemService.findProblemCountByUser(userId);
 
         //then
-        assertThat(problemCount).isEqualTo(5L);
+        assertThat(problemCount).isEqualTo(problemRepository.countByUserId(userId));
+        assertThat(problemCount).isEqualTo(problemList.size());
     }
 
     @Test
