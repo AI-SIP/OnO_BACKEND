@@ -34,7 +34,7 @@ public class PracticeNote extends BaseEntity {
     private LocalDateTime lastSolvedAt;
 
     @OneToMany(mappedBy = "practiceNote", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ProblemPracticeNoteMapping> problemPracticeNoteMappingList;
+    private List<ProblemPracticeNoteMapping> problemPracticeNoteMappingList = new ArrayList<>();
 
     public static PracticeNote from(PracticeNoteRegisterDto practiceNoteRegisterDto, Long userId) {
         return PracticeNote.builder()
@@ -42,7 +42,6 @@ public class PracticeNote extends BaseEntity {
                 .title(practiceNoteRegisterDto.practiceTitle())
                 .practiceCount(0L)
                 .lastSolvedAt(null)
-                .problemPracticeNoteMappingList(new ArrayList<>())
                 .build();
     }
 

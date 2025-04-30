@@ -36,18 +36,16 @@ public class Folder extends BaseEntity {
     private Folder parentFolder;
 
     @OneToMany(mappedBy = "parentFolder", cascade = CascadeType.ALL)
-    private List<Folder> subFolderList;
+    private List<Folder> subFolderList = new ArrayList<>();
 
     @OneToMany(mappedBy = "folder", cascade = CascadeType.ALL)
-    private List<Problem> problemList;
+    private List<Problem> problemList = new ArrayList<>();
 
     public static Folder from(FolderRegisterDto folderRegisterDto, Folder parentFolder, Long userId) {
         return Folder.builder()
                 .name(folderRegisterDto.folderName())
                 .userId(userId)
                 .parentFolder(parentFolder)
-                .subFolderList(new ArrayList<>())
-                .problemList(new ArrayList<>())
                 .build();
     }
 
