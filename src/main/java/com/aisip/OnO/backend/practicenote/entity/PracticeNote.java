@@ -42,6 +42,7 @@ public class PracticeNote extends BaseEntity {
                 .title(practiceNoteRegisterDto.practiceTitle())
                 .practiceCount(0L)
                 .lastSolvedAt(null)
+                .problemPracticeNoteMappingList(new ArrayList<>())
                 .build();
     }
 

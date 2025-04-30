@@ -45,6 +45,8 @@ public class Folder extends BaseEntity {
         return Folder.builder()
                 .name(folderRegisterDto.folderName())
                 .userId(userId)
+                .subFolderList(new ArrayList<>())
+                .problemList(new ArrayList<>())
                 .build();
     }
 
@@ -53,6 +55,8 @@ public class Folder extends BaseEntity {
                 .name(folderRegisterDto.folderName())
                 .userId(userId)
                 .parentFolder(parentFolder)
+                .subFolderList(new ArrayList<>())
+                .problemList(new ArrayList<>())
                 .build();
     }
 

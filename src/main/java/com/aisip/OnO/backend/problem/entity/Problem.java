@@ -52,6 +52,8 @@ public class Problem extends BaseEntity {
                 .folder(null)
                 .reference(problemRegisterDto.reference())
                 .solvedAt(problemRegisterDto.solvedAt())
+                .problemImageDataList(new ArrayList<>())
+                .problemPracticeNoteMappingList(new ArrayList<>())
                 .build();
     }
 
