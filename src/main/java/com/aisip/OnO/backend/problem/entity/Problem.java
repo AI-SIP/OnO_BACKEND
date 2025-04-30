@@ -40,10 +40,10 @@ public class Problem extends BaseEntity {
     private LocalDateTime solvedAt;
 
     @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ProblemImageData> problemImageDataList;
+    private List<ProblemImageData> problemImageDataList = new ArrayList<>();
 
     @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ProblemPracticeNoteMapping> problemPracticeNoteMappingList;
+    private List<ProblemPracticeNoteMapping> problemPracticeNoteMappingList = new ArrayList<>();
 
     public static Problem from(ProblemRegisterDto problemRegisterDto, Long userId) {
         return Problem.builder()
@@ -52,8 +52,6 @@ public class Problem extends BaseEntity {
                 .folder(null)
                 .reference(problemRegisterDto.reference())
                 .solvedAt(problemRegisterDto.solvedAt())
-                .problemImageDataList(new ArrayList<>())
-                .problemPracticeNoteMappingList(new ArrayList<>())
                 .build();
     }
 

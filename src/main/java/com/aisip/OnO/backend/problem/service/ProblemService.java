@@ -139,7 +139,7 @@ public class ProblemService {
 
         if (problemRegisterDto.imageDataDtoList() != null) {
             List<ProblemImageData> imageDataList = problemRegisterDto.imageDataDtoList().stream()
-                    .map(problemImageDataRegisterDto -> ProblemImageData.from(problemImageDataRegisterDto, problem)).toList();
+                    .map(problemImageDataRegisterDto -> problemImageDataRepository.save(ProblemImageData.from(problemImageDataRegisterDto, problem))).toList();
 
             problem.updateImageDataList(imageDataList);
         }
