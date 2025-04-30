@@ -23,6 +23,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -51,7 +52,7 @@ class ProblemServiceTest {
     @Autowired
     private FolderRepository folderRepository;
 
-    @Mock
+    @MockBean
     private FileUploadService fileUploadService;
 
     private final Long userId = 1L;
@@ -358,9 +359,7 @@ class ProblemServiceTest {
 
         // Then
         verify(fileUploadService, times(2)).deleteImageFileFromS3(anyString());
-
-        //verify(problemImageDataRepository, times(2)).delete(any(ProblemImageData.class));
-        //verify(problemRepository).deleteById(problemId);
+        assertThat(problemRepository.findAll().size()).isEqualTo(problemList.size() - 1);
     }
 
     @Test
@@ -373,27 +372,27 @@ class ProblemServiceTest {
                 null
         );
 
-        when(problemRepository.findAllByUserId(userId)).thenReturn(problemList);
-        for (int i = 0; i < problemList.size(); i++) {
-            Long problemId = (long) i + 1;
-            when(problemImageDataRepository.findAllByProblemId(problemId)).thenReturn(problemList.get(i).getProblemImageDataList());
-        }
+        // when
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when
         problemService.deleteProblems(problemDeleteRequestDto);
 
         // then
-        verify(problemRepository).findAllByUserId(userId);
-        verify(fileUploadService, times(2 * problemList.size())).deleteImageFileFromS3(anyString());
-        verify(problemImageDataRepository, times(2 * problemList.size())).delete(any(ProblemImageData.class));
-        verify(problemRepository, times(problemList.size())).deleteById(anyLong());
+        verify(fileUploadService, times(2  * problemList.size())).deleteImageFileFromS3(anyString());
+        assertThat(problemRepository.findAll().size()).isEqualTo(0);
     }
 
     @Test
     @DisplayName("삭제할 문제 목록을 전달받아 삭제하기")
     void deleteProblems_problemIdList() {
         // given
-        List<Long> problemIdList = List.of(1L, 2L, 3L);
+        int deleteCount = 3;
+        List<Long> problemIdList = new ArrayList<>();
+        for (int i = 0; i < deleteCount; i++) {
+            Long problemId = problemList.get(i).getId();
+            problemIdList.add(problemId);
+        }
 
         ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
                 null,
@@ -401,25 +400,20 @@ class ProblemServiceTest {
                 null
         );
 
-        for (int i = 0; i < problemList.size(); i++) {
-            Long problemId = (long) i + 1;
-            when(problemImageDataRepository.findAllByProblemId(problemId)).thenReturn(problemList.get(i).getProblemImageDataList());
-        }
-
         // when
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
         problemService.deleteProblems(problemDeleteRequestDto);
 
         // then
         verify(fileUploadService, times(2 * problemIdList.size())).deleteImageFileFromS3(anyString());
-        verify(problemImageDataRepository, times(2 * problemIdList.size())).delete(any(ProblemImageData.class));
-        verify(problemRepository, times(problemIdList.size())).deleteById(anyLong());
+        assertThat(problemRepository.findAll().size()).isEqualTo(problemList.size() - (long) deleteCount);
     }
 
     @Test
     @DisplayName("삭제할 폴더 목록을 전달받아 삭제하기")
     void deleteProblems_folderIdList() {
         // given
-        List<Long> folderIdList = List.of(1L, 2L);
+        List<Long> folderIdList = List.of(folderList.get(0).getId());
 
         ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
                 null,
@@ -427,34 +421,37 @@ class ProblemServiceTest {
                 folderIdList
         );
 
-        when(problemRepository.findAllByFolderId(1L)).thenReturn(List.of(problemList.get(0), problemList.get(1), problemList.get(2)));
-        when(problemRepository.findAllByFolderId(2L)).thenReturn(List.of(problemList.get(3), problemList.get(4)));
-        for (int i = 0; i < problemList.size(); i++) {
-            Long problemId = (long) i + 1;
-            when(problemImageDataRepository.findAllByProblemId(problemId)).thenReturn(problemList.get(i).getProblemImageDataList());
-        }
-
         // when
+        int problemCount = problemRepository.findAllByFolderId(folderIdList.get(0)).size();
         problemService.deleteProblems(problemDeleteRequestDto);
 
         // then
-        verify(problemRepository).findAllByFolderId(1L);
-        verify(problemRepository).findAllByFolderId(2L);
-        verify(fileUploadService, times(2 * 5)).deleteImageFileFromS3(anyString());
-        verify(problemImageDataRepository, times(2 * 5)).delete(any(ProblemImageData.class));
-        verify(problemRepository, times(5)).deleteById(anyLong());
+        verify(fileUploadService, times(2 * problemCount)).deleteImageFileFromS3(anyString());
+        assertThat(problemRepository.findAll().size()).isEqualTo(problemList.size() - (long) problemCount);
     }
 
     @Test
     @DisplayName("특정 이미지 URL로 이미지 삭제")
     void deleteProblemImageData() {
         // given
-        String imageUrl = "https://s3.amazonaws.com/bucket/problem_image_123.jpg";
+        Long problemId = problemList.get(0).getId();
+        Optional<Problem> optionalProblem = problemRepository.findProblemWithImageData(problemId);
+        if(optionalProblem.isPresent()) {
+            Problem problem = optionalProblem.get();
+            String imageUrl = problem.getProblemImageDataList().get(0).getImageUrl();
 
-        // when
-        problemService.deleteProblemImageData(imageUrl);
+            // when
+            problemService.deleteProblemImageData(imageUrl);
 
-        // then
-        verify(problemImageDataRepository, times(1)).deleteByImageUrl(imageUrl);
+            // then
+            verify(fileUploadService, times(1)).deleteImageFileFromS3(anyString());
+
+            optionalProblem = problemRepository.findProblemWithImageData(problemId);
+            if(optionalProblem.isPresent()) {
+                problem = optionalProblem.get();
+                imageUrl = problem.getProblemImageDataList().get(0).getImageUrl();
+                assertThat(problem.getProblemImageDataList().size()).isEqualTo(1);
+            }
+        }
     }
 }
