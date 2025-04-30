@@ -100,9 +100,9 @@ class ProblemRepositoryTest {
             );
             Problem problem = problemRepository.save(Problem.from(
                     problemRegisterDto,
-                    savedUser.getId(),
-                    savedFolder
+                    savedUser.getId()
             ));
+            problem.updateFolder(savedFolder);
 
             ProblemPracticeNoteMapping problemPracticeNoteMapping = problemPracticeNoteMappingRepository.save(ProblemPracticeNoteMapping.from(
                     savedPracticeNote, problem

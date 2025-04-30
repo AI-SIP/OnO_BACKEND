@@ -30,7 +30,7 @@ public class Problem extends BaseEntity {
     private Long userId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "folder_id", nullable = false)
+    @JoinColumn(name = "folder_id")
     private Folder folder;
 
     private String memo;
@@ -45,11 +45,11 @@ public class Problem extends BaseEntity {
     @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProblemPracticeNoteMapping> problemPracticeNoteMappingList;
 
-    public static Problem from(ProblemRegisterDto problemRegisterDto, Long userId, Folder folder) {
+    public static Problem from(ProblemRegisterDto problemRegisterDto, Long userId) {
         return Problem.builder()
                 .userId(userId)
-                .folder(folder)
                 .memo(problemRegisterDto.memo())
+                .folder(null)
                 .reference(problemRegisterDto.reference())
                 .solvedAt(problemRegisterDto.solvedAt())
                 .problemImageDataList(new ArrayList<>())
@@ -81,7 +81,12 @@ public class Problem extends BaseEntity {
     }
 
     public void updateFolder(Folder folder) {
+        if(this.getFolder() != null){
+            this.getFolder().removeProblem(this);
+        }
+
         this.folder = folder;
+        folder.addProblem(this);
     }
 
     public void addProblemToPractice(ProblemPracticeNoteMapping problemPracticeNoteMapping) {

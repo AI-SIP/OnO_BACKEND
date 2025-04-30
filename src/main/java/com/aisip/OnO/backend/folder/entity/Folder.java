@@ -35,10 +35,10 @@ public class Folder extends BaseEntity {
     @JoinColumn(name = "parent_folder_id")
     private Folder parentFolder;
 
-    @OneToMany(mappedBy = "parentFolder", cascade = CascadeType.ALL, orphanRemoval = false)
+    @OneToMany(mappedBy = "parentFolder", cascade = CascadeType.ALL)
     private List<Folder> subFolderList;
 
-    @OneToMany(mappedBy = "folder", cascade = CascadeType.ALL, orphanRemoval = false)
+    @OneToMany(mappedBy = "folder", cascade = CascadeType.ALL)
     private List<Problem> problemList;
 
     public static Folder from(FolderRegisterDto folderRegisterDto, Folder parentFolder, Long userId) {
@@ -53,6 +53,10 @@ public class Folder extends BaseEntity {
 
     public void addProblem(Problem problem) {
         problemList.add(problem);
+    }
+
+    public void removeProblem(Problem problem) {
+        problemList.remove(problem);
     }
 
     public void addSubFolder(Folder folder) {

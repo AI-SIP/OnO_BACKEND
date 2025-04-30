@@ -78,7 +78,7 @@ class ProblemServiceTest {
         // 문제 5개 생성 (폴더 1번에 3개, 폴더 2번에 2개)
         for (int i = 1; i <= 5; i++) {
             Folder folder = (i <= 3) ? folderList.get(0) : folderList.get(1);
-            Problem problem = problemRepository.save(Problem.from(
+            Problem problem = Problem.from(
                     new ProblemRegisterDto(
                             (long) i,
                             "memo" + i,
@@ -87,9 +87,10 @@ class ProblemServiceTest {
                             LocalDateTime.now(),
                             new ArrayList<>()
                     ),
-                    userId,
-                    folder
-            ));
+                    userId
+            );
+            problem.updateFolder(folder);
+            problemRepository.save(problem);
 
             // 이미지 2개씩 추가
             List<ProblemImageData> imageDataList = List.of(
@@ -169,6 +170,7 @@ class ProblemServiceTest {
             assertThat(problemResponseDtoList.get(i).memo()).isEqualTo(problem.getMemo());
             assertThat(problemResponseDtoList.get(i).reference()).isEqualTo(problem.getReference());
         }
+
         assertThat(problemResponseDtoList.get(0)).isNotNull();
         assertThat(problemResponseDtoList.size()).isEqualTo(3);
         assertThat(problemResponseDtoList.get(0).imageUrlList().size()).isEqualTo(2);
@@ -211,11 +213,12 @@ class ProblemServiceTest {
     @DisplayName("문제 등록하기 - 정상 케이스")
     void registerProblem_success() {
         // Given
+        Long folderId = folderList.get(0).getId();
         ProblemRegisterDto dto = new ProblemRegisterDto(
                 null,
                 "memo",
                 "reference",
-                1L,
+                folderId,
                 LocalDateTime.now(),
                 List.of(
                         new ProblemImageDataRegisterDto(null, "imageUrl1", ProblemImageType.valueOf(1)),
@@ -223,15 +226,11 @@ class ProblemServiceTest {
                 )
         );
 
-        when(folderRepository.findById(1L)).thenReturn(Optional.of(folderList.get(0)));
-        when(problemRepository.save(any(Problem.class))).thenReturn(problemList.get(0));
-
         // When
         problemService.registerProblem(dto, userId);
 
         // Then
-        verify(problemRepository).save(any(Problem.class));
-        verify(problemImageDataRepository, times(2)).save(any(ProblemImageData.class));
+        assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(problemList.size() + 1);
     }
 
     @Test
@@ -242,9 +241,6 @@ class ProblemServiceTest {
                 null, "memo", "reference", 999L, LocalDateTime.now(), null
         );
 
-        // when
-        when(folderRepository.findById(dto.folderId())).thenReturn(Optional.empty());
-
         // Then
         assertThatThrownBy(() -> problemService.registerProblem(dto, userId))
                 .isInstanceOf(ApplicationException.class)
@@ -254,15 +250,14 @@ class ProblemServiceTest {
     @Test
     @DisplayName("문제 정보(memo, reference) 수정")
     void updateProblemInfo() {
-        Long problemId = 1L;
-
         // Given
-        when(problemRepository.findById(problemId)).thenReturn(Optional.of(problemList.get(0)));
-
+        Long problemId = problemList.get(0).getId();
+        String updateMemo = "update memo";
+        String updateReference = "update reference";
         ProblemRegisterDto updateDto = new ProblemRegisterDto(
                 problemId,
-                "update memo",
-                "update reference",
+                updateMemo,
+                updateReference,
                 1L,
                 LocalDateTime.now(),
                 List.of(
@@ -270,32 +265,34 @@ class ProblemServiceTest {
                         new ProblemImageDataRegisterDto(null, "imageUrl2", ProblemImageType.valueOf(2))
                 )
         );
-
-        Problem target = problemList.get(0);
-
         //when
         problemService.updateProblemInfo(updateDto, userId);
 
         //then
-        assertThat(target.getMemo()).isEqualTo("update memo");
-        assertThat(target.getReference()).isEqualTo("update reference");
+        Optional<Problem> optionalProblem = problemRepository.findById(problemId);
+        if (optionalProblem.isEmpty()) {
+            assertThat(0).isEqualTo(1);
+        } else{
+            Problem problem = optionalProblem.get();
+            assertThat(problem.getMemo()).isEqualTo(updateMemo);
+            assertThat(problem.getReference()).isEqualTo(updateReference);
+        }
     }
 
     @Test
     @DisplayName("문제 폴더 수정")
     void updateProblemFolder() {
-        Long problemId = 1L;
-        Long folderId = 2L;
-
         // Given
-        when(problemRepository.findById(problemId)).thenReturn(Optional.of(problemList.get(0)));
-        when(folderRepository.findById(folderId)).thenReturn(Optional.of(folderList.get(1)));
+        Long problemId = problemList.get(0).getId();
+        Long updatedFolderId = folderList.get(1).getId();
+        String updateMemo = "update memo";
+        String updateReference = "update reference";
 
         ProblemRegisterDto updateDto = new ProblemRegisterDto(
                 problemId,
-                "update memo",
-                "update reference",
-                2L,
+                updateMemo,
+                updateReference,
+                updatedFolderId,
                 LocalDateTime.now(),
                 List.of(
                         new ProblemImageDataRegisterDto(null, "imageUrl1", ProblemImageType.valueOf(1)),
@@ -303,13 +300,17 @@ class ProblemServiceTest {
                 )
         );
 
-        Problem target = problemList.get(0);
-
         //when
         problemService.updateProblemFolder(updateDto, userId);
 
         // Then
-        assertThat(target.getFolder()).isEqualTo(folderList.get(1));
+        Optional<Problem> optionalProblem = problemRepository.findById(problemId);
+        if (optionalProblem.isEmpty()) {
+            assertThat(0).isEqualTo(1);
+        } else {
+            Problem problem = optionalProblem.get();
+            assertThat(problem.getFolder().getId()).isEqualTo(updatedFolderId);
+        }
     }
 
     @Test

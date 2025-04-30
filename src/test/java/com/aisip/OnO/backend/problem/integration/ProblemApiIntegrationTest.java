@@ -103,9 +103,9 @@ class ProblemApiIntegrationTest {
                                 LocalDateTime.now(),
                                 new ArrayList<>()
                         ),
-                        userId,
-                        folder
+                        userId
                 );
+                problem.updateFolder(folder);
                 problemRepository.save(problem);
                 problemList.add(problem);
 

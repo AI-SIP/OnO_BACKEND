@@ -89,9 +89,9 @@ public class ProblemService {
         Folder folder = folderRepository.findById(problemRegisterDto.folderId())
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
 
-        Problem problem = Problem.from(problemRegisterDto, userId, folder);
+        Problem problem = Problem.from(problemRegisterDto, userId);
+        problem.updateFolder(folder);
         problemRepository.save(problem);
-        folder.addProblem(problem);
 
         problemRegisterDto.imageDataDtoList()
                 .forEach(problemImageDataRegisterDto -> {

@@ -91,9 +91,9 @@ class PracticeNoteServiceTest {
                             LocalDateTime.now(),
                             null
                     ),
-                    userId,
-                    rootFolder
+                    userId
             ));
+            problem.updateFolder(rootFolder);
 
             List<ProblemImageData> imageDataList = new ArrayList<>();
             for (int j = 1; j <= 3; j++){

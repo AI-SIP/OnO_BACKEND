@@ -122,11 +122,10 @@ class FolderRepositoryTest {
                                     LocalDateTime.now(),
                                     null
                             ),
-                            userId,
-                            targetFolder
+                            userId
                     )
             );
-            targetFolder.addProblem(problem);
+            problem.updateFolder(targetFolder);
 
             List<ProblemImageData> imageDataList = new ArrayList<>();
             for (int j = 1; j <= 3; j++){

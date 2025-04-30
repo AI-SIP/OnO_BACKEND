@@ -127,11 +127,10 @@ public class FolderApiIntegrationTest {
                             LocalDateTime.now(),
                             null
                     ),
-                    userId,
-                    targetFolder
+                    userId
             );
-            targetFolder.addProblem(problem);
             problem = problemRepository.save(problem);
+            problem.updateFolder(targetFolder);
             problemList.add(problem);
 
             List<ProblemImageData> imageDataList = new ArrayList<>();
