@@ -41,6 +41,13 @@ public class Folder extends BaseEntity {
     @OneToMany(mappedBy = "folder", cascade = CascadeType.ALL)
     private List<Problem> problemList = new ArrayList<>();
 
+    public static Folder from(FolderRegisterDto folderRegisterDto, Long userId) {
+        return Folder.builder()
+                .name(folderRegisterDto.folderName())
+                .userId(userId)
+                .build();
+    }
+
     public static Folder from(FolderRegisterDto folderRegisterDto, Folder parentFolder, Long userId) {
         return Folder.builder()
                 .name(folderRegisterDto.folderName())
@@ -59,6 +66,7 @@ public class Folder extends BaseEntity {
 
     public void addSubFolder(Folder folder) {
         subFolderList.add(folder);
+        folder.updateParentFolder(this);
     }
 
     public void removeSubFolder(Folder folder) {
@@ -72,6 +80,10 @@ public class Folder extends BaseEntity {
     }
 
     public void updateParentFolder(Folder parentFolder) {
+        if (this.parentFolder != null) {
+            this.parentFolder.removeSubFolder(this);
+        }
         this.parentFolder = parentFolder;
+        parentFolder.addSubFolder(this);
     }
 }
