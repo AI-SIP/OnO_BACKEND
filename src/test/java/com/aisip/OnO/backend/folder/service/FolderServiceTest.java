@@ -288,55 +288,68 @@ class FolderServiceTest {
     @DisplayName("폴더 수정 테스트 - 폴더 이름 수정")
     void updateFolder_FolderName() {
         //given
-        Long folderId = 1L;
+        Long folderId = folderList.get(1).getId();
         String updateFolderName = "new folder name";
         FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
                 updateFolderName,
                 folderId,
                 null
         );
-        when(folderRepository.findById(folderId)).thenReturn(Optional.of(folderList.get(folderId.intValue())));
 
         //when
         folderService.updateFolder(folderRegisterDto, userId);
 
         //then
-        assertThat(folderList.get(folderId.intValue()).getName()).isEqualTo(updateFolderName);
+        Optional<Folder> optionalFolder = folderRepository.findById(folderId);
+        assertThat(optionalFolder.isPresent()).isTrue();
+
+        Folder folder = optionalFolder.get();
+        assertThat(folder.getName()).isEqualTo(updateFolderName);
     }
 
     @Test
     @DisplayName("폴더 수정 테스트 - 부모 폴더 수정")
     void updateFolder_ParentFolder() {
         //given
-        Long folderId = 1L;
-        Long newParentFolderId = 2L;
+        Long oldParentFolderId = folderList.get(0).getId();
+        Long folderId = folderList.get(1).getId();
+        Long newParentFolderId = folderList.get(2).getId();
         FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
                 null,
                 folderId,
                 newParentFolderId
         );
-        when(folderRepository.findById(folderId)).thenReturn(Optional.of(folderList.get(folderId.intValue())));
-        when(folderRepository.findById(newParentFolderId)).thenReturn(Optional.of(folderList.get(newParentFolderId.intValue())));
 
         folderService.updateFolder(folderRegisterDto, userId);
-        assertThat(folderList.get(0).getSubFolderList().size()).isEqualTo(1);
-        assertThat(folderList.get(folderId.intValue()).getParentFolder().getId()).isEqualTo(folderList.get(newParentFolderId.intValue()).getId());
-        assertThat(folderList.get(newParentFolderId.intValue()).getSubFolderList().size()).isEqualTo(2);
+
+        Optional<Folder> optionalOldParentFolder = folderRepository.findFolderWithDetailsByFolderId(oldParentFolderId);
+        Optional<Folder> optionalFolder = folderRepository.findFolderWithDetailsByFolderId(folderId);
+        Optional<Folder> optionalNewParentFolder = folderRepository.findFolderWithDetailsByFolderId(newParentFolderId);
+
+        assertThat(optionalOldParentFolder.isPresent()).isTrue();
+        assertThat(optionalFolder.isPresent()).isTrue();
+        assertThat(optionalNewParentFolder.isPresent()).isTrue();
+
+        Folder oldParentFolder = optionalOldParentFolder.get();
+        Folder folder = optionalFolder.get();
+        Folder newParentFolder = optionalNewParentFolder.get();
+
+        assertThat(oldParentFolder.getSubFolderList().size()).isEqualTo(1);
+        assertThat(folder.getParentFolder().getId()).isEqualTo(newParentFolderId);
+        assertThat(newParentFolder.getSubFolderList().size()).isEqualTo(2);
     }
 
     @Test
     @DisplayName("폴더 수정 테스트 - 부모 폴더가 존재하지 않을 경우")
     void updateFolder_ParentFolderNotExist() {
         //given
-        Long folderId = 1L;
+        Long folderId = folderList.get(1).getId();
         Long newParentFolderId = 100L;
         FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
                 null,
                 folderId,
                 newParentFolderId
         );
-        when(folderRepository.findById(folderId)).thenReturn(Optional.of(folderList.get(folderId.intValue())));
-        when(folderRepository.findById(newParentFolderId)).thenReturn(Optional.empty());
 
         //when & then
         assertThatThrownBy(() -> folderService.updateFolder(folderRegisterDto, userId))
