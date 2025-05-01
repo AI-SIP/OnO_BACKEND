@@ -1,6 +1,8 @@
 package com.aisip.OnO.backend.folder.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.folder.dto.FolderDeleteRequestDto;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
 import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
@@ -19,6 +21,7 @@ import com.aisip.OnO.backend.problem.service.ProblemService;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -27,9 +30,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
 
 @SpringBootTest
 class FolderServiceTest {
@@ -48,6 +50,9 @@ class FolderServiceTest {
 
     @Autowired
     private ProblemImageDataRepository problemImageDataRepository;
+
+    @MockBean
+    private FileUploadService fileUploadService;
 
     private final Long userId = 1L;
 
@@ -357,24 +362,78 @@ class FolderServiceTest {
                 .hasMessageContaining(FolderErrorCase.FOLDER_NOT_FOUND.getMessage());
     }
 
-
     @Test
-    void deleteFoldersWithProblems() {
+    @DisplayName("폴더 삭제 테스트 - 루트 폴더 삭제 시 예외")
+    void deleteFolders_rootFolder() {
+        // given
+        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
+                null,
+                List.of(folderList.get(0).getId())
+        );
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+
+        // when & then
+        assertThatThrownBy(() -> folderService.deleteFolders(folderDeleteRequestDto))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessageContaining(FolderErrorCase.ROOT_FOLDER_CANNOT_REMOVE.getMessage());
+
+        assertThat(folderRepository.findAllByUserId(userId).size()).isEqualTo(folderList.size());
     }
 
     @Test
-    void deleteAllUserFoldersWithProblems() {
+    @DisplayName("폴더 삭제 테스트 - 루트 폴더 제외 최상위 폴더 모두 삭제")
+    void deleteFolders_AllParentFolder() {
+        // given
+        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
+                null,
+                List.of(folderList.get(1).getId(), folderList.get(2).getId())
+        );
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+
+        // when
+        folderService.deleteFolders(folderDeleteRequestDto);
+
+        // then
+        assertThat(folderRepository.findAllByUserId(userId).size()).isEqualTo(1);
     }
 
     @Test
-    void getAllFolderIdsIncludingSubFolders() {
+    @DisplayName("폴더 삭제 테스트 - 특정 중간 폴더 삭제")
+    void deleteFolders_InternalFolder() {
+        // given
+        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
+                null,
+                List.of(folderList.get(1).getId())
+        );
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+
+        // when
+        folderService.deleteFolders(folderDeleteRequestDto);
+
+        // then
+        assertThat(folderRepository.findAllByUserId(userId).size()).isEqualTo(3);
+
+        Optional<Folder> optionalRootFolder = folderRepository.findFolderWithDetailsByFolderId(folderList.get(0).getId());
+        assertThat(optionalRootFolder.isPresent()).isTrue();
+
+        Folder rootFolder = optionalRootFolder.get();
+        assertThat(rootFolder.getSubFolderList().size()).isEqualTo(1);
     }
 
     @Test
-    void deleteAllByFolderIds() {
-    }
+    @DisplayName("폴더 삭제 테스트 - 유저의 모든 폴더 삭제")
+    void deleteFolders_AllUserFolders() {
+        // given
+        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
+                userId,
+                null
+        );
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
-    @Test
-    void deleteAllUserFolders() {
+        // when
+        folderService.deleteFolders(folderDeleteRequestDto);
+
+        // then
+        assertThat(folderRepository.findAllByUserId(userId)).isEmpty();
     }
 }

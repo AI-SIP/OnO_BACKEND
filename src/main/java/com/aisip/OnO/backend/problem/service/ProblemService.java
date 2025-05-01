@@ -186,6 +186,7 @@ public class ProblemService {
         if (userId != null) {
             // 유저 ID가 있으면 해당 유저의 모든 문제 삭제
             deleteAllUserProblems(userId);
+            log.info("userId: {} delete problems", userId);
         }
 
         if (problemIdList != null && !problemIdList.isEmpty()) {
@@ -198,7 +199,7 @@ public class ProblemService {
             deleteAllByFolderIds(folderIdList);
         }
 
-        log.info("userId: {} delete problems", userId);
+        log.info("userId: {} delete problems by id list", userId);
     }
 
     public void deleteProblemImageData(String imageUrl) {
