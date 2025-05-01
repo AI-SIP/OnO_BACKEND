@@ -44,13 +44,12 @@ public class PracticeNoteService {
     public void registerPractice(PracticeNoteRegisterDto practiceNoteRegisterDto, Long userId) {
 
         PracticeNote practiceNote = PracticeNote.from(practiceNoteRegisterDto, userId);
+        practiceNoteRepository.save(practiceNote);
 
         if (practiceNoteRegisterDto.problemIdList() != null) {
             practiceNoteRegisterDto.problemIdList().forEach(problemId ->
                     addProblemToPractice(practiceNote, problemId));
         }
-
-        practiceNoteRepository.save(practiceNote);
 
         log.info("userId: {} register practiceId: {}", userId, practiceNote.getId());
     }
