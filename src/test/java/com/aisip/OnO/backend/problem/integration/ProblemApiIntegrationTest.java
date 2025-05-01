@@ -35,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
@@ -107,7 +108,6 @@ class ProblemApiIntegrationTest {
                 );
                 problem.updateFolder(folder);
                 problemRepository.save(problem);
-                problemList.add(problem);
 
                 // 이미지 2개씩 추가
                 List<ProblemImageData> imageDataList = List.of(
@@ -117,8 +117,10 @@ class ProblemApiIntegrationTest {
 
                 imageDataList.forEach(imageData -> {
                     imageData.updateProblem(problem);
+                    problemImageDataRepository.save(imageData);
                 });
-                problemImageDataRepository.saveAll(imageDataList);
+
+                problemList.add(problem);
             }
         }
     }
@@ -260,7 +262,6 @@ class ProblemApiIntegrationTest {
     @Test
     @DisplayName("문제 이미지 등록 API 테스트")
     @WithMockCustomUser()
-    @Transactional
     void registerProblemImageData() throws Exception {
         // given
         Long problemId = problemList.get(0).getId();
@@ -276,9 +277,11 @@ class ProblemApiIntegrationTest {
                         .content(objectMapper.writeValueAsString(problemImageDataRegisterDto)))
                 .andExpect(status().isOk());
 
-        Problem problem = problemRepository.findProblemWithImageData(problemId).get();
-        List<ProblemImageData> problemImageDataList = problem.getProblemImageDataList();
+        Optional<Problem> optionalProblem = problemRepository.findProblemWithImageData(problemId);
+        Assertions.assertThat(optionalProblem.isPresent()).isTrue();
 
+        Problem problem = optionalProblem.get();
+        List<ProblemImageData> problemImageDataList = problem.getProblemImageDataList();
         Assertions.assertThat(problemImageDataList.size()).isEqualTo(3);
         Assertions.assertThat(problemImageDataList.get(problemImageDataList.size() - 1).getImageUrl()).isEqualTo("solveImageUrl");
     }
