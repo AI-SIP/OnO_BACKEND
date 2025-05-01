@@ -256,14 +256,15 @@ class FolderServiceTest {
                 null,
                 parentFolderId
         );
-        when(folderRepository.findById(parentFolderId)).thenReturn(Optional.of(folderList.get(folderList.size() - 1)));
 
         //when
         folderService.createFolder(folderRegisterDto, userId);
+        Optional<Folder> optionalParentFolder = folderRepository.findFolderWithDetailsByFolderId(parentFolderId);
+        assertThat(optionalParentFolder.isPresent()).isTrue();
 
-        verify(folderRepository).save(any(Folder.class));
-        assertThat(folderList.get(folderList.size() - 1).getSubFolderList().size()).isEqualTo(1);
-        assertThat(folderList.get(folderList.size() - 1).getSubFolderList().get(0).getName()).isEqualTo(folderName);
+        Folder parentFolder = optionalParentFolder.get();
+        assertThat(parentFolder.getSubFolderList().size()).isEqualTo(1);
+        assertThat(parentFolder.getSubFolderList().get(0).getName()).isEqualTo(folderName);
     }
 
     @Test
@@ -276,7 +277,6 @@ class FolderServiceTest {
                 null,
                 parentFolderId
         );
-        when(folderRepository.findById(parentFolderId)).thenReturn(Optional.empty());
 
         //when & then
         assertThatThrownBy(() -> folderService.createFolder(folderRegisterDto, userId))
