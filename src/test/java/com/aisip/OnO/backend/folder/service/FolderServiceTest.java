@@ -13,10 +13,13 @@ import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
+import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
+import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.problem.service.ProblemService;
 import org.junit.jupiter.api.*;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.LocalDateTime;
@@ -34,14 +37,20 @@ import static org.springframework.test.util.ReflectionTestUtils.setField;
 @SpringBootTest
 class FolderServiceTest {
 
-    @InjectMocks
+    @Autowired
     private FolderService folderService;
 
-    @Mock
+    @Autowired
     private FolderRepository folderRepository;
 
-    @Mock
+    @Autowired
     private ProblemService problemService;
+
+    @Autowired
+    private ProblemRepository problemRepository;
+
+    @Autowired
+    private ProblemImageDataRepository problemImageDataRepository;
 
     private final Long userId = 1L;
 
@@ -71,7 +80,7 @@ class FolderServiceTest {
                 null,
                 1L
         );
-        setField(rootFolder, "id", (long) 0);
+        folderRepository.save(rootFolder);
         folderList.add(rootFolder);
 
         for (int i = 0; i < 5; i++) {
@@ -84,10 +93,9 @@ class FolderServiceTest {
                     folderList.get(i / 2),
                     userId
             );
-            setField(folder, "id", (long) i + 1);
+            folder.updateParentFolder(folderList.get(i / 2));
+            folderRepository.save(folder);
             folderList.add(folder);
-
-            folderList.get(i / 2).addSubFolder(folder);
         }
 
         for (int i = 0; i < 12; i++) {
@@ -105,8 +113,8 @@ class FolderServiceTest {
                             userId
                     );
             problem.updateFolder(targetFolder);
+            problemRepository.save(problem);
 
-            List<ProblemImageData> imageDataList = new ArrayList<>();
             for (int j = 1; j <= 3; j++){
                 ProblemImageDataRegisterDto problemImageDataRegisterDto = new ProblemImageDataRegisterDto(
                         (long) i,
@@ -116,6 +124,7 @@ class FolderServiceTest {
 
                 ProblemImageData imageData = ProblemImageData.from(problemImageDataRegisterDto);
                 imageData.updateProblem(problem);
+                problemImageDataRepository.save(imageData);
             }
 
             ProblemResponseDto problemResponseDto = ProblemResponseDto.from(problem);
@@ -125,6 +134,10 @@ class FolderServiceTest {
 
     @AfterEach
     void tearDown() {
+        problemRepository.deleteAll();
+        problemRepository.deleteAll();
+        folderRepository.deleteAll();
+
         problemList.clear();
         folderList.clear();
     }
