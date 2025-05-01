@@ -56,6 +56,17 @@ public class ProblemService {
         return problem;
     }
 
+    public Problem findProblemEntityWithImageData(Long problemId, Long userId) {
+        Problem problem = problemRepository.findProblemWithImageData(problemId)
+                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
+
+        if (!Objects.equals(problem.getUserId(), userId)) {
+            throw new ApplicationException(ProblemErrorCase.PROBLEM_USER_UNMATCHED);
+        }
+
+        return problem;
+    }
+
     public List<ProblemResponseDto> findUserProblems(Long userId) {
         log.info("userId: {} find all user problems", userId);
 
@@ -104,7 +115,7 @@ public class ProblemService {
     }
 
     public void registerProblemImageData(ProblemImageDataRegisterDto problemImageDataRegisterDto, Long userId) {
-        Problem problem = findProblemEntity(problemImageDataRegisterDto.problemId(), userId);
+        Problem problem = findProblemEntityWithImageData(problemImageDataRegisterDto.problemId(), userId);
 
         ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto);
         problemImageData.updateProblem(problem);
@@ -136,18 +147,17 @@ public class ProblemService {
     }
 
     public void updateProblemImageData(ProblemRegisterDto problemRegisterDto, Long userId) {
-        Problem problem = findProblemEntity(problemRegisterDto.problemId(), userId);
+        Problem problem = findProblemEntityWithImageData(problemRegisterDto.problemId(), userId);
 
         if (problemRegisterDto.imageDataDtoList() != null) {
-            List<ProblemImageData> imageDataList = problemRegisterDto.imageDataDtoList().stream()
-                    .map(problemImageDataRegisterDto -> {
+            problem.getProblemImageDataList().clear();
+
+            problemRegisterDto.imageDataDtoList().forEach(
+                    problemImageDataRegisterDto -> {
                         ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto);
                         problemImageData.updateProblem(problem);
                         problemImageDataRepository.save(problemImageData);
-
-                        return problemImageData;
-                    }).toList();
-            problem.updateImageDataList(imageDataList);
+                    });
         }
 
         log.info("userId: {} update problem Image Data", userId);
