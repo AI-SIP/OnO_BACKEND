@@ -82,7 +82,7 @@ class PracticeNoteServiceTest {
          */
         problemList = new ArrayList<>();
         for (int i = 0; i < 12; i++) {
-            Problem problem = problemRepository.save(Problem.from(
+            Problem problem = Problem.from(
                     new ProblemRegisterDto(
                             null,
                             "memo" + i,
@@ -92,8 +92,9 @@ class PracticeNoteServiceTest {
                             null
                     ),
                     userId
-            ));
+            );
             problem.updateFolder(rootFolder);
+            problemRepository.save(problem);
 
             List<ProblemImageData> imageDataList = new ArrayList<>();
             for (int j = 1; j <= 3; j++){
@@ -103,12 +104,11 @@ class PracticeNoteServiceTest {
                         ProblemImageType.valueOf(j)
                 );
 
-                ProblemImageData imageData = problemImageDataRepository.save(ProblemImageData.from(problemImageDataRegisterDto));
+                ProblemImageData imageData = ProblemImageData.from(problemImageDataRegisterDto);
                 imageData.updateProblem(problem);
+                problemImageDataRepository.save(imageData);
                 imageDataList.add(imageData);
             }
-            //problem.updateImageDataList(imageDataList);
-
             problemList.add(problem);
         }
 
@@ -128,10 +128,10 @@ class PracticeNoteServiceTest {
             ));
 
             for(int j = 0; j < 4; j++){
-                ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from(practiceNote, problemList.get(i * 4 + j));
+                ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from();
+                Problem problem = problemList.get(i * 4 + j);
 
-                problemList.get(i * 4 + j).addProblemToPractice(problemPracticeNoteMapping);
-                practiceNote.addProblemToPracticeNote(problemPracticeNoteMapping);
+                problemPracticeNoteMapping.addMappingToProblemAndPractice(problem, practiceNote);
 
                 problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
                 problemPracticeNoteMappingList.add(problemPracticeNoteMapping);
@@ -142,10 +142,9 @@ class PracticeNoteServiceTest {
 
         // problem 0번에 대해서만 practiceNote 1, 2번과 추가 매핑
         for(int i = 1; i < 3; i++){
-            ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from(practiceNoteList.get(i), problemList.get(0));
+            ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from();
 
-            problemList.get(0).addProblemToPractice(problemPracticeNoteMapping);
-            practiceNoteList.get(i).addProblemToPracticeNote(problemPracticeNoteMapping);
+            problemPracticeNoteMapping.addMappingToProblemAndPractice(problemList.get(0), practiceNoteList.get(0));
 
             problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
             problemPracticeNoteMappingList.add(problemPracticeNoteMapping);
@@ -153,10 +152,9 @@ class PracticeNoteServiceTest {
 
         // problem 1번에 대해서만 practiceNote 0번과 추가 매핑
         for(int i = 0; i < 1; i++){
-            ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from(practiceNoteList.get(i), problemList.get(1));
+            ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from();
 
-            problemList.get(1).addProblemToPractice(problemPracticeNoteMapping);
-            practiceNoteList.get(i).addProblemToPracticeNote(problemPracticeNoteMapping);
+            problemPracticeNoteMapping.addMappingToProblemAndPractice(problemList.get(1), practiceNoteList.get(i));
 
             problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
             problemPracticeNoteMappingList.add(problemPracticeNoteMapping);

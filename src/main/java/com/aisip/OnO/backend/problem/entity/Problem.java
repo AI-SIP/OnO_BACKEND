@@ -61,10 +61,6 @@ public class Problem extends BaseEntity {
         problemImageDataList.add(problemImageData);
     }
 
-    public void addImageDataList(List<ProblemImageData> imageDataList) {
-        problemImageDataList.addAll(imageDataList);
-    }
-
     public void updateProblem(ProblemRegisterDto problemRegisterDto) {
         if (problemRegisterDto.memo() != null && !problemRegisterDto.memo().isBlank()) {
             this.memo = problemRegisterDto.memo();
@@ -93,7 +89,7 @@ public class Problem extends BaseEntity {
         folder.addProblem(this);
     }
 
-    public void addProblemToPractice(ProblemPracticeNoteMapping problemPracticeNoteMapping) {
+    public void addPracticeMappingToProblem(ProblemPracticeNoteMapping problemPracticeNoteMapping) {
         problemPracticeNoteMappingList.add(problemPracticeNoteMapping);
     }
 }

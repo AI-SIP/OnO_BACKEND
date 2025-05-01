@@ -44,12 +44,13 @@ public class PracticeNoteService {
     public void registerPractice(PracticeNoteRegisterDto practiceNoteRegisterDto, Long userId) {
 
         PracticeNote practiceNote = PracticeNote.from(practiceNoteRegisterDto, userId);
-        practiceNoteRepository.save(practiceNote);
 
         if (practiceNoteRegisterDto.problemIdList() != null) {
             practiceNoteRegisterDto.problemIdList().forEach(problemId ->
                     addProblemToPractice(practiceNote, problemId));
         }
+
+        practiceNoteRepository.save(practiceNote);
 
         log.info("userId: {} register practiceId: {}", userId, practiceNote.getId());
     }
@@ -146,11 +147,10 @@ public class PracticeNoteService {
             Problem problem = problemRepository.findById(problemId)
                     .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
-            ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from(practiceNote, problem);
-            problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
+            ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from();
+            problemPracticeNoteMapping.addMappingToProblemAndPractice(problem, practiceNote);
 
-            problem.addProblemToPractice(problemPracticeNoteMapping);
-            practiceNote.addProblemToPracticeNote(problemPracticeNoteMapping);
+            problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
         }
     }
 

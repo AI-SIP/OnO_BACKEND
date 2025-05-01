@@ -22,17 +22,23 @@ public class ProblemPracticeNoteMapping extends BaseEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "practice_note_id", nullable = false)
+    @JoinColumn(name = "practice_note_id")
     private PracticeNote practiceNote;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "problem_id", referencedColumnName = "id", nullable = false)
+    @JoinColumn(name = "problem_id", referencedColumnName = "id")
     private Problem problem;
 
-    public static ProblemPracticeNoteMapping from(PracticeNote practiceNote, Problem problem) {
+    public static ProblemPracticeNoteMapping from() {
         return ProblemPracticeNoteMapping.builder()
-                .practiceNote(practiceNote)
-                .problem(problem)
                 .build();
+    }
+
+    public void addMappingToProblemAndPractice(Problem problem, PracticeNote practiceNote) {
+        this.problem = problem;
+        this.practiceNote = practiceNote;
+
+        problem.addPracticeMappingToProblem(this);
+        practiceNote.addPracticeMappingToPracticeNote(this);
     }
 }

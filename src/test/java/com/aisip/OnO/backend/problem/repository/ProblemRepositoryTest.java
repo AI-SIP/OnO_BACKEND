@@ -104,9 +104,9 @@ class ProblemRepositoryTest {
             ));
             problem.updateFolder(savedFolder);
 
-            ProblemPracticeNoteMapping problemPracticeNoteMapping = problemPracticeNoteMappingRepository.save(ProblemPracticeNoteMapping.from(
-                    savedPracticeNote, problem
-            ));
+            ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from();
+            problemPracticeNoteMapping.addMappingToProblemAndPractice(problem, savedPracticeNote);
+            problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
 
             // 연관된 이미지 추가
             for (int j = 1; j <= 3; j++){
