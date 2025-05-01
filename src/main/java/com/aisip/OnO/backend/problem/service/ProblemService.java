@@ -56,6 +56,17 @@ public class ProblemService {
         return problem;
     }
 
+    public Problem findProblemEntityWithImageData(Long problemId, Long userId) {
+        Problem problem = problemRepository.findProblemWithImageData(problemId)
+                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
+
+        if (!Objects.equals(problem.getUserId(), userId)) {
+            throw new ApplicationException(ProblemErrorCase.PROBLEM_USER_UNMATCHED);
+        }
+
+        return problem;
+    }
+
     public List<ProblemResponseDto> findUserProblems(Long userId) {
         log.info("userId: {} find all user problems", userId);
 
@@ -89,13 +100,14 @@ public class ProblemService {
         Folder folder = folderRepository.findById(problemRegisterDto.folderId())
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
 
-        Problem problem = Problem.from(problemRegisterDto, userId, folder);
+        Problem problem = Problem.from(problemRegisterDto, userId);
+        problem.updateFolder(folder);
         problemRepository.save(problem);
-        folder.addProblem(problem);
 
         problemRegisterDto.imageDataDtoList()
                 .forEach(problemImageDataRegisterDto -> {
-                    ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
+                    ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto);
+                    problemImageData.updateProblem(problem);
                     problemImageDataRepository.save(problemImageData);
                 });
 
@@ -103,12 +115,12 @@ public class ProblemService {
     }
 
     public void registerProblemImageData(ProblemImageDataRegisterDto problemImageDataRegisterDto, Long userId) {
-        Problem problem = findProblemEntity(problemImageDataRegisterDto.problemId(), userId);
+        Problem problem = findProblemEntityWithImageData(problemImageDataRegisterDto.problemId(), userId);
 
-        ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
+        ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto);
+        problemImageData.updateProblem(problem);
+
         problemImageDataRepository.save(problemImageData);
-
-        problem.addImageDataList(List.of(problemImageData));
         log.info("userId: {} register problem image data for problemId: {}", userId, problem.getId());
     }
 
@@ -135,13 +147,17 @@ public class ProblemService {
     }
 
     public void updateProblemImageData(ProblemRegisterDto problemRegisterDto, Long userId) {
-        Problem problem = findProblemEntity(problemRegisterDto.problemId(), userId);
+        Problem problem = findProblemEntityWithImageData(problemRegisterDto.problemId(), userId);
 
         if (problemRegisterDto.imageDataDtoList() != null) {
-            List<ProblemImageData> imageDataList = problemRegisterDto.imageDataDtoList().stream()
-                    .map(problemImageDataRegisterDto -> ProblemImageData.from(problemImageDataRegisterDto, problem)).toList();
+            problem.getProblemImageDataList().clear();
 
-            problem.updateImageDataList(imageDataList);
+            problemRegisterDto.imageDataDtoList().forEach(
+                    problemImageDataRegisterDto -> {
+                        ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto);
+                        problemImageData.updateProblem(problem);
+                        problemImageDataRepository.save(problemImageData);
+                    });
         }
 
         log.info("userId: {} update problem Image Data", userId);
@@ -170,6 +186,7 @@ public class ProblemService {
         if (userId != null) {
             // 유저 ID가 있으면 해당 유저의 모든 문제 삭제
             deleteAllUserProblems(userId);
+            log.info("userId: {} delete problems", userId);
         }
 
         if (problemIdList != null && !problemIdList.isEmpty()) {
@@ -182,10 +199,11 @@ public class ProblemService {
             deleteAllByFolderIds(folderIdList);
         }
 
-        log.info("userId: {} delete problems", userId);
+        log.info("userId: {} delete problems by id list", userId);
     }
 
     public void deleteProblemImageData(String imageUrl) {
+        fileUploadService.deleteImageFileFromS3(imageUrl);
         problemImageDataRepository.deleteByImageUrl(imageUrl);
     }
 

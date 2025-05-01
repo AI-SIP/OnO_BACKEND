@@ -35,7 +35,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -103,20 +105,23 @@ class ProblemApiIntegrationTest {
                                 LocalDateTime.now(),
                                 new ArrayList<>()
                         ),
-                        userId,
-                        folder
+                        userId
                 );
+                problem.updateFolder(folder);
                 problemRepository.save(problem);
-                problemList.add(problem);
 
                 // 이미지 2개씩 추가
                 List<ProblemImageData> imageDataList = List.of(
-                        ProblemImageData.from(new ProblemImageDataRegisterDto(problem.getId(), "url" + i * f + "_1", ProblemImageType.PROBLEM_IMAGE), problem),
-                        ProblemImageData.from(new ProblemImageDataRegisterDto(problem.getId(), "url" + i * f + "_2", ProblemImageType.ANSWER_IMAGE), problem)
+                        ProblemImageData.from(new ProblemImageDataRegisterDto(problem.getId(), "url" + i * f + "_1", ProblemImageType.PROBLEM_IMAGE)),
+                        ProblemImageData.from(new ProblemImageDataRegisterDto(problem.getId(), "url" + i * f + "_2", ProblemImageType.ANSWER_IMAGE))
                 );
-                problemImageDataRepository.saveAll(imageDataList);
 
-                problem.updateImageDataList(imageDataList);
+                imageDataList.forEach(imageData -> {
+                    imageData.updateProblem(problem);
+                    problemImageDataRepository.save(imageData);
+                });
+
+                problemList.add(problem);
             }
         }
     }
@@ -140,7 +145,7 @@ class ProblemApiIntegrationTest {
         Long problemId = problemList.get(0).getId();
 
         // when & then - 해당 문제를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/problem/%d", problemId)))
+        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/problems/%d", problemId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.problemId").value(problemId))
                 .andExpect(jsonPath("$.data.memo").value(problemList.get(0).getMemo()))
@@ -158,10 +163,9 @@ class ProblemApiIntegrationTest {
     @WithMockCustomUser()
     void findAllUserProblems() throws Exception {
         // given
-        //List<Problem> problemList = problemRepository.findAllByUserId(userId);
 
         // when & then - 해당 문제를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get("/api/problem/user"))
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/problems/user"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.size()").value(problemList.size()))
                 .andExpect(jsonPath("$.data[0].problemId").value(problemList.get(0).getId()))
@@ -183,7 +187,7 @@ class ProblemApiIntegrationTest {
         int count = problemList.size();
 
         // when & then - 해당 문제를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get("/api/problem/problemCount"))
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/problems/problemCount"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(count));
     }
@@ -197,7 +201,7 @@ class ProblemApiIntegrationTest {
         Long folderId = folderRepository.findAllByUserId(userId).get(0).getId();
 
         // when & then - 해당 문제를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/problem/folder/%d", folderId)))
+        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/problems/folder/%d", folderId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.size()").value(3L))
                 .andExpect(jsonPath("$.data[0].problemId").value(problemList.get(0).getId()))
@@ -243,7 +247,7 @@ class ProblemApiIntegrationTest {
         );
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/problem")
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/problems")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemRegisterDto)))
                 .andExpect(status().isOk())
@@ -251,15 +255,14 @@ class ProblemApiIntegrationTest {
 
         Problem problem = problemRepository.findAllByUserId(userId).get((int) (problemRepository.countByUserId(userId) - 1));
 
-        Assertions.assertThat(problem.getMemo()).isEqualTo(problemRegisterDto.memo());
-        Assertions.assertThat(problem.getReference()).isEqualTo(problemRegisterDto.reference());
-        Assertions.assertThat(problem.getProblemImageDataList().size()).isEqualTo(3);
+        assertThat(problem.getMemo()).isEqualTo(problemRegisterDto.memo());
+        assertThat(problem.getReference()).isEqualTo(problemRegisterDto.reference());
+        assertThat(problem.getProblemImageDataList().size()).isEqualTo(3);
     }
 
     @Test
     @DisplayName("문제 이미지 등록 API 테스트")
     @WithMockCustomUser()
-    @Transactional
     void registerProblemImageData() throws Exception {
         // given
         Long problemId = problemList.get(0).getId();
@@ -270,16 +273,18 @@ class ProblemApiIntegrationTest {
         );
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/problem/imageData")
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/problems/imageData")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemImageDataRegisterDto)))
                 .andExpect(status().isOk());
 
-        Problem problem = problemRepository.findById(problemList.get(0).getId()).get();
-        List<ProblemImageData> problemImageDataList = problem.getProblemImageDataList();
+        Optional<Problem> optionalProblem = problemRepository.findProblemWithImageData(problemId);
+        assertThat(optionalProblem.isPresent()).isTrue();
 
-        Assertions.assertThat(problemImageDataList.size()).isEqualTo(3);
-        Assertions.assertThat(problemImageDataList.get(problemImageDataList.size() - 1).getImageUrl()).isEqualTo("solveImageUrl");
+        Problem problem = optionalProblem.get();
+        List<ProblemImageData> problemImageDataList = problem.getProblemImageDataList();
+        assertThat(problemImageDataList.size()).isEqualTo(3);
+        assertThat(problemImageDataList.get(problemImageDataList.size() - 1).getImageUrl()).isEqualTo("solveImageUrl");
     }
 
     @Test
@@ -300,7 +305,7 @@ class ProblemApiIntegrationTest {
         );
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problem/info")
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problems/info")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemRegisterDto)))
                 .andExpect(status().isOk())
@@ -308,8 +313,8 @@ class ProblemApiIntegrationTest {
 
         Problem problem = problemRepository.findById(problemList.get(0).getId()).get();
 
-        Assertions.assertThat(problem.getMemo()).isEqualTo(updateMemo);
-        Assertions.assertThat(problem.getReference()).isEqualTo(updateReference);
+        assertThat(problem.getMemo()).isEqualTo(updateMemo);
+        assertThat(problem.getReference()).isEqualTo(updateReference);
     }
 
     @Test
@@ -330,14 +335,14 @@ class ProblemApiIntegrationTest {
         );
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problem/path")
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problems/path")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemRegisterDto)))
                 .andExpect(status().isOk());
 
         Problem problem = problemRepository.findById(problemList.get(0).getId()).get();
 
-        Assertions.assertThat(problem.getFolder().getId()).isEqualTo(updateFolderId);
+        assertThat(problem.getFolder().getId()).isEqualTo(updateFolderId);
     }
 
     @Test
@@ -347,22 +352,56 @@ class ProblemApiIntegrationTest {
         // given
         Long problemId = problemList.get(0).getId();
 
+        ProblemImageDataRegisterDto problemImageDataRegisterDto1 = new ProblemImageDataRegisterDto(
+                problemId,
+                "problemImageUrl1",
+                ProblemImageType.PROBLEM_IMAGE
+        );
+
+        ProblemImageDataRegisterDto problemImageDataRegisterDto2 = new ProblemImageDataRegisterDto(
+                problemId,
+                "answerImageUrl2",
+                ProblemImageType.ANSWER_IMAGE
+        );
+
+        ProblemImageDataRegisterDto problemImageDataRegisterDto3 = new ProblemImageDataRegisterDto(
+                problemId,
+                "answerImageUrl3",
+                ProblemImageType.SOLVE_IMAGE
+        );
+
+        List<ProblemImageDataRegisterDto> imageDataRegisterDtoList = List.of(problemImageDataRegisterDto1, problemImageDataRegisterDto2, problemImageDataRegisterDto3);
+
         ProblemRegisterDto problemRegisterDto = new ProblemRegisterDto(
                 problemId,
                 null,
                 null,
                 null,
                 null,
-                null
+                imageDataRegisterDtoList
         );
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problem/path")
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problems/imageData")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemRegisterDto)))
                 .andExpect(status().isOk());
 
-        Problem problem = problemRepository.findById(problemList.get(0).getId()).get();
+        Optional<Problem> optionalProblem = problemRepository.findProblemWithImageData(problemId);
+        assertThat(optionalProblem.isPresent()).isTrue();
+
+        Problem problem = optionalProblem.get();
+        List<ProblemImageData> imageDataList = problem.getProblemImageDataList();
+
+        assertThat(imageDataList.size()).isEqualTo(3);
+        for(int i = 0; i < imageDataList.size(); i++) {
+            assertThat(imageDataList.get(i).getProblem().getId()).isEqualTo(problemId);
+            assertThat(imageDataList.get(i).getImageUrl()).isEqualTo(imageDataRegisterDtoList.get(i).imageUrl());
+            assertThat(imageDataList.get(i).getProblemImageType()).isEqualTo(imageDataRegisterDtoList.get(i).problemImageType());
+        }
+
+        List<ProblemImageData> problemImageDataList = problemImageDataRepository.findAllByProblemId(problemId);
+        assertThat(problemImageDataList.size()).isEqualTo(3);
     }
 
     @Test
@@ -378,12 +417,12 @@ class ProblemApiIntegrationTest {
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problem")
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problems")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
                 .andExpect(status().isOk());
 
-        Assertions.assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(0);
+        assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(0);
     }
     @Test
     @DisplayName("문제 삭제 - 문제 id 사용")
@@ -400,12 +439,12 @@ class ProblemApiIntegrationTest {
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problem")
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problems")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
                 .andExpect(status().isOk());
 
-        Assertions.assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(3L);
+        assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(3L);
     }
 
     @Test
@@ -423,11 +462,11 @@ class ProblemApiIntegrationTest {
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problem")
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problems")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
                 .andExpect(status().isOk());
 
-        Assertions.assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(3L);
+        assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(3L);
     }
 }

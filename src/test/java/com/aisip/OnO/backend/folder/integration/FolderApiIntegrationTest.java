@@ -127,12 +127,10 @@ public class FolderApiIntegrationTest {
                             LocalDateTime.now(),
                             null
                     ),
-                    userId,
-                    targetFolder
+                    userId
             );
-            targetFolder.addProblem(problem);
+            problem.updateFolder(targetFolder);
             problem = problemRepository.save(problem);
-            problemList.add(problem);
 
             List<ProblemImageData> imageDataList = new ArrayList<>();
             for (int j = 1; j <= 3; j++){
@@ -142,11 +140,11 @@ public class FolderApiIntegrationTest {
                         ProblemImageType.valueOf(j)
                 );
 
-                ProblemImageData imageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
-                imageDataList.add(imageData);
+                ProblemImageData imageData = ProblemImageData.from(problemImageDataRegisterDto);
+                imageData.updateProblem(problem);
                 problemImageDataRepository.save(imageData);
             }
-            problem.updateImageDataList(imageDataList);
+            problemList.add(problem);
         }
     }
 
@@ -168,7 +166,7 @@ public class FolderApiIntegrationTest {
         Folder folder = folderList.get(0);
 
         // when & then - 해당 폴더를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/folder/%d", folder.getId())))
+        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/folders/%d", folder.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.folderId").value(folder.getId()))
                 .andExpect(jsonPath("$.data.folderName").value(folder.getName()))
@@ -192,7 +190,7 @@ public class FolderApiIntegrationTest {
         Folder folder = folderList.get(1);
 
         // when & then - 해당 폴더를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/folder/%d", folder.getId())))
+        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/folders/%d", folder.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.folderId").value(folder.getId()))
                 .andExpect(jsonPath("$.data.folderName").value(folder.getName()))
@@ -216,7 +214,7 @@ public class FolderApiIntegrationTest {
         Folder folder = folderList.get(folderList.size() - 1);
 
         // when & then - 해당 폴더를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/folder/%d", folder.getId())))
+        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/folders/%d", folder.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.folderId").value(folder.getId()))
                 .andExpect(jsonPath("$.data.folderName").value(folder.getName()))
@@ -236,7 +234,7 @@ public class FolderApiIntegrationTest {
         Folder rootFolder = folderList.get(0);
 
         // when & then - 해당 폴더를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get("/api/folder/root"))
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/folders/root"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.folderId").value(rootFolder.getId()))
                 .andExpect(jsonPath("$.data.folderName").value(rootFolder.getName()))
@@ -261,7 +259,7 @@ public class FolderApiIntegrationTest {
         folderRepository.deleteAll();
 
         // when & then - 해당 폴더를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get("/api/folder/root"))
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/folders/root"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.folderId").isNotEmpty())
                 .andExpect(jsonPath("$.data.folderName").isNotEmpty())
@@ -276,7 +274,7 @@ public class FolderApiIntegrationTest {
         //given
 
         // when
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/api/folder/thumbnails"))
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/api/folders/thumbnails"))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -296,7 +294,7 @@ public class FolderApiIntegrationTest {
         //given
 
         // when
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/api/folder/all"))
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/api/folders"))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -338,7 +336,7 @@ public class FolderApiIntegrationTest {
         );
 
         // when
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/folder")
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/folders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(folderRegisterDto)))
                 .andExpect(status().isOk());
@@ -363,7 +361,7 @@ public class FolderApiIntegrationTest {
         );
 
         // when
-        mockMvc.perform(MockMvcRequestBuilders.patch("/api/folder")
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/folders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(folderRegisterDto)))
                 .andExpect(status().isOk());
@@ -387,7 +385,7 @@ public class FolderApiIntegrationTest {
         );
 
         // when
-        mockMvc.perform(MockMvcRequestBuilders.patch("/api/folder")
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/folders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(folderRegisterDto)))
                 .andExpect(status().isOk());
@@ -409,7 +407,7 @@ public class FolderApiIntegrationTest {
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/folder")
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/folders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(folderDeleteRequestDto)))
                 .andExpect(status().isOk());
@@ -429,7 +427,7 @@ public class FolderApiIntegrationTest {
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/folder")
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/folders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(folderDeleteRequestDto)))
                 .andExpect(status().isOk());
@@ -449,7 +447,7 @@ public class FolderApiIntegrationTest {
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/folder")
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/folders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(folderDeleteRequestDto)))
                 .andExpect(status().isOk());
@@ -469,7 +467,7 @@ public class FolderApiIntegrationTest {
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/folder")
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/folders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(folderDeleteRequestDto)))
                 .andExpect(status().isOk());
@@ -489,7 +487,7 @@ public class FolderApiIntegrationTest {
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/folder")
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/folders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(folderDeleteRequestDto)))
                 .andExpect(status().is4xxClientError());

@@ -32,10 +32,8 @@ public class PracticeNoteRepositoryImpl implements PracticeNoteRepositoryCustom 
     @Override
     public PracticeNote findPracticeNoteWithDetails(Long practiceNoteId) {
         return queryFactory
-                .select(practiceNote)
-                .from(practiceNote)
-                .join(problemPracticeNoteMapping).on(practiceNote.id.eq(problemPracticeNoteMapping.practiceNote.id))
-                .join(problemPracticeNoteMapping.practiceNote, practiceNote)
+                .selectFrom(practiceNote)
+                .join(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping).fetchJoin()
                 .where(practiceNote.id.eq(practiceNoteId))
                 .fetchOne();
     }
@@ -50,22 +48,19 @@ public class PracticeNoteRepositoryImpl implements PracticeNoteRepositoryCustom 
     }
 
     @Override
-    public List<PracticeNote> findPracticesByProblem(Long problemId) {
-
-        return queryFactory
-                .select(practiceNote)
-                .from(practiceNote)
-                .join(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping) // 중간 매핑 테이블 조인
-                .where(problemPracticeNoteMapping.problem.id.eq(problemId))
-                .fetch();
-    }
-
-    @Override
     public void deleteProblemFromPractice(Long practiceNoteId, Long problemId) {
         queryFactory
                 .delete(problemPracticeNoteMapping)
                 .where(problemPracticeNoteMapping.practiceNote.id.eq(practiceNoteId)
                         .and(problemPracticeNoteMapping.problem.id.eq(problemId)))
+                .execute();
+    }
+
+    @Override
+    public void deleteProblemFromAllPractice(Long problemId) {
+        queryFactory
+                .delete(problemPracticeNoteMapping)
+                .where(problemPracticeNoteMapping.problem.id.eq(problemId))
                 .execute();
     }
 

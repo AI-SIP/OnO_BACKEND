@@ -32,11 +32,15 @@ public class ProblemImageData extends BaseEntity {
     @Column(name = "image_type")
     private ProblemImageType problemImageType;
 
-    public static ProblemImageData from(ProblemImageDataRegisterDto problemImageDataRegisterDto, Problem problem) {
+    public static ProblemImageData from(ProblemImageDataRegisterDto problemImageDataRegisterDto) {
         return ProblemImageData.builder()
-                .problem(problem)
                 .imageUrl(problemImageDataRegisterDto.imageUrl())
                 .problemImageType(problemImageDataRegisterDto.problemImageType())
                 .build();
+    }
+
+    public void updateProblem(Problem problem) {
+        this.problem = problem;
+        problem.addImageData(this);
     }
 }

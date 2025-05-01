@@ -100,9 +100,9 @@ class ProblemRepositoryTest {
             );
             Problem problem = problemRepository.save(Problem.from(
                     problemRegisterDto,
-                    savedUser.getId(),
-                    savedFolder
+                    savedUser.getId()
             ));
+            problem.updateFolder(savedFolder);
 
             ProblemPracticeNoteMapping problemPracticeNoteMapping = problemPracticeNoteMappingRepository.save(ProblemPracticeNoteMapping.from(
                     savedPracticeNote, problem
@@ -116,7 +116,8 @@ class ProblemRepositoryTest {
                         ProblemImageType.valueOf(j)
                 );
 
-                ProblemImageData imageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
+                ProblemImageData imageData = ProblemImageData.from(problemImageDataRegisterDto);
+                imageData.updateProblem(problem);
                 problemImageDataRepository.save(imageData);
             }
         }

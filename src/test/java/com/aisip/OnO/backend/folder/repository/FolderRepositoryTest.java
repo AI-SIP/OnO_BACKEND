@@ -48,10 +48,11 @@ class FolderRepositoryTest {
 
     private final Long userId = 1L;
 
-    private List<Folder> folderList = new ArrayList<>();
+    private List<Folder> folderList;
 
     @BeforeEach
     void setUp() {
+        folderList = new ArrayList<>();
         Folder rootFolder = folderRepository.save(Folder.from(
                 new FolderRegisterDto(
                         "rootFolder",
@@ -121,11 +122,10 @@ class FolderRepositoryTest {
                                     LocalDateTime.now(),
                                     null
                             ),
-                            userId,
-                            targetFolder
+                            userId
                     )
             );
-            targetFolder.addProblem(problem);
+            problem.updateFolder(targetFolder);
 
             List<ProblemImageData> imageDataList = new ArrayList<>();
             for (int j = 1; j <= 3; j++){
@@ -135,8 +135,8 @@ class FolderRepositoryTest {
                         ProblemImageType.valueOf(j)
                 );
 
-                ProblemImageData imageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
-                imageDataList.add(imageData);
+                ProblemImageData imageData = ProblemImageData.from(problemImageDataRegisterDto);
+                imageData.updateProblem(problem);
             }
             problemImageDataRepository.saveAll(imageDataList);
             problem.updateImageDataList(imageDataList);

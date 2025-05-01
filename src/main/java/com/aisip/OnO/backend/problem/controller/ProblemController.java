@@ -18,7 +18,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/problem")
+@RequestMapping("/api/problems")
 public class ProblemController {
 
     private final ProblemService problemService;
@@ -92,6 +92,15 @@ public class ProblemController {
     public CommonResponse<String> updateProblemPath(@RequestBody ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         problemService.updateProblemFolder(problemRegisterDto, userId);
+
+        return CommonResponse.success("문제가 수정되었습니다.");
+    }
+
+    // ✅ 문제 이미지 데이터 변경
+    @PatchMapping("/imageData")
+    public CommonResponse<String> updateProblemImageData(@RequestBody ProblemRegisterDto problemRegisterDto) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        problemService.updateProblemImageData(problemRegisterDto, userId);
 
         return CommonResponse.success("문제가 수정되었습니다.");
     }

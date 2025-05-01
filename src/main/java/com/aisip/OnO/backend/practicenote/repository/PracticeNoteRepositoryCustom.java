@@ -13,9 +13,9 @@ public interface PracticeNoteRepositoryCustom {
 
     Set<Long> findProblemIdListByPracticeNoteId(Long practiceNoteId);
 
-    List<PracticeNote> findPracticesByProblem(Long problemId);
-
     void deleteProblemFromPractice(Long practiceId, Long problemId);
+
+    void deleteProblemFromAllPractice(Long problemId);
 
     void deleteProblemsFromAllPractice(List<Long> deleteProblemIdList);
 }

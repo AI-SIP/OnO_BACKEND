@@ -1,6 +1,8 @@
 package com.aisip.OnO.backend.folder.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.folder.dto.FolderDeleteRequestDto;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
 import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
@@ -13,11 +15,13 @@ import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
+import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
+import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.problem.service.ProblemService;
 import org.junit.jupiter.api.*;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -26,22 +30,29 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.util.ReflectionTestUtils.setField;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
 
 @SpringBootTest
 class FolderServiceTest {
 
-    @InjectMocks
+    @Autowired
     private FolderService folderService;
 
-    @Mock
+    @Autowired
     private FolderRepository folderRepository;
 
-    @Mock
+    @Autowired
     private ProblemService problemService;
+
+    @Autowired
+    private ProblemRepository problemRepository;
+
+    @Autowired
+    private ProblemImageDataRepository problemImageDataRepository;
+
+    @MockBean
+    private FileUploadService fileUploadService;
 
     private final Long userId = 1L;
 
@@ -71,7 +82,7 @@ class FolderServiceTest {
                 null,
                 1L
         );
-        setField(rootFolder, "id", (long) 0);
+        folderRepository.save(rootFolder);
         folderList.add(rootFolder);
 
         for (int i = 0; i < 5; i++) {
@@ -84,10 +95,9 @@ class FolderServiceTest {
                     folderList.get(i / 2),
                     userId
             );
-            setField(folder, "id", (long) i + 1);
+            folder.updateParentFolder(folderList.get(i / 2));
+            folderRepository.save(folder);
             folderList.add(folder);
-
-            folderList.get(i / 2).addSubFolder(folder);
         }
 
         for (int i = 0; i < 12; i++) {
@@ -102,12 +112,11 @@ class FolderServiceTest {
                                     LocalDateTime.now(),
                                     null
                             ),
-                            userId,
-                            targetFolder
+                            userId
                     );
-            targetFolder.addProblem(problem);
+            problem.updateFolder(targetFolder);
+            problemRepository.save(problem);
 
-            List<ProblemImageData> imageDataList = new ArrayList<>();
             for (int j = 1; j <= 3; j++){
                 ProblemImageDataRegisterDto problemImageDataRegisterDto = new ProblemImageDataRegisterDto(
                         (long) i,
@@ -115,10 +124,10 @@ class FolderServiceTest {
                         ProblemImageType.valueOf(j)
                 );
 
-                ProblemImageData imageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
-                imageDataList.add(imageData);
+                ProblemImageData imageData = ProblemImageData.from(problemImageDataRegisterDto);
+                imageData.updateProblem(problem);
+                problemImageDataRepository.save(imageData);
             }
-            problem.updateImageDataList(imageDataList);
 
             ProblemResponseDto problemResponseDto = ProblemResponseDto.from(problem);
             problemList.add(problemResponseDto);
@@ -127,6 +136,10 @@ class FolderServiceTest {
 
     @AfterEach
     void tearDown() {
+        problemRepository.deleteAll();
+        problemRepository.deleteAll();
+        folderRepository.deleteAll();
+
         problemList.clear();
         folderList.clear();
     }
@@ -134,9 +147,7 @@ class FolderServiceTest {
     @Test
     void findRootFolder() {
         //given
-        Long folderId = 0L;
-        when(folderRepository.findRootFolder(userId)).thenReturn(Optional.of(folderList.get(0)));
-        when(problemService.findFolderProblemList(folderId)).thenReturn(List.of(problemList.get(0), problemList.get(1)));
+        Long folderId = folderList.get(0).getId();
 
         //when
         FolderResponseDto folderResponseDto = folderService.findRootFolder(userId);
@@ -155,9 +166,8 @@ class FolderServiceTest {
     @DisplayName("folderId를 사용해 특정 폴더 response dto 조회하기 테스트")
     void findFolder() {
         //given
-        Long folderId = 1L;
-        when(folderRepository.findFolderWithDetailsByFolderId(folderId)).thenReturn(Optional.of(folderList.get(1)));
-        when(problemService.findFolderProblemList(folderId)).thenReturn(List.of(problemList.get(2), problemList.get(3)));
+        Long parentFolderId = folderList.get(0).getId();
+        Long folderId = folderList.get(1).getId();
 
         //when
         FolderResponseDto folderResponseDto = folderService.findFolder(folderId);
@@ -165,7 +175,7 @@ class FolderServiceTest {
         //then
         assertThat(folderResponseDto.folderId()).isEqualTo(folderList.get(1).getId());
         assertThat(folderResponseDto.folderName()).isEqualTo(folderList.get(1).getName());
-        assertThat(folderResponseDto.parentFolder().folderId()).isEqualTo(0L);
+        assertThat(folderResponseDto.parentFolder().folderId()).isEqualTo(parentFolderId);
         assertThat(folderResponseDto.subFolderList().get(0).folderId()).isEqualTo(folderList.get(3).getId());
         assertThat(folderResponseDto.subFolderList().get(1).folderId()).isEqualTo(folderList.get(4).getId());
         assertThat(folderResponseDto.problemList().get(0)).isEqualTo(problemList.get(2));
@@ -176,8 +186,7 @@ class FolderServiceTest {
     @DisplayName("folderId를 사용해 특정 폴더 엔티티 조회하기 테스트")
     void findFolderEntity() {
         //given
-        Long folderId = 0L;
-        when(folderRepository.findById(folderId)).thenReturn(Optional.of(folderList.get(0)));
+        Long folderId = folderList.get(0).getId();
 
         //when
         Folder folder = folderService.findFolderEntity(folderId);
@@ -186,14 +195,12 @@ class FolderServiceTest {
         assertThat(folder.getId()).isEqualTo(folderList.get(0).getId());
         assertThat(folder.getName()).isEqualTo(folderList.get(0).getName());
         assertThat(folder.getParentFolder()).isEqualTo(folderList.get(0).getParentFolder());
-        assertThat(folder.getSubFolderList().size()).isEqualTo(folderList.get(0).getSubFolderList().size());
     }
 
     @Test
     @DisplayName("특정 유저의 모든 폴더 썸네일 조회하기 테스트")
     void findAllUserFolderThumbnails() {
         //given
-        when(folderRepository.findAllByUserId(userId)).thenReturn(folderList);
 
         //when
         List<FolderThumbnailResponseDto> folderThumbnailResponseDtoList = folderService.findAllUserFolderThumbnails(userId);
@@ -209,10 +216,6 @@ class FolderServiceTest {
     @DisplayName("특정 유저의 모든 폴더 조회하기 테스트")
     void findAllUserFolders() {
         //given
-        when(folderRepository.findAllFoldersWithDetailsByUserId(userId)).thenReturn(folderList);
-        for (int i = 0; i < folderList.size(); i++) {
-            when(problemService.findFolderProblemList((long) i)).thenReturn(List.of(problemList.get(i), problemList.get(i + 1)));
-        }
 
         //when
         List<FolderResponseDto> userFolderList = folderService.findAllUserFolders(userId);
@@ -242,7 +245,6 @@ class FolderServiceTest {
         //when
         FolderResponseDto rootFolder = folderService.createRootFolder(userId);
 
-        verify(folderRepository).save(any(Folder.class));
         assertThat(rootFolder.folderName()).isEqualTo("메인");
         assertThat(rootFolder.parentFolder()).isNull();
         assertThat(rootFolder.subFolderList()).isEmpty();
@@ -259,14 +261,15 @@ class FolderServiceTest {
                 null,
                 parentFolderId
         );
-        when(folderRepository.findById(parentFolderId)).thenReturn(Optional.of(folderList.get(folderList.size() - 1)));
 
         //when
         folderService.createFolder(folderRegisterDto, userId);
+        Optional<Folder> optionalParentFolder = folderRepository.findFolderWithDetailsByFolderId(parentFolderId);
+        assertThat(optionalParentFolder.isPresent()).isTrue();
 
-        verify(folderRepository).save(any(Folder.class));
-        assertThat(folderList.get(folderList.size() - 1).getSubFolderList().size()).isEqualTo(1);
-        assertThat(folderList.get(folderList.size() - 1).getSubFolderList().get(0).getName()).isEqualTo(folderName);
+        Folder parentFolder = optionalParentFolder.get();
+        assertThat(parentFolder.getSubFolderList().size()).isEqualTo(1);
+        assertThat(parentFolder.getSubFolderList().get(0).getName()).isEqualTo(folderName);
     }
 
     @Test
@@ -279,7 +282,6 @@ class FolderServiceTest {
                 null,
                 parentFolderId
         );
-        when(folderRepository.findById(parentFolderId)).thenReturn(Optional.empty());
 
         //when & then
         assertThatThrownBy(() -> folderService.createFolder(folderRegisterDto, userId))
@@ -291,55 +293,68 @@ class FolderServiceTest {
     @DisplayName("폴더 수정 테스트 - 폴더 이름 수정")
     void updateFolder_FolderName() {
         //given
-        Long folderId = 1L;
+        Long folderId = folderList.get(1).getId();
         String updateFolderName = "new folder name";
         FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
                 updateFolderName,
                 folderId,
                 null
         );
-        when(folderRepository.findById(folderId)).thenReturn(Optional.of(folderList.get(folderId.intValue())));
 
         //when
         folderService.updateFolder(folderRegisterDto, userId);
 
         //then
-        assertThat(folderList.get(folderId.intValue()).getName()).isEqualTo(updateFolderName);
+        Optional<Folder> optionalFolder = folderRepository.findById(folderId);
+        assertThat(optionalFolder.isPresent()).isTrue();
+
+        Folder folder = optionalFolder.get();
+        assertThat(folder.getName()).isEqualTo(updateFolderName);
     }
 
     @Test
     @DisplayName("폴더 수정 테스트 - 부모 폴더 수정")
     void updateFolder_ParentFolder() {
         //given
-        Long folderId = 1L;
-        Long newParentFolderId = 2L;
+        Long oldParentFolderId = folderList.get(0).getId();
+        Long folderId = folderList.get(1).getId();
+        Long newParentFolderId = folderList.get(2).getId();
         FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
                 null,
                 folderId,
                 newParentFolderId
         );
-        when(folderRepository.findById(folderId)).thenReturn(Optional.of(folderList.get(folderId.intValue())));
-        when(folderRepository.findById(newParentFolderId)).thenReturn(Optional.of(folderList.get(newParentFolderId.intValue())));
 
         folderService.updateFolder(folderRegisterDto, userId);
-        assertThat(folderList.get(0).getSubFolderList().size()).isEqualTo(1);
-        assertThat(folderList.get(folderId.intValue()).getParentFolder().getId()).isEqualTo(folderList.get(newParentFolderId.intValue()).getId());
-        assertThat(folderList.get(newParentFolderId.intValue()).getSubFolderList().size()).isEqualTo(2);
+
+        Optional<Folder> optionalOldParentFolder = folderRepository.findFolderWithDetailsByFolderId(oldParentFolderId);
+        Optional<Folder> optionalFolder = folderRepository.findFolderWithDetailsByFolderId(folderId);
+        Optional<Folder> optionalNewParentFolder = folderRepository.findFolderWithDetailsByFolderId(newParentFolderId);
+
+        assertThat(optionalOldParentFolder.isPresent()).isTrue();
+        assertThat(optionalFolder.isPresent()).isTrue();
+        assertThat(optionalNewParentFolder.isPresent()).isTrue();
+
+        Folder oldParentFolder = optionalOldParentFolder.get();
+        Folder folder = optionalFolder.get();
+        Folder newParentFolder = optionalNewParentFolder.get();
+
+        assertThat(oldParentFolder.getSubFolderList().size()).isEqualTo(1);
+        assertThat(folder.getParentFolder().getId()).isEqualTo(newParentFolderId);
+        assertThat(newParentFolder.getSubFolderList().size()).isEqualTo(2);
     }
 
     @Test
     @DisplayName("폴더 수정 테스트 - 부모 폴더가 존재하지 않을 경우")
     void updateFolder_ParentFolderNotExist() {
         //given
-        Long folderId = 1L;
+        Long folderId = folderList.get(1).getId();
         Long newParentFolderId = 100L;
         FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
                 null,
                 folderId,
                 newParentFolderId
         );
-        when(folderRepository.findById(folderId)).thenReturn(Optional.of(folderList.get(folderId.intValue())));
-        when(folderRepository.findById(newParentFolderId)).thenReturn(Optional.empty());
 
         //when & then
         assertThatThrownBy(() -> folderService.updateFolder(folderRegisterDto, userId))
@@ -347,24 +362,78 @@ class FolderServiceTest {
                 .hasMessageContaining(FolderErrorCase.FOLDER_NOT_FOUND.getMessage());
     }
 
-
     @Test
-    void deleteFoldersWithProblems() {
+    @DisplayName("폴더 삭제 테스트 - 루트 폴더 삭제 시 예외")
+    void deleteFolders_rootFolder() {
+        // given
+        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
+                null,
+                List.of(folderList.get(0).getId())
+        );
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+
+        // when & then
+        assertThatThrownBy(() -> folderService.deleteFolders(folderDeleteRequestDto))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessageContaining(FolderErrorCase.ROOT_FOLDER_CANNOT_REMOVE.getMessage());
+
+        assertThat(folderRepository.findAllByUserId(userId).size()).isEqualTo(folderList.size());
     }
 
     @Test
-    void deleteAllUserFoldersWithProblems() {
+    @DisplayName("폴더 삭제 테스트 - 루트 폴더 제외 최상위 폴더 모두 삭제")
+    void deleteFolders_AllParentFolder() {
+        // given
+        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
+                null,
+                List.of(folderList.get(1).getId(), folderList.get(2).getId())
+        );
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+
+        // when
+        folderService.deleteFolders(folderDeleteRequestDto);
+
+        // then
+        assertThat(folderRepository.findAllByUserId(userId).size()).isEqualTo(1);
     }
 
     @Test
-    void getAllFolderIdsIncludingSubFolders() {
+    @DisplayName("폴더 삭제 테스트 - 특정 중간 폴더 삭제")
+    void deleteFolders_InternalFolder() {
+        // given
+        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
+                null,
+                List.of(folderList.get(1).getId())
+        );
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+
+        // when
+        folderService.deleteFolders(folderDeleteRequestDto);
+
+        // then
+        assertThat(folderRepository.findAllByUserId(userId).size()).isEqualTo(3);
+
+        Optional<Folder> optionalRootFolder = folderRepository.findFolderWithDetailsByFolderId(folderList.get(0).getId());
+        assertThat(optionalRootFolder.isPresent()).isTrue();
+
+        Folder rootFolder = optionalRootFolder.get();
+        assertThat(rootFolder.getSubFolderList().size()).isEqualTo(1);
     }
 
     @Test
-    void deleteAllByFolderIds() {
-    }
+    @DisplayName("폴더 삭제 테스트 - 유저의 모든 폴더 삭제")
+    void deleteFolders_AllUserFolders() {
+        // given
+        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
+                userId,
+                null
+        );
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
-    @Test
-    void deleteAllUserFolders() {
+        // when
+        folderService.deleteFolders(folderDeleteRequestDto);
+
+        // then
+        assertThat(folderRepository.findAllByUserId(userId)).isEmpty();
     }
 }

@@ -81,7 +81,7 @@ public class FolderService {
                 null
         );
 
-        Folder rootFolder = Folder.from(folderRegisterDto, null, userId);
+        Folder rootFolder = Folder.from(folderRegisterDto, userId);
         folderRepository.save(rootFolder);
 
         log.info("userId : {} create root folder id: {}", userId, rootFolder.getId());
@@ -89,27 +89,23 @@ public class FolderService {
     }
 
     public void createFolder(FolderRegisterDto folderRegisterDto, Long userId) {
+        Folder folder = Folder.from(folderRegisterDto, userId);
         Folder parentFolder = findFolderEntity(folderRegisterDto.parentFolderId());
 
-        Folder folder = Folder.from(folderRegisterDto, parentFolder, userId);
+        folder.updateParentFolder(parentFolder);
         folderRepository.save(folder);
-        parentFolder.addSubFolder(folder);
 
         log.info("userId : {} create folder id: {}", userId, folder.getId());
     }
 
     public void updateFolder(FolderRegisterDto folderRegisterDto, Long userId) {
         Folder folder = findFolderEntity(folderRegisterDto.folderId());
-
         folder.updateFolderInfo(folderRegisterDto);
 
         if (folderRegisterDto.parentFolderId() != null && folder.getParentFolder() != null) {
-            Folder oldParentFolder = folder.getParentFolder();
             Folder newParentFolder = findFolderEntity(folderRegisterDto.parentFolderId());
 
             folder.updateParentFolder(newParentFolder);
-            newParentFolder.addSubFolder(folder);
-            oldParentFolder.removeSubFolder(folder);
         }
 
         log.info("userId : {} update folder id: {}", userId, folder.getId());

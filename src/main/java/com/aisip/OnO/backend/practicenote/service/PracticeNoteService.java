@@ -75,7 +75,7 @@ public class PracticeNoteService {
         ).collect(Collectors.toList());
     }
 
-    public void updatePracticeNoteCount(Long practiceId) {
+    public void addPracticeNoteCount(Long practiceId) {
         PracticeNote practiceNote = getPracticeEntity(practiceId);
         practiceNote.updatePracticeNoteCount();
 
@@ -146,12 +146,15 @@ public class PracticeNoteService {
             Problem problem = problemRepository.findById(problemId)
                     .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
-            ProblemPracticeNoteMapping mapping = ProblemPracticeNoteMapping.from(practiceNote, problem);
-            problemPracticeNoteMappingRepository.save(mapping);
+            ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from(practiceNote, problem);
+            problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
+
+            problem.addProblemToPractice(problemPracticeNoteMapping);
+            practiceNote.addProblemToPracticeNote(problemPracticeNoteMapping);
         }
     }
 
-    private void deleteProblemFromPractice(Long practiceId, Long problemId) {
+    public void deleteProblemFromPractice(Long practiceId, Long problemId) {
         practiceNoteRepository.deleteProblemFromPractice(practiceId, problemId);
         log.info("problemId: {} has deleted from practiceId: {}", problemId, practiceId);
     }

@@ -16,7 +16,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/folder")
+@RequestMapping("/api/folders")
 public class FolderController {
 
     private final FolderService folderService;
@@ -46,7 +46,7 @@ public class FolderController {
     }
 
     // ✅ 유저의 전체 폴더 상세 정보 조회
-    @GetMapping("/all")
+    @GetMapping()
     public CommonResponse<List<FolderResponseDto>> getAllUserFolderDetails() {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 

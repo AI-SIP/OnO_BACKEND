@@ -73,7 +73,7 @@ public class UserApiIntegrationTest {
     @DisplayName("유저 정보 조회 - 성공")
     void getUserInfo() throws Exception {
         // When & Then
-        mockMvc.perform(get("/api/user")
+        mockMvc.perform(get("/api/users")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.name").value("testUser"))
@@ -87,7 +87,7 @@ public class UserApiIntegrationTest {
         UserRegisterDto updateRequest = new UserRegisterDto("updated@example.com", "UpdatedUser", "updatedIdentifier", "MEMBER", null);
 
         // When & Then
-        mockMvc.perform(patch("/api/user")
+        mockMvc.perform(patch("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest)))
                 .andExpect(status().isOk())
@@ -103,7 +103,7 @@ public class UserApiIntegrationTest {
     @DisplayName("유저 삭제 - 성공")
     void deleteUserInfo() throws Exception {
         // When & Then
-        mockMvc.perform(delete("/api/user")
+        mockMvc.perform(delete("/api/users")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
