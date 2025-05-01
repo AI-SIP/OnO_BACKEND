@@ -57,6 +57,10 @@ public class Problem extends BaseEntity {
                 .build();
     }
 
+    public void addImageData(ProblemImageData problemImageData) {
+        problemImageDataList.add(problemImageData);
+    }
+
     public void addImageDataList(List<ProblemImageData> imageDataList) {
         problemImageDataList.addAll(imageDataList);
     }

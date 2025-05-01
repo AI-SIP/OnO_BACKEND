@@ -141,8 +141,8 @@ public class FolderApiIntegrationTest {
                         ProblemImageType.valueOf(j)
                 );
 
-                ProblemImageData imageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
-                imageDataList.add(imageData);
+                ProblemImageData imageData = ProblemImageData.from(problemImageDataRegisterDto);
+                imageData.updateProblem(problem);
                 problemImageDataRepository.save(imageData);
             }
             problem.updateImageDataList(imageDataList);

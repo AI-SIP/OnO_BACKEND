@@ -111,12 +111,14 @@ class ProblemApiIntegrationTest {
 
                 // 이미지 2개씩 추가
                 List<ProblemImageData> imageDataList = List.of(
-                        ProblemImageData.from(new ProblemImageDataRegisterDto(problem.getId(), "url" + i * f + "_1", ProblemImageType.PROBLEM_IMAGE), problem),
-                        ProblemImageData.from(new ProblemImageDataRegisterDto(problem.getId(), "url" + i * f + "_2", ProblemImageType.ANSWER_IMAGE), problem)
+                        ProblemImageData.from(new ProblemImageDataRegisterDto(problem.getId(), "url" + i * f + "_1", ProblemImageType.PROBLEM_IMAGE)),
+                        ProblemImageData.from(new ProblemImageDataRegisterDto(problem.getId(), "url" + i * f + "_2", ProblemImageType.ANSWER_IMAGE))
                 );
-                problemImageDataRepository.saveAll(imageDataList);
 
-                problem.updateImageDataList(imageDataList);
+                imageDataList.forEach(imageData -> {
+                    imageData.updateProblem(problem);
+                });
+                problemImageDataRepository.saveAll(imageDataList);
             }
         }
     }
@@ -274,7 +276,7 @@ class ProblemApiIntegrationTest {
                         .content(objectMapper.writeValueAsString(problemImageDataRegisterDto)))
                 .andExpect(status().isOk());
 
-        Problem problem = problemRepository.findById(problemList.get(0).getId()).get();
+        Problem problem = problemRepository.findProblemWithImageData(problemId).get();
         List<ProblemImageData> problemImageDataList = problem.getProblemImageDataList();
 
         Assertions.assertThat(problemImageDataList.size()).isEqualTo(3);

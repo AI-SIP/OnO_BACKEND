@@ -103,7 +103,8 @@ class PracticeNoteServiceTest {
                         ProblemImageType.valueOf(j)
                 );
 
-                ProblemImageData imageData = problemImageDataRepository.save(ProblemImageData.from(problemImageDataRegisterDto, problem));
+                ProblemImageData imageData = problemImageDataRepository.save(ProblemImageData.from(problemImageDataRegisterDto));
+                imageData.updateProblem(problem);
                 imageDataList.add(imageData);
             }
             //problem.updateImageDataList(imageDataList);

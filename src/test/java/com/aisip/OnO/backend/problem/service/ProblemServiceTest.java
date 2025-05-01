@@ -94,11 +94,14 @@ class ProblemServiceTest {
             problemRepository.save(problem);
 
             // 이미지 2개씩 추가
-            List<ProblemImageData> imageDataList = List.of(
-                    problemImageDataRepository.save(ProblemImageData.from(new ProblemImageDataRegisterDto(null, "url" + i + "_1", ProblemImageType.PROBLEM_IMAGE), problem)),
-                    problemImageDataRepository.save(ProblemImageData.from(new ProblemImageDataRegisterDto(null, "url" + i + "_2", ProblemImageType.ANSWER_IMAGE), problem))
-            );
-            problem.updateImageDataList(imageDataList);
+            ProblemImageData imageData1 = ProblemImageData.from(new ProblemImageDataRegisterDto(problem.getId(), "url" + i + "_1", ProblemImageType.PROBLEM_IMAGE));
+            ProblemImageData imageData2 = ProblemImageData.from(new ProblemImageDataRegisterDto(problem.getId(), "url" + i + "_2", ProblemImageType.ANSWER_IMAGE));
+
+            imageData1.updateProblem(problem);
+            imageData2.updateProblem(problem);
+
+            problemImageDataRepository.save(imageData1);
+            problemImageDataRepository.save(imageData2);
 
             problemList.add(problem);
         }

@@ -95,7 +95,8 @@ public class ProblemService {
 
         problemRegisterDto.imageDataDtoList()
                 .forEach(problemImageDataRegisterDto -> {
-                    ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
+                    ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto);
+                    problemImageData.updateProblem(problem);
                     problemImageDataRepository.save(problemImageData);
                 });
 
@@ -105,10 +106,10 @@ public class ProblemService {
     public void registerProblemImageData(ProblemImageDataRegisterDto problemImageDataRegisterDto, Long userId) {
         Problem problem = findProblemEntity(problemImageDataRegisterDto.problemId(), userId);
 
-        ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
-        problemImageDataRepository.save(problemImageData);
-
+        ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto);
         problem.addImageDataList(List.of(problemImageData));
+
+        problemImageDataRepository.save(problemImageData);
         log.info("userId: {} register problem image data for problemId: {}", userId, problem.getId());
     }
 
@@ -139,8 +140,13 @@ public class ProblemService {
 
         if (problemRegisterDto.imageDataDtoList() != null) {
             List<ProblemImageData> imageDataList = problemRegisterDto.imageDataDtoList().stream()
-                    .map(problemImageDataRegisterDto -> problemImageDataRepository.save(ProblemImageData.from(problemImageDataRegisterDto, problem))).toList();
+                    .map(problemImageDataRegisterDto -> {
+                        ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto);
+                        problemImageData.updateProblem(problem);
+                        problemImageDataRepository.save(problemImageData);
 
+                        return problemImageData;
+                    }).toList();
             problem.updateImageDataList(imageDataList);
         }
 

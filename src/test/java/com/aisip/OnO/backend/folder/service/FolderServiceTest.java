@@ -114,10 +114,9 @@ class FolderServiceTest {
                         ProblemImageType.valueOf(j)
                 );
 
-                ProblemImageData imageData = ProblemImageData.from(problemImageDataRegisterDto, problem);
-                imageDataList.add(imageData);
+                ProblemImageData imageData = ProblemImageData.from(problemImageDataRegisterDto);
+                imageData.updateProblem(problem);
             }
-            problem.updateImageDataList(imageDataList);
 
             ProblemResponseDto problemResponseDto = ProblemResponseDto.from(problem);
             problemList.add(problemResponseDto);
