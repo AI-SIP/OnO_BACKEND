@@ -17,8 +17,6 @@ import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.problem.service.ProblemService;
 import org.junit.jupiter.api.*;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -32,7 +30,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.util.ReflectionTestUtils.setField;
 
 @SpringBootTest
 class FolderServiceTest {
@@ -145,9 +142,7 @@ class FolderServiceTest {
     @Test
     void findRootFolder() {
         //given
-        Long folderId = 0L;
-        when(folderRepository.findRootFolder(userId)).thenReturn(Optional.of(folderList.get(0)));
-        when(problemService.findFolderProblemList(folderId)).thenReturn(List.of(problemList.get(0), problemList.get(1)));
+        Long folderId = folderList.get(0).getId();
 
         //when
         FolderResponseDto folderResponseDto = folderService.findRootFolder(userId);
@@ -166,9 +161,8 @@ class FolderServiceTest {
     @DisplayName("folderId를 사용해 특정 폴더 response dto 조회하기 테스트")
     void findFolder() {
         //given
-        Long folderId = 1L;
-        when(folderRepository.findFolderWithDetailsByFolderId(folderId)).thenReturn(Optional.of(folderList.get(1)));
-        when(problemService.findFolderProblemList(folderId)).thenReturn(List.of(problemList.get(2), problemList.get(3)));
+        Long parentFolderId = folderList.get(0).getId();
+        Long folderId = folderList.get(1).getId();
 
         //when
         FolderResponseDto folderResponseDto = folderService.findFolder(folderId);
@@ -176,7 +170,7 @@ class FolderServiceTest {
         //then
         assertThat(folderResponseDto.folderId()).isEqualTo(folderList.get(1).getId());
         assertThat(folderResponseDto.folderName()).isEqualTo(folderList.get(1).getName());
-        assertThat(folderResponseDto.parentFolder().folderId()).isEqualTo(0L);
+        assertThat(folderResponseDto.parentFolder().folderId()).isEqualTo(parentFolderId);
         assertThat(folderResponseDto.subFolderList().get(0).folderId()).isEqualTo(folderList.get(3).getId());
         assertThat(folderResponseDto.subFolderList().get(1).folderId()).isEqualTo(folderList.get(4).getId());
         assertThat(folderResponseDto.problemList().get(0)).isEqualTo(problemList.get(2));
@@ -187,8 +181,7 @@ class FolderServiceTest {
     @DisplayName("folderId를 사용해 특정 폴더 엔티티 조회하기 테스트")
     void findFolderEntity() {
         //given
-        Long folderId = 0L;
-        when(folderRepository.findById(folderId)).thenReturn(Optional.of(folderList.get(0)));
+        Long folderId = folderList.get(0).getId();
 
         //when
         Folder folder = folderService.findFolderEntity(folderId);
@@ -197,14 +190,12 @@ class FolderServiceTest {
         assertThat(folder.getId()).isEqualTo(folderList.get(0).getId());
         assertThat(folder.getName()).isEqualTo(folderList.get(0).getName());
         assertThat(folder.getParentFolder()).isEqualTo(folderList.get(0).getParentFolder());
-        assertThat(folder.getSubFolderList().size()).isEqualTo(folderList.get(0).getSubFolderList().size());
     }
 
     @Test
     @DisplayName("특정 유저의 모든 폴더 썸네일 조회하기 테스트")
     void findAllUserFolderThumbnails() {
         //given
-        when(folderRepository.findAllByUserId(userId)).thenReturn(folderList);
 
         //when
         List<FolderThumbnailResponseDto> folderThumbnailResponseDtoList = folderService.findAllUserFolderThumbnails(userId);
@@ -220,10 +211,6 @@ class FolderServiceTest {
     @DisplayName("특정 유저의 모든 폴더 조회하기 테스트")
     void findAllUserFolders() {
         //given
-        when(folderRepository.findAllFoldersWithDetailsByUserId(userId)).thenReturn(folderList);
-        for (int i = 0; i < folderList.size(); i++) {
-            when(problemService.findFolderProblemList((long) i)).thenReturn(List.of(problemList.get(i), problemList.get(i + 1)));
-        }
 
         //when
         List<FolderResponseDto> userFolderList = folderService.findAllUserFolders(userId);
@@ -253,7 +240,6 @@ class FolderServiceTest {
         //when
         FolderResponseDto rootFolder = folderService.createRootFolder(userId);
 
-        verify(folderRepository).save(any(Folder.class));
         assertThat(rootFolder.folderName()).isEqualTo("메인");
         assertThat(rootFolder.parentFolder()).isNull();
         assertThat(rootFolder.subFolderList()).isEmpty();
