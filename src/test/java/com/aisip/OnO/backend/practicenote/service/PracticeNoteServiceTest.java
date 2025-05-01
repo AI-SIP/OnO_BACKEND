@@ -268,19 +268,35 @@ class PracticeNoteServiceTest {
     @Test
     void deletePractice() {
         // given
+        Long practiceNoteId = practiceNoteList.get(0).getId();
 
         // when
+        practiceNoteService.deletePractice(practiceNoteId);
 
         // then
+        Optional<PracticeNote> optionalPracticeNote = practiceNoteRepository.findById(practiceNoteId);
+        assertThat(optionalPracticeNote.isPresent()).isFalse();
+
+        List<ProblemPracticeNoteMapping> practiceNoteMappingList = problemPracticeNoteMappingRepository.findAllByPracticeNoteId(practiceNoteId);
+        assertThat(practiceNoteMappingList.size()).isEqualTo(0);
     }
 
     @Test
     void deletePractices() {
         // given
+        List<Long> practiceIdList = List.of(practiceNoteList.get(0).getId(), practiceNoteList.get(1).getId());
 
         // when
+        practiceNoteService.deletePractices(practiceIdList);
 
         // then
+        for (int i = 0; i < 2; i++) {
+            Optional<PracticeNote> optionalPracticeNote = practiceNoteRepository.findById(practiceIdList.get(i));
+            assertThat(optionalPracticeNote.isPresent()).isFalse();
+
+            List<ProblemPracticeNoteMapping> practiceNoteMappingList = problemPracticeNoteMappingRepository.findAllByPracticeNoteId(practiceIdList.get(i));
+            assertThat(practiceNoteMappingList.size()).isEqualTo(0);
+        }
     }
 
     @Test
@@ -288,16 +304,10 @@ class PracticeNoteServiceTest {
         // given
 
         // when
+        practiceNoteService.deleteAllPracticesByUser(userId);
 
         // then
-    }
-
-    @Test
-    void deletePracticeNoteMapping() {
-        // given
-
-        // when
-
-        // then
+        assertThat(practiceNoteRepository.findAll()).isEmpty();
+        assertThat(problemPracticeNoteMappingRepository.findAll()).isEmpty();
     }
 }

@@ -105,21 +105,21 @@ public class PracticeNoteService {
     }
 
     public void deletePractice(Long practiceId) {
-        PracticeNote practiceNote = getPracticeEntity(practiceId);
-        practiceNote.getProblemPracticeNoteMappingList().clear();  // 매핑 삭제
+        List<ProblemPracticeNoteMapping> problemPracticeNoteMappingList = problemPracticeNoteMappingRepository.findAllByPracticeNoteId(practiceId);
+        problemPracticeNoteMappingList.forEach(ProblemPracticeNoteMapping::removeMappingFromProblemAndPractice);
 
-        practiceNoteRepository.delete(practiceNote);
+        practiceNoteRepository.deleteById(practiceId);
         log.info("practiceId: {} has deleted", practiceId);
     }
 
-    public void deletePractices(List<Long> practiceIds) {
-        practiceIds.forEach(this::deletePractice);
+    public void deletePractices(List<Long> practiceIdList) {
+        practiceIdList.forEach(this::deletePractice);
     }
 
     public void deleteAllPracticesByUser(Long userId) {
-        List<PracticeNote> practiceNoteList = practiceNoteRepository.findAllByUserId(userId);
+        List<Long> practiceIdList = practiceNoteRepository.findAllPracticeIdsByUserId(userId);
 
-        practiceNoteRepository.deleteAll(practiceNoteList);
+        deletePractices(practiceIdList);
         log.info("userId: {} has delete all practices", userId);
     }
 
@@ -138,7 +138,7 @@ public class PracticeNoteService {
         }
     }
 
-    public void deletePracticeNoteMapping(PracticeNote practiceNote, Long problemId) {
+   private void deletePracticeNoteMapping(PracticeNote practiceNote, Long problemId) {
         Optional<ProblemPracticeNoteMapping> optionalProblemPracticeNoteMapping = problemPracticeNoteMappingRepository.findProblemPracticeNoteMappingByProblemIdAndPracticeNoteId(problemId, practiceNote.getId());
         if (optionalProblemPracticeNoteMapping.isPresent()) {
             optionalProblemPracticeNoteMapping.get().removeMappingFromProblemAndPractice();
