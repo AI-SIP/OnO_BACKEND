@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteThumbnailResponseDto;
+import com.aisip.OnO.backend.practicenote.dto.PracticeNoteUpdateDto;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -63,9 +64,9 @@ public class PracticeNoteController {
 
     // ✅ 복습 리스트 수정
     @PatchMapping("")
-    public CommonResponse<String> updatePractice(@RequestBody PracticeNoteRegisterDto practiceNoteRegisterDto) {
+    public CommonResponse<String> updatePractice(@RequestBody PracticeNoteUpdateDto practiceNoteUpdateDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        practiceNoteService.updatePracticeInfo(practiceNoteRegisterDto);
+        practiceNoteService.updatePracticeInfo(practiceNoteUpdateDto);
 
         return CommonResponse.success("복습 리스트가 성공적으로 수정되었습니다.");
     }

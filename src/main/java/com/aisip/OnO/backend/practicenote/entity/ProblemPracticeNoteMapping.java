@@ -41,4 +41,9 @@ public class ProblemPracticeNoteMapping extends BaseEntity {
         problem.addPracticeMappingToProblem(this);
         practiceNote.addPracticeMappingToPracticeNote(this);
     }
+
+    public void removeMappingFromProblemAndPractice() {
+        this.problem.removePracticeMappingFromProblem(this);
+        this.practiceNote.removePracticeMappingFromPracticeNote(this);
+    }
 }

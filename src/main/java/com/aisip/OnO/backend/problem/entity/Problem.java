@@ -39,10 +39,10 @@ public class Problem extends BaseEntity {
 
     private LocalDateTime solvedAt;
 
-    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL)
     private List<ProblemImageData> problemImageDataList = new ArrayList<>();
 
-    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL)
     private List<ProblemPracticeNoteMapping> problemPracticeNoteMappingList = new ArrayList<>();
 
     public static Problem from(ProblemRegisterDto problemRegisterDto, Long userId) {
@@ -91,5 +91,9 @@ public class Problem extends BaseEntity {
 
     public void addPracticeMappingToProblem(ProblemPracticeNoteMapping problemPracticeNoteMapping) {
         problemPracticeNoteMappingList.add(problemPracticeNoteMapping);
+    }
+
+    public void removePracticeMappingFromProblem(ProblemPracticeNoteMapping problemPracticeNoteMapping) {
+        problemPracticeNoteMappingList.remove(problemPracticeNoteMapping);
     }
 }

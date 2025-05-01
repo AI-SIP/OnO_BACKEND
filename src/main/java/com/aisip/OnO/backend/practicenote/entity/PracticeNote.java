@@ -60,4 +60,8 @@ public class PracticeNote extends BaseEntity {
     public void addPracticeMappingToPracticeNote(ProblemPracticeNoteMapping problemPracticeNoteMapping) {
         problemPracticeNoteMappingList.add(problemPracticeNoteMapping);
     }
+
+    public void removePracticeMappingFromPracticeNote(ProblemPracticeNoteMapping problemPracticeNoteMapping) {
+        problemPracticeNoteMappingList.remove(problemPracticeNoteMapping);
+    }
 }

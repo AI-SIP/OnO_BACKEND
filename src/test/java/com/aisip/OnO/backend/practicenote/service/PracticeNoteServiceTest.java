@@ -6,6 +6,7 @@ import com.aisip.OnO.backend.folder.repository.FolderRepository;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteThumbnailResponseDto;
+import com.aisip.OnO.backend.practicenote.dto.PracticeNoteUpdateDto;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
@@ -27,6 +28,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -76,9 +78,9 @@ class PracticeNoteServiceTest {
         ));
 
         /*
-        problem 0 ~ 3 -> practice 0번과 mapping
-        problem 4 ~ 7 -> practice 1번과 mapping
-        problem 8 ~ 11 -> practice 2번과 mapping
+        practice 0 : problem 0, 1, 2, 3
+        practice 1 : problem 0, 1, 4, 5, 6, 7
+        practice 2 : problem 0, 8, 9, 10, 11
          */
         problemList = new ArrayList<>();
         for (int i = 0; i < 12; i++) {
@@ -144,14 +146,14 @@ class PracticeNoteServiceTest {
         for(int i = 1; i < 3; i++){
             ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from();
 
-            problemPracticeNoteMapping.addMappingToProblemAndPractice(problemList.get(0), practiceNoteList.get(0));
+            problemPracticeNoteMapping.addMappingToProblemAndPractice(problemList.get(0), practiceNoteList.get(i));
 
             problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
             problemPracticeNoteMappingList.add(problemPracticeNoteMapping);
         }
 
-        // problem 1번에 대해서만 practiceNote 0번과 추가 매핑
-        for(int i = 0; i < 1; i++){
+        // problem 1번에 대해서만 practiceNote 1번과 추가 매핑
+        for(int i = 1; i < 2; i++){
             ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from();
 
             problemPracticeNoteMapping.addMappingToProblemAndPractice(problemList.get(1), practiceNoteList.get(i));
@@ -190,7 +192,6 @@ class PracticeNoteServiceTest {
         assertThat(practiceNoteRepository.findAll().size()).isEqualTo(practiceNoteList.size() + 1);
     }
 
-
     @Test
     @DisplayName("복습 노트 상세 정보 조회 테스트")
     void findPracticeNoteDetail() {
@@ -225,6 +226,7 @@ class PracticeNoteServiceTest {
     }
 
     @Test
+    @DisplayName("복습 노트 조회 수 증가")
     void addPracticeNoteCount() {
         //given
         Long practiceNoteId = practiceNoteList.get(0).getId();
@@ -238,7 +240,29 @@ class PracticeNoteServiceTest {
     }
 
     @Test
+    @DisplayName("복습 노트 수정 - 문제 리스트 수정")
     void updatePracticeInfo() {
+        // given
+        Long practiceNoteId = practiceNoteList.get(0).getId();
+        String updateTitle = "new title";
+        List<Long> addProblemIdList = List.of(problemList.get(0).getId(), problemList.get(6).getId(), problemList.get(7).getId(), problemList.get(8).getId());
+        List<Long> removeProblemIdList = List.of(problemList.get(1).getId(), problemList.get(2).getId());
+
+        PracticeNoteUpdateDto practiceNoteUpdateDto = new PracticeNoteUpdateDto(
+                practiceNoteId,
+                updateTitle,
+                addProblemIdList,
+                removeProblemIdList
+        );
+
+        // when
+        assertThat(practiceNoteList.get(0).getProblemPracticeNoteMappingList().size()).isEqualTo(4);
+        practiceNoteService.updatePracticeInfo(practiceNoteUpdateDto);
+
+        // then
+        PracticeNote practiceNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceNoteId);
+        assertThat(practiceNote.getTitle()).isEqualTo(updateTitle);
+        assertThat(practiceNote.getProblemPracticeNoteMappingList().size()).isEqualTo(5);
     }
 
     @Test
@@ -269,7 +293,7 @@ class PracticeNoteServiceTest {
     }
 
     @Test
-    void deleteProblemFromPractice() {
+    void deletePracticeNoteMapping() {
         // given
 
         // when
