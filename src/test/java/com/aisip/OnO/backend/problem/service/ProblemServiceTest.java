@@ -252,6 +252,33 @@ class ProblemServiceTest {
     }
 
     @Test
+    @DisplayName("문제 이미지 등록하기")
+    void registerProblemImageData() {
+        // given
+        Long problemId = problemList.get(0).getId();
+        String imageUrl = "imageUrl";
+
+        ProblemImageDataRegisterDto dto = new ProblemImageDataRegisterDto(
+                problemId,
+                imageUrl,
+                ProblemImageType.SOLVE_IMAGE
+        );
+
+        // when
+        problemService.registerProblemImageData(dto, userId);
+
+        // then
+        Optional<Problem> optionalProblem = problemRepository.findProblemWithImageData(problemId);
+        assertThat(optionalProblem.isPresent()).isTrue();
+
+        Problem problem = optionalProblem.get();
+        int imageDataSize = problem.getProblemImageDataList().size();
+        assertThat(imageDataSize).isEqualTo(problemList.get(0).getProblemImageDataList().size() + 1);
+        assertThat(problem.getProblemImageDataList().get(imageDataSize - 1).getImageUrl()).isEqualTo(imageUrl);
+        assertThat(problem.getProblemImageDataList().get(imageDataSize - 1).getProblemImageType()).isEqualTo(ProblemImageType.SOLVE_IMAGE);
+    }
+
+    @Test
     @DisplayName("문제 정보(memo, reference) 수정")
     void updateProblemInfo() {
         // Given

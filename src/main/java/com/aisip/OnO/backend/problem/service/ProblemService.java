@@ -107,7 +107,7 @@ public class ProblemService {
         Problem problem = findProblemEntity(problemImageDataRegisterDto.problemId(), userId);
 
         ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto);
-        problem.addImageDataList(List.of(problemImageData));
+        problemImageData.updateProblem(problem);
 
         problemImageDataRepository.save(problemImageData);
         log.info("userId: {} register problem image data for problemId: {}", userId, problem.getId());
