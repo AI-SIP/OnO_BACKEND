@@ -129,9 +129,8 @@ public class FolderApiIntegrationTest {
                     ),
                     userId
             );
-            problem = problemRepository.save(problem);
             problem.updateFolder(targetFolder);
-            problemList.add(problem);
+            problem = problemRepository.save(problem);
 
             List<ProblemImageData> imageDataList = new ArrayList<>();
             for (int j = 1; j <= 3; j++){
@@ -145,7 +144,7 @@ public class FolderApiIntegrationTest {
                 imageData.updateProblem(problem);
                 problemImageDataRepository.save(imageData);
             }
-            problem.updateImageDataList(imageDataList);
+            problemList.add(problem);
         }
     }
 

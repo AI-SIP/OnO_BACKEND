@@ -70,7 +70,6 @@ public class Folder extends BaseEntity {
 
     public void addSubFolder(Folder folder) {
         subFolderList.add(folder);
-        folder.updateParentFolder(this);
     }
 
     public void removeSubFolder(Folder folder) {
