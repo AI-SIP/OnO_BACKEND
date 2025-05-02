@@ -9,12 +9,14 @@ import com.aisip.OnO.backend.auth.entity.Authority;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class JwtTokenService {
 
     private final JwtTokenizer jwtTokenizer;
