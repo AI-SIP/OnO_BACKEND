@@ -39,7 +39,7 @@ public class Problem extends BaseEntity {
 
     private LocalDateTime solvedAt;
 
-    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProblemImageData> problemImageDataList = new ArrayList<>();
 
     @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL)
