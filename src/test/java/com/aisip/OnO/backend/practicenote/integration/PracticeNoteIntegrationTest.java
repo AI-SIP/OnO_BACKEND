@@ -211,6 +211,18 @@ public class PracticeNoteIntegrationTest {
     }
 
     @Test
+    @DisplayName("복습 노트 상세 정보 조회 테스트 - 존재하지 않는 복습 리스트")
+    void findPracticeNoteDetail_Failure() throws Exception{
+        //given
+        Long practiceNoteId = 999L;
+
+        // when
+        MvcResult result = mockMvc.perform(get("/api/practiceNotes/{practiceNoteId}", practiceNoteId))
+                .andExpect(status().is4xxClientError())
+                .andReturn();
+    }
+
+    @Test
     @DisplayName("유저의 복습 노트 썸네일 리스트 조회 테스트")
     void findAllPracticeThumbnailsByUser() throws Exception{
         // given & when

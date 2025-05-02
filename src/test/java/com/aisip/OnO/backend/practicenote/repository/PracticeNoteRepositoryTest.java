@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -193,7 +194,10 @@ class PracticeNoteRepositoryTest {
         Long practiceId = practiceNote.getId();
 
         // when
-        PracticeNote targetPracticeNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceId);
+        Optional<PracticeNote> optionalPracticeNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceId);
+        assertThat(optionalPracticeNote.isPresent()).isTrue();
+
+        PracticeNote targetPracticeNote = optionalPracticeNote.get();
 
         // then
         assertThat(practiceNote.getId()).isEqualTo(targetPracticeNote.getId());

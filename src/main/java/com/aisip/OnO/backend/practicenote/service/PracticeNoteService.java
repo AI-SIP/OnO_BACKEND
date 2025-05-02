@@ -55,7 +55,9 @@ public class PracticeNoteService {
     }
 
     public PracticeNoteDetailResponseDto findPracticeNoteDetail(Long practiceId){
-        PracticeNote practiceNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceId);
+        PracticeNote practiceNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceId)
+                .orElseThrow(() -> new ApplicationException(PracticeNoteErrorCase.PRACTICE_NOTE_NOT_FOUND));
+
         List<Problem> problemList = problemRepository.findAllProblemsByPracticeId(practiceId);
         List<ProblemResponseDto> problemResponseDtoList = problemList.stream().map(
                 ProblemResponseDto::from

@@ -260,7 +260,9 @@ class PracticeNoteServiceTest {
         practiceNoteService.updatePracticeInfo(practiceNoteUpdateDto);
 
         // then
-        PracticeNote practiceNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceNoteId);
+        Optional<PracticeNote> optionalPracticeNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceNoteId);
+        assertThat(optionalPracticeNote.isPresent()).isTrue();
+        PracticeNote practiceNote = optionalPracticeNote.get();
         assertThat(practiceNote.getTitle()).isEqualTo(updateTitle);
         assertThat(practiceNote.getProblemPracticeNoteMappingList().size()).isEqualTo(5);
     }
