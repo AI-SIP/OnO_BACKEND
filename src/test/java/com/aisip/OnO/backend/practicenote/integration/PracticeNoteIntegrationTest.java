@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.practicenote.integration;
 
+import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
@@ -7,23 +8,36 @@ import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
 import com.aisip.OnO.backend.practicenote.repository.ProblemPracticeNoteMappingRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
+import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT) // 랜덤 포트로 애플리케이션 실행
 @AutoConfigureMockMvc
@@ -55,8 +69,15 @@ public class PracticeNoteIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        userId = 1L;
+        // 인증 설정
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        userId, null, List.of(new SimpleGrantedAuthority("ROLE_MEMBER"))
+                )
+        );
+
         practiceNoteList = new ArrayList<>();
-        problemList = new ArrayList<>();
 
         /*
         practice 0 : problem 0, 1, 2, 3
@@ -152,7 +173,36 @@ public class PracticeNoteIntegrationTest {
     }
 
     @Test
-    void test() {
+    @DisplayName("복습 노트 상세 정보 조회 테스트")
+    void findPracticeNoteDetail() throws Exception{
+        //given
+        PracticeNote practiceNote = practiceNoteList.get(0);
+        Long practiceNoteId = practiceNote.getId();
 
+        // when
+        MvcResult result = mockMvc.perform(get("/api/practiceNotes/{practiceNoteId}", practiceNoteId))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString();
+        JsonNode root = objectMapper.readTree(json);
+        JsonNode dataNode = root.get("data");
+        PracticeNoteDetailResponseDto dto = objectMapper.treeToValue(dataNode, PracticeNoteDetailResponseDto.class);
+
+        List<ProblemResponseDto> problemResponseDtoList = dto.problemResponseDtoList();
+
+        // then
+        assertThat(dto.practiceNoteId()).isEqualTo(practiceNoteId);
+        assertThat(dto.practiceTitle()).isEqualTo(practiceNote.getTitle());
+        assertThat(dto.practiceCount()).isEqualTo(practiceNote.getPracticeCount());
+        assertThat(problemResponseDtoList.size()).isEqualTo(4);
+
+        for(int i = 0; i < dto.problemResponseDtoList().size(); i++){
+            assertThat(problemResponseDtoList.get(i).problemId()).isEqualTo(problemList.get(i).getId());
+            assertThat(problemResponseDtoList.get(i).memo()).isEqualTo(problemList.get(i).getMemo());
+            assertThat(problemResponseDtoList.get(i).reference()).isEqualTo(problemList.get(i).getReference());
+            assertThat(problemResponseDtoList.get(i).createdAt()).isEqualTo(problemList.get(i).getCreatedAt());
+            assertThat(problemResponseDtoList.get(i).imageUrlList().size()).isEqualTo(problemList.get(i).getProblemImageDataList().size());
+        }
     }
 }

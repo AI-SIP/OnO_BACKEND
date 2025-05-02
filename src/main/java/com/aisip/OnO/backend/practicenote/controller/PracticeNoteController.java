@@ -24,7 +24,7 @@ public class PracticeNoteController {
 
     // ✅ 특정 복습 리스트 조회
     @GetMapping("/{practiceId}")
-    public CommonResponse<PracticeNoteDetailResponseDto> getPracticeDetail(@PathVariable Long practiceId) {
+    public CommonResponse<PracticeNoteDetailResponseDto> getPracticeDetail(@PathVariable("practiceId") Long practiceId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} get problem practice for practice id: {}", userId, practiceId);
 
