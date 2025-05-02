@@ -150,6 +150,9 @@ public class ProblemService {
         Problem problem = findProblemEntityWithImageData(problemRegisterDto.problemId(), userId);
 
         if (problemRegisterDto.imageDataDtoList() != null) {
+            for(ProblemImageData problemImageData : problem.getProblemImageDataList()){
+                deleteProblemImageData(problemImageData.getImageUrl());
+            }
             problem.getProblemImageDataList().clear();
 
             problemRegisterDto.imageDataDtoList().forEach(

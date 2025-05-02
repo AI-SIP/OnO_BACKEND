@@ -6,6 +6,7 @@ import jakarta.persistence.EntityManager;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static com.aisip.OnO.backend.practicenote.entity.QPracticeNote.practiceNote;
@@ -30,12 +31,14 @@ public class PracticeNoteRepositoryImpl implements PracticeNoteRepositoryCustom 
     }
 
     @Override
-    public PracticeNote findPracticeNoteWithDetails(Long practiceNoteId) {
-        return queryFactory
+    public Optional<PracticeNote> findPracticeNoteWithDetails(Long practiceNoteId) {
+        PracticeNote result = queryFactory
                 .selectFrom(practiceNote)
                 .join(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping).fetchJoin()
                 .where(practiceNote.id.eq(practiceNoteId))
                 .fetchOne();
+
+        return Optional.ofNullable(result);
     }
 
     @Override

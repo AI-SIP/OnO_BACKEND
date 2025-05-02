@@ -57,7 +57,11 @@ public class PracticeNote extends BaseEntity {
         this.lastSolvedAt = LocalDateTime.now();
     }
 
-    public void addProblemToPracticeNote(ProblemPracticeNoteMapping problemPracticeNoteMapping) {
+    public void addPracticeMappingToPracticeNote(ProblemPracticeNoteMapping problemPracticeNoteMapping) {
         problemPracticeNoteMappingList.add(problemPracticeNoteMapping);
+    }
+
+    public void removePracticeMappingFromPracticeNote(ProblemPracticeNoteMapping problemPracticeNoteMapping) {
+        problemPracticeNoteMappingList.remove(problemPracticeNoteMapping);
     }
 }

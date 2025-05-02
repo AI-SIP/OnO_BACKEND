@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteThumbnailResponseDto;
+import com.aisip.OnO.backend.practicenote.dto.PracticeNoteUpdateDto;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +24,7 @@ public class PracticeNoteController {
 
     // ✅ 특정 복습 리스트 조회
     @GetMapping("/{practiceId}")
-    public CommonResponse<PracticeNoteDetailResponseDto> getPracticeDetail(@PathVariable Long practiceId) {
+    public CommonResponse<PracticeNoteDetailResponseDto> getPracticeDetail(@PathVariable("practiceId") Long practiceId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} get problem practice for practice id: {}", userId, practiceId);
 
@@ -53,7 +54,7 @@ public class PracticeNoteController {
 
     // ✅ 복습 완료 횟수 증가
     @PatchMapping("/{practiceId}/complete")
-    public CommonResponse<String> addPracticeCount(@PathVariable Long practiceId) {
+    public CommonResponse<String> addPracticeCount(@PathVariable("practiceId") Long practiceId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         practiceNoteService.addPracticeNoteCount(practiceId);
 
@@ -63,18 +64,18 @@ public class PracticeNoteController {
 
     // ✅ 복습 리스트 수정
     @PatchMapping("")
-    public CommonResponse<String> updatePractice(@RequestBody PracticeNoteRegisterDto practiceNoteRegisterDto) {
+    public CommonResponse<String> updatePractice(@RequestBody PracticeNoteUpdateDto practiceNoteUpdateDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        practiceNoteService.updatePracticeInfo(practiceNoteRegisterDto);
+        practiceNoteService.updatePracticeInfo(practiceNoteUpdateDto);
 
         return CommonResponse.success("복습 리스트가 성공적으로 수정되었습니다.");
     }
 
     // ✅ 복습 리스트 삭제 (204 No Content 반환)
     @DeleteMapping("")
-    public CommonResponse<String> deletePractices(@RequestParam List<Long> deletePracticeIds) {
+    public CommonResponse<String> deletePractices(@RequestParam("deletePracticeIdList") List<Long> deletePracticeIdList) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        practiceNoteService.deletePractices(deletePracticeIds);
+        practiceNoteService.deletePractices(deletePracticeIdList);
 
         return CommonResponse.success("선택한 복습 노트가 삭제되었습니다.");
     }

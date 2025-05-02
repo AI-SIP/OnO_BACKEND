@@ -42,7 +42,7 @@ public class Problem extends BaseEntity {
     @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProblemImageData> problemImageDataList = new ArrayList<>();
 
-    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL)
     private List<ProblemPracticeNoteMapping> problemPracticeNoteMappingList = new ArrayList<>();
 
     public static Problem from(ProblemRegisterDto problemRegisterDto, Long userId) {
@@ -59,10 +59,6 @@ public class Problem extends BaseEntity {
 
     public void addImageData(ProblemImageData problemImageData) {
         problemImageDataList.add(problemImageData);
-    }
-
-    public void addImageDataList(List<ProblemImageData> imageDataList) {
-        problemImageDataList.addAll(imageDataList);
     }
 
     public void updateProblem(ProblemRegisterDto problemRegisterDto) {
@@ -93,7 +89,11 @@ public class Problem extends BaseEntity {
         folder.addProblem(this);
     }
 
-    public void addProblemToPractice(ProblemPracticeNoteMapping problemPracticeNoteMapping) {
+    public void addPracticeMappingToProblem(ProblemPracticeNoteMapping problemPracticeNoteMapping) {
         problemPracticeNoteMappingList.add(problemPracticeNoteMapping);
+    }
+
+    public void removePracticeMappingFromProblem(ProblemPracticeNoteMapping problemPracticeNoteMapping) {
+        problemPracticeNoteMappingList.remove(problemPracticeNoteMapping);
     }
 }

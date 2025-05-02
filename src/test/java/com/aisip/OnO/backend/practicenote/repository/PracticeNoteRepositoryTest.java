@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -129,26 +130,20 @@ class PracticeNoteRepositoryTest {
 
 
             for(int j = 0; j < 4; j++){
-                ProblemPracticeNoteMapping problemPracticeNoteMapping = problemPracticeNoteMappingRepository.save(
-                        ProblemPracticeNoteMapping.from(practiceNote, problemList.get(i * 4 + j))
-                );
+                ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from();
+                problemPracticeNoteMapping.addMappingToProblemAndPractice(problemList.get(i * 4 + j), practiceNote);
                 problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
-                problemList.get(i * 4 + j).addProblemToPractice(problemPracticeNoteMapping);
-                practiceNote.addProblemToPracticeNote(problemPracticeNoteMapping);
             }
 
             practiceNoteList.add(practiceNote);
         }
 
         // problem 0번에 대해서만 practiceNote 1, 2번과 추가 매핑
-        for(int i = 1; i < 3; i++){
-            ProblemPracticeNoteMapping problemPracticeNoteMapping = problemPracticeNoteMappingRepository.save(
-                    ProblemPracticeNoteMapping.from(practiceNoteList.get(i), problemList.get(0))
-            );
+        for(int i = 1; i < 3; i++) {
+            ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from();
+            problemPracticeNoteMapping.addMappingToProblemAndPractice(problemList.get(0), practiceNoteList.get(i));
 
             problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
-            problemList.get(0).addProblemToPractice(problemPracticeNoteMapping);
-            practiceNoteList.get(i).addProblemToPracticeNote(problemPracticeNoteMapping);
         }
     }
 
@@ -199,7 +194,10 @@ class PracticeNoteRepositoryTest {
         Long practiceId = practiceNote.getId();
 
         // when
-        PracticeNote targetPracticeNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceId);
+        Optional<PracticeNote> optionalPracticeNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceId);
+        assertThat(optionalPracticeNote.isPresent()).isTrue();
+
+        PracticeNote targetPracticeNote = optionalPracticeNote.get();
 
         // then
         assertThat(practiceNote.getId()).isEqualTo(targetPracticeNote.getId());
