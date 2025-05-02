@@ -32,7 +32,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -41,7 +40,6 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT) // 랜덤 포트로 애플리케이션 실행
@@ -361,5 +359,21 @@ public class PracticeNoteIntegrationTest {
             List<ProblemPracticeNoteMapping> practiceNoteMappingList = problemPracticeNoteMappingRepository.findAllByPracticeNoteId(practiceIdList.get(i));
             assertThat(practiceNoteMappingList.size()).isEqualTo(0);
         }
+    }
+
+    @Test
+    @DisplayName("복습 노트 삭제 - 유저의 모든 복습 노트 삭제")
+    void deleteAllPracticesByUser() throws Exception{
+        // given
+
+        // when
+        mockMvc.perform(delete("/api/practiceNotes/all")
+                        .accept(MediaType.APPLICATION_JSON)
+                )
+                .andExpect(status().isOk());
+
+        // then
+        assertThat(practiceNoteRepository.findAll()).isEmpty();
+        assertThat(problemPracticeNoteMappingRepository.findAll()).isEmpty();
     }
 }
