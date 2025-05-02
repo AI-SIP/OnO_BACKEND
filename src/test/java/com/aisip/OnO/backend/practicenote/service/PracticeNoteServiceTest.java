@@ -177,22 +177,6 @@ class PracticeNoteServiceTest {
     }
 
     @Test
-    @DisplayName("복습 노트 등록 테스트")
-    void registerPractice() {
-        //given
-        PracticeNoteRegisterDto practiceNoteRegisterDto = new PracticeNoteRegisterDto(
-                null,
-                "new practice",
-                List.of(problemList.get(0).getId(), problemList.get(1).getId(), problemList.get(2).getId())
-        );
-
-        //when
-        practiceNoteService.registerPractice(practiceNoteRegisterDto, userId);
-
-        assertThat(practiceNoteRepository.findAll().size()).isEqualTo(practiceNoteList.size() + 1);
-    }
-
-    @Test
     @DisplayName("복습 노트 상세 정보 조회 테스트")
     void findPracticeNoteDetail() {
         //given
@@ -237,6 +221,22 @@ class PracticeNoteServiceTest {
         //then
         PracticeNote practiceNote = practiceNoteRepository.findById(practiceNoteId).get();
         assertThat(practiceNote.getPracticeCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("복습 노트 등록 테스트")
+    void registerPractice() {
+        //given
+        PracticeNoteRegisterDto practiceNoteRegisterDto = new PracticeNoteRegisterDto(
+                null,
+                "new practice",
+                List.of(problemList.get(0).getId(), problemList.get(1).getId(), problemList.get(2).getId())
+        );
+
+        //when
+        practiceNoteService.registerPractice(practiceNoteRegisterDto, userId);
+
+        assertThat(practiceNoteRepository.findAll().size()).isEqualTo(practiceNoteList.size() + 1);
     }
 
     @Test

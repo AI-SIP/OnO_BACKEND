@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -214,7 +215,7 @@ public class PracticeNoteIntegrationTest {
     void findAllPracticeThumbnailsByUser() throws Exception{
         // given & when
         MvcResult result = mockMvc.perform(get("/api/practiceNotes/thumbnail"))
-                .andExpect(status().isOk())
+                .andExpect(status().is2xxSuccessful())
                 .andReturn();
 
         String json = result.getResponse().getContentAsString();
@@ -248,7 +249,7 @@ public class PracticeNoteIntegrationTest {
 
         //when
         mockMvc.perform(patch("/api/practiceNotes/{practiceNoteId}/complete", practiceNoteId))
-                .andExpect(status().isOk())
+                .andExpect(status().is2xxSuccessful())
                 .andReturn();
 
         //then
@@ -257,5 +258,36 @@ public class PracticeNoteIntegrationTest {
 
         PracticeNote practiceNote = optionalPracticeNote.get();
         assertThat(practiceNote.getPracticeCount()).isEqualTo(practiceNoteList.get(0).getPracticeCount() + 1);
+    }
+
+    @Test
+    @DisplayName("복습 노트 등록 테스트")
+    void registerPractice() throws Exception{
+        //given
+        String practiceTitle = "new practice";
+        PracticeNoteRegisterDto practiceNoteRegisterDto = new PracticeNoteRegisterDto(
+                null,
+                practiceTitle,
+                List.of(problemList.get(0).getId(), problemList.get(1).getId(), problemList.get(2).getId())
+        );
+
+        //when
+        mockMvc.perform(post("/api/practiceNotes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(practiceNoteRegisterDto))
+                )
+                .andExpect(status().is2xxSuccessful());
+
+        //then
+        List<PracticeNote> dbPracticeNoteList = practiceNoteRepository.findAll();
+        assertThat(dbPracticeNoteList.size()).isEqualTo(practiceNoteList.size() + 1);
+
+        PracticeNote practiceNote = dbPracticeNoteList.get(dbPracticeNoteList.size() - 1);
+        assertThat(practiceNote.getTitle()).isEqualTo(practiceTitle);
+
+        for(int i = 0; i < 2; i++){
+            assertThat(problemPracticeNoteMappingRepository.findProblemPracticeNoteMappingByProblemIdAndPracticeNoteId(problemList.get(i).getId(), practiceNote.getId()).isPresent()).isTrue();
+        }
     }
 }
