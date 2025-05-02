@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.practicenote.integration;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteThumbnailResponseDto;
+import com.aisip.OnO.backend.practicenote.dto.PracticeNoteUpdateDto;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
@@ -301,5 +302,37 @@ public class PracticeNoteIntegrationTest {
         for(int i = 0; i < 2; i++){
             assertThat(problemPracticeNoteMappingRepository.findProblemPracticeNoteMappingByProblemIdAndPracticeNoteId(problemList.get(i).getId(), practiceNote.getId()).isPresent()).isTrue();
         }
+    }
+
+    @Test
+    @DisplayName("복습 노트 수정 - 문제 리스트 수정")
+    void updatePracticeInfo() throws Exception{
+        // given
+        Long practiceNoteId = practiceNoteList.get(0).getId();
+        String updateTitle = "new title";
+        List<Long> addProblemIdList = List.of(problemList.get(0).getId(), problemList.get(6).getId(), problemList.get(7).getId(), problemList.get(8).getId());
+        List<Long> removeProblemIdList = List.of(problemList.get(1).getId(), problemList.get(2).getId());
+
+        PracticeNoteUpdateDto practiceNoteUpdateDto = new PracticeNoteUpdateDto(
+                practiceNoteId,
+                updateTitle,
+                addProblemIdList,
+                removeProblemIdList
+        );
+
+        //when
+        mockMvc.perform(patch("/api/practiceNotes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(practiceNoteUpdateDto))
+                )
+                .andExpect(status().is2xxSuccessful());
+
+        // then
+        Optional<PracticeNote> optionalPracticeNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceNoteId);
+        assertThat(optionalPracticeNote.isPresent()).isTrue();
+        PracticeNote practiceNote = optionalPracticeNote.get();
+        assertThat(practiceNote.getTitle()).isEqualTo(updateTitle);
+        assertThat(practiceNote.getProblemPracticeNoteMappingList().size()).isEqualTo(5);
     }
 }
