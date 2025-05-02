@@ -35,9 +35,10 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -237,5 +238,24 @@ public class PracticeNoteIntegrationTest {
             assertThat(dto.practiceCount()).isEqualTo(practiceNote.getPracticeCount());
             assertThat(dto.lastSolvedAt()).isEqualTo(practiceNote.getLastSolvedAt());
         }
+    }
+
+    @Test
+    @DisplayName("복습 노트 조회 수 증가")
+    void addPracticeNoteCount() throws Exception{
+        //given
+        Long practiceNoteId = practiceNoteList.get(0).getId();
+
+        //when
+        mockMvc.perform(patch("/api/practiceNotes/{practiceNoteId}/complete", practiceNoteId))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        //then
+        Optional<PracticeNote> optionalPracticeNote = practiceNoteRepository.findById(practiceNoteId);
+        assertThat(optionalPracticeNote.isPresent()).isTrue();
+
+        PracticeNote practiceNote = optionalPracticeNote.get();
+        assertThat(practiceNote.getPracticeCount()).isEqualTo(practiceNoteList.get(0).getPracticeCount() + 1);
     }
 }

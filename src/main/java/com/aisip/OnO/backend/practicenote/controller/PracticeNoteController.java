@@ -54,7 +54,7 @@ public class PracticeNoteController {
 
     // ✅ 복습 완료 횟수 증가
     @PatchMapping("/{practiceId}/complete")
-    public CommonResponse<String> addPracticeCount(@PathVariable Long practiceId) {
+    public CommonResponse<String> addPracticeCount(@PathVariable("practiceId") Long practiceId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         practiceNoteService.addPracticeNoteCount(practiceId);
 
