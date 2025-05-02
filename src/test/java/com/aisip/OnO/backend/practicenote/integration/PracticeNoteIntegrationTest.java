@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.practicenote.integration;
 
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
+import com.aisip.OnO.backend.practicenote.dto.PracticeNoteThumbnailResponseDto;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
@@ -14,6 +15,7 @@ import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -203,6 +205,37 @@ public class PracticeNoteIntegrationTest {
             assertThat(problemResponseDtoList.get(i).reference()).isEqualTo(problemList.get(i).getReference());
             assertThat(problemResponseDtoList.get(i).createdAt()).isEqualTo(problemList.get(i).getCreatedAt());
             assertThat(problemResponseDtoList.get(i).imageUrlList().size()).isEqualTo(problemList.get(i).getProblemImageDataList().size());
+        }
+    }
+
+    @Test
+    @DisplayName("유저의 복습 노트 썸네일 리스트 조회 테스트")
+    void findAllPracticeThumbnailsByUser() throws Exception{
+        // given & when
+        MvcResult result = mockMvc.perform(get("/api/practiceNotes/thumbnail"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString();
+        JsonNode root = objectMapper.readTree(json);
+        JsonNode dataNode = root.get("data");
+
+        // then
+        List<PracticeNoteThumbnailResponseDto> dtoList =
+                objectMapper.convertValue(
+                        dataNode,
+                        new TypeReference<List<PracticeNoteThumbnailResponseDto>>() {}
+                );
+
+        assertThat(dtoList.size()).isEqualTo(practiceNoteList.size());
+        for(int i = 0; i < dtoList.size(); i++){
+            PracticeNoteThumbnailResponseDto dto = dtoList.get(i);
+            PracticeNote practiceNote = practiceNoteList.get(i);
+
+            assertThat(dto.practiceNoteId()).isEqualTo(practiceNote.getId());
+            assertThat(dto.practiceTitle()).isEqualTo(practiceNote.getTitle());
+            assertThat(dto.practiceCount()).isEqualTo(practiceNote.getPracticeCount());
+            assertThat(dto.lastSolvedAt()).isEqualTo(practiceNote.getLastSolvedAt());
         }
     }
 }
