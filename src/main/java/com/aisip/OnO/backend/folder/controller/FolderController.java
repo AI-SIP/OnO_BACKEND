@@ -55,11 +55,11 @@ public class FolderController {
 
     // ✅ 폴더 생성
     @PostMapping("")
-    public CommonResponse<String> createFolder(@RequestBody FolderRegisterDto folderRegisterDto) {
+    public CommonResponse<Long> createFolder(@RequestBody FolderRegisterDto folderRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        folderService.createFolder(folderRegisterDto, userId);
-        return CommonResponse.success("폴더가 성공적으로 생성되었습니다.");
+        Long folderId = folderService.createFolder(folderRegisterDto, userId);
+        return CommonResponse.success(folderId);
     }
 
     // ✅ 폴더 정보 수정

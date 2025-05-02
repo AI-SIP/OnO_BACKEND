@@ -88,7 +88,7 @@ public class FolderService {
         return FolderResponseDto.from(rootFolder, List.of());
     }
 
-    public void createFolder(FolderRegisterDto folderRegisterDto, Long userId) {
+    public Long createFolder(FolderRegisterDto folderRegisterDto, Long userId) {
         Folder folder = Folder.from(folderRegisterDto, userId);
         Folder parentFolder = findFolderEntity(folderRegisterDto.parentFolderId());
 
@@ -96,6 +96,7 @@ public class FolderService {
         folderRepository.save(folder);
 
         log.info("userId : {} create folder id: {}", userId, folder.getId());
+        return folder.getId();
     }
 
     public void updateFolder(FolderRegisterDto folderRegisterDto, Long userId) {
