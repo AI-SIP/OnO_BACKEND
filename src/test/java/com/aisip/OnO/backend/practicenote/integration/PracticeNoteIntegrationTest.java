@@ -335,4 +335,31 @@ public class PracticeNoteIntegrationTest {
         assertThat(practiceNote.getTitle()).isEqualTo(updateTitle);
         assertThat(practiceNote.getProblemPracticeNoteMappingList().size()).isEqualTo(5);
     }
+
+    @Test
+    @DisplayName("복습 노트 삭제 - 삭제할 복습 노트 id 리스트 사용")
+    void deletePractices() throws Exception{
+        // given
+        List<Long> practiceIdList = List.of(practiceNoteList.get(0).getId(), practiceNoteList.get(1).getId());
+
+        // when
+        mockMvc.perform(delete("/api/practiceNotes")
+                        .param("deletePracticeIdList",
+                                practiceIdList.stream()
+                                        .map(String::valueOf)
+                                        .toArray(String[]::new)
+                        )
+                        .accept(MediaType.APPLICATION_JSON)
+                )
+                .andExpect(status().isOk());
+
+        // then
+        for (int i = 0; i < 2; i++) {
+            Optional<PracticeNote> optionalPracticeNote = practiceNoteRepository.findById(practiceIdList.get(i));
+            assertThat(optionalPracticeNote.isPresent()).isFalse();
+
+            List<ProblemPracticeNoteMapping> practiceNoteMappingList = problemPracticeNoteMappingRepository.findAllByPracticeNoteId(practiceIdList.get(i));
+            assertThat(practiceNoteMappingList.size()).isEqualTo(0);
+        }
+    }
 }

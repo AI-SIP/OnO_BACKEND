@@ -73,9 +73,9 @@ public class PracticeNoteController {
 
     // ✅ 복습 리스트 삭제 (204 No Content 반환)
     @DeleteMapping("")
-    public CommonResponse<String> deletePractices(@RequestParam List<Long> deletePracticeIds) {
+    public CommonResponse<String> deletePractices(@RequestParam("deletePracticeIdList") List<Long> deletePracticeIdList) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        practiceNoteService.deletePractices(deletePracticeIds);
+        practiceNoteService.deletePractices(deletePracticeIdList);
 
         return CommonResponse.success("선택한 복습 노트가 삭제되었습니다.");
     }

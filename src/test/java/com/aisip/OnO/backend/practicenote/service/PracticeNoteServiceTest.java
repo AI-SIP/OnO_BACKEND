@@ -268,6 +268,7 @@ class PracticeNoteServiceTest {
     }
 
     @Test
+    @DisplayName("복습 노트 삭제 - 특정 복습 노트 삭제")
     void deletePractice() {
         // given
         Long practiceNoteId = practiceNoteList.get(0).getId();
@@ -284,6 +285,7 @@ class PracticeNoteServiceTest {
     }
 
     @Test
+    @DisplayName("복습 노트 삭제 - 삭제할 복습 노트 id 리스트 사용")
     void deletePractices() {
         // given
         List<Long> practiceIdList = List.of(practiceNoteList.get(0).getId(), practiceNoteList.get(1).getId());
@@ -302,6 +304,7 @@ class PracticeNoteServiceTest {
     }
 
     @Test
+    @DisplayName("복습 노트 삭제 - 유저의 모든 복습 노트 삭제")
     void deleteAllPracticesByUser() {
         // given
 
