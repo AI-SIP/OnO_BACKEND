@@ -427,25 +427,7 @@ class ProblemApiIntegrationTest {
         // when & then
         mockMvc.perform(MockMvcRequestBuilders.delete("/api/problems")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
-                .andExpect(status().isOk());
-
-        assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(3L);
-    }
-
-    @Test
-    @DisplayName("문제 삭제 - folder id 사용")
-    @WithMockCustomUser()
-    void deleteProblemsWithFolderId() throws Exception {
-        // given
-        List<Long> folderIdList = List.of(folderList.get(0).getId());
-
-        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
-
-        // when & then
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problems")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
+                .content(objectMapper.writeValueAsString(deleteProblemIdList)))
                 .andExpect(status().isOk());
 
         assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(3L);

@@ -115,7 +115,6 @@ public class ProblemController {
 
     @DeleteMapping("/all")
     public CommonResponse<String> deleteUserProblems(
-
     ) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         problemService.deleteAllUserProblems(userId);
