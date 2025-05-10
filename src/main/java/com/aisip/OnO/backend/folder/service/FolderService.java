@@ -1,7 +1,6 @@
 package com.aisip.OnO.backend.folder.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
-import com.aisip.OnO.backend.folder.dto.FolderDeleteRequestDto;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
 import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
@@ -110,21 +109,6 @@ public class FolderService {
         }
 
         log.info("userId : {} update folder id: {}", userId, folder.getId());
-    }
-
-    public void deleteFolders(FolderDeleteRequestDto folderDeleteRequestDto) {
-        if (folderDeleteRequestDto.userId() != null) {
-            deleteAllUserFoldersWithProblems(folderDeleteRequestDto.userId());
-
-            log.info("userId : {} delete all user folder With Problems", folderDeleteRequestDto.userId());
-            return;
-        }
-
-        if (folderDeleteRequestDto.folderIdList() != null) {
-            deleteFoldersWithProblems(folderDeleteRequestDto.folderIdList());
-
-            log.info("delete folder With Problems, folder id list: " + folderDeleteRequestDto.folderIdList());
-        }
     }
 
     public void deleteFoldersWithProblems(List<Long> folderIds) {

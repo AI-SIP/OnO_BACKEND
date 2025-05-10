@@ -258,26 +258,6 @@ class ProblemControllerTest {
     }
 
     @Test
-    @DisplayName("문제 삭제")
-    @WithMockCustomUser()
-    void deleteProblems() throws Exception {
-        // given
-        ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
-                List.of(1L, 2L),
-                List.of(1L)
-        );
-
-
-        // when & then
-        mockMvc.perform(delete("/api/problems")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
-                .andExpect(status().isOk());
-
-        Mockito.verify(problemService, Mockito.times(1)).deleteProblems(problemDeleteRequestDto);
-    }
-
-    @Test
     @DisplayName("문제 이미지 삭제")
     @WithMockCustomUser()
     void deleteProblemImageData() throws Exception {
