@@ -263,7 +263,6 @@ class ProblemControllerTest {
     void deleteProblems() throws Exception {
         // given
         ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
-                1L,
                 List.of(1L, 2L),
                 List.of(1L)
         );

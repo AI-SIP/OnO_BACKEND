@@ -6,7 +6,6 @@ import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
-import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
@@ -19,8 +18,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -29,7 +26,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -395,18 +391,11 @@ class ProblemServiceTest {
     @Test
     @DisplayName("특정 유저의 모든 문제 삭제하기")
     void deleteProblems_userId() {
-        // given
-        ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
-                userId,
-                null,
-                null
-        );
-
         // when
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when
-        problemService.deleteProblems(problemDeleteRequestDto);
+        problemService.deleteAllUserProblems(userId);
 
         // then
         verify(fileUploadService, times(2  * problemList.size())).deleteImageFileFromS3(anyString());
@@ -424,15 +413,9 @@ class ProblemServiceTest {
             problemIdList.add(problemId);
         }
 
-        ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
-                null,
-                problemIdList,
-                null
-        );
-
         // when
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
-        problemService.deleteProblems(problemDeleteRequestDto);
+        problemService.deleteProblemList(problemIdList);
 
         // then
         verify(fileUploadService, times(2 * problemIdList.size())).deleteImageFileFromS3(anyString());
@@ -445,15 +428,9 @@ class ProblemServiceTest {
         // given
         List<Long> folderIdList = List.of(folderList.get(0).getId());
 
-        ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
-                null,
-                null,
-                folderIdList
-        );
-
         // when
         int problemCount = problemRepository.findAllByFolderId(folderIdList.get(0)).size();
-        problemService.deleteProblems(problemDeleteRequestDto);
+        problemService.deleteAllByFolderIds(folderIdList);
 
         // then
         verify(fileUploadService, times(2 * problemCount)).deleteImageFileFromS3(anyString());

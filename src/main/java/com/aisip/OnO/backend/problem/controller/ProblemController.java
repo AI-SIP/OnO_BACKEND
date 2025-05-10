@@ -1,7 +1,6 @@
 package com.aisip.OnO.backend.problem.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
-import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
@@ -108,10 +107,20 @@ public class ProblemController {
     // ✅ 문제 삭제
     @DeleteMapping("")
     public CommonResponse<String> deleteProblems(
-            @RequestBody ProblemDeleteRequestDto deleteRequestDto
+            @RequestBody List<Long> problemIdList
     ) {
-        problemService.deleteProblems(deleteRequestDto);
+        problemService.deleteProblemList(problemIdList);
         return CommonResponse.success("문제 삭제가 완료되었습니다.");
+    }
+
+    @DeleteMapping("/all")
+    public CommonResponse<String> deleteUserProblems(
+
+    ) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        problemService.deleteAllUserProblems(userId);
+
+        return CommonResponse.success("유저의 모든 문제가 삭제되었습니다.");
     }
 
     // ✅ 문제 이미지 데이터 삭제
