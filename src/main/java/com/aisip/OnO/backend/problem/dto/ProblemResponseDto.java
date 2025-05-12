@@ -13,6 +13,8 @@ public record ProblemResponseDto (
 
     Long problemId,
 
+    Long folderId,
+
     String memo,
 
     String reference,
@@ -33,6 +35,7 @@ public record ProblemResponseDto (
 
         return ProblemResponseDto.builder()
                 .problemId(problem.getId())
+                .folderId(problem.getFolder().getId())
                 .memo(problem.getMemo())
                 .reference(problem.getReference())
                 .solvedAt(problem.getSolvedAt())

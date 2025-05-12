@@ -73,7 +73,12 @@ public class JwtTokenizer {
     }
 
     public void validateAccessToken(String token) {
-        Jwts.parserBuilder().setSigningKey(accessKey).build().parseClaimsJws(token);
+        try{
+            Jwts.parserBuilder().setSigningKey(accessKey).build().parseClaimsJws(token);
+        } catch (Exception e) {
+            log.error("엑세스 토큰 검증 실패: {} / token={}", e.getMessage(), token);
+            throw new ApplicationException(AuthErrorCase.ACCESS_TOKEN_EXPIRED);
+        }
     }
 
     public void validateRefreshToken(String token) {
