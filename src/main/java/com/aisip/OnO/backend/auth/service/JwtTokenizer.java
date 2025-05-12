@@ -8,6 +8,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -16,6 +17,7 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.Map;
 
+@Slf4j
 @Component
 public class JwtTokenizer {
 
@@ -78,6 +80,7 @@ public class JwtTokenizer {
         try {
             Jwts.parserBuilder().setSigningKey(refreshKey).build().parseClaimsJws(token);
         } catch (Exception e) {
+            log.error("리프레시 토큰 검증 실패: {} / token={}", e.getMessage(), token);
             throw new ApplicationException(AuthErrorCase.INVALID_REFRESH_TOKEN);
         }
     }

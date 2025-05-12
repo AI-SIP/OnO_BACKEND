@@ -38,6 +38,6 @@ public class UserAuthService {
     }
 
     public TokenResponseDto refreshAccessToken(TokenRequestDto tokenRequestDto) {
-        return jwtTokenService.refreshAccessToken(tokenRequestDto.getAccessToken());
+        return jwtTokenService.refreshAccessToken(tokenRequestDto.getRefreshToken());
     }
 }
