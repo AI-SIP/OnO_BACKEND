@@ -66,6 +66,7 @@ class ProblemControllerTest {
 
             ProblemResponseDto problemResponseDto = new ProblemResponseDto(
                     (long)i,
+                    -1L,
                     "memo" + i,
                     "reference" + i,
                     LocalDateTime.now(),
