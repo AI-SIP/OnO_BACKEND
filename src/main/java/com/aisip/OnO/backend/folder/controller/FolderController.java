@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.folder.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
+import com.aisip.OnO.backend.folder.dto.FolderDeleteRequestDto;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
 import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
@@ -72,8 +73,8 @@ public class FolderController {
 
     // ✅ 폴더 삭제 기능
     @DeleteMapping("")
-    public CommonResponse<String> deleteFoldersWithProblems(@RequestBody List<Long> folderIdList) {
-        folderService.deleteFoldersWithProblems(folderIdList);
+    public CommonResponse<String> deleteFoldersWithProblems(@RequestBody FolderDeleteRequestDto folderDeleteRequestDto) {
+        folderService.deleteFoldersWithProblems(folderDeleteRequestDto.deleteFolderIdList());
         return CommonResponse.success("폴더가 성공적으로 삭제되었습니다.");
     }
 

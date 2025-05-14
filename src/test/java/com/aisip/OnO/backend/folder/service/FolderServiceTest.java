@@ -244,7 +244,7 @@ class FolderServiceTest {
         //when
         FolderResponseDto rootFolder = folderService.createRootFolder(userId);
 
-        assertThat(rootFolder.folderName()).isEqualTo("메인");
+        assertThat(rootFolder.folderName()).isEqualTo("책장");
         assertThat(rootFolder.parentFolder()).isNull();
         assertThat(rootFolder.subFolderList()).isEmpty();
     }

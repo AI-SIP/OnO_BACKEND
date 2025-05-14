@@ -1,10 +1,7 @@
 package com.aisip.OnO.backend.practicenote.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteThumbnailResponseDto;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteUpdateDto;
+import com.aisip.OnO.backend.practicenote.dto.*;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -73,9 +70,9 @@ public class PracticeNoteController {
 
     // ✅ 복습 리스트 삭제 (204 No Content 반환)
     @DeleteMapping("")
-    public CommonResponse<String> deletePractices(@RequestParam("deletePracticeIdList") List<Long> deletePracticeIdList) {
+    public CommonResponse<String> deletePractices(@RequestBody PracticeNoteDeleteRequestDto practiceNoteDeleteRequestDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        practiceNoteService.deletePractices(deletePracticeIdList);
+        practiceNoteService.deletePractices(practiceNoteDeleteRequestDto.deletePracticeIdList());
 
         return CommonResponse.success("선택한 복습 노트가 삭제되었습니다.");
     }

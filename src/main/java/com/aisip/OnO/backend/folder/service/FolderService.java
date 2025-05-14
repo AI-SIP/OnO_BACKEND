@@ -75,7 +75,7 @@ public class FolderService {
 
     public FolderResponseDto createRootFolder(Long userId) {
         FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
-                "메인",
+                "책장",
                 null,
                 null
         );
