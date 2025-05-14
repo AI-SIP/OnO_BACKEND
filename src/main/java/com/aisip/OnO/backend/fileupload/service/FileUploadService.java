@@ -48,12 +48,15 @@ public class FileUploadService {
     }
 
     public void deleteImageFileFromS3(String imageUrl) {
+        /*
         String splitStr = ".com/";
         String fileName = imageUrl.substring(imageUrl.lastIndexOf(splitStr) + splitStr.length());
 
         log.info("file url : " + imageUrl + " has removed from S3");
 
         amazonS3Client.deleteObject(new DeleteObjectRequest(bucket, fileName));
+
+         */
     }
 
     private String createFileName(MultipartFile file) {
