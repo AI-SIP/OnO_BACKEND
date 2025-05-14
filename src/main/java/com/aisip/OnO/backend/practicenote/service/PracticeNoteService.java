@@ -55,6 +55,7 @@ public class PracticeNoteService {
     }
 
     public PracticeNoteDetailResponseDto findPracticeNoteDetail(Long practiceId){
+        log.info("find practiceId: {}", practiceId);
         PracticeNote practiceNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceId)
                 .orElseThrow(() -> new ApplicationException(PracticeNoteErrorCase.PRACTICE_NOTE_NOT_FOUND));
 
