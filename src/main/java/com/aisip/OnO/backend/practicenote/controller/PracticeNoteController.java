@@ -38,15 +38,24 @@ public class PracticeNoteController {
         return CommonResponse.success(practiceNoteService.findAllPracticeThumbnailsByUser(userId));
     }
 
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/all")
+    public CommonResponse<List<PracticeNoteDetailResponseDto>> getAllPractices() {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        log.info("userId: {} get all problem practice details", userId);
+
+        return CommonResponse.success(practiceNoteService.findAllPracticesByUser(userId));
+    }
+
     // ✅ 복습 리스트 등록
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("")
-    public CommonResponse<String> registerPractice(@RequestBody PracticeNoteRegisterDto practiceNoteRegisterDto) {
+    public CommonResponse<Long> registerPractice(@RequestBody PracticeNoteRegisterDto practiceNoteRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        practiceNoteService.registerPractice(practiceNoteRegisterDto, userId);
+        Long practiceNoteId = practiceNoteService.registerPractice(practiceNoteRegisterDto, userId);
         log.info("userId: {} registered problem practice", userId);
 
-        return CommonResponse.success("복습 노트가 성공적으로 생성되었습니다.");
+        return CommonResponse.success(practiceNoteId);
     }
 
     // ✅ 복습 완료 횟수 증가

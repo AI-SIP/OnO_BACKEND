@@ -41,7 +41,7 @@ public class PracticeNoteService {
                 .orElseThrow(() -> new ApplicationException(PracticeNoteErrorCase.PRACTICE_NOTE_NOT_FOUND));
     }
 
-    public void registerPractice(PracticeNoteRegisterDto practiceNoteRegisterDto, Long userId) {
+    public Long registerPractice(PracticeNoteRegisterDto practiceNoteRegisterDto, Long userId) {
 
         PracticeNote practiceNote = PracticeNote.from(practiceNoteRegisterDto, userId);
         practiceNoteRepository.save(practiceNote);
@@ -52,6 +52,7 @@ public class PracticeNoteService {
         }
 
         log.info("userId: {} register practiceId: {}", userId, practiceNote.getId());
+        return practiceNote.getId();
     }
 
     public PracticeNoteDetailResponseDto findPracticeNoteDetail(Long practiceId){
@@ -72,6 +73,20 @@ public class PracticeNoteService {
 
         return practiceNoteList.stream().map(
                 PracticeNoteThumbnailResponseDto::from
+        ).collect(Collectors.toList());
+    }
+
+    public List<PracticeNoteDetailResponseDto> findAllPracticesByUser(Long userId){
+        List<PracticeNote> practiceNoteList = practiceNoteRepository.findAllUserPracticeNotesWithDetails(userId);
+
+        log.info("userId: {} find all practice details", userId);
+
+        return practiceNoteList.stream().map(
+                practiceNote -> {
+                    List<Long> problemIdList = practiceNoteRepository.findProblemIdListByPracticeNoteId(practiceNote.getId());
+                    return PracticeNoteDetailResponseDto.from(practiceNote, problemIdList);
+                }
+
         ).collect(Collectors.toList());
     }
 

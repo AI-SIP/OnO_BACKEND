@@ -43,6 +43,16 @@ public class PracticeNoteRepositoryImpl implements PracticeNoteRepositoryCustom 
     }
 
     @Override
+    public List<PracticeNote> findAllUserPracticeNotesWithDetails(Long userId) {
+        return queryFactory
+                .selectFrom(practiceNote)
+                .join(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping).fetchJoin()
+                .where(practiceNote.userId.eq(userId))
+                .orderBy(practiceNote.id.asc())
+                .fetch();
+    }
+
+    @Override
     public List<Long> findProblemIdListByPracticeNoteId(Long practiceNoteId) {
         return queryFactory
                 .select(problemPracticeNoteMapping.problem.id)
