@@ -19,13 +19,13 @@ public record FolderResponseDto (
 
     List<FolderThumbnailResponseDto> subFolderList,
 
-    List<ProblemResponseDto> problemList,
+    List<Long> problemIdList,
 
     LocalDateTime createdAt,
 
     LocalDateTime updateAt
 ) {
-    public static FolderResponseDto from(Folder folder, List<ProblemResponseDto> problemResponseDtoList) {
+    public static FolderResponseDto from(Folder folder, List<Long> problemIdList) {
 
         FolderThumbnailResponseDto parentFolder = folder.getParentFolder() != null
                 ? FolderThumbnailResponseDto.from(folder.getParentFolder())
@@ -43,7 +43,7 @@ public record FolderResponseDto (
                 .folderName(folder.getName())
                 .parentFolder(parentFolder)
                 .subFolderList(subFolderList)
-                .problemList(problemResponseDtoList)
+                .problemIdList(problemIdList)
                 .createdAt(folder.getCreatedAt())
                 .updateAt(folder.getUpdatedAt())
                 .build();

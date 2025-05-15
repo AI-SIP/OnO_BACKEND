@@ -69,7 +69,7 @@ public class PracticeNoteIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        userId = 99L;
+        userId = 1L;
         // 인증 설정
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(

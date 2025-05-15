@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.aisip.OnO.backend.folder.entity.QFolder.folder;
+import static com.aisip.OnO.backend.problem.entity.QProblem.problem;
 
 public class FolderRepositoryImpl implements FolderRepositoryCustom {
 
@@ -48,6 +49,16 @@ public class FolderRepositoryImpl implements FolderRepositoryCustom {
                 .leftJoin(folder.parentFolder, new QFolder("parentFolder")).fetchJoin()
                 .where(folder.userId.eq(userId))
                 .orderBy(folder.id.asc())
+                .fetch();
+    }
+
+    @Override
+    public List<Long> findProblemIdsByFolder(Long folderId) {
+        return queryFactory
+                .select(problem.id)
+                .from(problem)
+                .where(problem.folder.id.eq(folderId))
+                .orderBy(problem.id.asc())
                 .fetch();
     }
 }

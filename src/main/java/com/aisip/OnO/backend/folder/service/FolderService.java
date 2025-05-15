@@ -31,8 +31,8 @@ public class FolderService {
         return folderRepository.findRootFolder(userId)
                 .map(rootFolder -> {
                     log.info("userId : {} find root folder id: {}", userId, rootFolder.getId());
-                    List<ProblemResponseDto> problemResponseDtoList = problemService.findFolderProblemList(rootFolder.getId());
-                    return FolderResponseDto.from(rootFolder, problemResponseDtoList);
+                    List<Long> problemIdList = folderRepository.findProblemIdsByFolder(rootFolder.getId());
+                    return FolderResponseDto.from(rootFolder, problemIdList);
                 })
                 .orElseGet(() -> {
                     log.info("userId : {} create root folder", userId);
@@ -44,8 +44,8 @@ public class FolderService {
         Folder folder = folderRepository.findFolderWithDetailsByFolderId(folderId)
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
 
-        List<ProblemResponseDto> problemResponseDtoList = problemService.findFolderProblemList(folderId);
-        return FolderResponseDto.from(folder, problemResponseDtoList);
+        List<Long> problemIdList = folderRepository.findProblemIdsByFolder(folder.getId());
+        return FolderResponseDto.from(folder, problemIdList);
     }
 
     public Folder findFolderEntity(Long folderId) {
@@ -68,8 +68,8 @@ public class FolderService {
         return folders.isEmpty()
                 ? List.of(findRootFolder(userId))
                 : folders.stream().map(folder -> {
-            List<ProblemResponseDto> problemResponseDtoList = problemService.findFolderProblemList(folder.getId());
-            return FolderResponseDto.from(folder, problemResponseDtoList);
+                    List<Long> problemIdList = folderRepository.findProblemIdsByFolder(folder.getId());
+                    return FolderResponseDto.from(folder, problemIdList);
                 }).toList();
     }
 
