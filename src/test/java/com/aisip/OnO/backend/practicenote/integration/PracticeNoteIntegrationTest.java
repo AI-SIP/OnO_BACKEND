@@ -1,9 +1,6 @@
 package com.aisip.OnO.backend.practicenote.integration;
 
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteThumbnailResponseDto;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteUpdateDto;
+import com.aisip.OnO.backend.practicenote.dto.*;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
@@ -192,20 +189,16 @@ public class PracticeNoteIntegrationTest {
         JsonNode dataNode = root.get("data");
         PracticeNoteDetailResponseDto dto = objectMapper.treeToValue(dataNode, PracticeNoteDetailResponseDto.class);
 
-        List<ProblemResponseDto> problemResponseDtoList = dto.problemResponseDtoList();
+        List<Long> problemIdList = dto.problemIdList();
 
         // then
         assertThat(dto.practiceNoteId()).isEqualTo(practiceNoteId);
         assertThat(dto.practiceTitle()).isEqualTo(practiceNote.getTitle());
         assertThat(dto.practiceCount()).isEqualTo(practiceNote.getPracticeCount());
-        assertThat(problemResponseDtoList.size()).isEqualTo(4);
+        assertThat(problemIdList.size()).isEqualTo(4);
 
-        for(int i = 0; i < dto.problemResponseDtoList().size(); i++){
-            assertThat(problemResponseDtoList.get(i).problemId()).isEqualTo(problemList.get(i).getId());
-            assertThat(problemResponseDtoList.get(i).memo()).isEqualTo(problemList.get(i).getMemo());
-            assertThat(problemResponseDtoList.get(i).reference()).isEqualTo(problemList.get(i).getReference());
-            assertThat(problemResponseDtoList.get(i).createdAt()).isEqualTo(problemList.get(i).getCreatedAt());
-            assertThat(problemResponseDtoList.get(i).imageUrlList().size()).isEqualTo(problemList.get(i).getProblemImageDataList().size());
+        for(int i = 0; i < dto.problemIdList().size(); i++){
+            assertThat(problemIdList.get(i)).isEqualTo(problemList.get(i).getId());
         }
     }
 
@@ -340,14 +333,16 @@ public class PracticeNoteIntegrationTest {
         // given
         List<Long> practiceIdList = List.of(practiceNoteList.get(0).getId(), practiceNoteList.get(1).getId());
 
+        PracticeNoteDeleteRequestDto practiceNoteDeleteRequestDto = new PracticeNoteDeleteRequestDto(
+                practiceIdList
+        );
+
         // when
         mockMvc.perform(delete("/api/practiceNotes")
-                        .param("deletePracticeIdList",
-                                practiceIdList.stream()
-                                        .map(String::valueOf)
-                                        .toArray(String[]::new)
-                        )
+                        .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(practiceNoteDeleteRequestDto))
+
                 )
                 .andExpect(status().isOk());
 

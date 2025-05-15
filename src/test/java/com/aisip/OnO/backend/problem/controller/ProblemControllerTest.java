@@ -66,6 +66,7 @@ class ProblemControllerTest {
 
             ProblemResponseDto problemResponseDto = new ProblemResponseDto(
                     (long)i,
+                    -1L,
                     "memo" + i,
                     "reference" + i,
                     LocalDateTime.now(),
@@ -255,27 +256,6 @@ class ProblemControllerTest {
                 .andExpect(jsonPath("$.data").value("문제가 수정되었습니다."));
 
         verify(problemService, times(1)).updateProblemFolder(any(), eq(1L));
-    }
-
-    @Test
-    @DisplayName("문제 삭제")
-    @WithMockCustomUser()
-    void deleteProblems() throws Exception {
-        // given
-        ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
-                1L,
-                List.of(1L, 2L),
-                List.of(1L)
-        );
-
-
-        // when & then
-        mockMvc.perform(delete("/api/problems")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
-                .andExpect(status().isOk());
-
-        Mockito.verify(problemService, Mockito.times(1)).deleteProblems(problemDeleteRequestDto);
     }
 
     @Test

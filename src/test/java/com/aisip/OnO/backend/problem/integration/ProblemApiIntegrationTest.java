@@ -6,7 +6,6 @@ import com.aisip.OnO.backend.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
-import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
@@ -15,7 +14,6 @@ import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,7 +28,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -409,17 +406,11 @@ class ProblemApiIntegrationTest {
     @WithMockCustomUser()
     void deleteProblemsWithUserId() throws Exception {
         // given
-        ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
-                userId,
-                null,
-                null
-        );
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problems")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problems/all")
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
         assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(0);
@@ -431,40 +422,12 @@ class ProblemApiIntegrationTest {
         // given
         List<Long> deleteProblemIdList = List.of(problemList.get(0).getId(), problemList.get(1).getId(), problemList.get(4).getId());
 
-        ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
-                null,
-                deleteProblemIdList,
-                null
-        );
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when & then
         mockMvc.perform(MockMvcRequestBuilders.delete("/api/problems")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
-                .andExpect(status().isOk());
-
-        assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(3L);
-    }
-
-    @Test
-    @DisplayName("문제 삭제 - folder id 사용")
-    @WithMockCustomUser()
-    void deleteProblemsWithFolderId() throws Exception {
-        // given
-        List<Long> folderIdList = List.of(folderList.get(0).getId());
-
-        ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(
-                null,
-                null,
-                folderIdList
-        );
-        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
-
-        // when & then
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problems")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
+                .content(objectMapper.writeValueAsString(deleteProblemIdList)))
                 .andExpect(status().isOk());
 
         assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(3L);

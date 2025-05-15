@@ -214,7 +214,7 @@ class PracticeNoteRepositoryTest {
         Long practiceId = practiceNote.getId();
 
         // when
-        Set<Long> problemIdList = practiceNoteRepository.findProblemIdListByPracticeNoteId(practiceId);
+        List<Long> problemIdList = practiceNoteRepository.findProblemIdListByPracticeNoteId(practiceId);
 
         // then
         assertThat(practiceNote.getProblemPracticeNoteMappingList().size()).isEqualTo(4);

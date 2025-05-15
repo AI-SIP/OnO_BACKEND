@@ -25,6 +25,7 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
     public Optional<Problem> findProblemWithImageData(Long problemId) {
         Problem problem = queryFactory
                 .selectFrom(QProblem.problem)
+                .leftJoin(QProblem.problem.folder).fetchJoin()
                 .leftJoin(QProblem.problem.problemImageDataList, problemImageData).fetchJoin()
                 .where(QProblem.problem.id.eq(problemId))
                 .fetchOne();
@@ -36,8 +37,10 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
     public List<Problem> findAllByUserId(Long userId) {
         return queryFactory
                 .selectFrom(problem)
+                .leftJoin(QProblem.problem.folder).fetchJoin()
                 .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
                 .where(problem.userId.eq(userId))
+                .orderBy(problem.id.asc())
                 .fetch();
     }
 
@@ -45,8 +48,10 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
     public List<Problem> findAllByFolderId(Long folderId) {
         return queryFactory
                 .selectFrom(problem)
+                .leftJoin(QProblem.problem.folder).fetchJoin()
                 .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
                 .where(problem.folder.id.eq(folderId))
+                .orderBy(problem.id.asc())
                 .fetch();
     }
 
@@ -54,7 +59,9 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
     public List<Problem> findAll() {
         return queryFactory
                 .selectFrom(problem)
+                .leftJoin(QProblem.problem.folder).fetchJoin()
                 .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
+                .orderBy(problem.id.asc())
                 .fetch();
     }
 
@@ -64,8 +71,10 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
                 .select(problem)
                 .from(problem)
                 .join(problemPracticeNoteMapping).on(problem.id.eq(problemPracticeNoteMapping.problem.id))
+                .leftJoin(QProblem.problem.folder).fetchJoin()
                 .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
                 .where(practiceNote.id.eq(practiceId))
+                .orderBy(problem.id.asc())
                 .fetch();
     }
 }

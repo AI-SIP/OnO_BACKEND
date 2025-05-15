@@ -2,7 +2,6 @@ package com.aisip.OnO.backend.folder.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.fileupload.service.FileUploadService;
-import com.aisip.OnO.backend.folder.dto.FolderDeleteRequestDto;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
 import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
@@ -158,8 +157,8 @@ class FolderServiceTest {
         assertThat(folderResponseDto.parentFolder()).isNull();
         assertThat(folderResponseDto.subFolderList().get(0).folderId()).isEqualTo(folderList.get(1).getId());
         assertThat(folderResponseDto.subFolderList().get(1).folderId()).isEqualTo(folderList.get(2).getId());
-        assertThat(folderResponseDto.problemList().get(0)).isEqualTo(problemList.get(0));
-        assertThat(folderResponseDto.problemList().get(1)).isEqualTo(problemList.get(1));
+        assertThat(folderResponseDto.problemIdList().get(0)).isEqualTo(problemList.get(0).problemId());
+        assertThat(folderResponseDto.problemIdList().get(1)).isEqualTo(problemList.get(1).problemId());
     }
 
     @Test
@@ -178,8 +177,8 @@ class FolderServiceTest {
         assertThat(folderResponseDto.parentFolder().folderId()).isEqualTo(parentFolderId);
         assertThat(folderResponseDto.subFolderList().get(0).folderId()).isEqualTo(folderList.get(3).getId());
         assertThat(folderResponseDto.subFolderList().get(1).folderId()).isEqualTo(folderList.get(4).getId());
-        assertThat(folderResponseDto.problemList().get(0)).isEqualTo(problemList.get(2));
-        assertThat(folderResponseDto.problemList().get(1)).isEqualTo(problemList.get(3));
+        assertThat(folderResponseDto.problemIdList().get(0)).isEqualTo(problemList.get(2).problemId());
+        assertThat(folderResponseDto.problemIdList().get(1)).isEqualTo(problemList.get(3).problemId());
     }
 
     @Test
@@ -245,7 +244,7 @@ class FolderServiceTest {
         //when
         FolderResponseDto rootFolder = folderService.createRootFolder(userId);
 
-        assertThat(rootFolder.folderName()).isEqualTo("메인");
+        assertThat(rootFolder.folderName()).isEqualTo("책장");
         assertThat(rootFolder.parentFolder()).isNull();
         assertThat(rootFolder.subFolderList()).isEmpty();
     }
@@ -365,15 +364,11 @@ class FolderServiceTest {
     @Test
     @DisplayName("폴더 삭제 테스트 - 루트 폴더 삭제 시 예외")
     void deleteFolders_rootFolder() {
-        // given
-        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
-                null,
-                List.of(folderList.get(0).getId())
-        );
+        List<Long> folderIdList = List.of(folderList.get(0).getId());
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when & then
-        assertThatThrownBy(() -> folderService.deleteFolders(folderDeleteRequestDto))
+        assertThatThrownBy(() -> folderService.deleteFoldersWithProblems(folderIdList))
                 .isInstanceOf(ApplicationException.class)
                 .hasMessageContaining(FolderErrorCase.ROOT_FOLDER_CANNOT_REMOVE.getMessage());
 
@@ -384,14 +379,11 @@ class FolderServiceTest {
     @DisplayName("폴더 삭제 테스트 - 루트 폴더 제외 최상위 폴더 모두 삭제")
     void deleteFolders_AllParentFolder() {
         // given
-        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
-                null,
-                List.of(folderList.get(1).getId(), folderList.get(2).getId())
-        );
+        List<Long> folderIdList = List.of(folderList.get(1).getId(), folderList.get(2).getId());
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when
-        folderService.deleteFolders(folderDeleteRequestDto);
+        folderService.deleteFoldersWithProblems(folderIdList);
 
         // then
         assertThat(folderRepository.findAllByUserId(userId).size()).isEqualTo(1);
@@ -401,14 +393,11 @@ class FolderServiceTest {
     @DisplayName("폴더 삭제 테스트 - 특정 중간 폴더 삭제")
     void deleteFolders_InternalFolder() {
         // given
-        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
-                null,
-                List.of(folderList.get(1).getId())
-        );
+        List<Long> folderIdList = List.of(folderList.get(1).getId());
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when
-        folderService.deleteFolders(folderDeleteRequestDto);
+        folderService.deleteFoldersWithProblems(folderIdList);
 
         // then
         assertThat(folderRepository.findAllByUserId(userId).size()).isEqualTo(3);
@@ -424,14 +413,10 @@ class FolderServiceTest {
     @DisplayName("폴더 삭제 테스트 - 유저의 모든 폴더 삭제")
     void deleteFolders_AllUserFolders() {
         // given
-        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
-                userId,
-                null
-        );
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when
-        folderService.deleteFolders(folderDeleteRequestDto);
+        folderService.deleteAllUserFolders(userId);
 
         // then
         assertThat(folderRepository.findAllByUserId(userId)).isEmpty();

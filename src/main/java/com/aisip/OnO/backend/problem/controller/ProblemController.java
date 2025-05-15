@@ -62,11 +62,11 @@ public class ProblemController {
 
     // ✅ 문제 등록
     @PostMapping("")
-    public CommonResponse<String> registerProblem(@RequestBody ProblemRegisterDto problemRegisterDto) {
+    public CommonResponse<Long> registerProblem(@RequestBody ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        problemService.registerProblem(problemRegisterDto, userId);
+        Long problemId = problemService.registerProblem(problemRegisterDto, userId);
 
-        return CommonResponse.success("문제가 등록되었습니다.");
+        return CommonResponse.success(problemId);
     }
 
     // ✅ 이미지 데이터 등록
@@ -108,10 +108,19 @@ public class ProblemController {
     // ✅ 문제 삭제
     @DeleteMapping("")
     public CommonResponse<String> deleteProblems(
-            @RequestBody ProblemDeleteRequestDto deleteRequestDto
-    ) {
-        problemService.deleteProblems(deleteRequestDto);
+            @RequestBody ProblemDeleteRequestDto problemDeleteRequestDto
+            ) {
+        problemService.deleteProblemList(problemDeleteRequestDto.deleteProblemIdList());
         return CommonResponse.success("문제 삭제가 완료되었습니다.");
+    }
+
+    @DeleteMapping("/all")
+    public CommonResponse<String> deleteUserProblems(
+    ) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        problemService.deleteAllUserProblems(userId);
+
+        return CommonResponse.success("유저의 모든 문제가 삭제되었습니다.");
     }
 
     // ✅ 문제 이미지 데이터 삭제

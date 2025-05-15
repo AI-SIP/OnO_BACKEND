@@ -1,7 +1,6 @@
 package com.aisip.OnO.backend.folder.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
-import com.aisip.OnO.backend.folder.dto.FolderDeleteRequestDto;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
 import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
@@ -32,8 +31,8 @@ public class FolderService {
         return folderRepository.findRootFolder(userId)
                 .map(rootFolder -> {
                     log.info("userId : {} find root folder id: {}", userId, rootFolder.getId());
-                    List<ProblemResponseDto> problemResponseDtoList = problemService.findFolderProblemList(rootFolder.getId());
-                    return FolderResponseDto.from(rootFolder, problemResponseDtoList);
+                    List<Long> problemIdList = folderRepository.findProblemIdsByFolder(rootFolder.getId());
+                    return FolderResponseDto.from(rootFolder, problemIdList);
                 })
                 .orElseGet(() -> {
                     log.info("userId : {} create root folder", userId);
@@ -45,8 +44,8 @@ public class FolderService {
         Folder folder = folderRepository.findFolderWithDetailsByFolderId(folderId)
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
 
-        List<ProblemResponseDto> problemResponseDtoList = problemService.findFolderProblemList(folderId);
-        return FolderResponseDto.from(folder, problemResponseDtoList);
+        List<Long> problemIdList = folderRepository.findProblemIdsByFolder(folder.getId());
+        return FolderResponseDto.from(folder, problemIdList);
     }
 
     public Folder findFolderEntity(Long folderId) {
@@ -69,14 +68,14 @@ public class FolderService {
         return folders.isEmpty()
                 ? List.of(findRootFolder(userId))
                 : folders.stream().map(folder -> {
-            List<ProblemResponseDto> problemResponseDtoList = problemService.findFolderProblemList(folder.getId());
-            return FolderResponseDto.from(folder, problemResponseDtoList);
+                    List<Long> problemIdList = folderRepository.findProblemIdsByFolder(folder.getId());
+                    return FolderResponseDto.from(folder, problemIdList);
                 }).toList();
     }
 
     public FolderResponseDto createRootFolder(Long userId) {
         FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
-                "메인",
+                "책장",
                 null,
                 null
         );
@@ -88,7 +87,7 @@ public class FolderService {
         return FolderResponseDto.from(rootFolder, List.of());
     }
 
-    public void createFolder(FolderRegisterDto folderRegisterDto, Long userId) {
+    public Long createFolder(FolderRegisterDto folderRegisterDto, Long userId) {
         Folder folder = Folder.from(folderRegisterDto, userId);
         Folder parentFolder = findFolderEntity(folderRegisterDto.parentFolderId());
 
@@ -96,6 +95,7 @@ public class FolderService {
         folderRepository.save(folder);
 
         log.info("userId : {} create folder id: {}", userId, folder.getId());
+        return folder.getId();
     }
 
     public void updateFolder(FolderRegisterDto folderRegisterDto, Long userId) {
@@ -109,21 +109,6 @@ public class FolderService {
         }
 
         log.info("userId : {} update folder id: {}", userId, folder.getId());
-    }
-
-    public void deleteFolders(FolderDeleteRequestDto folderDeleteRequestDto) {
-        if (folderDeleteRequestDto.userId() != null) {
-            deleteAllUserFoldersWithProblems(folderDeleteRequestDto.userId());
-
-            log.info("userId : {} delete all user folder With Problems", folderDeleteRequestDto.userId());
-            return;
-        }
-
-        if (folderDeleteRequestDto.folderIdList() != null) {
-            deleteFoldersWithProblems(folderDeleteRequestDto.folderIdList());
-
-            log.info("delete folder With Problems, folder id list: " + folderDeleteRequestDto.folderIdList());
-        }
     }
 
     public void deleteFoldersWithProblems(List<Long> folderIds) {

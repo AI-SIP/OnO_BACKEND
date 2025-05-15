@@ -14,7 +14,9 @@ public enum AuthErrorCase implements ErrorCase {
 
     INVALID_AUTHORITY(400, 1003, "유효하지 않은 권한입니다."),
 
-    REFRESH_TOKEN_NOT_EQUAL(400, 1004, "리프레시 토큰이 일치하지 않습니다.");
+    REFRESH_TOKEN_NOT_EQUAL(400, 1004, "리프레시 토큰이 일치하지 않습니다."),
+
+    ACCESS_TOKEN_EXPIRED(400, 1005, "엑세스 토큰이 만료되었습니다.");
 
     private final Integer httpStatusCode;
     private final Integer errorCode;

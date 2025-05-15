@@ -41,7 +41,7 @@ public class PracticeNoteService {
                 .orElseThrow(() -> new ApplicationException(PracticeNoteErrorCase.PRACTICE_NOTE_NOT_FOUND));
     }
 
-    public void registerPractice(PracticeNoteRegisterDto practiceNoteRegisterDto, Long userId) {
+    public Long registerPractice(PracticeNoteRegisterDto practiceNoteRegisterDto, Long userId) {
 
         PracticeNote practiceNote = PracticeNote.from(practiceNoteRegisterDto, userId);
         practiceNoteRepository.save(practiceNote);
@@ -52,19 +52,18 @@ public class PracticeNoteService {
         }
 
         log.info("userId: {} register practiceId: {}", userId, practiceNote.getId());
+        return practiceNote.getId();
     }
 
     public PracticeNoteDetailResponseDto findPracticeNoteDetail(Long practiceId){
+        log.info("find practiceId: {}", practiceId);
         PracticeNote practiceNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceId)
                 .orElseThrow(() -> new ApplicationException(PracticeNoteErrorCase.PRACTICE_NOTE_NOT_FOUND));
 
-        List<Problem> problemList = problemRepository.findAllProblemsByPracticeId(practiceId);
-        List<ProblemResponseDto> problemResponseDtoList = problemList.stream().map(
-                ProblemResponseDto::from
-        ).toList();
+        List<Long> problemIdList = practiceNoteRepository.findProblemIdListByPracticeNoteId(practiceId);
 
         log.info("find detail for practiceId: {}", practiceNote.getId());
-        return PracticeNoteDetailResponseDto.from(practiceNote, problemResponseDtoList);
+        return PracticeNoteDetailResponseDto.from(practiceNote, problemIdList);
     }
 
     public List<PracticeNoteThumbnailResponseDto> findAllPracticeThumbnailsByUser(Long userId){
@@ -74,6 +73,20 @@ public class PracticeNoteService {
 
         return practiceNoteList.stream().map(
                 PracticeNoteThumbnailResponseDto::from
+        ).collect(Collectors.toList());
+    }
+
+    public List<PracticeNoteDetailResponseDto> findAllPracticesByUser(Long userId){
+        List<PracticeNote> practiceNoteList = practiceNoteRepository.findAllUserPracticeNotesWithDetails(userId);
+
+        log.info("userId: {} find all practice details", userId);
+
+        return practiceNoteList.stream().map(
+                practiceNote -> {
+                    List<Long> problemIdList = practiceNoteRepository.findProblemIdListByPracticeNoteId(practiceNote.getId());
+                    return PracticeNoteDetailResponseDto.from(practiceNote, problemIdList);
+                }
+
         ).collect(Collectors.toList());
     }
 
@@ -142,9 +155,7 @@ public class PracticeNoteService {
 
    private void deletePracticeNoteMapping(PracticeNote practiceNote, Long problemId) {
         Optional<ProblemPracticeNoteMapping> optionalProblemPracticeNoteMapping = problemPracticeNoteMappingRepository.findProblemPracticeNoteMappingByProblemIdAndPracticeNoteId(problemId, practiceNote.getId());
-        if (optionalProblemPracticeNoteMapping.isPresent()) {
-            optionalProblemPracticeNoteMapping.get().removeMappingFromProblemAndPractice();
-        }
+       optionalProblemPracticeNoteMapping.ifPresent(ProblemPracticeNoteMapping::removeMappingFromProblemAndPractice);
 
         log.info("problemId: {} has deleted from practiceId: {}", problemId, practiceNote.getId());
     }

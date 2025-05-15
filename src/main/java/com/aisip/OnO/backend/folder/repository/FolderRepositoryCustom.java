@@ -12,4 +12,6 @@ public interface FolderRepositoryCustom {
     Optional<Folder> findFolderWithDetailsByFolderId(Long folderId);
 
     List<Folder> findAllFoldersWithDetailsByUserId(Long userId);
+
+    List<Long> findProblemIdsByFolder(Long folderId);
 }

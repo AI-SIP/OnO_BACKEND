@@ -2,7 +2,6 @@ package com.aisip.OnO.backend.problem.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.fileupload.service.FileUploadService;
-import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
@@ -95,7 +94,7 @@ public class ProblemService {
         return problemRepository.countByUserId(userId);
     }
 
-    public void registerProblem(ProblemRegisterDto problemRegisterDto, Long userId) {
+    public Long registerProblem(ProblemRegisterDto problemRegisterDto, Long userId) {
 
         Folder folder = folderRepository.findById(problemRegisterDto.folderId())
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
@@ -112,6 +111,8 @@ public class ProblemService {
                 });
 
         log.info("userId: {} register problemId: {}", userId, problem.getId());
+
+        return problem.getId();
     }
 
     public void registerProblemImageData(ProblemImageDataRegisterDto problemImageDataRegisterDto, Long userId) {
@@ -178,31 +179,6 @@ public class ProblemService {
         problemRepository.deleteById(problemId);
 
         log.info("problemId: {} has deleted", problemId);
-    }
-
-    @Transactional
-    public void deleteProblems(ProblemDeleteRequestDto deleteRequestDto) {
-        Long userId = deleteRequestDto.userId();
-        List<Long> problemIdList = deleteRequestDto.problemIdList();
-        List<Long> folderIdList = deleteRequestDto.folderIdList();
-
-        if (userId != null) {
-            // 유저 ID가 있으면 해당 유저의 모든 문제 삭제
-            deleteAllUserProblems(userId);
-            log.info("userId: {} delete problems", userId);
-        }
-
-        if (problemIdList != null && !problemIdList.isEmpty()) {
-            // 특정 problemId 리스트에 해당하는 문제 삭제
-            deleteProblemList(problemIdList);
-        }
-
-        if (folderIdList != null && !folderIdList.isEmpty()) {
-            // 특정 folderId 리스트에 포함된 모든 문제 삭제
-            deleteAllByFolderIds(folderIdList);
-        }
-
-        log.info("userId: {} delete problems by id list", userId);
     }
 
     public void deleteProblemImageData(String imageUrl) {
