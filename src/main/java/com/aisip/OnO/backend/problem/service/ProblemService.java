@@ -94,7 +94,7 @@ public class ProblemService {
         return problemRepository.countByUserId(userId);
     }
 
-    public void registerProblem(ProblemRegisterDto problemRegisterDto, Long userId) {
+    public Long registerProblem(ProblemRegisterDto problemRegisterDto, Long userId) {
 
         Folder folder = folderRepository.findById(problemRegisterDto.folderId())
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
@@ -111,6 +111,8 @@ public class ProblemService {
                 });
 
         log.info("userId: {} register problemId: {}", userId, problem.getId());
+
+        return problem.getId();
     }
 
     public void registerProblemImageData(ProblemImageDataRegisterDto problemImageDataRegisterDto, Long userId) {

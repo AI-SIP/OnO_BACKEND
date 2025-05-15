@@ -62,11 +62,11 @@ public class ProblemController {
 
     // ✅ 문제 등록
     @PostMapping("")
-    public CommonResponse<String> registerProblem(@RequestBody ProblemRegisterDto problemRegisterDto) {
+    public CommonResponse<Long> registerProblem(@RequestBody ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        problemService.registerProblem(problemRegisterDto, userId);
+        Long problemId = problemService.registerProblem(problemRegisterDto, userId);
 
-        return CommonResponse.success("문제가 등록되었습니다.");
+        return CommonResponse.success(problemId);
     }
 
     // ✅ 이미지 데이터 등록
