@@ -190,8 +190,8 @@ class PracticeNoteServiceTest {
         assertThat(practiceNote.getId()).isEqualTo(practiceNoteDetailResponseDto.practiceNoteId());
         assertThat(practiceNote.getTitle()).isEqualTo(practiceNoteDetailResponseDto.practiceTitle());
         for(int i = 0; i < 4; i++){
-            System.out.println("===== imageDataSize: " + practiceNoteDetailResponseDto.problemResponseDtoList().get(i).imageUrlList().size() + "=====");
-            assertThat(problemList.get(i).getId()).isEqualTo(practiceNoteDetailResponseDto.problemResponseDtoList().get(i).problemId());
+            //System.out.println("===== imageDataSize: " + practiceNoteDetailResponseDto.problemResponseDtoList().get(i).imageUrlList().size() + "=====");
+            assertThat(problemList.get(i).getId()).isEqualTo(practiceNoteDetailResponseDto.problemIdList().get(i));
         }
     }
 

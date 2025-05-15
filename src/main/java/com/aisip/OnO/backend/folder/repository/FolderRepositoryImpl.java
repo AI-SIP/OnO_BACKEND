@@ -47,6 +47,7 @@ public class FolderRepositoryImpl implements FolderRepositoryCustom {
                 .leftJoin(folder.subFolderList, new QFolder("subFolder")).fetchJoin()
                 .leftJoin(folder.parentFolder, new QFolder("parentFolder")).fetchJoin()
                 .where(folder.userId.eq(userId))
+                .orderBy(folder.id.asc())
                 .fetch();
     }
 }

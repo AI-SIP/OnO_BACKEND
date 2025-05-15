@@ -36,18 +36,21 @@ public class PracticeNoteRepositoryImpl implements PracticeNoteRepositoryCustom 
                 .selectFrom(practiceNote)
                 .join(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping).fetchJoin()
                 .where(practiceNote.id.eq(practiceNoteId))
+                .orderBy(practiceNote.id.asc())
                 .fetchOne();
 
         return Optional.ofNullable(result);
     }
 
     @Override
-    public Set<Long> findProblemIdListByPracticeNoteId(Long practiceNoteId) {
-        return new HashSet<>(queryFactory
+    public List<Long> findProblemIdListByPracticeNoteId(Long practiceNoteId) {
+        return queryFactory
                 .select(problemPracticeNoteMapping.problem.id)
+                .distinct()  // 중복 제거
                 .from(problemPracticeNoteMapping)
                 .where(problemPracticeNoteMapping.practiceNote.id.eq(practiceNoteId))
-                .fetch());
+                .orderBy(problemPracticeNoteMapping.problem.id.asc())
+                .fetch();
     }
 
     @Override

@@ -40,6 +40,7 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
                 .leftJoin(QProblem.problem.folder).fetchJoin()
                 .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
                 .where(problem.userId.eq(userId))
+                .orderBy(problem.id.asc())
                 .fetch();
     }
 
@@ -50,6 +51,7 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
                 .leftJoin(QProblem.problem.folder).fetchJoin()
                 .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
                 .where(problem.folder.id.eq(folderId))
+                .orderBy(problem.id.asc())
                 .fetch();
     }
 
@@ -59,6 +61,7 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
                 .selectFrom(problem)
                 .leftJoin(QProblem.problem.folder).fetchJoin()
                 .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
+                .orderBy(problem.id.asc())
                 .fetch();
     }
 
@@ -71,6 +74,7 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
                 .leftJoin(QProblem.problem.folder).fetchJoin()
                 .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
                 .where(practiceNote.id.eq(practiceId))
+                .orderBy(problem.id.asc())
                 .fetch();
     }
 }

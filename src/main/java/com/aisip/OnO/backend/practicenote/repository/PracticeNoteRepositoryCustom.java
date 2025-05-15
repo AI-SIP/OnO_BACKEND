@@ -12,7 +12,7 @@ public interface PracticeNoteRepositoryCustom {
 
     Optional<PracticeNote> findPracticeNoteWithDetails(Long practiceId);
 
-    Set<Long> findProblemIdListByPracticeNoteId(Long practiceNoteId);
+    List<Long> findProblemIdListByPracticeNoteId(Long practiceNoteId);
 
     void deleteProblemFromPractice(Long practiceId, Long problemId);
 
