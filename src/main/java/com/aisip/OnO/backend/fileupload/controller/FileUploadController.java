@@ -20,14 +20,14 @@ public class FileUploadController {
     private final FileUploadService fileUploadService;
 
     @PostMapping("/image")
-    public CommonResponse<Map<String, Object>> uploadImageFile(
+    public CommonResponse<String> uploadImageFile(
             Authentication authentication,
             @RequestParam("image") MultipartFile file
     ) {
         //Long userId = (Long) authentication.getPrincipal();
         String imageUrl = fileUploadService.uploadFileToS3(file);
 
-        return CommonResponse.success(Map.of("imageUrl", imageUrl));
+        return CommonResponse.success(imageUrl);
     }
 
     @PostMapping("/images")
