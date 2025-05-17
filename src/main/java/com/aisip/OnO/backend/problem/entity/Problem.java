@@ -62,6 +62,10 @@ public class Problem extends BaseEntity {
     }
 
     public void updateProblem(ProblemRegisterDto problemRegisterDto) {
+        if (problemRegisterDto.solvedAt() != null) {
+            this.solvedAt = problemRegisterDto.solvedAt();
+        }
+
         if (problemRegisterDto.memo() != null && !problemRegisterDto.memo().isBlank()) {
             this.memo = problemRegisterDto.memo();
         }
