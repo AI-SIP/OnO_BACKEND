@@ -7,5 +7,7 @@ public record PracticeNoteRegisterDto (
 
         String practiceTitle,
 
-        List<Long> problemIdList
+        List<Long> problemIdList,
+
+        PracticeNotificationRegisterDto practiceNotification
 ){}
