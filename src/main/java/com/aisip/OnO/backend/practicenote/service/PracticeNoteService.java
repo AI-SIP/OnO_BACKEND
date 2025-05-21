@@ -6,6 +6,7 @@ import com.aisip.OnO.backend.practicenote.dto.PracticeNoteThumbnailResponseDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteUpdateDto;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
+import com.aisip.OnO.backend.practicenote.entity.PracticeNotification;
 import com.aisip.OnO.backend.practicenote.exception.PracticeNoteErrorCase;
 import com.aisip.OnO.backend.practicenote.repository.ProblemPracticeNoteMappingRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
@@ -102,6 +103,8 @@ public class PracticeNoteService {
         PracticeNote practiceNote = getPracticeEntity(practiceId);
 
         practiceNote.updateTitle(practiceNoteUpdateDto.practiceTitle());
+
+        practiceNote.updateNotification(PracticeNotification.from(practiceNoteUpdateDto.practiceNotification()));
 
         if (!practiceNoteUpdateDto.addProblemIdList().isEmpty()) {
             practiceNoteUpdateDto.addProblemIdList().forEach(problemId -> {

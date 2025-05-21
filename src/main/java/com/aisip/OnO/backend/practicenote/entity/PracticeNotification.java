@@ -22,6 +22,10 @@ public class PracticeNotification {
     }
 
     public static PracticeNotification from(PracticeNotificationRegisterDto practiceNotificationRegisterDto) {
+        if(practiceNotificationRegisterDto == null) {
+            return null;
+        }
+
         return new PracticeNotification(
                 practiceNotificationRegisterDto.intervalDays(),
                 practiceNotificationRegisterDto.hour(),

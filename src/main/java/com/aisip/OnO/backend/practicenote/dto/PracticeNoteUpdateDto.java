@@ -9,5 +9,7 @@ public record PracticeNoteUpdateDto (
 
         List<Long> addProblemIdList,
 
-        List<Long> removeProblemIdList
+        List<Long> removeProblemIdList,
+
+        PracticeNotificationRegisterDto practiceNotification
 ){}
