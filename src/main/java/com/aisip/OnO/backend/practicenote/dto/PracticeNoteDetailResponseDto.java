@@ -16,6 +16,8 @@ public record PracticeNoteDetailResponseDto(
 
         List<Long> problemIdList,
 
+        PracticeNotificationResponseDto practiceNotification,
+
         LocalDateTime lastSolvedAt,
 
         LocalDateTime createdAt,
@@ -23,11 +25,20 @@ public record PracticeNoteDetailResponseDto(
         LocalDateTime updatedAt
 ) {
     public static PracticeNoteDetailResponseDto from(PracticeNote practiceNote, List<Long> problemIdList) {
+
+        PracticeNotificationResponseDto notificationDto = null;
+        if (practiceNote.getPracticeNotification() != null) {
+            notificationDto = PracticeNotificationResponseDto.from(
+                    practiceNote.getPracticeNotification()
+            );
+        }
+
         return PracticeNoteDetailResponseDto.builder()
                 .practiceNoteId(practiceNote.getId())
                 .practiceTitle(practiceNote.getTitle())
                 .practiceCount(practiceNote.getPracticeCount())
                 .problemIdList(problemIdList)
+                .practiceNotification(notificationDto)
                 .lastSolvedAt(practiceNote.getLastSolvedAt())
                 .createdAt(practiceNote.getCreatedAt())
                 .updatedAt(practiceNote.getUpdatedAt())
