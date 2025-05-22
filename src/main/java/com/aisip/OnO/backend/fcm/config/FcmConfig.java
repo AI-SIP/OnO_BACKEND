@@ -1,4 +1,4 @@
-package com.aisip.OnO.backend.common.config;
+package com.aisip.OnO.backend.fcm.config;
 
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.FirebaseApp;
