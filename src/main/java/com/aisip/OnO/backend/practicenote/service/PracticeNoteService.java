@@ -1,6 +1,8 @@
 package com.aisip.OnO.backend.practicenote.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.fcm.dto.NotificationRequestDto;
+import com.aisip.OnO.backend.fcm.service.FcmService;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteThumbnailResponseDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteUpdateDto;
@@ -21,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -35,6 +38,8 @@ public class PracticeNoteService {
     private final PracticeNoteRepository practiceNoteRepository;
 
     private final ProblemPracticeNoteMappingRepository problemPracticeNoteMappingRepository;
+
+    private final FcmService fcmService;
 
     private PracticeNote getPracticeEntity(Long practiceId){
 
