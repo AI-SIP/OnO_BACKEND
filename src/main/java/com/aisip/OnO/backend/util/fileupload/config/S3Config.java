@@ -1,4 +1,4 @@
-package com.aisip.OnO.backend.fileupload.config;
+package com.aisip.OnO.backend.util.fileupload.config;
 
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;

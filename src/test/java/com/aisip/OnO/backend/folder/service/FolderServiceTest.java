@@ -1,7 +1,7 @@
 package com.aisip.OnO.backend.folder.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
-import com.aisip.OnO.backend.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
 import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;

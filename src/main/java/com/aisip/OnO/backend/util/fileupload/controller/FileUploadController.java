@@ -1,7 +1,7 @@
-package com.aisip.OnO.backend.fileupload.controller;
+package com.aisip.OnO.backend.util.fileupload.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
-import com.aisip.OnO.backend.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @RestController

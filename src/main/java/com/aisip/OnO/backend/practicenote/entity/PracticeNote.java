@@ -33,6 +33,9 @@ public class PracticeNote extends BaseEntity {
 
     private LocalDateTime lastSolvedAt;
 
+    @Embedded
+    private PracticeNotification practiceNotification;
+
     @OneToMany(mappedBy = "practiceNote", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProblemPracticeNoteMapping> problemPracticeNoteMappingList = new ArrayList<>();
 
@@ -42,6 +45,7 @@ public class PracticeNote extends BaseEntity {
                 .title(practiceNoteRegisterDto.practiceTitle())
                 .practiceCount(0L)
                 .lastSolvedAt(null)
+                .practiceNotification(PracticeNotification.from(practiceNoteRegisterDto.practiceNotification()))
                 .problemPracticeNoteMappingList(new ArrayList<>())
                 .build();
     }
@@ -55,6 +59,10 @@ public class PracticeNote extends BaseEntity {
     public void updatePracticeNoteCount() {
         this.practiceCount += 1;
         this.lastSolvedAt = LocalDateTime.now();
+    }
+
+    public void updateNotification(PracticeNotification practiceNotification) {
+        this.practiceNotification = practiceNotification;
     }
 
     public void addPracticeMappingToPracticeNote(ProblemPracticeNoteMapping problemPracticeNoteMapping) {

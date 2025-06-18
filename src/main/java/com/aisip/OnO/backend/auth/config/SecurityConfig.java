@@ -67,6 +67,7 @@ public class SecurityConfig {
                                 .requestMatchers("/", "/robots.txt", "/home","/images/**", "/login", "/css/**", "/js/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                                 .requestMatchers("/api/auth/**").permitAll()
                                 .requestMatchers("/admin/**").hasRole("ADMIN")
+                                .requestMatchers("/api/fcm/**").hasAnyRole("GUEST", "MEMBER", "ADMIN")
                                 .requestMatchers("/api/users/**").hasAnyRole("GUEST", "MEMBER", "ADMIN")
                                 .requestMatchers("/api/problems/**").hasAnyRole("GUEST", "MEMBER", "ADMIN")
                                 .requestMatchers("/api/folders/**").hasAnyRole("GUEST", "MEMBER", "ADMIN")

@@ -1,5 +1,8 @@
 package com.aisip.OnO.backend.user.service;
 
+import com.aisip.OnO.backend.folder.service.FolderService;
+import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
+import com.aisip.OnO.backend.problem.service.ProblemService;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.entity.User;
@@ -21,6 +24,12 @@ import java.util.stream.Collectors;
 public class UserService {
 
     private final UserRepository userRepository;
+
+    private final FolderService folderService;
+
+    private final ProblemService problemService;
+
+    private final PracticeNoteService practiceNoteService;
 
     private User findUserEntity(Long userId){
         return userRepository.findById(userId)
@@ -85,6 +94,10 @@ public class UserService {
     }
 
     public void deleteUserById(Long userId) {
+        practiceNoteService.deleteAllPracticesByUser(userId);
+        problemService.deleteAllUserProblems(userId);
+        folderService.deleteAllUserFolders(userId);
+
         userRepository.deleteById(userId);
         userRepository.flush();
 

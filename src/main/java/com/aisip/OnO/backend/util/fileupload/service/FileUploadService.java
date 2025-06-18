@@ -1,17 +1,12 @@
-package com.aisip.OnO.backend.fileupload.service;
+package com.aisip.OnO.backend.util.fileupload.service;
 
-import com.aisip.OnO.backend.common.exception.ApplicationException;
-import com.aisip.OnO.backend.fileupload.exception.FileUploadErrorCase;
 import com.amazonaws.services.s3.AmazonS3Client;
-import com.amazonaws.services.s3.model.DeleteObjectRequest;
-import com.amazonaws.services.s3.model.ObjectMetadata;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;

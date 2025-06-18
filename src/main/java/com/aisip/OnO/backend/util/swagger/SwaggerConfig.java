@@ -1,4 +1,4 @@
-package com.aisip.OnO.backend.common.config;
+package com.aisip.OnO.backend.util.swagger;
 
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;

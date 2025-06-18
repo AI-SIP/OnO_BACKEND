@@ -1,6 +1,6 @@
 package com.aisip.OnO.backend.folder.integration;
 
-import com.aisip.OnO.backend.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
@@ -34,8 +34,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doNothing;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 

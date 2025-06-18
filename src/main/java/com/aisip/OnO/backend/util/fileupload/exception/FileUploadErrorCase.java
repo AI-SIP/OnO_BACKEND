@@ -1,4 +1,4 @@
-package com.aisip.OnO.backend.fileupload.exception;
+package com.aisip.OnO.backend.util.fileupload.exception;
 
 import com.aisip.OnO.backend.common.exception.ErrorCase;
 import lombok.Getter;

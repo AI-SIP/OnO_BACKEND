@@ -2,7 +2,7 @@ package com.aisip.OnO.backend.problem.integration;
 
 
 import com.aisip.OnO.backend.auth.WithMockCustomUser;
-import com.aisip.OnO.backend.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;

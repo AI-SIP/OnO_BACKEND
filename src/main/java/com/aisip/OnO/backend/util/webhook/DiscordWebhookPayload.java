@@ -1,4 +1,4 @@
-package com.aisip.OnO.backend.common.webhook;
+package com.aisip.OnO.backend.util.webhook;
 
 import java.util.List;
 

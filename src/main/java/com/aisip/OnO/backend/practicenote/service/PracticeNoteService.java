@@ -1,14 +1,11 @@
 package com.aisip.OnO.backend.practicenote.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteThumbnailResponseDto;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteUpdateDto;
+import com.aisip.OnO.backend.practicenote.dto.*;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
+import com.aisip.OnO.backend.practicenote.entity.PracticeNotification;
 import com.aisip.OnO.backend.practicenote.exception.PracticeNoteErrorCase;
 import com.aisip.OnO.backend.practicenote.repository.ProblemPracticeNoteMappingRepository;
-import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
@@ -35,6 +32,8 @@ public class PracticeNoteService {
 
     private final ProblemPracticeNoteMappingRepository problemPracticeNoteMappingRepository;
 
+    private final PracticeNotificationScheduler practiceNotificationScheduler;
+
     private PracticeNote getPracticeEntity(Long practiceId){
 
         return practiceNoteRepository.findById(practiceId)
@@ -51,8 +50,16 @@ public class PracticeNoteService {
                     addProblemToPractice(practiceNote, problemId));
         }
 
+        if(practiceNoteRegisterDto.practiceNotification() != null) {
+            registerPracticeNotification(userId, practiceNote.getId(), practiceNote.getTitle(), practiceNoteRegisterDto.practiceNotification());
+        }
+
         log.info("userId: {} register practiceId: {}", userId, practiceNote.getId());
         return practiceNote.getId();
+    }
+
+    public void registerPracticeNotification(Long userId, Long practiceId, String practiceTitle, PracticeNotificationRegisterDto notificationRegisterDto) {
+        practiceNotificationScheduler.schedulePracticeNotification(userId, practiceId, practiceTitle, notificationRegisterDto);
     }
 
     public PracticeNoteDetailResponseDto findPracticeNoteDetail(Long practiceId){
@@ -97,11 +104,13 @@ public class PracticeNoteService {
         log.info("practiceId: {} count has updated", practiceId);
     }
 
-    public void updatePracticeInfo(PracticeNoteUpdateDto practiceNoteUpdateDto) {
+    public void updatePracticeInfo(Long userId, PracticeNoteUpdateDto practiceNoteUpdateDto) {
         Long practiceId = practiceNoteUpdateDto.practiceNoteId();
         PracticeNote practiceNote = getPracticeEntity(practiceId);
 
         practiceNote.updateTitle(practiceNoteUpdateDto.practiceTitle());
+
+        practiceNote.updateNotification(PracticeNotification.from(practiceNoteUpdateDto.practiceNotification()));
 
         if (!practiceNoteUpdateDto.addProblemIdList().isEmpty()) {
             practiceNoteUpdateDto.addProblemIdList().forEach(problemId -> {
@@ -109,14 +118,25 @@ public class PracticeNoteService {
             });
         }
 
-        // ✅ 문제 삭제
         if (!practiceNoteUpdateDto.removeProblemIdList().isEmpty()) {
             practiceNoteUpdateDto.removeProblemIdList().forEach(problemId -> {
                 deletePracticeNoteMapping(practiceNote, problemId);
             });
         }
 
+        if (practiceNoteUpdateDto.practiceNotification() != null) {
+            practiceNotificationScheduler.updateNotification(userId, practiceId, practiceNote.getTitle(), practiceNoteUpdateDto.practiceNotification());
+        }
+
+        if (practiceNoteUpdateDto.practiceNotification() == null) {
+            practiceNotificationScheduler.deleteNotification(practiceId);
+        }
+
         log.info("practiceId: {} has updated", practiceId);
+    }
+
+    public void updatePracticeNotification(Long userId, Long practiceId, String practiceTitle, PracticeNotificationRegisterDto notificationRegisterDto) {
+
     }
 
     public void deletePractice(Long practiceId) {
