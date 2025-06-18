@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import lombok.AccessLevel;
 import lombok.Builder;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,7 +26,7 @@ public record FolderResponseDto (
 
     LocalDateTime updateAt
 ) {
-    public static FolderResponseDto from(Folder folder, List<Long> problemIdList) {
+    public static FolderResponseDto from(@NotNull Folder folder, List<Long> problemIdList) {
 
         FolderThumbnailResponseDto parentFolder = folder.getParentFolder() != null
                 ? FolderThumbnailResponseDto.from(folder.getParentFolder())

@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.problem.dto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import lombok.AccessLevel;
 import lombok.Builder;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,7 +28,7 @@ public record ProblemResponseDto (
 
     List<ProblemImageDataResponseDto> imageUrlList
 ) {
-    public static ProblemResponseDto from(Problem problem) {
+    public static ProblemResponseDto from(@NotNull Problem problem) {
 
         List<ProblemImageDataResponseDto> problemImageDataList = Optional.ofNullable(problem.getProblemImageDataList())
                 .orElse(List.of())

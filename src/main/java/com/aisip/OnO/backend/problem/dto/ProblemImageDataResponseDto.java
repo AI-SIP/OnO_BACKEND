@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import lombok.AccessLevel;
 import lombok.Builder;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.LocalDateTime;
 
@@ -16,7 +17,7 @@ public record ProblemImageDataResponseDto (
 
     LocalDateTime createdAt
 ) {
-    public static ProblemImageDataResponseDto from(ProblemImageData problemImageData) {
+    public static ProblemImageDataResponseDto from(@NotNull ProblemImageData problemImageData) {
         return ProblemImageDataResponseDto.builder()
                 .imageUrl(problemImageData.getImageUrl())
                 .problemImageType(problemImageData.getProblemImageType())

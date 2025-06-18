@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.practicenote.dto;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNotification;
 import lombok.AccessLevel;
 import lombok.Builder;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
@@ -14,7 +15,7 @@ public record PracticeNotificationResponseDto(
         String repeatType,
         List<Integer> weekDays
 ) {
-    public static PracticeNotificationResponseDto from(PracticeNotification practiceNotification) {
+    public static PracticeNotificationResponseDto from(@NotNull PracticeNotification practiceNotification) {
         return PracticeNotificationResponseDto.builder()
                 .intervalDays(practiceNotification.getIntervalDays())
                 .hour(practiceNotification.getHour())
