@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.practicenote.service;
 
 import com.aisip.OnO.backend.practicenote.dto.PracticeNotificationRegisterDto;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.quartz.*;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +33,20 @@ public class PracticeNotificationScheduler {
             scheduler.scheduleJob(jobDetail, trigger);
         } catch (SchedulerException e) {
             throw new RuntimeException("스케줄 등록 실패", e);
+        }
+    }
+
+    public void updateNotification(Long userId, Long practiceId, String title, PracticeNotificationRegisterDto dto) {
+        deleteNotification(practiceId);
+        schedulePracticeNotification(userId, practiceId, title, dto);
+    }
+
+    public void deleteNotification(Long practiceId) {
+        try {
+            JobKey jobKey = JobKey.jobKey("practice-" + practiceId, "practice-reminder");
+            scheduler.deleteJob(jobKey);
+        } catch (SchedulerException e) {
+            throw new RuntimeException("알림 삭제 실패", e);
         }
     }
 

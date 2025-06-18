@@ -104,7 +104,7 @@ public class PracticeNoteService {
         log.info("practiceId: {} count has updated", practiceId);
     }
 
-    public void updatePracticeInfo(PracticeNoteUpdateDto practiceNoteUpdateDto) {
+    public void updatePracticeInfo(Long userId, PracticeNoteUpdateDto practiceNoteUpdateDto) {
         Long practiceId = practiceNoteUpdateDto.practiceNoteId();
         PracticeNote practiceNote = getPracticeEntity(practiceId);
 
@@ -118,14 +118,25 @@ public class PracticeNoteService {
             });
         }
 
-        // ✅ 문제 삭제
         if (!practiceNoteUpdateDto.removeProblemIdList().isEmpty()) {
             practiceNoteUpdateDto.removeProblemIdList().forEach(problemId -> {
                 deletePracticeNoteMapping(practiceNote, problemId);
             });
         }
 
+        if (practiceNoteUpdateDto.practiceNotification() != null) {
+            practiceNotificationScheduler.updateNotification(userId, practiceId, practiceNote.getTitle(), practiceNoteUpdateDto.practiceNotification());
+        }
+
+        if (practiceNoteUpdateDto.practiceNotification() == null) {
+            practiceNotificationScheduler.deleteNotification(practiceId);
+        }
+
         log.info("practiceId: {} has updated", practiceId);
+    }
+
+    public void updatePracticeNotification(Long userId, Long practiceId, String practiceTitle, PracticeNotificationRegisterDto notificationRegisterDto) {
+
     }
 
     public void deletePractice(Long practiceId) {
