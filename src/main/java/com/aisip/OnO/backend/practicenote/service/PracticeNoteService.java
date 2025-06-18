@@ -1,17 +1,11 @@
 package com.aisip.OnO.backend.practicenote.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
-import com.aisip.OnO.backend.fcm.dto.NotificationRequestDto;
-import com.aisip.OnO.backend.fcm.service.FcmService;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteThumbnailResponseDto;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteUpdateDto;
+import com.aisip.OnO.backend.practicenote.dto.*;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNotification;
 import com.aisip.OnO.backend.practicenote.exception.PracticeNoteErrorCase;
 import com.aisip.OnO.backend.practicenote.repository.ProblemPracticeNoteMappingRepository;
-import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
@@ -23,7 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -39,7 +32,7 @@ public class PracticeNoteService {
 
     private final ProblemPracticeNoteMappingRepository problemPracticeNoteMappingRepository;
 
-    private final FcmService fcmService;
+    private final PracticeNotificationScheduler practiceNotificationScheduler;
 
     private PracticeNote getPracticeEntity(Long practiceId){
 
@@ -57,8 +50,16 @@ public class PracticeNoteService {
                     addProblemToPractice(practiceNote, problemId));
         }
 
+        if(practiceNoteRegisterDto.practiceNotification() != null) {
+            registerPracticeNotification(userId, practiceNote.getId(), practiceNote.getTitle(), practiceNoteRegisterDto.practiceNotification());
+        }
+
         log.info("userId: {} register practiceId: {}", userId, practiceNote.getId());
         return practiceNote.getId();
+    }
+
+    public void registerPracticeNotification(Long userId, Long practiceId, String practiceTitle, PracticeNotificationRegisterDto notificationRegisterDto) {
+        practiceNotificationScheduler.schedulePracticeNotification(userId, practiceId, practiceTitle, notificationRegisterDto);
     }
 
     public PracticeNoteDetailResponseDto findPracticeNoteDetail(Long practiceId){
