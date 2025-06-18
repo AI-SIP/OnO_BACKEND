@@ -1,7 +1,7 @@
 package com.aisip.OnO.backend.problem.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
-import com.aisip.OnO.backend.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;

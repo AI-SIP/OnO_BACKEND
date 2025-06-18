@@ -1,7 +1,7 @@
 package com.aisip.OnO.backend.common.exception;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
-import com.aisip.OnO.backend.common.webhook.DiscordWebhookPayload;
+import com.aisip.OnO.backend.util.webhook.DiscordWebhookPayload;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

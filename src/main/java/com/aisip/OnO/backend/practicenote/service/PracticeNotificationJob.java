@@ -1,7 +1,7 @@
 package com.aisip.OnO.backend.practicenote.service;
 
-import com.aisip.OnO.backend.fcm.dto.NotificationRequestDto;
-import com.aisip.OnO.backend.fcm.service.FcmService;
+import com.aisip.OnO.backend.util.fcm.dto.NotificationRequestDto;
+import com.aisip.OnO.backend.util.fcm.service.FcmService;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.JobDataMap;
 import org.quartz.JobExecutionContext;
@@ -29,7 +29,7 @@ public class PracticeNotificationJob extends QuartzJobBean {
                 userId,
                 new NotificationRequestDto(
                         "User Token",
-                        "복습할 시간이예요!",
+                        "오답노트를 복습할 시간이예요!",
                         practiceTitle + " 복습노트를 공부할 시간입니다!",
                         Map.of("practiceId", String.valueOf(practiceId))
                 )
