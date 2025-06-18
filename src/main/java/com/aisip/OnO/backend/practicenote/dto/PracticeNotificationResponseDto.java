@@ -4,19 +4,23 @@ import com.aisip.OnO.backend.practicenote.entity.PracticeNotification;
 import lombok.AccessLevel;
 import lombok.Builder;
 
+import java.util.List;
+
 @Builder(access = AccessLevel.PRIVATE)
 public record PracticeNotificationResponseDto(
         int intervalDays,
         int hour,
         int minute,
-        int notifyCount
+        String repeatType,
+        List<Integer> weekDays
 ) {
     public static PracticeNotificationResponseDto from(PracticeNotification practiceNotification) {
         return PracticeNotificationResponseDto.builder()
                 .intervalDays(practiceNotification.getIntervalDays())
                 .hour(practiceNotification.getHour())
                 .minute(practiceNotification.getMinute())
-                .notifyCount(practiceNotification.getNotifyCount())
+                .repeatType(practiceNotification.getRepeatType())
+                .weekDays(practiceNotification.getWeekDays())
                 .build();
     }
 }
