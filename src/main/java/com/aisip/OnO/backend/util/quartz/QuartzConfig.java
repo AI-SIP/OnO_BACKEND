@@ -6,6 +6,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.quartz.SchedulerFactoryBean;
 
+import javax.sql.DataSource;
+
 @Configuration
 public class QuartzConfig {
 
@@ -17,9 +19,14 @@ public class QuartzConfig {
     }
 
     @Bean
-    public SchedulerFactoryBean schedulerFactoryBean(JobFactory jobFactory) {
+    public SchedulerFactoryBean schedulerFactoryBean(JobFactory jobFactory, DataSource dataSource) {
         SchedulerFactoryBean factory = new SchedulerFactoryBean();
-        factory.setJobFactory(jobFactory); // 여기에 설정
+        factory.setJobFactory(jobFactory);
+        factory.setDataSource(dataSource);
+        factory.setOverwriteExistingJobs(true);
+        factory.setStartupDelay(5);
+        factory.setAutoStartup(true);
+        factory.setWaitForJobsToCompleteOnShutdown(true);
         return factory;
     }
 }

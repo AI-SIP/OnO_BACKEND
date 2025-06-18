@@ -20,6 +20,8 @@ public class PracticeNotificationScheduler {
                     .usingJobData("userId", userId)
                     .usingJobData("practiceId", practiceId)
                     .usingJobData("practiceTitle", practiceTitle)
+                    .storeDurably(true)
+                    .requestRecovery(true)
                     .build();
 
             String cron = convertDtoToCron(dto);
@@ -30,7 +32,8 @@ public class PracticeNotificationScheduler {
                     .forJob(jobDetail)
                     .build();
 
-            scheduler.scheduleJob(jobDetail, trigger);
+            scheduler.addJob(jobDetail, true);
+            scheduler.scheduleJob(trigger);
         } catch (SchedulerException e) {
             throw new RuntimeException("스케줄 등록 실패", e);
         }
