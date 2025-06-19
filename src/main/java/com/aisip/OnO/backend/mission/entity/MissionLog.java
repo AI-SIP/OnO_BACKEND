@@ -25,6 +25,8 @@ public class MissionLog extends BaseEntity {
     @JoinColumn(name = "user_id")
     private User user;
 
+    private MissionType missionType;
+
     private String title;
 
     private Long point;

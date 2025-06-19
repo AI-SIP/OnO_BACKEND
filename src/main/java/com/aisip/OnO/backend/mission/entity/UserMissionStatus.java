@@ -10,10 +10,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserMissionStatus {
-    private int level;
-    private int point;
+    private Long level;
+    private Long point;
 
-    public void gainPoint(int value) {
+    public void gainPoint(Long value) {
         this.point += value;
         while (this.point >= getThresholdForLevel(level)) {
             this.point -= getThresholdForLevel(level);
@@ -21,7 +21,7 @@ public class UserMissionStatus {
         }
     }
 
-    private int getThresholdForLevel(int level) {
+    private Long getThresholdForLevel(Long level) {
         return 100 + (level - 1) * 20;
     }
 }

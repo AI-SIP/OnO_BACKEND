@@ -12,8 +12,8 @@ public record UserResponseDto (
     Long userId,
     String name,
     String email,
-    int level,
-    int point,
+    Long level,
+    Long point,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {
