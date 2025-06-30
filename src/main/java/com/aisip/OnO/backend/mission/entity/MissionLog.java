@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.mission.entity;
 
 import com.aisip.OnO.backend.common.entity.BaseEntity;
+import com.aisip.OnO.backend.mission.dto.MissionRegisterDto;
 import com.aisip.OnO.backend.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -27,9 +28,16 @@ public class MissionLog extends BaseEntity {
 
     private MissionType missionType;
 
-    private String title;
-
     private Long point;
 
     private Long referenceId;
+
+    public static MissionLog from(MissionRegisterDto missionRegisterDto, User user) {
+        return MissionLog.builder()
+                .user(user)
+                .missionType(missionRegisterDto.missionType())
+                .point(missionRegisterDto.missionType().getPoint())
+                .referenceId(missionRegisterDto.referenceId())
+                .build();
+    }
 }
