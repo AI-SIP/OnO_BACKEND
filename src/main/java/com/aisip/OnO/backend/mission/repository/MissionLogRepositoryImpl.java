@@ -19,6 +19,20 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
     }
 
     @Override
+    public boolean alreadyWriteProblemsTodayMoreThan3(Long userId) {
+        Long count = queryFactory
+                .select(missionLog.count())
+                .from(missionLog)
+                .where(missionLog.missionType.eq(MissionType.PROBLEM_WRITE)
+                        .and(missionLog.user.id.eq(userId))
+                        .and(missionLog.createdAt.between(getStartOfToday(), getEndOfToday()))
+                )
+                .fetchOne();
+
+        return count != null && count >= 3;
+    }
+
+    @Override
     public boolean alreadyPracticeProblem(Long problemId){
 
         return queryFactory
