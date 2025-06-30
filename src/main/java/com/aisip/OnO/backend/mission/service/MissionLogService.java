@@ -24,17 +24,17 @@ public class MissionLogService {
 
     public String registerMissionLog(MissionRegisterDto missionRegisterDto) {
 
-        boolean canRegister = true;
-        canRegister = switch (missionRegisterDto.missionType()) {
-            case USER_LOGIN -> missionLogRepository.alreadyLogin(missionRegisterDto.userId());
-            case PROBLEM_WRITE -> true;
+        Long userId = missionRegisterDto.userId();
+        boolean canNotRegister = true;
+        canNotRegister = switch (missionRegisterDto.missionType()) {
+            case USER_LOGIN -> missionLogRepository.alreadyLogin(userId);
+            case PROBLEM_WRITE -> missionLogRepository.alreadyWriteProblemsTodayMoreThan3(userId);
             case PROBLEM_PRACTICE -> missionLogRepository.alreadyPracticeProblem(missionRegisterDto.referenceId());
             case NOTE_PRACTICE -> missionLogRepository.alreadyPracticeNote(missionRegisterDto.referenceId());
             default -> throw new ApplicationException(MissionErrorCase.MISSION_TYPE_NOT_FOUND);
         };
 
-        if(canRegister) {
-            Long userId = missionRegisterDto.userId();
+        if(!canNotRegister) {
             User user = userRepository.findById(userId).orElseThrow(() -> new ApplicationException(MissionErrorCase.USER_NOT_FOUND));
 
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
