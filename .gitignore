@@ -38,6 +38,7 @@ out/
 .vscode/
 
 ### aws properties file
+application.yml
 application.properties
 application-aws.properties
 application-dev.properties
