@@ -4,6 +4,8 @@ import com.aisip.OnO.backend.common.entity.BaseEntity;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Getter
@@ -11,6 +13,8 @@ import lombok.*;
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "image_data")
+@SQLDelete(sql = "UPDATE image_data SET deleted_at = now() WHERE id = ?")
+@SQLRestriction("deleted_at IS NULL")
 public class ProblemImageData extends BaseEntity {
 
     @Id
@@ -28,11 +32,15 @@ public class ProblemImageData extends BaseEntity {
     @Column(name = "image_type")
     private ProblemImageType problemImageType;
 
-    public static ProblemImageData from(ProblemImageDataRegisterDto problemImageDataRegisterDto, Problem problem) {
+    public static ProblemImageData from(ProblemImageDataRegisterDto problemImageDataRegisterDto) {
         return ProblemImageData.builder()
-                .problem(problem)
                 .imageUrl(problemImageDataRegisterDto.imageUrl())
                 .problemImageType(problemImageDataRegisterDto.problemImageType())
                 .build();
+    }
+
+    public void updateProblem(Problem problem) {
+        this.problem = problem;
+        problem.addImageData(this);
     }
 }

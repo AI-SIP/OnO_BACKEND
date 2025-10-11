@@ -8,9 +8,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum ProblemErrorCase implements ErrorCase {
 
-    PROBLEM_NOT_FOUND(400, 1001, "문제를 찾을 수 없습니다."),
+    PROBLEM_NOT_FOUND(400, 4001, "문제를 찾을 수 없습니다."),
 
-    PROBLEM_USER_UNMATCHED(400, 1002, "문제 작성자가 아닙니다.");
+    PROBLEM_USER_UNMATCHED(400, 4002, "문제 작성자가 아닙니다.");
 
     private final Integer httpStatusCode;
     private final Integer errorCode;

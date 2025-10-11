@@ -4,9 +4,8 @@ import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.Optional;
 
 import static com.aisip.OnO.backend.practicenote.entity.QPracticeNote.practiceNote;
 import static com.aisip.OnO.backend.practicenote.entity.QProblemPracticeNoteMapping.problemPracticeNoteMapping;
@@ -30,33 +29,35 @@ public class PracticeNoteRepositoryImpl implements PracticeNoteRepositoryCustom 
     }
 
     @Override
-    public PracticeNote findPracticeNoteWithDetails(Long practiceNoteId) {
-        return queryFactory
-                .select(practiceNote)
-                .from(practiceNote)
-                .join(problemPracticeNoteMapping).on(practiceNote.id.eq(problemPracticeNoteMapping.practiceNote.id))
-                .join(problemPracticeNoteMapping.practiceNote, practiceNote)
+    public Optional<PracticeNote> findPracticeNoteWithDetails(Long practiceNoteId) {
+        PracticeNote result = queryFactory
+                .selectFrom(practiceNote)
+                .join(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping).fetchJoin()
                 .where(practiceNote.id.eq(practiceNoteId))
+                .orderBy(practiceNote.id.asc())
                 .fetchOne();
+
+        return Optional.ofNullable(result);
     }
 
     @Override
-    public Set<Long> findProblemIdListByPracticeNoteId(Long practiceNoteId) {
-        return new HashSet<>(queryFactory
+    public List<PracticeNote> findAllUserPracticeNotesWithDetails(Long userId) {
+        return queryFactory
+                .selectFrom(practiceNote)
+                .join(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping).fetchJoin()
+                .where(practiceNote.userId.eq(userId))
+                .orderBy(practiceNote.id.asc())
+                .fetch();
+    }
+
+    @Override
+    public List<Long> findProblemIdListByPracticeNoteId(Long practiceNoteId) {
+        return queryFactory
                 .select(problemPracticeNoteMapping.problem.id)
+                .distinct()  // 중복 제거
                 .from(problemPracticeNoteMapping)
                 .where(problemPracticeNoteMapping.practiceNote.id.eq(practiceNoteId))
-                .fetch());
-    }
-
-    @Override
-    public List<PracticeNote> findPracticesByProblem(Long problemId) {
-
-        return queryFactory
-                .select(practiceNote)
-                .from(practiceNote)
-                .join(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping) // 중간 매핑 테이블 조인
-                .where(problemPracticeNoteMapping.problem.id.eq(problemId))
+                .orderBy(problemPracticeNoteMapping.problem.id.asc())
                 .fetch();
     }
 
@@ -66,6 +67,14 @@ public class PracticeNoteRepositoryImpl implements PracticeNoteRepositoryCustom 
                 .delete(problemPracticeNoteMapping)
                 .where(problemPracticeNoteMapping.practiceNote.id.eq(practiceNoteId)
                         .and(problemPracticeNoteMapping.problem.id.eq(problemId)))
+                .execute();
+    }
+
+    @Override
+    public void deleteProblemFromAllPractice(Long problemId) {
+        queryFactory
+                .delete(problemPracticeNoteMapping)
+                .where(problemPracticeNoteMapping.problem.id.eq(problemId))
                 .execute();
     }
 

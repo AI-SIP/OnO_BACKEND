@@ -2,8 +2,6 @@ package com.aisip.OnO.backend.folder.repository;
 
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.entity.QFolder;
-import com.aisip.OnO.backend.problem.entity.QProblem;
-import com.aisip.OnO.backend.problem.entity.QProblemImageData;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
 
@@ -11,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.aisip.OnO.backend.folder.entity.QFolder.folder;
+import static com.aisip.OnO.backend.problem.entity.QProblem.problem;
 
 public class FolderRepositoryImpl implements FolderRepositoryCustom {
 
@@ -34,8 +33,6 @@ public class FolderRepositoryImpl implements FolderRepositoryCustom {
     @Override
     public Optional<Folder> findFolderWithDetailsByFolderId(Long folderId) {
         Folder folder = queryFactory.selectFrom(QFolder.folder)
-                .leftJoin(QFolder.folder.problemList, QProblem.problem).fetchJoin()
-                .leftJoin(QProblem.problem.problemImageDataList, QProblemImageData.problemImageData).fetchJoin()
                 .leftJoin(QFolder.folder.subFolderList, new QFolder("subFolder")).fetchJoin()
                 .leftJoin(QFolder.folder.parentFolder, new QFolder("parentFolder")).fetchJoin()
                 .where(QFolder.folder.id.eq(folderId))
@@ -48,11 +45,20 @@ public class FolderRepositoryImpl implements FolderRepositoryCustom {
     public List<Folder> findAllFoldersWithDetailsByUserId(Long userId) {
         return queryFactory.selectDistinct(folder)
                 .from(folder)
-                .leftJoin(folder.problemList, QProblem.problem).fetchJoin()
-                .leftJoin(QProblem.problem.problemImageDataList, QProblemImageData.problemImageData).fetchJoin()
                 .leftJoin(folder.subFolderList, new QFolder("subFolder")).fetchJoin()
                 .leftJoin(folder.parentFolder, new QFolder("parentFolder")).fetchJoin()
                 .where(folder.userId.eq(userId))
+                .orderBy(folder.id.asc())
+                .fetch();
+    }
+
+    @Override
+    public List<Long> findProblemIdsByFolder(Long folderId) {
+        return queryFactory
+                .select(problem.id)
+                .from(problem)
+                .where(problem.folder.id.eq(folderId))
+                .orderBy(problem.id.asc())
                 .fetch();
     }
 }

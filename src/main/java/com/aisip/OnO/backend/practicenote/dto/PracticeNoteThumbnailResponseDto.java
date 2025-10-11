@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.practicenote.dto;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import lombok.AccessLevel;
 import lombok.Builder;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.LocalDateTime;
 
@@ -16,7 +17,7 @@ public record PracticeNoteThumbnailResponseDto(
 
         LocalDateTime lastSolvedAt
 ) {
-    public static PracticeNoteThumbnailResponseDto from(PracticeNote practiceNote) {
+    public static PracticeNoteThumbnailResponseDto from(@NotNull PracticeNote practiceNote) {
         return PracticeNoteThumbnailResponseDto.builder()
                 .practiceNoteId(practiceNote.getId())
                 .practiceTitle(practiceNote.getTitle())

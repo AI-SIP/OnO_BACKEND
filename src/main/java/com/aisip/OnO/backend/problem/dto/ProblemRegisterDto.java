@@ -5,6 +5,7 @@ import java.util.List;
 
 public record ProblemRegisterDto (
     Long problemId,
+
     String memo,
 
     String reference,
@@ -13,6 +14,6 @@ public record ProblemRegisterDto (
 
     LocalDateTime solvedAt,
 
-    List<ProblemImageDataRegisterDto> imageDataList
+    List<ProblemImageDataRegisterDto> imageDataDtoList
 ) {}
 

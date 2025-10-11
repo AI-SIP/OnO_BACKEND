@@ -9,7 +9,6 @@ import com.aisip.OnO.backend.problem.service.ProblemService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.propertyeditors.CustomNumberEditor;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
@@ -19,7 +18,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/problem")
+@RequestMapping("/api/problems")
 public class ProblemController {
 
     private final ProblemService problemService;
@@ -31,7 +30,7 @@ public class ProblemController {
 
     // ✅ 특정 문제 조회
     @GetMapping("/{problemId}")
-    public CommonResponse<ProblemResponseDto> getProblem(@PathVariable Long problemId) {
+    public CommonResponse<ProblemResponseDto> getProblem(@PathVariable("problemId") Long problemId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         ProblemResponseDto problemResponseDto = problemService.findProblem(problemId, userId);
 
@@ -39,12 +38,19 @@ public class ProblemController {
     }
 
     // ✅ 유저가 등록한 모든 문제 조회
-    @ResponseStatus(HttpStatus.OK)
-    @GetMapping("/all")
+    @GetMapping("/user")
     public CommonResponse<List<ProblemResponseDto>> getProblemsByUserId() {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         return CommonResponse.success(problemService.findUserProblems(userId));
+    }
+
+    // ✅ 특정 폴더 내부의 모든 문제 조회
+    @GetMapping("/folder/{folderId}")
+    public CommonResponse<List<ProblemResponseDto>> getProblemsByUserId(@PathVariable("folderId") Long folderId) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        return CommonResponse.success(problemService.findFolderProblemList(folderId));
     }
 
     // ✅ 사용자의 문제 개수 조회
@@ -54,14 +60,13 @@ public class ProblemController {
         return CommonResponse.success(problemService.findProblemCountByUser(userId));
     }
 
-
     // ✅ 문제 등록
     @PostMapping("")
-    public CommonResponse<String> registerProblem(@RequestBody ProblemRegisterDto problemRegisterDto) {
+    public CommonResponse<Long> registerProblem(@RequestBody ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        problemService.registerProblem(problemRegisterDto, userId);
+        Long problemId = problemService.registerProblem(problemRegisterDto, userId);
 
-        return CommonResponse.success("문제가 등록되었습니다.");
+        return CommonResponse.success(problemId);
     }
 
     // ✅ 이미지 데이터 등록
@@ -91,12 +96,31 @@ public class ProblemController {
         return CommonResponse.success("문제가 수정되었습니다.");
     }
 
+    // ✅ 문제 이미지 데이터 변경
+    @PatchMapping("/imageData")
+    public CommonResponse<String> updateProblemImageData(@RequestBody ProblemRegisterDto problemRegisterDto) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        problemService.updateProblemImageData(problemRegisterDto, userId);
+
+        return CommonResponse.success("문제가 수정되었습니다.");
+    }
+
+    // ✅ 문제 삭제
     @DeleteMapping("")
     public CommonResponse<String> deleteProblems(
-            @RequestBody ProblemDeleteRequestDto deleteRequestDto
-    ) {
-        problemService.deleteProblems(deleteRequestDto);
+            @RequestBody ProblemDeleteRequestDto problemDeleteRequestDto
+            ) {
+        problemService.deleteProblemList(problemDeleteRequestDto.deleteProblemIdList());
         return CommonResponse.success("문제 삭제가 완료되었습니다.");
+    }
+
+    @DeleteMapping("/all")
+    public CommonResponse<String> deleteUserProblems(
+    ) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        problemService.deleteAllUserProblems(userId);
+
+        return CommonResponse.success("유저의 모든 문제가 삭제되었습니다.");
     }
 
     // ✅ 문제 이미지 데이터 삭제

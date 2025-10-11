@@ -10,6 +10,7 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -29,7 +30,7 @@ public class Problem extends BaseEntity {
     private Long userId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "folder_id", nullable = false)
+    @JoinColumn(name = "folder_id")
     private Folder folder;
 
     private String memo;
@@ -39,32 +40,64 @@ public class Problem extends BaseEntity {
     private LocalDateTime solvedAt;
 
     @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ProblemImageData> problemImageDataList;
+    private List<ProblemImageData> problemImageDataList = new ArrayList<>();
 
-    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ProblemPracticeNoteMapping> problemPracticeNoteMappingList;
+    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL)
+    private List<ProblemPracticeNoteMapping> problemPracticeNoteMappingList = new ArrayList<>();
 
-    public static Problem from(ProblemRegisterDto problemRegisterDto, Long userId, Folder folder) {
+    public static Problem from(ProblemRegisterDto problemRegisterDto, Long userId) {
         return Problem.builder()
                 .userId(userId)
-                .folder(folder)
                 .memo(problemRegisterDto.memo())
+                .folder(null)
                 .reference(problemRegisterDto.reference())
                 .solvedAt(problemRegisterDto.solvedAt())
+                .problemImageDataList(new ArrayList<>())
+                .problemPracticeNoteMappingList(new ArrayList<>())
                 .build();
     }
 
+    public void addImageData(ProblemImageData problemImageData) {
+        problemImageDataList.add(problemImageData);
+    }
+
     public void updateProblem(ProblemRegisterDto problemRegisterDto) {
+        if (problemRegisterDto.solvedAt() != null) {
+            this.solvedAt = problemRegisterDto.solvedAt();
+        }
+
         if (problemRegisterDto.memo() != null && !problemRegisterDto.memo().isBlank()) {
-            this.memo = memo;
+            this.memo = problemRegisterDto.memo();
         }
 
         if (problemRegisterDto.reference() != null && !problemRegisterDto.reference().isBlank()) {
-            this.reference = reference;
+            this.reference = problemRegisterDto.reference();
+        }
+    }
+
+    public void updateImageDataList(List<ProblemImageData> imageDataList) {
+        if (imageDataList != null) {
+            if (this.problemImageDataList != null) {
+                this.problemImageDataList.clear();
+                this.problemImageDataList.addAll(imageDataList);
+            }
         }
     }
 
     public void updateFolder(Folder folder) {
+        if(this.getFolder() != null){
+            this.getFolder().removeProblem(this);
+        }
+
         this.folder = folder;
+        folder.addProblem(this);
+    }
+
+    public void addPracticeMappingToProblem(ProblemPracticeNoteMapping problemPracticeNoteMapping) {
+        problemPracticeNoteMappingList.add(problemPracticeNoteMapping);
+    }
+
+    public void removePracticeMappingFromProblem(ProblemPracticeNoteMapping problemPracticeNoteMapping) {
+        problemPracticeNoteMappingList.remove(problemPracticeNoteMapping);
     }
 }

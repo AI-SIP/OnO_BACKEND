@@ -7,6 +7,7 @@ import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
+import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.service.ProblemService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -26,41 +27,12 @@ public class FolderService {
 
     private final ProblemService problemService;
 
-    public FolderResponseDto findFolder(Long folderId) {
-        Folder folder = folderRepository.findFolderWithDetailsByFolderId(folderId)
-                .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
-
-        log.info("");
-        return FolderResponseDto.from(folder);
-    }
-
-    public Folder findFolderEntity(Long folderId) {
-        return folderRepository.findById(folderId)
-                .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
-    }
-
-    public List<FolderThumbnailResponseDto> findAllFolderThumbnails(Long userId) {
-        List<Folder> folderList = folderRepository.findAllByUserId(userId);
-
-        return folderList.isEmpty()
-                ? List.of()
-                : folderList.stream().map(FolderThumbnailResponseDto::from).collect(Collectors.toList());
-    }
-
-    public List<FolderResponseDto> findAllFolders(Long userId) {
-        List<Folder> folders = folderRepository.findAllFoldersWithDetailsByUserId(userId);
-
-        log.info("userId : {} find All folders", userId);
-        return folders.isEmpty()
-                ? List.of(findRootFolder(userId))
-                : folders.stream().map(FolderResponseDto::from).toList();
-    }
-
     public FolderResponseDto findRootFolder(Long userId) {
         return folderRepository.findRootFolder(userId)
                 .map(rootFolder -> {
                     log.info("userId : {} find root folder id: {}", userId, rootFolder.getId());
-                    return FolderResponseDto.from(rootFolder);
+                    List<Long> problemIdList = folderRepository.findProblemIdsByFolder(rootFolder.getId());
+                    return FolderResponseDto.from(rootFolder, problemIdList);
                 })
                 .orElseGet(() -> {
                     log.info("userId : {} create root folder", userId);
@@ -68,52 +40,84 @@ public class FolderService {
                 });
     }
 
+    public FolderResponseDto findFolder(Long folderId) {
+        Folder folder = folderRepository.findFolderWithDetailsByFolderId(folderId)
+                .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
+
+        List<Long> problemIdList = folderRepository.findProblemIdsByFolder(folder.getId());
+        return FolderResponseDto.from(folder, problemIdList);
+    }
+
+    public Folder findFolderEntity(Long folderId) {
+        return folderRepository.findById(folderId)
+                .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
+    }
+
+    public List<FolderThumbnailResponseDto> findAllUserFolderThumbnails(Long userId) {
+        List<Folder> folderList = folderRepository.findAllByUserId(userId);
+
+        return folderList.isEmpty()
+                ? List.of()
+                : folderList.stream().map(FolderThumbnailResponseDto::from).collect(Collectors.toList());
+    }
+
+    public List<FolderResponseDto> findAllUserFolders(Long userId) {
+        List<Folder> folders = folderRepository.findAllFoldersWithDetailsByUserId(userId);
+
+        log.info("userId : {} find All user folders", userId);
+        return folders.isEmpty()
+                ? List.of(findRootFolder(userId))
+                : folders.stream().map(folder -> {
+                    List<Long> problemIdList = folderRepository.findProblemIdsByFolder(folder.getId());
+                    return FolderResponseDto.from(folder, problemIdList);
+                }).toList();
+    }
+
     public FolderResponseDto createRootFolder(Long userId) {
         FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
-                "메인",
+                "책장",
                 null,
                 null
         );
 
-        Folder rootFolder = Folder.from(folderRegisterDto, null, userId);
+        Folder rootFolder = Folder.from(folderRegisterDto, userId);
         folderRepository.save(rootFolder);
 
         log.info("userId : {} create root folder id: {}", userId, rootFolder.getId());
-        return FolderResponseDto.from(rootFolder);
+        return FolderResponseDto.from(rootFolder, List.of());
     }
 
-    public void createFolder(FolderRegisterDto folderRegisterDto, Long userId) {
+    public Long createFolder(FolderRegisterDto folderRegisterDto, Long userId) {
+        Folder folder = Folder.from(folderRegisterDto, userId);
         Folder parentFolder = findFolderEntity(folderRegisterDto.parentFolderId());
 
-        Folder folder = Folder.from(folderRegisterDto, parentFolder, userId);
+        folder.updateParentFolder(parentFolder);
         folderRepository.save(folder);
 
         log.info("userId : {} create folder id: {}", userId, folder.getId());
+        return folder.getId();
     }
 
     public void updateFolder(FolderRegisterDto folderRegisterDto, Long userId) {
         Folder folder = findFolderEntity(folderRegisterDto.folderId());
-
         folder.updateFolderInfo(folderRegisterDto);
 
-        if (folderRegisterDto.parentFolderId() != null) {
-            Folder parentFolder = findFolderEntity(folderRegisterDto.parentFolderId());
-            folder.updateParentFolder(parentFolder);
+        if (folderRegisterDto.parentFolderId() != null && folder.getParentFolder() != null) {
+            Folder newParentFolder = findFolderEntity(folderRegisterDto.parentFolderId());
+
+            folder.updateParentFolder(newParentFolder);
         }
 
         log.info("userId : {} update folder id: {}", userId, folder.getId());
     }
 
-    public void deleteFoldersWithProblems(List<Long> folderIds, Long userId) {
-
+    public void deleteFoldersWithProblems(List<Long> folderIds) {
         // 삭제할 모든 폴더의 ID 조회 (하위 폴더 포함)
         Set<Long> allFolderIds = getAllFolderIdsIncludingSubFolders(folderIds);
 
         problemService.deleteAllByFolderIds(allFolderIds);
 
         deleteAllByFolderIds(allFolderIds);
-
-        log.info("userId : {} delete folder With Problems", userId);
     }
 
     public void deleteAllUserFoldersWithProblems(Long userId) {
@@ -121,8 +125,6 @@ public class FolderService {
         problemService.deleteAllUserProblems(userId);
 
         deleteAllUserFolders(userId);
-
-        log.info("userId : {} delete all user folder With Problems", userId);
     }
 
     public Set<Long> getAllFolderIdsIncludingSubFolders(List<Long> folderIds) {
@@ -154,7 +156,8 @@ public class FolderService {
     }
 
     public void deleteAllByFolderIds(Collection<Long> folderIds) {
-        folderRepository.deleteAllByIdIn(folderIds);
+        List<Folder> foldersToDelete = folderRepository.findAllById(folderIds);
+        folderRepository.deleteAll(foldersToDelete);
     }
 
     public void deleteAllUserFolders(Long userId) {

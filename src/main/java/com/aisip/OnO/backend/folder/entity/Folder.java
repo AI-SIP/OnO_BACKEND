@@ -35,17 +35,45 @@ public class Folder extends BaseEntity {
     @JoinColumn(name = "parent_folder_id")
     private Folder parentFolder;
 
-    @OneToMany(mappedBy = "parentFolder", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "parentFolder", cascade = CascadeType.ALL)
     private List<Folder> subFolderList = new ArrayList<>();
 
-    @OneToMany(mappedBy = "folder", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "folder", cascade = CascadeType.ALL)
     private List<Problem> problemList = new ArrayList<>();
+
+    public static Folder from(FolderRegisterDto folderRegisterDto, Long userId) {
+        return Folder.builder()
+                .name(folderRegisterDto.folderName())
+                .userId(userId)
+                .subFolderList(new ArrayList<>())
+                .problemList(new ArrayList<>())
+                .build();
+    }
+
     public static Folder from(FolderRegisterDto folderRegisterDto, Folder parentFolder, Long userId) {
         return Folder.builder()
                 .name(folderRegisterDto.folderName())
                 .userId(userId)
                 .parentFolder(parentFolder)
+                .subFolderList(new ArrayList<>())
+                .problemList(new ArrayList<>())
                 .build();
+    }
+
+    public void addProblem(Problem problem) {
+        problemList.add(problem);
+    }
+
+    public void removeProblem(Problem problem) {
+        problemList.remove(problem);
+    }
+
+    public void addSubFolder(Folder folder) {
+        subFolderList.add(folder);
+    }
+
+    public void removeSubFolder(Folder folder) {
+        subFolderList.remove(folder);
     }
 
     public void updateFolderInfo(FolderRegisterDto folderRegisterDto) {
@@ -55,6 +83,10 @@ public class Folder extends BaseEntity {
     }
 
     public void updateParentFolder(Folder parentFolder) {
+        if (this.parentFolder != null) {
+            this.parentFolder.removeSubFolder(this);
+        }
         this.parentFolder = parentFolder;
+        parentFolder.addSubFolder(this);
     }
 }

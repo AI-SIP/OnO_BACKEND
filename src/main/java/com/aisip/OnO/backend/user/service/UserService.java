@@ -1,5 +1,8 @@
 package com.aisip.OnO.backend.user.service;
 
+import com.aisip.OnO.backend.folder.service.FolderService;
+import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
+import com.aisip.OnO.backend.problem.service.ProblemService;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.entity.User;
@@ -22,6 +25,12 @@ public class UserService {
 
     private final UserRepository userRepository;
 
+    private final FolderService folderService;
+
+    private final ProblemService problemService;
+
+    private final PracticeNoteService practiceNoteService;
+
     private User findUserEntity(Long userId){
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
@@ -34,8 +43,8 @@ public class UserService {
 
     private User createGuestUser() {
         UserRegisterDto userRegisterDto = new UserRegisterDto(
-                makeGuestName(),
                 makeGuestEmail(),
+                makeGuestName(),
                 makeGuestIdentifier(),
                 "GUEST",
                 null
@@ -81,10 +90,16 @@ public class UserService {
         user.updateUser(userRegisterDto);
 
         log.info("userId: {} has updated", userId);
+        userRepository.save(user);
     }
 
     public void deleteUserById(Long userId) {
+        practiceNoteService.deleteAllPracticesByUser(userId);
+        problemService.deleteAllUserProblems(userId);
+        folderService.deleteAllUserFolders(userId);
+
         userRepository.deleteById(userId);
+        userRepository.flush();
 
         log.info("userId: {} has deleted", userId);
     }

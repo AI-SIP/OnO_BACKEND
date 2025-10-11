@@ -2,11 +2,16 @@ package com.aisip.OnO.backend.user.entity;
 
 import com.aisip.OnO.backend.common.entity.BaseEntity;
 import com.aisip.OnO.backend.common.service.CryptoConverter;
+import com.aisip.OnO.backend.mission.entity.MissionLog;
+import com.aisip.OnO.backend.mission.entity.UserMissionStatus;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Entity
@@ -33,6 +38,12 @@ public class User extends BaseEntity {
 
     private String platform;
 
+    @Embedded
+    private UserMissionStatus userMissionStatus;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    private List<MissionLog> missionLogList = new ArrayList<>();
+
     public static User from(UserRegisterDto userRegisterDto) {
         return User.builder()
                 .email(userRegisterDto.email())
@@ -40,6 +51,7 @@ public class User extends BaseEntity {
                 .identifier(userRegisterDto.identifier())
                 .platform(userRegisterDto.platform())
                 .password(userRegisterDto.password())
+                .userMissionStatus(new UserMissionStatus(1L, 0L))
                 .build();
     }
 

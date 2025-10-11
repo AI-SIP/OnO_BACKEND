@@ -72,3 +72,5 @@
 #              # 24시간 동안 사용되지 않은 모든 Docker 이미지를 삭제하여 공간 확보
 #              docker image prune -a -f --filter "until=24h"
 #            EOSSH
+#TODO
+#FirebaseAdminKey.json 파일 생성하기

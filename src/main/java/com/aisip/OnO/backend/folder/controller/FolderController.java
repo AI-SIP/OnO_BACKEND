@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.folder.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
+import com.aisip.OnO.backend.folder.dto.FolderDeleteRequestDto;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
 import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
@@ -15,26 +16,10 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/folder")
+@RequestMapping("/api/folders")
 public class FolderController {
 
     private final FolderService folderService;
-
-    // ✅ 유저의 전체 폴더 상세 정보 조회
-    @GetMapping("/all")
-    public CommonResponse<List<FolderResponseDto>> getAllUserFolderDetails() {
-        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
-        return CommonResponse.success(folderService.findAllFolders(userId));
-    }
-
-    // ✅ 모든 폴더 조회
-    @GetMapping("/thumbnails")
-    public CommonResponse<List<FolderThumbnailResponseDto>> getAllUserFolderThumbnails() {
-        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
-        return CommonResponse.success(folderService.findAllFolderThumbnails(userId));
-    }
 
     // ✅ 루트 폴더 조회
     @GetMapping("/root")
@@ -46,23 +31,39 @@ public class FolderController {
 
     // ✅ 특정 폴더 조회
     @GetMapping("/{folderId}")
-    public CommonResponse<FolderResponseDto> getFolder(@PathVariable Long folderId) {
+    public CommonResponse<FolderResponseDto> getFolder(@PathVariable("folderId") Long folderId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         return CommonResponse.success(folderService.findFolder(folderId));
     }
 
-    // ✅ 폴더 생성
-    @PostMapping("")
-    public CommonResponse<String> createFolder(@RequestBody FolderRegisterDto folderRegisterDto) {
+    // ✅ 모든 폴더 조회
+    @GetMapping("/thumbnails")
+    public CommonResponse<List<FolderThumbnailResponseDto>> getAllUserFolderThumbnails() {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        folderService.createFolder(folderRegisterDto, userId);
-        return CommonResponse.success("폴더가 성공적으로 생성되었습니다.");
+        return CommonResponse.success(folderService.findAllUserFolderThumbnails(userId));
+    }
+
+    // ✅ 유저의 전체 폴더 상세 정보 조회
+    @GetMapping()
+    public CommonResponse<List<FolderResponseDto>> getAllUserFolderDetails() {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        return CommonResponse.success(folderService.findAllUserFolders(userId));
+    }
+
+    // ✅ 폴더 생성
+    @PostMapping("")
+    public CommonResponse<Long> createFolder(@RequestBody FolderRegisterDto folderRegisterDto) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        Long folderId = folderService.createFolder(folderRegisterDto, userId);
+        return CommonResponse.success(folderId);
     }
 
     // ✅ 폴더 정보 수정
-    @PatchMapping("/{folderId}")
+    @PatchMapping("")
     public CommonResponse<String> updateFolderInfo(@RequestBody FolderRegisterDto folderRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
@@ -72,19 +73,17 @@ public class FolderController {
 
     // ✅ 폴더 삭제 기능
     @DeleteMapping("")
-    public CommonResponse<String> deleteFoldersWithProblems(@RequestParam List<Long> deleteFolderIdList) {
-        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
-        folderService.deleteFoldersWithProblems(deleteFolderIdList, userId);
+    public CommonResponse<String> deleteFoldersWithProblems(@RequestBody FolderDeleteRequestDto folderDeleteRequestDto) {
+        folderService.deleteFoldersWithProblems(folderDeleteRequestDto.deleteFolderIdList());
         return CommonResponse.success("폴더가 성공적으로 삭제되었습니다.");
     }
 
-    // ✅ 특정 유저의 모든 폴더 삭제
+    // ✅ 폴더 삭제 기능
     @DeleteMapping("/all")
-    public CommonResponse<String> deleteAllUserFolders() {
+    public CommonResponse<String> deleteAllFoldersWithProblems() {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
         folderService.deleteAllUserFoldersWithProblems(userId);
-        return CommonResponse.success("유저의 모든 폴더가 삭제되었습니다.");
+
+        return CommonResponse.success("폴더가 성공적으로 삭제되었습니다.");
     }
 }
