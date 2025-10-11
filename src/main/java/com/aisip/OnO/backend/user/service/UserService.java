@@ -62,16 +62,13 @@ public class UserService {
     }
 
     public UserResponseDto registerMemberUser(UserRegisterDto userRegisterDto) {
-
-        Optional<User> optionalUser = userRepository.findByIdentifier(userRegisterDto.identifier());
-        if (optionalUser.isPresent()) {
-            return UserResponseDto.from(optionalUser.get());
-        } else{
-            User user = User.from(userRegisterDto);
-            userRepository.save(user);
-
-            return UserResponseDto.from(user);
-        }
+        return userRepository.findByIdentifier(userRegisterDto.identifier())
+                .map(UserResponseDto::from)
+                .orElseGet(() -> {
+                    User user = User.from(userRegisterDto);
+                    userRepository.save(user);
+                    return UserResponseDto.from(user);
+                });
     }
 
     public UserResponseDto findUser(Long userId) {
