@@ -26,6 +26,7 @@ import jakarta.persistence.EntityManager;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 /**
  * 인덱스 도입 전후 성능 비교 테스트
@@ -250,13 +251,15 @@ public class IndexPerformanceTest {
         log.info("Test 1: Problem.folder_id 인덱스");
         log.info("========================================");
 
+        Random random = new Random();
+
         // Warm-up
         problemRepository.findAllByFolderId(testFolderIds.get(0));
 
         List<Long> executionTimes = new ArrayList<>();
 
         for (int i = 0; i < QUERY_REPEAT_COUNT; i++) {
-            Long folderId = testFolderIds.get(i % testFolderIds.size());
+            Long folderId = testFolderIds.get(random.nextInt(testFolderIds.size()));
 
             long startTime = System.nanoTime();
             List<Problem> problems = problemRepository.findAllByFolderId(folderId);
@@ -292,13 +295,15 @@ public class IndexPerformanceTest {
         log.info("Test 2: Folder.userId 인덱스");
         log.info("========================================");
 
+        Random random = new Random();
+
         // Warm-up
         folderRepository.findAllByUserId(testUserIds.get(0));
 
         List<Long> executionTimes = new ArrayList<>();
 
         for (int i = 0; i < QUERY_REPEAT_COUNT; i++) {
-            Long userId = testUserIds.get(i % testUserIds.size());
+            Long userId = testUserIds.get(random.nextInt(testUserIds.size()));
 
             long startTime = System.nanoTime();
             List<Folder> folders = folderRepository.findAllByUserId(userId);
@@ -334,13 +339,15 @@ public class IndexPerformanceTest {
         log.info("Test 3: Problem.userId 인덱스");
         log.info("========================================");
 
+        Random random = new Random();
+
         // Warm-up
         problemRepository.findAllByUserId(testUserIds.get(0));
 
         List<Long> executionTimes = new ArrayList<>();
 
         for (int i = 0; i < QUERY_REPEAT_COUNT; i++) {
-            Long userId = testUserIds.get(i % testUserIds.size());
+            Long userId = testUserIds.get(random.nextInt(testUserIds.size()));
 
             long startTime = System.nanoTime();
             List<Problem> problems = problemRepository.findAllByUserId(userId);
@@ -376,13 +383,15 @@ public class IndexPerformanceTest {
         log.info("Test 4: PracticeNote.userId 인덱스");
         log.info("========================================");
 
+        Random random = new Random();
+
         // Warm-up
         practiceNoteRepository.findAllByUserId(testUserIds.get(0));
 
         List<Long> executionTimes = new ArrayList<>();
 
         for (int i = 0; i < QUERY_REPEAT_COUNT; i++) {
-            Long userId = testUserIds.get(i % testUserIds.size());
+            Long userId = testUserIds.get(random.nextInt(testUserIds.size()));
 
             long startTime = System.nanoTime();
             List<PracticeNote> practiceNotes = practiceNoteRepository.findAllByUserId(userId);
@@ -418,13 +427,15 @@ public class IndexPerformanceTest {
         log.info("Test 5: User.identifier 인덱스");
         log.info("========================================");
 
+        Random random = new Random();
+
         // Warm-up
         userRepository.findByIdentifier(testIdentifiers.get(0));
 
         List<Long> executionTimes = new ArrayList<>();
 
         for (int i = 0; i < QUERY_REPEAT_COUNT; i++) {
-            String identifier = testIdentifiers.get(i % testIdentifiers.size());
+            String identifier = testIdentifiers.get(random.nextInt(testIdentifiers.size()));
 
             long startTime = System.nanoTime();
             userRepository.findByIdentifier(identifier);
@@ -459,40 +470,41 @@ public class IndexPerformanceTest {
         log.info("Test 6: 종합 성능 테스트");
         log.info("========================================");
 
+        Random random = new Random();
         long totalStartTime = System.currentTimeMillis();
 
         // 1. Problem by folderId
         long start1 = System.currentTimeMillis();
         for (int i = 0; i < QUERY_REPEAT_COUNT; i++) {
-            problemRepository.findAllByFolderId(testFolderIds.get(i % testFolderIds.size()));
+            problemRepository.findAllByFolderId(testFolderIds.get(random.nextInt(testFolderIds.size())));
         }
         long time1 = System.currentTimeMillis() - start1;
 
         // 2. Folder by userId
         long start2 = System.currentTimeMillis();
         for (int i = 0; i < QUERY_REPEAT_COUNT; i++) {
-            folderRepository.findAllByUserId(testUserIds.get(i % testUserIds.size()));
+            folderRepository.findAllByUserId(testUserIds.get(random.nextInt(testUserIds.size())));
         }
         long time2 = System.currentTimeMillis() - start2;
 
         // 3. Problem by userId
         long start3 = System.currentTimeMillis();
         for (int i = 0; i < QUERY_REPEAT_COUNT; i++) {
-            problemRepository.findAllByUserId(testUserIds.get(i % testUserIds.size()));
+            problemRepository.findAllByUserId(testUserIds.get(random.nextInt(testUserIds.size())));
         }
         long time3 = System.currentTimeMillis() - start3;
 
         // 4. PracticeNote by userId
         long start4 = System.currentTimeMillis();
         for (int i = 0; i < QUERY_REPEAT_COUNT; i++) {
-            practiceNoteRepository.findAllByUserId(testUserIds.get(i % testUserIds.size()));
+            practiceNoteRepository.findAllByUserId(testUserIds.get(random.nextInt(testUserIds.size())));
         }
         long time4 = System.currentTimeMillis() - start4;
 
         // 5. User by identifier
         long start5 = System.currentTimeMillis();
         for (int i = 0; i < QUERY_REPEAT_COUNT; i++) {
-            userRepository.findByIdentifier(testIdentifiers.get(i % testIdentifiers.size()));
+            userRepository.findByIdentifier(testIdentifiers.get(random.nextInt(testIdentifiers.size())));
         }
         long time5 = System.currentTimeMillis() - start5;
 
