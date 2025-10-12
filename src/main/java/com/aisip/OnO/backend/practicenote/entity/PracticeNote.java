@@ -18,7 +18,9 @@ import java.util.List;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SQLDelete(sql = "UPDATE practice_note SET deleted_at = now() WHERE id = ?")
 @SQLRestriction("deleted_at IS NULL")
-@Table(name = "practice_note")
+@Table(name = "practice_note", indexes = {
+        @Index(name = "idx_practice_note_user_id", columnList = "userId")
+})
 public class PracticeNote extends BaseEntity {
 
     @Id
