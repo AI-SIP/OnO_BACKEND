@@ -18,7 +18,9 @@ import java.util.List;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SQLDelete(sql = "UPDATE folder SET deleted_at = now() WHERE id = ?")
 @SQLRestriction("deleted_at IS NULL")
-@Table(name = "folder")
+@Table(name = "folder", indexes = {
+        @Index(name = "idx_folder_user_id", columnList = "userId")
+})
 public class Folder extends BaseEntity {
 
     @Id
