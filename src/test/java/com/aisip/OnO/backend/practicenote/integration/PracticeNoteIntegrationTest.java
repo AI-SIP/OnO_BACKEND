@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.practicenote.integration;
 
 import com.aisip.OnO.backend.practicenote.dto.*;
+import com.aisip.OnO.backend.practicenote.dto.PracticeNotificationRegisterDto;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
@@ -125,7 +126,8 @@ public class PracticeNoteIntegrationTest {
                     new PracticeNoteRegisterDto(
                             null,
                             "practiceNote" + i,
-                            problemIdList
+                            problemIdList,
+                            new PracticeNotificationRegisterDto(1, 9, 0, "NONE", null)
                     ),
                     userId
             ));
@@ -272,7 +274,8 @@ public class PracticeNoteIntegrationTest {
         PracticeNoteRegisterDto practiceNoteRegisterDto = new PracticeNoteRegisterDto(
                 null,
                 practiceTitle,
-                List.of(problemList.get(0).getId(), problemList.get(1).getId(), problemList.get(2).getId())
+                List.of(problemList.get(0).getId(), problemList.get(1).getId(), problemList.get(2).getId()),
+                new com.aisip.OnO.backend.practicenote.dto.PracticeNotificationRegisterDto(1, 9, 0, "NONE", null)
         );
 
         //when
@@ -308,7 +311,8 @@ public class PracticeNoteIntegrationTest {
                 practiceNoteId,
                 updateTitle,
                 addProblemIdList,
-                removeProblemIdList
+                removeProblemIdList,
+                new com.aisip.OnO.backend.practicenote.dto.PracticeNotificationRegisterDto(1, 9, 0, "NONE", null)
         );
 
         //when

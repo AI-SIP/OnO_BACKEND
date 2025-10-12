@@ -44,7 +44,15 @@ class UserControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockUserResponse = new UserResponseDto(1L, "testUser", "test@example.com", LocalDateTime.now(), LocalDateTime.now());
+        mockUserResponse = new UserResponseDto(
+                1L,  // userId
+                "testUser",  // name
+                "test@example.com",  // email
+                1L,  // level
+                0L,  // point
+                LocalDateTime.now(),  // createdAt
+                LocalDateTime.now()  // updatedAt
+        );
     }
 
     @AfterEach
