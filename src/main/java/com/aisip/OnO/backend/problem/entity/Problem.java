@@ -20,7 +20,10 @@ import java.util.List;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SQLDelete(sql = "UPDATE problem SET deleted_at = now() WHERE id = ?")
 @SQLRestriction("deleted_at IS NULL")
-@Table(name = "problem")
+@Table(name = "problem", indexes = {
+        @Index(name = "idx_problem_folder_id", columnList = "folder_id"),
+        @Index(name = "idx_problem_user_id", columnList = "userId")
+})
 public class Problem extends BaseEntity {
 
     @Id
