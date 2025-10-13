@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.common.auth;
 
 import com.aisip.OnO.backend.auth.entity.Authority;
 import com.aisip.OnO.backend.auth.service.JwtTokenizer;
+import com.aisip.OnO.backend.util.redis.RedisTokenService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
@@ -28,6 +29,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
     public static final String AUTHORIZATION_HEADER = "Authorization";
 
     private final JwtTokenizer jwtTokenizer;
+    private final RedisTokenService redisTokenService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
@@ -39,8 +41,17 @@ public class JwtTokenFilter extends OncePerRequestFilter {
 
         if(accessToken != null) {
             try {
+                // 1. 토큰 검증 (만료 여부 먼저 확인)
                 jwtTokenizer.validateAccessToken(accessToken);
 
+                // 2. 블랙리스트 체크 (로그아웃된 토큰인지 확인)
+                if (redisTokenService.isBlacklisted(accessToken)) {
+                    request.setAttribute("errorMessage", "로그아웃된 토큰입니다.");
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+
+                // 3. 인증 정보 설정
                 Claims claims = jwtTokenizer.getClaimsFromAccessToken(accessToken);
                 Long userId = Long.valueOf(claims.getSubject());
                 Authority authority = Authority.valueOf(claims.get("authority", String.class));
