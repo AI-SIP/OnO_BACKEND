@@ -338,6 +338,58 @@ class ProblemApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("문제 이미지 등록 API 테스트 - 당일 복습 이미지 중복 등록 시 예외 발생")
+    @WithMockCustomUser()
+    void registerProblemImageDataDuplicateSolveImage() throws Exception {
+        // given
+        Long problemId = problemList.get(0).getId();
+
+        // 첫 번째 복습 이미지 등록
+        ProblemImageDataRegisterDto firstSolveImage = new ProblemImageDataRegisterDto(
+                problemId,
+                "solveImageUrl1",
+                ProblemImageType.SOLVE_IMAGE
+        );
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/problems/imageData")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(firstSolveImage)))
+                .andExpect(status().isOk());
+
+        // 같은 날 두 번째 복습 이미지 등록 시도
+        ProblemImageDataRegisterDto secondSolveImage = new ProblemImageDataRegisterDto(
+                problemId,
+                "solveImageUrl2",
+                ProblemImageType.SOLVE_IMAGE
+        );
+
+        // when & then - 예외 발생 확인
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.post("/api/problems/imageData")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(secondSolveImage)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(4003))
+                .andExpect(jsonPath("$.message").value("이미 오늘의 복습을 완료한 문제입니다."))
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+
+        System.out.println("==== 응답 결과 (예외) ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
+
+        // 복습 이미지가 1개만 등록되었는지 확인
+        Optional<Problem> optionalProblem = problemRepository.findProblemWithImageData(problemId);
+        assertThat(optionalProblem.isPresent()).isTrue();
+
+        Problem problem = optionalProblem.get();
+        long solveImageCount = problem.getProblemImageDataList().stream()
+                .filter(imageData -> imageData.getProblemImageType().equals(ProblemImageType.SOLVE_IMAGE))
+                .count();
+
+        assertThat(solveImageCount).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("문제 메모, 출처 수정")
     @WithMockCustomUser()
     void updateProblemInfo() throws Exception {
