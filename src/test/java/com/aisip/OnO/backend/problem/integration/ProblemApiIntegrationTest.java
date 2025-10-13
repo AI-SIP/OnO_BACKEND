@@ -6,6 +6,7 @@ import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
+import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
@@ -13,6 +14,7 @@ import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,8 +29,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -142,7 +146,7 @@ class ProblemApiIntegrationTest {
         Long problemId = problemList.get(0).getId();
 
         // when & then - 해당 문제를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/problems/%d", problemId)))
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/problems/%d", problemId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.problemId").value(problemId))
                 .andExpect(jsonPath("$.data.memo").value(problemList.get(0).getMemo()))
@@ -152,7 +156,16 @@ class ProblemApiIntegrationTest {
                 .andExpect(jsonPath("$.data.updatedAt").isNotEmpty())
                 .andExpect(jsonPath("$.data.imageUrlList.length()").value(2))
                 .andExpect(jsonPath("$.data.imageUrlList[0].imageUrl").value(problemList.get(0).getProblemImageDataList().get(0).getImageUrl()))
-                .andExpect(jsonPath("$.data.imageUrlList[1].imageUrl").value(problemList.get(0).getProblemImageDataList().get(1).getImageUrl()));
+                .andExpect(jsonPath("$.data.imageUrlList[1].imageUrl").value(problemList.get(0).getProblemImageDataList().get(1).getImageUrl()))
+                .andExpect(status().is2xxSuccessful())
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        JsonNode root = objectMapper.readTree(json);
+        JsonNode dataNode = root.get("data");
+
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
     }
 
     @Test
@@ -162,7 +175,7 @@ class ProblemApiIntegrationTest {
         // given
 
         // when & then - 해당 문제를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get("/api/problems/user"))
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/api/problems/user"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.size()").value(problemList.size()))
                 .andExpect(jsonPath("$.data[0].problemId").value(problemList.get(0).getId()))
@@ -173,7 +186,16 @@ class ProblemApiIntegrationTest {
                 .andExpect(jsonPath("$.data[0].updatedAt").isNotEmpty())
                 .andExpect(jsonPath("$.data[0].imageUrlList.length()").value(2))
                 .andExpect(jsonPath("$.data[0].imageUrlList[0].imageUrl").value(problemList.get(0).getProblemImageDataList().get(0).getImageUrl()))
-                .andExpect(jsonPath("$.data[0].imageUrlList[1].imageUrl").value(problemList.get(0).getProblemImageDataList().get(1).getImageUrl()));
+                .andExpect(jsonPath("$.data[0].imageUrlList[1].imageUrl").value(problemList.get(0).getProblemImageDataList().get(1).getImageUrl()))
+                .andExpect(status().is2xxSuccessful())
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        JsonNode root = objectMapper.readTree(json);
+        JsonNode dataNode = root.get("data");
+
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
     }
 
     @Test
@@ -184,9 +206,17 @@ class ProblemApiIntegrationTest {
         int count = problemList.size();
 
         // when & then - 해당 문제를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get("/api/problems/problemCount"))
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/api/problems/problemCount"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value(count));
+                .andExpect(jsonPath("$.data").value(count))
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        JsonNode root = objectMapper.readTree(json);
+        JsonNode dataNode = root.get("data");
+
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
     }
 
     @Test
@@ -198,7 +228,7 @@ class ProblemApiIntegrationTest {
         Long folderId = folderRepository.findAllByUserId(userId).get(0).getId();
 
         // when & then - 해당 문제를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/problems/folder/%d", folderId)))
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/problems/folder/%d", folderId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.size()").value(3L))
                 .andExpect(jsonPath("$.data[0].problemId").value(problemList.get(0).getId()))
@@ -209,7 +239,15 @@ class ProblemApiIntegrationTest {
                 .andExpect(jsonPath("$.data[0].updatedAt").isNotEmpty())
                 .andExpect(jsonPath("$.data[0].imageUrlList.length()").value(2))
                 .andExpect(jsonPath("$.data[0].imageUrlList[0].imageUrl").value(problemList.get(0).getProblemImageDataList().get(0).getImageUrl()))
-                .andExpect(jsonPath("$.data[0].imageUrlList[1].imageUrl").value(problemList.get(0).getProblemImageDataList().get(1).getImageUrl()));
+                .andExpect(jsonPath("$.data[0].imageUrlList[1].imageUrl").value(problemList.get(0).getProblemImageDataList().get(1).getImageUrl()))
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        JsonNode root = objectMapper.readTree(json);
+        JsonNode dataNode = root.get("data");
+
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
     }
 
     @Test
@@ -244,11 +282,18 @@ class ProblemApiIntegrationTest {
         );
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/problems")
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.post("/api/problems")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemRegisterDto)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value("문제가 등록되었습니다.")); // 또는 반환값에 맞게 수정
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        JsonNode root = objectMapper.readTree(json);
+        JsonNode dataNode = root.get("data");
+
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
 
         Problem problem = problemRepository.findAllByUserId(userId).get((int) (problemRepository.countByUserId(userId) - 1));
 
@@ -270,10 +315,18 @@ class ProblemApiIntegrationTest {
         );
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/problems/imageData")
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.post("/api/problems/imageData")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemImageDataRegisterDto)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        JsonNode root = objectMapper.readTree(json);
+        JsonNode dataNode = root.get("data");
+
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
 
         Optional<Problem> optionalProblem = problemRepository.findProblemWithImageData(problemId);
         assertThat(optionalProblem.isPresent()).isTrue();
@@ -302,11 +355,19 @@ class ProblemApiIntegrationTest {
         );
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problems/info")
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.patch("/api/problems/info")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemRegisterDto)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value("문제가 수정되었습니다.")); // 또는 반환값에 맞게 수정
+                .andExpect(jsonPath("$.data").value("문제가 수정되었습니다."))
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        JsonNode root = objectMapper.readTree(json);
+        JsonNode dataNode = root.get("data");
+
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
 
         Problem problem = problemRepository.findById(problemList.get(0).getId()).get();
 
@@ -332,10 +393,18 @@ class ProblemApiIntegrationTest {
         );
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problems/path")
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.patch("/api/problems/path")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemRegisterDto)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        JsonNode root = objectMapper.readTree(json);
+        JsonNode dataNode = root.get("data");
+
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
 
         Problem problem = problemRepository.findById(problemList.get(0).getId()).get();
 
@@ -379,10 +448,18 @@ class ProblemApiIntegrationTest {
         );
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problems/imageData")
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.patch("/api/problems/imageData")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(problemRegisterDto)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        JsonNode root = objectMapper.readTree(json);
+        JsonNode dataNode = root.get("data");
+
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
 
         Optional<Problem> optionalProblem = problemRepository.findProblemWithImageData(problemId);
         assertThat(optionalProblem.isPresent()).isTrue();
@@ -402,6 +479,33 @@ class ProblemApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("문제 삭제 - 문제 id 사용")
+    @WithMockCustomUser()
+    void deleteProblemsWithProblemId() throws Exception {
+        // given
+        List<Long> deleteProblemIdList = List.of(problemList.get(0).getId(), problemList.get(1).getId(), problemList.get(4).getId());
+        ProblemDeleteRequestDto problemDeleteRequestDto = new ProblemDeleteRequestDto(deleteProblemIdList);
+
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+
+        // when & then
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.delete("/api/problems")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(problemDeleteRequestDto)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        JsonNode root = objectMapper.readTree(json);
+        JsonNode dataNode = root.get("data");
+
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
+
+        assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(3L);
+    }
+
+    @Test
     @DisplayName("문제 삭제 - 유저 모든 문제 삭제")
     @WithMockCustomUser()
     void deleteProblemsWithUserId() throws Exception {
@@ -409,27 +513,18 @@ class ProblemApiIntegrationTest {
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when & then
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problems/all")
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.delete("/api/problems/all")
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        JsonNode root = objectMapper.readTree(json);
+        JsonNode dataNode = root.get("data");
+
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
 
         assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(0);
-    }
-    @Test
-    @DisplayName("문제 삭제 - 문제 id 사용")
-    @WithMockCustomUser()
-    void deleteProblemsWithProblemId() throws Exception {
-        // given
-        List<Long> deleteProblemIdList = List.of(problemList.get(0).getId(), problemList.get(1).getId(), problemList.get(4).getId());
-
-        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
-
-        // when & then
-        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problems")
-                        .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(deleteProblemIdList)))
-                .andExpect(status().isOk());
-
-        assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(3L);
     }
 }
