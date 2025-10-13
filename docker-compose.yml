@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  # 1. Redis 서비스 정의만 남김
+  redis:
+    image: redis:7.2-alpine
+    container_name: dev-redis-server # 로컬 개발용임을 명시
+    restart: always
+    ports:
+      - "6379:6379" # 로컬 포트 6379를 컨테이너 6379로 연결
+    volumes:
+      - redis-data:/data # 데이터 영속성 유지
+
+volumes:
+  redis-data:
