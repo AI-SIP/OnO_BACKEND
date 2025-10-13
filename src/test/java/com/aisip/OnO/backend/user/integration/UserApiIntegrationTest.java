@@ -17,7 +17,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -73,11 +75,16 @@ public class UserApiIntegrationTest {
     @DisplayName("유저 정보 조회 - 성공")
     void getUserInfo() throws Exception {
         // When & Then
-        mockMvc.perform(get("/api/users")
+        MvcResult result = mockMvc.perform(get("/api/users")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.name").value("testUser"))
-                .andExpect(jsonPath("$.data.email").value("test@example.com"));
+                .andExpect(jsonPath("$.data.email").value("test@example.com"))
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
     }
 
     @Test
@@ -87,11 +94,16 @@ public class UserApiIntegrationTest {
         UserRegisterDto updateRequest = new UserRegisterDto("updated@example.com", "UpdatedUser", "updatedIdentifier", "MEMBER", null);
 
         // When & Then
-        mockMvc.perform(patch("/api/users")
+        MvcResult result = mockMvc.perform(patch("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value("사용자 정보 수정이 완료되었습니다."));
+                .andExpect(jsonPath("$.data").value("사용자 정보 수정이 완료되었습니다."))
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
 
         // 수정된 데이터 확인
         UserResponseDto userResponseDto = userService.findUser(userId);
@@ -103,9 +115,14 @@ public class UserApiIntegrationTest {
     @DisplayName("유저 삭제 - 성공")
     void deleteUserInfo() throws Exception {
         // When & Then
-        mockMvc.perform(delete("/api/users")
+        MvcResult result = mockMvc.perform(delete("/api/users")
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
 
         // 삭제 후, 다시 조회 시 예외 발생 여부 검증
         assertThatThrownBy(() -> userService.findUser(userId))

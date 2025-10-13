@@ -31,6 +31,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -186,7 +187,10 @@ public class PracticeNoteIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        String json = result.getResponse().getContentAsString();
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
+
         JsonNode root = objectMapper.readTree(json);
         JsonNode dataNode = root.get("data");
         PracticeNoteDetailResponseDto dto = objectMapper.treeToValue(dataNode, PracticeNoteDetailResponseDto.class);
@@ -214,6 +218,10 @@ public class PracticeNoteIntegrationTest {
         MvcResult result = mockMvc.perform(get("/api/practiceNotes/{practiceNoteId}", practiceNoteId))
                 .andExpect(status().is4xxClientError())
                 .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
     }
 
     @Test
@@ -224,7 +232,10 @@ public class PracticeNoteIntegrationTest {
                 .andExpect(status().is2xxSuccessful())
                 .andReturn();
 
-        String json = result.getResponse().getContentAsString();
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
+
         JsonNode root = objectMapper.readTree(json);
         JsonNode dataNode = root.get("data");
 
@@ -254,9 +265,13 @@ public class PracticeNoteIntegrationTest {
         Long practiceNoteId = practiceNoteList.get(0).getId();
 
         //when
-        mockMvc.perform(patch("/api/practiceNotes/{practiceNoteId}/complete", practiceNoteId))
+        MvcResult result = mockMvc.perform(patch("/api/practiceNotes/{practiceNoteId}/complete", practiceNoteId))
                 .andExpect(status().is2xxSuccessful())
                 .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
 
         //then
         Optional<PracticeNote> optionalPracticeNote = practiceNoteRepository.findById(practiceNoteId);
@@ -279,12 +294,17 @@ public class PracticeNoteIntegrationTest {
         );
 
         //when
-        mockMvc.perform(post("/api/practiceNotes")
+        MvcResult result = mockMvc.perform(post("/api/practiceNotes")
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(practiceNoteRegisterDto))
                 )
-                .andExpect(status().is2xxSuccessful());
+                .andExpect(status().is2xxSuccessful())
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
 
         //then
         List<PracticeNote> dbPracticeNoteList = practiceNoteRepository.findAll();
@@ -316,12 +336,17 @@ public class PracticeNoteIntegrationTest {
         );
 
         //when
-        mockMvc.perform(patch("/api/practiceNotes")
+        MvcResult result = mockMvc.perform(patch("/api/practiceNotes")
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(practiceNoteUpdateDto))
                 )
-                .andExpect(status().is2xxSuccessful());
+                .andExpect(status().is2xxSuccessful())
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
 
         // then
         Optional<PracticeNote> optionalPracticeNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceNoteId);
@@ -342,13 +367,18 @@ public class PracticeNoteIntegrationTest {
         );
 
         // when
-        mockMvc.perform(delete("/api/practiceNotes")
+        MvcResult result = mockMvc.perform(delete("/api/practiceNotes")
                         .contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(practiceNoteDeleteRequestDto))
 
                 )
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
 
         // then
         for (int i = 0; i < 2; i++) {
@@ -366,10 +396,15 @@ public class PracticeNoteIntegrationTest {
         // given
 
         // when
-        mockMvc.perform(delete("/api/practiceNotes/all")
+        MvcResult result = mockMvc.perform(delete("/api/practiceNotes/all")
                         .accept(MediaType.APPLICATION_JSON)
                 )
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
 
         // then
         assertThat(practiceNoteRepository.findAll()).isEmpty();
