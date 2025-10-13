@@ -20,10 +20,8 @@ public class FileUploadController {
 
     @PostMapping("/image")
     public CommonResponse<String> uploadImageFile(
-            Authentication authentication,
             @RequestParam("image") MultipartFile file
     ) {
-        //Long userId = (Long) authentication.getPrincipal();
         String imageUrl = fileUploadService.uploadFileToS3(file);
 
         return CommonResponse.success(imageUrl);
@@ -31,11 +29,8 @@ public class FileUploadController {
 
     @PostMapping("/images")
     public CommonResponse<List<String>> uploadMultipleImageFiles(
-            Authentication authentication,
             @RequestParam("images") List<MultipartFile> files
     ) {
-        //Long userId = (Long) authentication.getPrincipal();
-
         List<String> imageUrls = files.stream()
                 .map(fileUploadService::uploadFileToS3)
                 .toList();
@@ -45,10 +40,8 @@ public class FileUploadController {
 
     @DeleteMapping("/image")
     public CommonResponse<String> deleteImageFile(
-            Authentication authentication,
             @RequestParam("imageUrl") String imageUrl
     ) {
-        //Long userId = (Long) authentication.getPrincipal();
         fileUploadService.deleteImageFileFromS3(imageUrl);
 
         return CommonResponse.success("이미지 삭제가 완료되었습니다.");

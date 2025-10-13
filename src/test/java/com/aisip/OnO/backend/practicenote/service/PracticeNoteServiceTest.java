@@ -7,6 +7,7 @@ import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteThumbnailResponseDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteUpdateDto;
+import com.aisip.OnO.backend.practicenote.dto.PracticeNotificationRegisterDto;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
@@ -124,7 +125,8 @@ class PracticeNoteServiceTest {
                     new PracticeNoteRegisterDto(
                             null,
                             "practiceNote" + i,
-                            problemIdList
+                            problemIdList,
+                            new PracticeNotificationRegisterDto(1, 9, 0, "NONE", null)
                     ),
                     userId
             ));
@@ -216,7 +218,8 @@ class PracticeNoteServiceTest {
         PracticeNoteRegisterDto practiceNoteRegisterDto = new PracticeNoteRegisterDto(
                 null,
                 "new practice",
-                List.of(problemList.get(0).getId(), problemList.get(1).getId(), problemList.get(2).getId())
+                List.of(problemList.get(0).getId(), problemList.get(1).getId(), problemList.get(2).getId()),
+                new PracticeNotificationRegisterDto(1, 9, 0, "NONE", null)
         );
 
         //when
@@ -252,12 +255,13 @@ class PracticeNoteServiceTest {
                 practiceNoteId,
                 updateTitle,
                 addProblemIdList,
-                removeProblemIdList
+                removeProblemIdList,
+                new PracticeNotificationRegisterDto(1, 9, 0, "NONE", null)
         );
 
         // when
         assertThat(practiceNoteList.get(0).getProblemPracticeNoteMappingList().size()).isEqualTo(4);
-        practiceNoteService.updatePracticeInfo(practiceNoteUpdateDto);
+        practiceNoteService.updatePracticeInfo(userId, practiceNoteUpdateDto);
 
         // then
         Optional<PracticeNote> optionalPracticeNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceNoteId);

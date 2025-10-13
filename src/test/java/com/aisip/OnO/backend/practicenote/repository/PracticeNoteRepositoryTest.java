@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
+import com.aisip.OnO.backend.practicenote.dto.PracticeNotificationRegisterDto;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
@@ -122,7 +123,8 @@ class PracticeNoteRepositoryTest {
                             new PracticeNoteRegisterDto(
                                     null,
                                     "practiceNote" + i,
-                                problemIdList
+                                    problemIdList,
+                                    new PracticeNotificationRegisterDto(1, 9, 0, "NONE", null)
                             ),
                             userId
                     )

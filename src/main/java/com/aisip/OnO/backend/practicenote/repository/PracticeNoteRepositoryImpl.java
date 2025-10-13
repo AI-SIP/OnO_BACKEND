@@ -4,10 +4,8 @@ import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static com.aisip.OnO.backend.practicenote.entity.QPracticeNote.practiceNote;
 import static com.aisip.OnO.backend.practicenote.entity.QProblemPracticeNoteMapping.problemPracticeNoteMapping;

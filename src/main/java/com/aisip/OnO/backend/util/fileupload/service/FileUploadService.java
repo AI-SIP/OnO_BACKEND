@@ -61,7 +61,7 @@ public class FileUploadService {
         String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd")); // 날짜 기반 폴더
         String randomFileName = UUID.randomUUID().toString(); // 랜덤 UUID
 
-        // 예: image/2025/02/12/랜덤값.png
+        // 예: image/YYYY/MM/DD/랜덤값.png
         return "image/" + datePath + "/" + randomFileName + extension;
     }
 

@@ -12,6 +12,8 @@ public record UserResponseDto (
     Long userId,
     String name,
     String email,
+    Long level,
+    Long point,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {
@@ -20,6 +22,8 @@ public record UserResponseDto (
                 .userId(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
+                .level(user.getUserMissionStatus().getLevel())
+                .point(user.getUserMissionStatus().getPoint())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();
