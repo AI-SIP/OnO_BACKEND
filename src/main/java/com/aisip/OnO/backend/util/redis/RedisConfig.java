@@ -1,4 +1,4 @@
-package com.aisip.OnO.backend.common.config;
+package com.aisip.OnO.backend.util.redis;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
