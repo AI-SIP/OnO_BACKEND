@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.problem.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
@@ -117,6 +118,17 @@ public class ProblemService {
 
     public void registerProblemImageData(ProblemImageDataRegisterDto problemImageDataRegisterDto, Long userId) {
         Problem problem = findProblemEntityWithImageData(problemImageDataRegisterDto.problemId(), userId);
+
+        if (problemImageDataRegisterDto.problemImageType().equals(ProblemImageType.SOLVE_IMAGE)) {
+            boolean hasTodaySolveImage = problem.getProblemImageDataList().stream()
+                    .anyMatch(imageData ->
+                            imageData.getProblemImageType().equals(ProblemImageType.SOLVE_IMAGE) &&
+                            imageData.getCreatedAt().toLocalDate().equals(java.time.LocalDate.now()));
+
+            if (hasTodaySolveImage) {
+                throw new ApplicationException(ProblemErrorCase.PROBLEM_SOLVE_IMAGE_ALREADY_REGISTERED);
+            }
+        }
 
         ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto);
         problemImageData.updateProblem(problem);
