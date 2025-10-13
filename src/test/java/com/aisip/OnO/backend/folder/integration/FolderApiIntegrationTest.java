@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -163,7 +164,7 @@ public class FolderApiIntegrationTest {
         Folder folder = folderList.get(0);
 
         // when & then - 해당 폴더를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/folders/%d", folder.getId())))
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/folders/%d", folder.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.folderId").value(folder.getId()))
                 .andExpect(jsonPath("$.data.folderName").value(folder.getName()))
@@ -173,11 +174,13 @@ public class FolderApiIntegrationTest {
                 .andExpect(jsonPath("$.data.subFolderList[0].folderName").value(folder.getSubFolderList().get(0).getName()))
                 .andExpect(jsonPath("$.data.subFolderList[1].folderId").value(folder.getSubFolderList().get(1).getId()))
                 .andExpect(jsonPath("$.data.subFolderList[1].folderName").value(folder.getSubFolderList().get(1).getName()))
-                .andExpect(jsonPath("$.data.problemList.length()").value(folder.getProblemList().size()))
-                .andExpect(jsonPath("$.data.problemList[0].problemId").value(folder.getProblemList().get(0).getId()))
-                .andExpect(jsonPath("$.data.problemList[0].imageUrlList.length()").value(folder.getProblemList().get(0).getProblemImageDataList().size()))
-                .andExpect(jsonPath("$.data.problemList[1].problemId").value(folder.getProblemList().get(1).getId()))
-                .andExpect(jsonPath("$.data.problemList[1].imageUrlList.length()").value(folder.getProblemList().get(1).getProblemImageDataList().size()));
+                .andExpect(jsonPath("$.data.problemIdList.length()").value(folder.getProblemList().size()))
+                .andExpect(jsonPath("$.data.problemIdList[0]").value(folder.getProblemList().get(0).getId()))
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
     }
 
     @Test
@@ -187,7 +190,7 @@ public class FolderApiIntegrationTest {
         Folder folder = folderList.get(1);
 
         // when & then - 해당 폴더를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/folders/%d", folder.getId())))
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/folders/%d", folder.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.folderId").value(folder.getId()))
                 .andExpect(jsonPath("$.data.folderName").value(folder.getName()))
@@ -197,11 +200,13 @@ public class FolderApiIntegrationTest {
                 .andExpect(jsonPath("$.data.subFolderList[0].folderName").value(folder.getSubFolderList().get(0).getName()))
                 .andExpect(jsonPath("$.data.subFolderList[1].folderId").value(folder.getSubFolderList().get(1).getId()))
                 .andExpect(jsonPath("$.data.subFolderList[1].folderName").value(folder.getSubFolderList().get(1).getName()))
-                .andExpect(jsonPath("$.data.problemList.length()").value(folder.getProblemList().size()))
-                .andExpect(jsonPath("$.data.problemList[0].problemId").value(folder.getProblemList().get(0).getId()))
-                .andExpect(jsonPath("$.data.problemList[0].imageUrlList.length()").value(folder.getProblemList().get(0).getProblemImageDataList().size()))
-                .andExpect(jsonPath("$.data.problemList[1].problemId").value(folder.getProblemList().get(1).getId()))
-                .andExpect(jsonPath("$.data.problemList[1].imageUrlList.length()").value(folder.getProblemList().get(1).getProblemImageDataList().size()));
+                .andExpect(jsonPath("$.data.problemIdList.length()").value(folder.getProblemList().size()))
+                .andExpect(jsonPath("$.data.problemIdList[0]").value(folder.getProblemList().get(0).getId()))
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
     }
 
     @Test
@@ -211,17 +216,19 @@ public class FolderApiIntegrationTest {
         Folder folder = folderList.get(folderList.size() - 1);
 
         // when & then - 해당 폴더를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/folders/%d", folder.getId())))
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/folders/%d", folder.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.folderId").value(folder.getId()))
                 .andExpect(jsonPath("$.data.folderName").value(folder.getName()))
                 .andExpect(jsonPath("$.data.parentFolder.folderId").value(folder.getParentFolder().getId()))
                 .andExpect(jsonPath("$.data.subFolderList.length()").value(0))
-                .andExpect(jsonPath("$.data.problemList.length()").value(folder.getProblemList().size()))
-                .andExpect(jsonPath("$.data.problemList[0].problemId").value(folder.getProblemList().get(0).getId()))
-                .andExpect(jsonPath("$.data.problemList[0].imageUrlList.length()").value(folder.getProblemList().get(0).getProblemImageDataList().size()))
-                .andExpect(jsonPath("$.data.problemList[1].problemId").value(folder.getProblemList().get(1).getId()))
-                .andExpect(jsonPath("$.data.problemList[1].imageUrlList.length()").value(folder.getProblemList().get(1).getProblemImageDataList().size()));
+                .andExpect(jsonPath("$.data.problemIdList.length()").value(folder.getProblemList().size()))
+                .andExpect(jsonPath("$.data.problemIdList[0]").value(folder.getProblemList().get(0).getId()))
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
     }
 
     @Test
@@ -231,22 +238,23 @@ public class FolderApiIntegrationTest {
         Folder rootFolder = folderList.get(0);
 
         // when & then - 해당 폴더를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get("/api/folders/root"))
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/api/folders/root"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.folderId").value(rootFolder.getId()))
                 .andExpect(jsonPath("$.data.folderName").value(rootFolder.getName()))
                 .andExpect(jsonPath("$.data.parentFolder").isEmpty())
                 .andExpect(jsonPath("$.data.subFolderList.length()").value(rootFolder.getSubFolderList().size()))
-                .andExpect(jsonPath("$.data.problemList.length()").value(rootFolder.getProblemList().size()))
+                .andExpect(jsonPath("$.data.problemIdList.length()").value(rootFolder.getProblemList().size()))
                 .andExpect(jsonPath("$.data.subFolderList[0].folderId").value(rootFolder.getSubFolderList().get(0).getId()))
                 .andExpect(jsonPath("$.data.subFolderList[0].folderName").value(rootFolder.getSubFolderList().get(0).getName()))
                 .andExpect(jsonPath("$.data.subFolderList[1].folderId").value(rootFolder.getSubFolderList().get(1).getId()))
                 .andExpect(jsonPath("$.data.subFolderList[1].folderName").value(rootFolder.getSubFolderList().get(1).getName()))
-                .andExpect(jsonPath("$.data.problemList[0].problemId").value(rootFolder.getProblemList().get(0).getId()))
-                .andExpect(jsonPath("$.data.problemList[0].imageUrlList.length()").value(rootFolder.getProblemList().get(0).getProblemImageDataList().size()))
-                .andExpect(jsonPath("$.data.problemList[1].problemId").value(rootFolder.getProblemList().get(1).getId()))
-                .andExpect(jsonPath("$.data.problemList[1].imageUrlList.length()").value(rootFolder.getProblemList().get(1).getProblemImageDataList().size()));
+                .andExpect(jsonPath("$.data.problemIdList[0]").value(rootFolder.getProblemList().get(0).getId()))
+                .andReturn();
 
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
     }
 
     @Test
@@ -256,13 +264,18 @@ public class FolderApiIntegrationTest {
         folderRepository.deleteAll();
 
         // when & then - 해당 폴더를 조회하는 API 호출
-        mockMvc.perform(MockMvcRequestBuilders.get("/api/folders/root"))
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/api/folders/root"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.folderId").isNotEmpty())
                 .andExpect(jsonPath("$.data.folderName").isNotEmpty())
                 .andExpect(jsonPath("$.data.parentFolder").isEmpty())
                 .andExpect(jsonPath("$.data.subFolderList.length()").value(0))
-                .andExpect(jsonPath("$.data.problemList.length()").value(0));
+                .andExpect(jsonPath("$.data.problemIdList.length()").value(0))
+                .andReturn();
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
     }
 
     @Test
@@ -276,13 +289,16 @@ public class FolderApiIntegrationTest {
                 .andReturn();
 
         // then
-        String content = result.getResponse().getContentAsString();
+        String content = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
 
         for (int i = 0; i < folderList.size(); i++) {
             Folder folder = folderList.get(i);
             assertThat(folder.getId().intValue()).isEqualTo( JsonPath.read(content, "$.data[" + i + "].folderId"));
             assertThat(folder.getName()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].folderName"));
         }
+
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(content)));
     }
 
     @Test
@@ -296,7 +312,7 @@ public class FolderApiIntegrationTest {
                 .andReturn();
 
         // then
-        String content = result.getResponse().getContentAsString();
+        String content = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
 
         for (int i = 0; i < folderList.size(); i++) {
             Folder folder = folderList.get(i);
@@ -308,17 +324,11 @@ public class FolderApiIntegrationTest {
                 assertThat(folder.getParentFolder()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].parentFolder"));
             }
             assertThat(folder.getSubFolderList().size()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].subFolderList.length()"));
-            assertThat(folder.getProblemList().size()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].problemList.length()"));
-
-            for (int j = 0; j < folder.getProblemList().size(); j++) {
-                Problem problem = folder.getProblemList().get(j);
-                assertThat(problem.getId().intValue()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].problemList[" + j + "].problemId"));
-                assertThat(problem.getMemo()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].problemList[" + j + "].memo"));
-                assertThat(problem.getReference()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].problemList[" + j + "].reference"));
-                assertThat(problem.getSolvedAt()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].problemList[" + j + "].solvedAt"));
-                assertThat(problem.getProblemImageDataList().size()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].problemList[" + j + "].imageUrlList.length()"));
-            }
+            assertThat(folder.getProblemList().size()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].problemIdList.length()"));
         }
+
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(content)));
     }
 
     @Test
@@ -333,16 +343,21 @@ public class FolderApiIntegrationTest {
         );
 
         // when
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/folders")
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.post("/api/folders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(folderRegisterDto)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn();
 
         // then
         List<Folder> folders = folderRepository.findAll();
         Folder folder = folders.get(folders.size() - 1);
         assertThat(folder.getName()).isEqualTo(folderName);
         assertThat(folder.getParentFolder().getId()).isEqualTo(folderList.get(0).getId());
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
     }
 
     @Test
@@ -358,14 +373,19 @@ public class FolderApiIntegrationTest {
         );
 
         // when
-        mockMvc.perform(MockMvcRequestBuilders.patch("/api/folders")
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.patch("/api/folders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(folderRegisterDto)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn();
 
         // then
         Folder folder = folderRepository.findById(folderId).get();
         assertThat(folder.getName()).isEqualTo(folderName);
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
     }
 
     @Test
@@ -382,15 +402,20 @@ public class FolderApiIntegrationTest {
         );
 
         // when
-        mockMvc.perform(MockMvcRequestBuilders.patch("/api/folders")
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.patch("/api/folders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(folderRegisterDto)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn();
 
         // then
         Folder folder = folderRepository.findById(folderId).get();
 
         assertThat(folder.getParentFolder().getId()).isEqualTo(newParentFolderId);
+
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        System.out.println("==== 응답 결과 ====");
+        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
     }
 
     /*
