@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.problem.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
@@ -36,6 +37,8 @@ public class ProblemService {
     private final FolderRepository folderRepository;
 
     private final FileUploadService fileUploadService;
+
+    private final MissionLogService missionLogService;
 
     public ProblemResponseDto findProblem(Long problemId, Long userId) {
         Problem problem = problemRepository.findProblemWithImageData(problemId)
@@ -111,6 +114,9 @@ public class ProblemService {
                     problemImageDataRepository.save(problemImageData);
                 });
 
+        // 오답노트 작성 미션 등록
+        missionLogService.registerProblemWriteMission(userId);
+
         log.info("userId: {} register problemId: {}", userId, problem.getId());
 
         return problem.getId();
@@ -128,6 +134,9 @@ public class ProblemService {
             if (hasTodaySolveImage) {
                 throw new ApplicationException(ProblemErrorCase.PROBLEM_SOLVE_IMAGE_ALREADY_REGISTERED);
             }
+
+            // 문제 복습 미션 등록 (SOLVE_IMAGE 등록 시)
+            missionLogService.registerProblemPracticeMission(userId, problem.getId());
         }
 
         ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto);

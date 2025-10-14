@@ -62,7 +62,7 @@ public class PracticeNoteController {
     @PatchMapping("/{practiceId}/complete")
     public CommonResponse<String> addPracticeCount(@PathVariable("practiceId") Long practiceId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        practiceNoteService.addPracticeNoteCount(practiceId);
+        practiceNoteService.addPracticeNoteCount(userId, practiceId);
 
         log.info("userId: {} completed problem practice with practiceNoteId: {}", userId, practiceId);
         return CommonResponse.success("복습을 완료했습니다.");

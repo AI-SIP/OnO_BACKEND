@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.practicenote.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.practicenote.dto.*;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNotification;
@@ -33,6 +34,8 @@ public class PracticeNoteService {
     private final ProblemPracticeNoteMappingRepository problemPracticeNoteMappingRepository;
 
     private final PracticeNotificationScheduler practiceNotificationScheduler;
+
+    private final MissionLogService missionLogService;
 
     private PracticeNote getPracticeEntity(Long practiceId){
 
@@ -97,9 +100,12 @@ public class PracticeNoteService {
         ).collect(Collectors.toList());
     }
 
-    public void addPracticeNoteCount(Long practiceId) {
+    public void addPracticeNoteCount(Long userId, Long practiceId) {
         PracticeNote practiceNote = getPracticeEntity(practiceId);
         practiceNote.updatePracticeNoteCount();
+
+        // 복습노트 사용 미션 등록
+        missionLogService.registerNotePracticeMission(userId, practiceId);
 
         log.info("practiceId: {} count has updated", practiceId);
     }

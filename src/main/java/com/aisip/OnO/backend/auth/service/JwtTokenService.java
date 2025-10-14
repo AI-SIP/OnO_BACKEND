@@ -6,6 +6,7 @@ import com.aisip.OnO.backend.auth.exception.AuthErrorCase;
 import com.aisip.OnO.backend.auth.repository.RefreshTokenRepository;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.auth.entity.Authority;
+import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.util.redis.RedisTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ public class JwtTokenService {
     private final JwtTokenizer jwtTokenizer;
     private final RedisTokenService redisTokenService;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final MissionLogService missionLogService;
 
     /**
      * ✅ 유저 정보를 기반으로 새로운 액세스/리프레시 토큰 생성 (Redis 사용)
@@ -59,6 +61,9 @@ public class JwtTokenService {
             redisTokenService.deleteRefreshToken(userId);
             throw new ApplicationException(AuthErrorCase.REFRESH_TOKEN_NOT_EQUAL);
         }
+
+        // 데일리 출석 미션 등록 (토큰 갱신 = 로그인)
+        missionLogService.registerLoginMission(userId);
 
         log.info("userId: {} has : refresh access token", userId);
         return generateTokens(userId, authority);
