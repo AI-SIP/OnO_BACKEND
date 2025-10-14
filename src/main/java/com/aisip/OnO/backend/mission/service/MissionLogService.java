@@ -60,6 +60,7 @@ public class MissionLogService {
 
             User user = userRepository.findById(userId).orElseThrow(() -> new ApplicationException(MissionErrorCase.USER_NOT_FOUND));
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
+            missionLogRepository.save(missionLog);
 
             addPointToUser(user, missionLog);
         }
@@ -77,6 +78,7 @@ public class MissionLogService {
 
             User user = userRepository.findById(userId).orElseThrow(() -> new ApplicationException(MissionErrorCase.USER_NOT_FOUND));
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
+            missionLogRepository.save(missionLog);
 
             addPointToUser(user, missionLog);
         }
@@ -95,6 +97,7 @@ public class MissionLogService {
 
             User user = userRepository.findById(userId).orElseThrow(() -> new ApplicationException(MissionErrorCase.USER_NOT_FOUND));
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
+            missionLogRepository.save(missionLog);
 
             addPointToUser(user, missionLog);
         }
@@ -113,6 +116,7 @@ public class MissionLogService {
 
             User user = userRepository.findById(userId).orElseThrow(() -> new ApplicationException(MissionErrorCase.USER_NOT_FOUND));
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
+            missionLogRepository.save(missionLog);
 
             addPointToUser(user, missionLog);
         }
@@ -122,7 +126,14 @@ public class MissionLogService {
         Long pointToday = missionLogRepository.getPointSumToday(user.getId());
         if(pointToday <= DAILY_MISSION_POINT_LIMIT) {
             Long point = getMin(missionLog.getPoint(), DAILY_MISSION_POINT_LIMIT - pointToday);
-            user.getUserMissionStatus().gainPoint(point);
+
+            // 미션 타입에 따라 적절한 능력치에 경험치 적용
+            switch(missionLog.getMissionType().getAbilityType()) {
+                case ATTENDANCE -> user.getUserMissionStatus().gainAttendancePoint(point);
+                case NOTE_WRITE -> user.getUserMissionStatus().gainNoteWritePoint(point);
+                case PROBLEM_PRACTICE -> user.getUserMissionStatus().gainProblemPracticePoint(point);
+                case NOTE_PRACTICE -> user.getUserMissionStatus().gainNotePracticePoint(point);
+            }
 
             return point;
         } else {
