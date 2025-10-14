@@ -22,7 +22,7 @@ public class MissionLogService {
 
     private final UserRepository userRepository;
 
-    private static final Long DAILY_MISSION_POINT_LIMIT = 100L;
+    private static final Long DAILY_MISSION_POINT_LIMIT = 200L;
 
     public Long registerMissionLog(@NotNull MissionRegisterDto missionRegisterDto) {
 
