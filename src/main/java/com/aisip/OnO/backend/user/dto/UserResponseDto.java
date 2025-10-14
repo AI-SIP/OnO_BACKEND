@@ -12,8 +12,14 @@ public record UserResponseDto (
     Long userId,
     String name,
     String email,
-    Long level,
-    Long point,
+    Long attendanceLevel,
+    Long attendancePoint,
+    Long noteWriteLevel,
+    Long noteWritePoint,
+    Long problemPracticeLevel,
+    Long problemPracticePoint,
+    Long notePracticeLevel,
+    Long notePracticePoint,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {
@@ -22,8 +28,14 @@ public record UserResponseDto (
                 .userId(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
-                .level(user.getUserMissionStatus().getLevel())
-                .point(user.getUserMissionStatus().getPoint())
+                .attendanceLevel(user.getUserMissionStatus().getAttendanceLevel())
+                .attendancePoint(user.getUserMissionStatus().getAttendancePoint())
+                .noteWriteLevel(user.getUserMissionStatus().getNoteWriteLevel())
+                .noteWritePoint(user.getUserMissionStatus().getNoteWritePoint())
+                .problemPracticeLevel(user.getUserMissionStatus().getProblemPracticeLevel())
+                .problemPracticePoint(user.getUserMissionStatus().getProblemPracticePoint())
+                .notePracticeLevel(user.getUserMissionStatus().getNotePracticeLevel())
+                .notePracticePoint(user.getUserMissionStatus().getNotePracticePoint())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();

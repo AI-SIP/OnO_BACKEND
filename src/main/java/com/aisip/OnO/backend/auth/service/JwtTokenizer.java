@@ -116,4 +116,38 @@ public class JwtTokenizer {
         return Authority.valueOf(claims.get("authority", String.class));
     }
 
+    public Long getUserIdFromAccessToken(String token) {
+        Claims claims = getClaimsFromAccessToken(token);
+        return Long.valueOf(claims.getSubject());
+    }
+
+    public Authority getAuthorityFromAccessToken(String token) {
+        Claims claims = getClaimsFromAccessToken(token);
+        return Authority.valueOf(claims.get("authority", String.class));
+    }
+
+    /**
+     * AccessToken의 남은 만료 시간을 초 단위로 반환
+     */
+    public long getRemainingExpirationTime(String token) {
+        Claims claims = getClaimsFromAccessToken(token);
+        Date expiration = claims.getExpiration();
+        long now = System.currentTimeMillis();
+        return Math.max(0, (expiration.getTime() - now) / 1000);
+    }
+
+    /**
+     * RefreshToken 만료 시간을 초 단위로 반환
+     */
+    public long getRefreshTokenExpirationSeconds() {
+        return refreshTokenExpiration / 1000;
+    }
+
+    /**
+     * AccessToken 만료 시간을 초 단위로 반환
+     */
+    public long getAccessTokenExpirationSeconds() {
+        return accessTokenExpiration / 1000;
+    }
+
 }

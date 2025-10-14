@@ -7,6 +7,7 @@ import com.aisip.OnO.backend.auth.service.UserAuthService;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @Slf4j
@@ -31,5 +32,14 @@ public class AuthController {
     @PostMapping("/refresh")
     public CommonResponse<TokenResponseDto> refreshToken(@RequestBody TokenRequestDto tokenRequestDto) {
         return CommonResponse.success(userAuthService.refreshAccessToken(tokenRequestDto));
+    }
+
+    // ✅ 로그아웃
+    @PostMapping("/logout")
+    public CommonResponse<String> logout(@RequestHeader("Authorization") String accessToken,
+                                          Authentication authentication) {
+        Long userId = Long.valueOf(authentication.getName());
+        userAuthService.logout(accessToken, userId);
+        return CommonResponse.success("로그아웃 되었습니다.");
     }
 }

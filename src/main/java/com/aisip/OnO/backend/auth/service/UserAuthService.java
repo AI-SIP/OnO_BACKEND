@@ -40,4 +40,9 @@ public class UserAuthService {
     public TokenResponseDto refreshAccessToken(TokenRequestDto tokenRequestDto) {
         return jwtTokenService.refreshAccessToken(tokenRequestDto.getRefreshToken());
     }
+
+    public void logout(String accessToken, Long userId) {
+        jwtTokenService.logout(accessToken, userId);
+        log.info("userId: {} has logged out", userId);
+    }
 }

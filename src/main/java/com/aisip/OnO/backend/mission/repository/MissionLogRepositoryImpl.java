@@ -63,7 +63,7 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
                 .selectOne()
                 .from(missionLog)
                 .where(missionLog.missionType.eq(MissionType.USER_LOGIN)
-                        .and(missionLog.referenceId.eq(userId))
+                        .and(missionLog.user.id.eq(userId))
                         .and(missionLog.createdAt.between(getStartOfToday(), getEndOfToday()))
                 )
                 .fetchFirst() != null;

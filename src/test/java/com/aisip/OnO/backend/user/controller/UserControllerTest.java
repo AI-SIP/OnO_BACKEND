@@ -50,8 +50,15 @@ class UserControllerTest {
                 "test@example.com",  // email
                 1L,  // level
                 0L,  // point
+                1L,
+                0L,
+                1L,
+                0L,
+                1L,
+                0L,
                 LocalDateTime.now(),  // createdAt
-                LocalDateTime.now()  // updatedAt
+                LocalDateTime.now()  // updatedAt,
+
         );
     }
 
