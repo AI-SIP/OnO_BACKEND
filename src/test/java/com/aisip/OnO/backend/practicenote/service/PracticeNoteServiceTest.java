@@ -235,7 +235,7 @@ class PracticeNoteServiceTest {
         Long practiceNoteId = practiceNoteList.get(0).getId();
 
         //when
-        practiceNoteService.addPracticeNoteCount(practiceNoteId);
+        practiceNoteService.addPracticeNoteCount(userId, practiceNoteId);
 
         //then
         PracticeNote practiceNote = practiceNoteRepository.findById(practiceNoteId).get();
