@@ -53,7 +53,12 @@ public class User extends BaseEntity {
                 .identifier(userRegisterDto.identifier())
                 .platform(userRegisterDto.platform())
                 .password(userRegisterDto.password())
-                .userMissionStatus(new UserMissionStatus(1L, 0L))
+                .userMissionStatus(new UserMissionStatus(
+                        1L, 0L,  // 데일리 출석
+                        1L, 0L,  // 오답노트 작성
+                        1L, 0L,  // 문제 복습
+                        1L, 0L   // 복습노트 사용
+                ))
                 .build();
     }
 
