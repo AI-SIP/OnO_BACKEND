@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -39,6 +40,8 @@ public class ProblemService {
     private final FileUploadService fileUploadService;
 
     private final MissionLogService missionLogService;
+
+    private final ProblemAnalysisService analysisService;
 
     public ProblemResponseDto findProblem(Long problemId, Long userId) {
         Problem problem = problemRepository.findProblemWithImageData(problemId)
@@ -107,15 +110,31 @@ public class ProblemService {
         problem.updateFolder(folder);
         problemRepository.save(problem);
 
-        problemRegisterDto.imageDataDtoList()
-                .forEach(problemImageDataRegisterDto -> {
-                    ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto);
-                    problemImageData.updateProblem(problem);
-                    problemImageDataRepository.save(problemImageData);
-                });
+        // 이미지 저장 및 PROBLEM_IMAGE 타입 수집
+        List<String> problemImageUrls = new ArrayList<>();
+        for (var imageDto : problemRegisterDto.imageDataDtoList()) {
+            ProblemImageData problemImageData = ProblemImageData.from(imageDto);
+            problemImageData.updateProblem(problem);
+            problemImageDataRepository.save(problemImageData);
+
+            // PROBLEM_IMAGE 타입의 이미지 URL 수집 (여러 장 가능)
+            if (imageDto.problemImageType() == ProblemImageType.PROBLEM_IMAGE) {
+                problemImageUrls.add(imageDto.imageUrl());
+            }
+        }
 
         // 오답노트 작성 미션 등록
         missionLogService.registerProblemWriteMission(userId);
+
+        // AI 분석 비동기 시작 (PROBLEM_IMAGE가 있을 때만)
+        if (!problemImageUrls.isEmpty()) {
+            analysisService.analyzeProblemAsync(problem.getId(), problemImageUrls);
+            log.info("Started AI analysis for problemId: {} with {} PROBLEM_IMAGE(s)", problem.getId(), problemImageUrls.size());
+        } else {
+            // PROBLEM_IMAGE가 없으면 분석 스킵 상태로 저장
+            analysisService.createSkippedAnalysis(problem.getId());
+            log.info("Skipped AI analysis for problemId: {} (no PROBLEM_IMAGE)", problem.getId());
+        }
 
         log.info("userId: {} register problemId: {}", userId, problem.getId());
 
@@ -177,12 +196,31 @@ public class ProblemService {
             }
             problem.getProblemImageDataList().clear();
 
-            problemRegisterDto.imageDataDtoList().forEach(
-                    problemImageDataRegisterDto -> {
-                        ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto);
-                        problemImageData.updateProblem(problem);
-                        problemImageDataRepository.save(problemImageData);
-                    });
+            // 이미지 업데이트 및 PROBLEM_IMAGE 수집
+            List<String> problemImageUrls = new ArrayList<>();
+            for (var imageDto : problemRegisterDto.imageDataDtoList()) {
+                ProblemImageData problemImageData = ProblemImageData.from(imageDto);
+                problemImageData.updateProblem(problem);
+                problemImageDataRepository.save(problemImageData);
+
+                // PROBLEM_IMAGE 타입의 이미지 URL 수집 (여러 장 가능)
+                if (imageDto.problemImageType() == ProblemImageType.PROBLEM_IMAGE) {
+                    problemImageUrls.add(imageDto.imageUrl());
+                }
+            }
+
+            // 기존 분석 삭제 후 재분석
+            analysisService.deleteAnalysis(problem.getId());
+
+            if (!problemImageUrls.isEmpty()) {
+                // PROBLEM_IMAGE가 있으면 재분석
+                analysisService.analyzeProblemAsync(problem.getId(), problemImageUrls);
+                log.info("Restarted AI analysis for problemId: {} with {} new PROBLEM_IMAGE(s)", problem.getId(), problemImageUrls.size());
+            } else {
+                // PROBLEM_IMAGE가 없으면 스킵 상태로 저장
+                analysisService.createSkippedAnalysis(problem.getId());
+                log.info("Skipped AI analysis for problemId: {} (no PROBLEM_IMAGE after update)", problem.getId());
+            }
         }
 
         log.info("userId: {} update problem Image Data", userId);
