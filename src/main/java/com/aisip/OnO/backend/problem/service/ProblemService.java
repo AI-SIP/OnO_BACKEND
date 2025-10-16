@@ -29,7 +29,6 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class ProblemService {
     private final ProblemRepository problemRepository;
 
@@ -43,6 +42,7 @@ public class ProblemService {
 
     private final ProblemAnalysisService analysisService;
 
+    @Transactional
     public ProblemResponseDto findProblem(Long problemId, Long userId) {
         Problem problem = problemRepository.findProblemWithImageData(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
@@ -51,6 +51,7 @@ public class ProblemService {
         return ProblemResponseDto.from(problem);
     }
 
+    @Transactional
     public Problem findProblemEntity(Long problemId, Long userId) {
         Problem problem = problemRepository.findById(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
@@ -62,6 +63,7 @@ public class ProblemService {
         return problem;
     }
 
+    @Transactional
     public Problem findProblemEntityWithImageData(Long problemId, Long userId) {
         Problem problem = problemRepository.findProblemWithImageData(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
@@ -73,6 +75,7 @@ public class ProblemService {
         return problem;
     }
 
+    @Transactional
     public List<ProblemResponseDto> findUserProblems(Long userId) {
         log.info("userId: {} find all user problems", userId);
 
@@ -82,6 +85,7 @@ public class ProblemService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public List<ProblemResponseDto> findFolderProblemList(Long folderId) {
         return problemRepository.findAllByFolderId(folderId)
                 .stream()
@@ -89,6 +93,7 @@ public class ProblemService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public List<ProblemResponseDto> findAllProblems() {
         return problemRepository.findAll()
                 .stream()
@@ -96,11 +101,13 @@ public class ProblemService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public Long findProblemCountByUser(Long userId) {
         log.info("userId: {} find problem count", userId);
         return problemRepository.countByUserId(userId);
     }
 
+    @Transactional
     public Long registerProblem(ProblemRegisterDto problemRegisterDto, Long userId) {
 
         Folder folder = folderRepository.findById(problemRegisterDto.folderId())
@@ -109,6 +116,18 @@ public class ProblemService {
         Problem problem = Problem.from(problemRegisterDto, userId);
         problem.updateFolder(folder);
         problemRepository.save(problem);
+
+        missionLogService.registerProblemWriteMission(userId);
+
+        log.info("userId: {} register problemId: {}", userId, problem.getId());
+
+        return problem.getId();
+    }
+
+    @Transactional
+    public void saveProblemImages(ProblemRegisterDto problemRegisterDto, Long problemId) {
+        Problem problem = problemRepository.findById(problemId)
+                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
         // 이미지 저장 및 PROBLEM_IMAGE 타입 수집
         List<String> problemImageUrls = new ArrayList<>();
@@ -123,9 +142,6 @@ public class ProblemService {
             }
         }
 
-        // 오답노트 작성 미션 등록
-        missionLogService.registerProblemWriteMission(userId);
-
         // AI 분석 비동기 시작 (PROBLEM_IMAGE가 있을 때만)
         if (!problemImageUrls.isEmpty()) {
             analysisService.analyzeProblemAsync(problem.getId(), problemImageUrls);
@@ -135,10 +151,6 @@ public class ProblemService {
             analysisService.createSkippedAnalysis(problem.getId());
             log.info("Skipped AI analysis for problemId: {} (no PROBLEM_IMAGE)", problem.getId());
         }
-
-        log.info("userId: {} register problemId: {}", userId, problem.getId());
-
-        return problem.getId();
     }
 
     public void registerProblemImageData(ProblemImageDataRegisterDto problemImageDataRegisterDto, Long userId) {

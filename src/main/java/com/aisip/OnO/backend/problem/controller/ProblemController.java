@@ -66,6 +66,8 @@ public class ProblemController {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         Long problemId = problemService.registerProblem(problemRegisterDto, userId);
 
+        problemService.saveProblemImages(problemRegisterDto, problemId);
+
         return CommonResponse.success(problemId);
     }
 
