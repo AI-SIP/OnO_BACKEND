@@ -48,6 +48,9 @@ public class Problem extends BaseEntity {
     @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL)
     private List<ProblemPracticeNoteMapping> problemPracticeNoteMappingList = new ArrayList<>();
 
+    @OneToOne(mappedBy = "problem", cascade = CascadeType.ALL)
+    private ProblemAnalysis problemAnalysis;
+
     public static Problem from(ProblemRegisterDto problemRegisterDto, Long userId) {
         return Problem.builder()
                 .userId(userId)

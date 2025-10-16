@@ -26,13 +26,19 @@ public record ProblemResponseDto (
 
     LocalDateTime updatedAt,
 
-    List<ProblemImageDataResponseDto> imageUrlList
+    List<ProblemImageDataResponseDto> imageUrlList,
+
+    ProblemAnalysisResponseDto analysis
 ) {
     public static ProblemResponseDto from(@NotNull Problem problem) {
 
         List<ProblemImageDataResponseDto> problemImageDataList = Optional.ofNullable(problem.getProblemImageDataList())
                 .orElse(List.of())
                 .stream().map(ProblemImageDataResponseDto::from).toList();
+
+        ProblemAnalysisResponseDto analysisDto = Optional.ofNullable(problem.getProblemAnalysis())
+                .map(ProblemAnalysisResponseDto::from)
+                .orElse(null);
 
         return ProblemResponseDto.builder()
                 .problemId(problem.getId())
@@ -43,6 +49,7 @@ public record ProblemResponseDto (
                 .createdAt(problem.getCreatedAt())
                 .updatedAt(problem.getUpdatedAt())
                 .imageUrlList(problemImageDataList)
+                .analysis(analysisDto)
                 .build();
     }
 }
