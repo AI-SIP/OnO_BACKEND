@@ -106,4 +106,8 @@ public class Problem extends BaseEntity {
     public void removePracticeMappingFromProblem(ProblemPracticeNoteMapping problemPracticeNoteMapping) {
         problemPracticeNoteMappingList.remove(problemPracticeNoteMapping);
     }
+
+    public void updateProblemAnalysis(ProblemAnalysis analysis) {
+        this.problemAnalysis = analysis;
+    }
 }

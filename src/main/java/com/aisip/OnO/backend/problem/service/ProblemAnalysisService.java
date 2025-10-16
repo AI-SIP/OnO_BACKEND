@@ -52,6 +52,7 @@ public class ProblemAnalysisService {
 
             if (!analysisRepository.existsByProblemId(problemId)) {
                 ProblemAnalysis skipped = ProblemAnalysis.createSkipped(problem);
+                problem.updateProblemAnalysis(skipped);
                 analysisRepository.save(skipped);
                 log.info("Created skipped analysis for problemId: {}", problemId);
             }
@@ -80,6 +81,7 @@ public class ProblemAnalysisService {
 
             // 3. 분석 상태 생성 (PROCESSING)
             ProblemAnalysis analysis = ProblemAnalysis.createProcessing(problem);
+            problem.updateProblemAnalysis(analysis);
             analysisRepository.save(analysis);
 
             // 4. OpenAI API 호출 (여러 이미지를 하나의 문제로 분석)
