@@ -1,6 +1,11 @@
 package com.aisip.OnO.backend.util.fileupload.service;
 
+import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.util.fileupload.exception.FileUploadErrorCase;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.model.DeleteObjectRequest;
+import com.amazonaws.services.s3.model.ObjectMetadata;
+import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,7 +26,6 @@ public class FileUploadService {
 
     public String uploadFileToS3(MultipartFile file) {
 
-        /*
         String fileName = createFileName(file);
         String fileUrl = getFileUrl(fileName);
 
@@ -37,21 +41,15 @@ public class FileUploadService {
 
         log.info("file url : " + fileUrl + " has upload to S3");
         return fileUrl;
-         */
-
-        return file.getOriginalFilename();
     }
 
     public void deleteImageFileFromS3(String imageUrl) {
-        /*
         String splitStr = ".com/";
         String fileName = imageUrl.substring(imageUrl.lastIndexOf(splitStr) + splitStr.length());
 
         log.info("file url : " + imageUrl + " has removed from S3");
 
         amazonS3Client.deleteObject(new DeleteObjectRequest(bucket, fileName));
-
-         */
     }
 
     private String createFileName(MultipartFile file) {
