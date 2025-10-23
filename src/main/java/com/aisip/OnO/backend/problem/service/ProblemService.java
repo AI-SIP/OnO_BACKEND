@@ -145,8 +145,10 @@ public class ProblemService {
             }
         }
 
-        // AI 분석 비동기 시작 (PROBLEM_IMAGE가 있을 때만)
+        // AI 분석 처리
         if (!problemImageUrls.isEmpty()) {
+            // PROBLEM_IMAGE가 있으면 먼저 PROCESSING 상태 생성 후 비동기 분석 시작
+            analysisService.createPendingAnalysis(problem.getId());
             analysisService.analyzeProblemAsync(problem.getId(), problemImageUrls);
             log.info("Started AI analysis for problemId: {} with {} PROBLEM_IMAGE(s)", problem.getId(), problemImageUrls.size());
         } else {
@@ -228,7 +230,8 @@ public class ProblemService {
             analysisService.deleteAnalysis(problem.getId());
 
             if (!problemImageUrls.isEmpty()) {
-                // PROBLEM_IMAGE가 있으면 재분석
+                // PROBLEM_IMAGE가 있으면 먼저 PROCESSING 상태 생성 후 재분석
+                analysisService.createPendingAnalysis(problem.getId());
                 analysisService.analyzeProblemAsync(problem.getId(), problemImageUrls);
                 log.info("Restarted AI analysis for problemId: {} with {} new PROBLEM_IMAGE(s)", problem.getId(), problemImageUrls.size());
             } else {

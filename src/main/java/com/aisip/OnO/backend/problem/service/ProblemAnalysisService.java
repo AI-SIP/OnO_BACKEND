@@ -62,6 +62,21 @@ public class ProblemAnalysisService {
     }
 
     /**
+     * PROCESSING 상태의 분석 엔티티를 미리 생성 (비동기 작업 전)
+     */
+    public void createPendingAnalysis(Long problemId) {
+        Problem problem = problemRepository.findById(problemId)
+                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
+
+        if (!analysisRepository.existsByProblemId(problemId)) {
+            ProblemAnalysis pending = ProblemAnalysis.createProcessing(problem);
+            problem.updateProblemAnalysis(pending);
+            analysisRepository.save(pending);
+            log.info("Created pending analysis for problemId: {}", problemId);
+        }
+    }
+
+    /**
      * 비동기로 문제 이미지를 분석합니다.
      */
     @Async
