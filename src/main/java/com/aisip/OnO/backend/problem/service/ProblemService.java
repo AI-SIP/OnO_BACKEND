@@ -15,10 +15,12 @@ import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -124,7 +126,8 @@ public class ProblemService {
         return problem.getId();
     }
 
-    @Transactional
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void saveProblemImages(ProblemRegisterDto problemRegisterDto, Long problemId) {
         Problem problem = problemRepository.findById(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
