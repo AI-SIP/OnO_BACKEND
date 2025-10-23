@@ -88,16 +88,19 @@ public class ProblemAnalysisService {
             Problem problem = problemRepository.findById(problemId)
                     .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
-            // 2. 이미 분석 중이거나 완료된 경우 스킵
-            if (analysisRepository.existsByProblemId(problemId)) {
-                log.info("Analysis already exists for problemId: {}", problemId);
+            // 2. 기존 분석 조회 또는 새로 생성
+            ProblemAnalysis analysis = analysisRepository.findByProblemId(problemId)
+                    .orElseGet(() -> {
+                        ProblemAnalysis newAnalysis = ProblemAnalysis.createProcessing(problem);
+                        problem.updateProblemAnalysis(newAnalysis);
+                        return analysisRepository.save(newAnalysis);
+                    });
+
+            // 3. 이미 완료된 경우 스킵
+            if (analysis.getStatus() == ProblemAnalysis.AnalysisStatus.COMPLETED) {
+                log.info("Analysis already completed for problemId: {}", problemId);
                 return;
             }
-
-            // 3. 분석 상태 생성 (PROCESSING)
-            ProblemAnalysis analysis = ProblemAnalysis.createProcessing(problem);
-            problem.updateProblemAnalysis(analysis);
-            analysisRepository.save(analysis);
 
             // 4. OpenAI API 호출 (여러 이미지를 하나의 문제로 분석)
             ProblemAnalysisResult result = openAIClient.analyzeImages(imageUrls);
@@ -176,11 +179,21 @@ public class ProblemAnalysisService {
             throw new ApplicationException(ProblemErrorCase.PROBLEM_USER_UNMATCHED);
         }
 
-        // 2. Analysis 조회
-        ProblemAnalysis analysis = analysisRepository.findByProblemId(problemId)
-                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_ANALYSIS_NOT_FOUND));
-
-        return ProblemAnalysisResponseDto.from(analysis);
+        // 2. Analysis 조회 (없으면 null 필드로 반환)
+        return analysisRepository.findByProblemId(problemId)
+                .map(ProblemAnalysisResponseDto::from)
+                .orElse(ProblemAnalysisResponseDto.builder()
+                        .id(null)
+                        .problemId(problemId)
+                        .subject(null)
+                        .problemType(null)
+                        .keyPoints(null)
+                        .solution(null)
+                        .commonMistakes(null)
+                        .studyTips(null)
+                        .status("NOT_STARTED")
+                        .errorMessage(null)
+                        .build());
     }
 
     /**
