@@ -15,11 +15,14 @@ import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -28,7 +31,6 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class ProblemService {
     private final ProblemRepository problemRepository;
 
@@ -40,6 +42,9 @@ public class ProblemService {
 
     private final MissionLogService missionLogService;
 
+    private final ProblemAnalysisService analysisService;
+
+    @Transactional
     public ProblemResponseDto findProblem(Long problemId, Long userId) {
         Problem problem = problemRepository.findProblemWithImageData(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
@@ -48,6 +53,7 @@ public class ProblemService {
         return ProblemResponseDto.from(problem);
     }
 
+    @Transactional
     public Problem findProblemEntity(Long problemId, Long userId) {
         Problem problem = problemRepository.findById(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
@@ -59,6 +65,7 @@ public class ProblemService {
         return problem;
     }
 
+    @Transactional
     public Problem findProblemEntityWithImageData(Long problemId, Long userId) {
         Problem problem = problemRepository.findProblemWithImageData(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
@@ -70,6 +77,7 @@ public class ProblemService {
         return problem;
     }
 
+    @Transactional
     public List<ProblemResponseDto> findUserProblems(Long userId) {
         log.info("userId: {} find all user problems", userId);
 
@@ -79,6 +87,7 @@ public class ProblemService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public List<ProblemResponseDto> findFolderProblemList(Long folderId) {
         return problemRepository.findAllByFolderId(folderId)
                 .stream()
@@ -86,6 +95,7 @@ public class ProblemService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public List<ProblemResponseDto> findAllProblems() {
         return problemRepository.findAll()
                 .stream()
@@ -93,11 +103,13 @@ public class ProblemService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public Long findProblemCountByUser(Long userId) {
         log.info("userId: {} find problem count", userId);
         return problemRepository.countByUserId(userId);
     }
 
+    @Transactional
     public Long registerProblem(ProblemRegisterDto problemRegisterDto, Long userId) {
 
         Folder folder = folderRepository.findById(problemRegisterDto.folderId())
@@ -107,19 +119,62 @@ public class ProblemService {
         problem.updateFolder(folder);
         problemRepository.save(problem);
 
-        problemRegisterDto.imageDataDtoList()
-                .forEach(problemImageDataRegisterDto -> {
-                    ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto);
-                    problemImageData.updateProblem(problem);
-                    problemImageDataRepository.save(problemImageData);
-                });
-
-        // 오답노트 작성 미션 등록
         missionLogService.registerProblemWriteMission(userId);
 
         log.info("userId: {} register problemId: {}", userId, problem.getId());
 
         return problem.getId();
+    }
+
+    @Transactional
+    public Long registerProblemWithAnalysis(ProblemRegisterDto problemRegisterDto, Long userId) {
+        // 1. 문제 등록
+        Long problemId = registerProblem(problemRegisterDto, userId);
+
+        // 2. 이미지가 있는지 확인
+        boolean hasProblemImage = problemRegisterDto.imageDataDtoList() != null &&
+                problemRegisterDto.imageDataDtoList().stream()
+                        .anyMatch(imageDto -> imageDto.problemImageType() == ProblemImageType.PROBLEM_IMAGE);
+
+        // 3. 빈 분석 객체 생성
+        if (hasProblemImage) {
+            // 이미지가 있으면 PROCESSING 상태로 생성
+            analysisService.createPendingAnalysis(problemId);
+        } else {
+            // 이미지가 없으면 FAILED(스킵) 상태로 생성
+            analysisService.createSkippedAnalysis(problemId);
+        }
+
+        return problemId;
+    }
+
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void saveProblemImages(ProblemRegisterDto problemRegisterDto, Long problemId) {
+        Problem problem = problemRepository.findById(problemId)
+                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
+
+        // 이미지 저장 및 PROBLEM_IMAGE 타입 수집
+        List<String> problemImageUrls = new ArrayList<>();
+        for (var imageDto : problemRegisterDto.imageDataDtoList()) {
+            ProblemImageData problemImageData = ProblemImageData.from(imageDto);
+            problemImageData.updateProblem(problem);
+            problemImageDataRepository.save(problemImageData);
+
+            // PROBLEM_IMAGE 타입의 이미지 URL 수집 (여러 장 가능)
+            if (imageDto.problemImageType() == ProblemImageType.PROBLEM_IMAGE) {
+                problemImageUrls.add(imageDto.imageUrl());
+            }
+        }
+
+        // AI 분석 처리 (분석 객체는 이미 registerProblemWithAnalysis에서 생성됨)
+        if (!problemImageUrls.isEmpty()) {
+            // PROBLEM_IMAGE가 있으면 비동기 분석 시작
+            analysisService.analyzeProblemAsync(problem.getId(), problemImageUrls);
+            log.info("Started AI analysis for problemId: {} with {} PROBLEM_IMAGE(s)", problem.getId(), problemImageUrls.size());
+        } else {
+            log.info("No PROBLEM_IMAGE for problemId: {}, analysis already set to SKIPPED", problem.getId());
+        }
     }
 
     public void registerProblemImageData(ProblemImageDataRegisterDto problemImageDataRegisterDto, Long userId) {
@@ -177,12 +232,32 @@ public class ProblemService {
             }
             problem.getProblemImageDataList().clear();
 
-            problemRegisterDto.imageDataDtoList().forEach(
-                    problemImageDataRegisterDto -> {
-                        ProblemImageData problemImageData = ProblemImageData.from(problemImageDataRegisterDto);
-                        problemImageData.updateProblem(problem);
-                        problemImageDataRepository.save(problemImageData);
-                    });
+            // 이미지 업데이트 및 PROBLEM_IMAGE 수집
+            List<String> problemImageUrls = new ArrayList<>();
+            for (var imageDto : problemRegisterDto.imageDataDtoList()) {
+                ProblemImageData problemImageData = ProblemImageData.from(imageDto);
+                problemImageData.updateProblem(problem);
+                problemImageDataRepository.save(problemImageData);
+
+                // PROBLEM_IMAGE 타입의 이미지 URL 수집 (여러 장 가능)
+                if (imageDto.problemImageType() == ProblemImageType.PROBLEM_IMAGE) {
+                    problemImageUrls.add(imageDto.imageUrl());
+                }
+            }
+
+            // 기존 분석 삭제 후 재분석
+            analysisService.deleteAnalysis(problem.getId());
+
+            if (!problemImageUrls.isEmpty()) {
+                // PROBLEM_IMAGE가 있으면 먼저 PROCESSING 상태 생성 후 재분석
+                analysisService.createPendingAnalysis(problem.getId());
+                analysisService.analyzeProblemAsync(problem.getId(), problemImageUrls);
+                log.info("Restarted AI analysis for problemId: {} with {} new PROBLEM_IMAGE(s)", problem.getId(), problemImageUrls.size());
+            } else {
+                // PROBLEM_IMAGE가 없으면 스킵 상태로 저장
+                analysisService.createSkippedAnalysis(problem.getId());
+                log.info("Skipped AI analysis for problemId: {} (no PROBLEM_IMAGE after update)", problem.getId());
+            }
         }
 
         log.info("userId: {} update problem Image Data", userId);

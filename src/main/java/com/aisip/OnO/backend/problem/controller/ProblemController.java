@@ -1,10 +1,12 @@
 package com.aisip.OnO.backend.problem.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
+import com.aisip.OnO.backend.problem.dto.ProblemAnalysisResponseDto;
 import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
+import com.aisip.OnO.backend.problem.service.ProblemAnalysisService;
 import com.aisip.OnO.backend.problem.service.ProblemService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,7 @@ import java.util.List;
 public class ProblemController {
 
     private final ProblemService problemService;
+    private final ProblemAnalysisService analysisService;
 
     @InitBinder
     public void initBinder(WebDataBinder binder) {
@@ -64,9 +67,23 @@ public class ProblemController {
     @PostMapping("")
     public CommonResponse<Long> registerProblem(@RequestBody ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        Long problemId = problemService.registerProblem(problemRegisterDto, userId);
+
+        // 문제 등록 + 빈 분석 객체 생성 (동기)
+        Long problemId = problemService.registerProblemWithAnalysis(problemRegisterDto, userId);
+
+        // 이미지 저장 및 분석은 비동기로 처리
+        problemService.saveProblemImages(problemRegisterDto, problemId);
 
         return CommonResponse.success(problemId);
+    }
+
+    // ✅ 문제 분석 결과 조회 (폴링용)
+    @GetMapping("/{problemId}/analysis")
+    public CommonResponse<ProblemAnalysisResponseDto> getProblemAnalysis(@PathVariable("problemId") Long problemId) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        ProblemAnalysisResponseDto analysisResponseDto = analysisService.getAnalysis(problemId, userId);
+
+        return CommonResponse.success(analysisResponseDto);
     }
 
     // ✅ 이미지 데이터 등록
