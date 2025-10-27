@@ -126,6 +126,28 @@ public class ProblemService {
         return problem.getId();
     }
 
+    @Transactional
+    public Long registerProblemWithAnalysis(ProblemRegisterDto problemRegisterDto, Long userId) {
+        // 1. 문제 등록
+        Long problemId = registerProblem(problemRegisterDto, userId);
+
+        // 2. 이미지가 있는지 확인
+        boolean hasProblemImage = problemRegisterDto.imageDataDtoList() != null &&
+                problemRegisterDto.imageDataDtoList().stream()
+                        .anyMatch(imageDto -> imageDto.problemImageType() == ProblemImageType.PROBLEM_IMAGE);
+
+        // 3. 빈 분석 객체 생성
+        if (hasProblemImage) {
+            // 이미지가 있으면 PROCESSING 상태로 생성
+            analysisService.createPendingAnalysis(problemId);
+        } else {
+            // 이미지가 없으면 FAILED(스킵) 상태로 생성
+            analysisService.createSkippedAnalysis(problemId);
+        }
+
+        return problemId;
+    }
+
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void saveProblemImages(ProblemRegisterDto problemRegisterDto, Long problemId) {
@@ -145,16 +167,13 @@ public class ProblemService {
             }
         }
 
-        // AI 분석 처리
+        // AI 분석 처리 (분석 객체는 이미 registerProblemWithAnalysis에서 생성됨)
         if (!problemImageUrls.isEmpty()) {
-            // PROBLEM_IMAGE가 있으면 먼저 PROCESSING 상태 생성 후 비동기 분석 시작
-            analysisService.createPendingAnalysis(problem.getId());
+            // PROBLEM_IMAGE가 있으면 비동기 분석 시작
             analysisService.analyzeProblemAsync(problem.getId(), problemImageUrls);
             log.info("Started AI analysis for problemId: {} with {} PROBLEM_IMAGE(s)", problem.getId(), problemImageUrls.size());
         } else {
-            // PROBLEM_IMAGE가 없으면 분석 스킵 상태로 저장
-            analysisService.createSkippedAnalysis(problem.getId());
-            log.info("Skipped AI analysis for problemId: {} (no PROBLEM_IMAGE)", problem.getId());
+            log.info("No PROBLEM_IMAGE for problemId: {}, analysis already set to SKIPPED", problem.getId());
         }
     }
 

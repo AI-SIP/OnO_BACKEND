@@ -67,7 +67,9 @@ public class ProblemController {
     @PostMapping("")
     public CommonResponse<Long> registerProblem(@RequestBody ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        Long problemId = problemService.registerProblem(problemRegisterDto, userId);
+
+        // 문제 등록 + 빈 분석 객체 생성 (동기)
+        Long problemId = problemService.registerProblemWithAnalysis(problemRegisterDto, userId);
 
         // 이미지 저장 및 분석은 비동기로 처리
         problemService.saveProblemImages(problemRegisterDto, problemId);
