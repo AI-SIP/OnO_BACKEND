@@ -281,6 +281,7 @@ public class ProblemService {
         log.info("problemId: {} has deleted", problemId);
     }
 
+    @Transactional
     public void deleteProblemImageData(String imageUrl) {
         fileUploadService.deleteImageFileFromS3(imageUrl);
         problemImageDataRepository.deleteByImageUrl(imageUrl);
