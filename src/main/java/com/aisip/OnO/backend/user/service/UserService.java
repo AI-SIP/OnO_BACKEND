@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -36,6 +37,7 @@ public class UserService {
                 .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
     }
 
+    @Transactional
     public User findUserEntityByIdentifier(String identifier){
         return userRepository.findByIdentifier(identifier)
                 .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
@@ -53,6 +55,7 @@ public class UserService {
         return User.from(userRegisterDto);
     }
 
+    @Transactional
     public UserResponseDto registerGuestUser() {
 
         User user = createGuestUser();
@@ -61,6 +64,7 @@ public class UserService {
         return UserResponseDto.from(user);
     }
 
+    @Transactional
     public UserResponseDto registerMemberUser(UserRegisterDto userRegisterDto) {
         return userRepository.findByIdentifier(userRegisterDto.identifier())
                 .map(UserResponseDto::from)
@@ -71,16 +75,19 @@ public class UserService {
                 });
     }
 
+    @Transactional(readOnly = true)
     public UserResponseDto findUser(Long userId) {
         User user = findUserEntity(userId);
         return UserResponseDto.from(user);
     }
 
+    @Transactional(readOnly = true)
     public List<UserResponseDto> findAllUsers() {
         List<User> userList = userRepository.findAll();
         return userList.stream().map(UserResponseDto::from).collect(Collectors.toList());
     }
 
+    @Transactional
     public void updateUser(Long userId, UserRegisterDto userRegisterDto) {
 
         User user = findUserEntity(userId);
@@ -90,6 +97,7 @@ public class UserService {
         userRepository.save(user);
     }
 
+    @Transactional
     public void deleteUserById(Long userId) {
         practiceNoteService.deleteAllPracticesByUser(userId);
         problemService.deleteAllUserProblems(userId);

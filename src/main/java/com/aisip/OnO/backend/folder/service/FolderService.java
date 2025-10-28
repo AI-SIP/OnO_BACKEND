@@ -7,9 +7,8 @@ import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
-import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.service.ProblemService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +26,7 @@ public class FolderService {
 
     private final ProblemService problemService;
 
+    @Transactional(readOnly = true)
     public FolderResponseDto findRootFolder(Long userId) {
         return folderRepository.findRootFolder(userId)
                 .map(rootFolder -> {
@@ -40,6 +40,7 @@ public class FolderService {
                 });
     }
 
+    @Transactional(readOnly = true)
     public FolderResponseDto findFolder(Long folderId) {
         Folder folder = folderRepository.findFolderWithDetailsByFolderId(folderId)
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
@@ -48,11 +49,13 @@ public class FolderService {
         return FolderResponseDto.from(folder, problemIdList);
     }
 
+    @Transactional(readOnly = true)
     public Folder findFolderEntity(Long folderId) {
         return folderRepository.findById(folderId)
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
     }
 
+    @Transactional(readOnly = true)
     public List<FolderThumbnailResponseDto> findAllUserFolderThumbnails(Long userId) {
         List<Folder> folderList = folderRepository.findAllByUserId(userId);
 
@@ -61,6 +64,7 @@ public class FolderService {
                 : folderList.stream().map(FolderThumbnailResponseDto::from).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<FolderResponseDto> findAllUserFolders(Long userId) {
         List<Folder> folders = folderRepository.findAllFoldersWithDetailsByUserId(userId);
 
