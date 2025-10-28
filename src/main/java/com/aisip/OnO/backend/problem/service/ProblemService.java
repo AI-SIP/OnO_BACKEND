@@ -177,6 +177,7 @@ public class ProblemService {
         }
     }
 
+    @Transactional
     public void registerProblemImageData(ProblemImageDataRegisterDto problemImageDataRegisterDto, Long userId) {
         Problem problem = findProblemEntityWithImageData(problemImageDataRegisterDto.problemId(), userId);
 
@@ -201,6 +202,7 @@ public class ProblemService {
         log.info("userId: {} register problem image data for problemId: {}", userId, problem.getId());
     }
 
+    @Transactional
     public void updateProblemInfo(ProblemRegisterDto problemRegisterDto, Long userId) {
 
         Problem problem = findProblemEntity(problemRegisterDto.problemId(), userId);
@@ -210,6 +212,7 @@ public class ProblemService {
         log.info("userId: {} update problemId: {}", userId, problem.getId());
     }
 
+    @Transactional
     public void updateProblemFolder(ProblemRegisterDto problemRegisterDto, Long userId) {
         Problem problem = findProblemEntity(problemRegisterDto.problemId(), userId);
 
@@ -223,6 +226,7 @@ public class ProblemService {
         }
     }
 
+    @Transactional
     public void updateProblemImageData(ProblemRegisterDto problemRegisterDto, Long userId) {
         Problem problem = findProblemEntityWithImageData(problemRegisterDto.problemId(), userId);
 
