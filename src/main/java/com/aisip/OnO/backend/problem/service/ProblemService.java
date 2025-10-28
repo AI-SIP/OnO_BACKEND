@@ -44,7 +44,7 @@ public class ProblemService {
 
     private final ProblemAnalysisService analysisService;
 
-    @Transactional
+    @Transactional(readOnly = true)
     public ProblemResponseDto findProblem(Long problemId, Long userId) {
         Problem problem = problemRepository.findProblemWithImageData(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
@@ -53,7 +53,7 @@ public class ProblemService {
         return ProblemResponseDto.from(problem);
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public Problem findProblemEntity(Long problemId, Long userId) {
         Problem problem = problemRepository.findById(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
@@ -65,7 +65,7 @@ public class ProblemService {
         return problem;
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public Problem findProblemEntityWithImageData(Long problemId, Long userId) {
         Problem problem = problemRepository.findProblemWithImageData(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
@@ -77,7 +77,7 @@ public class ProblemService {
         return problem;
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public List<ProblemResponseDto> findUserProblems(Long userId) {
         log.info("userId: {} find all user problems", userId);
 
@@ -87,7 +87,7 @@ public class ProblemService {
                 .collect(Collectors.toList());
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public List<ProblemResponseDto> findFolderProblemList(Long folderId) {
         return problemRepository.findAllByFolderId(folderId)
                 .stream()
@@ -95,7 +95,7 @@ public class ProblemService {
                 .collect(Collectors.toList());
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public List<ProblemResponseDto> findAllProblems() {
         return problemRepository.findAll()
                 .stream()
@@ -103,7 +103,7 @@ public class ProblemService {
                 .collect(Collectors.toList());
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public Long findProblemCountByUser(Long userId) {
         log.info("userId: {} find problem count", userId);
         return problemRepository.countByUserId(userId);
@@ -267,6 +267,7 @@ public class ProblemService {
         log.info("userId: {} update problem Image Data", userId);
     }
 
+    @Transactional
     public void deleteProblem(Long problemId) {
 
         List<ProblemImageData> imageDataList= problemImageDataRepository.findAllByProblemId(problemId);
@@ -287,10 +288,12 @@ public class ProblemService {
         problemImageDataRepository.deleteByImageUrl(imageUrl);
     }
 
+    @Transactional
     public void deleteProblemList(List<Long> problemIdList) {
         problemIdList.forEach(this::deleteProblem);
     }
 
+    @Transactional
     public void deleteFolderProblems(Long folderId) {
         problemRepository.findAllByFolderId(folderId)
                 .forEach(problem -> {
@@ -300,10 +303,12 @@ public class ProblemService {
         log.info("problem in folderId: {} has deleted", folderId);
     }
 
+    @Transactional
     public void deleteAllByFolderIds(Collection<Long> folderIds) {
         folderIds.forEach(this::deleteFolderProblems);
     }
 
+    @Transactional
     public void deleteAllUserProblems(Long userId) {
         problemRepository.findAllByUserId(userId)
                 .forEach(problem -> {
