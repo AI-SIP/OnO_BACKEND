@@ -17,7 +17,8 @@ public class CryptoService {
 
     // ✅ 암호화
     public String encrypt(String plainText) throws Exception {
-        SecretKeySpec keySpec = new SecretKeySpec(secretKey.getBytes(), ALGORITHM);
+        byte[] decodedKey = Base64.getDecoder().decode(secretKey);
+        SecretKeySpec keySpec = new SecretKeySpec(decodedKey, ALGORITHM);
         Cipher cipher = Cipher.getInstance(ALGORITHM);
         cipher.init(Cipher.ENCRYPT_MODE, keySpec);
         byte[] encryptedBytes = cipher.doFinal(plainText.getBytes());
@@ -26,7 +27,8 @@ public class CryptoService {
 
     // ✅ 복호화
     public String decrypt(String encryptedText) throws Exception {
-        SecretKeySpec keySpec = new SecretKeySpec(secretKey.getBytes(), ALGORITHM);
+        byte[] decodedKey = Base64.getDecoder().decode(secretKey);
+        SecretKeySpec keySpec = new SecretKeySpec(decodedKey, ALGORITHM);
         Cipher cipher = Cipher.getInstance(ALGORITHM);
         cipher.init(Cipher.DECRYPT_MODE, keySpec);
         byte[] decryptedBytes = cipher.doFinal(Base64.getDecoder().decode(encryptedText));

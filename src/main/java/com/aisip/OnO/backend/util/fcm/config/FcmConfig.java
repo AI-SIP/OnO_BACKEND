@@ -9,9 +9,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.beans.factory.annotation.Value;
 
 import java.io.IOException;
+import java.io.InputStream;
 
 @Slf4j
 @Configuration
@@ -36,14 +39,29 @@ public class FcmConfig {
 
     @PostConstruct
     public void init() throws IOException {
-        ClassPathResource resource = new ClassPathResource(filePath);
-        FirebaseOptions options = FirebaseOptions.builder()
-                .setCredentials(GoogleCredentials.fromStream(resource.getInputStream()))
-                .setProjectId(projectId)
-                .build();
+        // ClassPathResource와 FileSystemResource 모두 시도
+        Resource resource;
+        try {
+            // 먼저 classpath에서 시도 (로컬 개발 환경)
+            resource = new ClassPathResource(filePath);
+            if (!resource.exists()) {
+                // classpath에 없으면 파일 시스템에서 시도 (Docker 환경)
+                resource = new FileSystemResource(filePath);
+            }
+        } catch (Exception e) {
+            // classpath 실패 시 파일 시스템에서 시도
+            resource = new FileSystemResource(filePath);
+        }
 
-        if (FirebaseApp.getApps().isEmpty()) {
-            FirebaseApp.initializeApp(options);
+        try (InputStream inputStream = resource.getInputStream()) {
+            FirebaseOptions options = FirebaseOptions.builder()
+                    .setCredentials(GoogleCredentials.fromStream(inputStream))
+                    .setProjectId(projectId)
+                    .build();
+
+            if (FirebaseApp.getApps().isEmpty()) {
+                FirebaseApp.initializeApp(options);
+            }
         }
     }
 

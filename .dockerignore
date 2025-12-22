@@ -1,0 +1,66 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+
+# IDE
+.idea
+.vscode
+*.iml
+*.iws
+*.ipr
+out/
+
+# Build artifacts (제외할 것들)
+build/
+!build/libs/*.jar
+target/
+bin/
+
+# Gradle
+.gradle
+gradle-wrapper.jar
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Test
+test/
+src/test/
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Docker
+docker-compose*.yml
+Dockerfile
+
+# Sensitive files
+application-local.yml
+application-dev.yml
+*-key.pem
+*.key
+*.cert
+*.p12
+*.jks

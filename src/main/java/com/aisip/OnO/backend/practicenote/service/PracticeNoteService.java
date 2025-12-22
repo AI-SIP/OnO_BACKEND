@@ -12,10 +12,10 @@ import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -65,6 +65,7 @@ public class PracticeNoteService {
         practiceNotificationScheduler.schedulePracticeNotification(userId, practiceId, practiceTitle, notificationRegisterDto);
     }
 
+    @Transactional(readOnly = true)
     public PracticeNoteDetailResponseDto findPracticeNoteDetail(Long practiceId){
         log.info("find practiceId: {}", practiceId);
         PracticeNote practiceNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceId)
@@ -76,6 +77,7 @@ public class PracticeNoteService {
         return PracticeNoteDetailResponseDto.from(practiceNote, problemIdList);
     }
 
+    @Transactional(readOnly = true)
     public List<PracticeNoteThumbnailResponseDto> findAllPracticeThumbnailsByUser(Long userId){
         List<PracticeNote> practiceNoteList = practiceNoteRepository.findAllByUserId(userId);
 
@@ -86,6 +88,7 @@ public class PracticeNoteService {
         ).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<PracticeNoteDetailResponseDto> findAllPracticesByUser(Long userId){
         List<PracticeNote> practiceNoteList = practiceNoteRepository.findAllUserPracticeNotesWithDetails(userId);
 
