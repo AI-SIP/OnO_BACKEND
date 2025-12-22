@@ -73,7 +73,6 @@ services:
       ADMIN_IDENTIFIER: ${ADMIN_IDENTIFIER}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     volumes:
-      - ./FirebaseAdminKey.json:/app/FirebaseAdminKey.json:ro
       - app_logs:/app/logs
     depends_on:
       mysql:
