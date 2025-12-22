@@ -1,6 +1,7 @@
 # open jdk 17 버전의 환경을 구성한다.
 # Eclipse Temurin은 OpenJDK의 공식 후속 이미지입니다
-FROM eclipse-temurin:17-jre-alpine
+# alpine 대신 일반 버전 사용 (ARM64/Apple Silicon 지원)
+FROM eclipse-temurin:17-jre
 
 # build가 될 때 JAR_FILE이라는 변수 명에 build/libs/*.jar 선언
 # build/libs - gradle로 빌드했을 때 jar 파일이 생성되는 경로임
