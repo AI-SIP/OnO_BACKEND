@@ -37,6 +37,7 @@ jobs:
       # 4. Firebase Admin Key 생성 (GitHub Secrets에서 주입)
       - name: Create FirebaseAdminKey.json
         run: |
+          rm -rf ./FirebaseAdminKey.json  # 기존 파일/디렉토리 삭제
           echo "${{ secrets.FIREBASE_ADMIN_KEY }}" > ./FirebaseAdminKey.json
         shell: bash
 
