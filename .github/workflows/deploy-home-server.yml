@@ -92,18 +92,20 @@ jobs:
       # 10. Docker Compose로 배포
       - name: Deploy with Docker Compose
         run: |
-          # 기존 컨테이너 중지 및 제거
-          docker-compose down || true
+          # MySQL과 Redis가 없으면 시작 (최초 배포 시)
+          docker-compose up -d mysql redis
 
-          # 새 컨테이너 시작
-          docker-compose up -d
+          # Spring Boot 앱만 재시작 (기존 컨테이너 중지 후 새로 시작)
+          docker-compose stop app || true
+          docker-compose rm -f app || true
+          docker-compose up -d app
 
           # 헬스체크 대기 (최대 2분)
           echo "Waiting for application to be healthy..."
           timeout=120
           elapsed=0
           while [ $elapsed -lt $timeout ]; do
-            if docker-compose ps | grep -q "healthy"; then
+            if docker-compose ps app | grep -q "healthy"; then
               echo "Application is healthy!"
               break
             fi
