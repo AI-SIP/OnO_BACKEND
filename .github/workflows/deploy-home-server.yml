@@ -1,8 +1,10 @@
 name: Deploy to Home Server (Mac Mini)
 
 on:
+#  push:
+#    branches: ["main"]  # main 브랜치에 푸시될 때 워크플로우 실행
   push:
-    branches: ["main"]  # main 브랜치에 푸시될 때 워크플로우 실행
+      branches: ["chore/homeserver"]  # chore 브랜치에 푸시될 때 워크플로우 실행
   workflow_dispatch:  # 수동 실행 가능
 
 permissions:
