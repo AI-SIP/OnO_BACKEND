@@ -30,7 +30,6 @@ jobs:
         run: |
           mkdir -p ./src/main/resources
           echo "${{ secrets.APPLICATION_PROD }}" > ./src/main/resources/application.yml
-          EOF
         shell: bash
 
       # 4. Firebase Admin Key 생성
