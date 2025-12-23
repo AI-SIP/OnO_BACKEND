@@ -140,7 +140,7 @@ jobs:
             COLOR="15158332"  # 빨간색 (실패)
           fi
 
-          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL_DEV }}" \
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
             -H "Content-Type: application/json" \
             -d "{
               \"embeds\": [{
