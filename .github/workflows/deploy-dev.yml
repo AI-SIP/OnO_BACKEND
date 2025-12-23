@@ -1,15 +1,15 @@
-name: Deploy to Home Server (Mac Mini)
+name: Deploy to Development Server (Mac Mini)
 
 on:
   push:
-    branches: ["main"]  # main 브랜치에 푸시될 때 워크플로우 실행
+    branches: ["develop"]  # develop 브랜치에 푸시될 때 개발 배포
   workflow_dispatch:  # 수동 실행 가능
 
 permissions:
   contents: read
 
 jobs:
-  build-and-deploy:
+  build-and-deploy-dev:
     runs-on: self-hosted  # Mac Mini의 Self-hosted Runner 사용
 
     steps:
@@ -23,19 +23,19 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: 'gradle'  # Gradle 캐시 활성화
+          cache: 'gradle'
 
-      # 3. application-prod.yml 생성 (GitHub Secrets에서 주입)
-      - name: Create application-prod.yml
+      # 3. application-dev.yml 생성 (개발 환경 설정)
+      - name: Create application-dev.yml
         run: |
           mkdir -p ./src/main/resources
-          echo "${{ secrets.APPLICATION_PROD }}" > ./src/main/resources/application-prod.yml
+          echo "${{ secrets.APPLICATION_DEV }}" > ./src/main/resources/application.yml
         shell: bash
 
-      # 4. Firebase Admin Key 생성 (GitHub Secrets에서 주입)
+      # 4. Firebase Admin Key 생성
       - name: Create FirebaseAdminKey.json
         run: |
-          rm -rf ./FirebaseAdminKey.json  # 기존 파일/디렉토리 삭제
+          rm -rf ./FirebaseAdminKey.json
           cat > ./FirebaseAdminKey.json << 'EOF'
           ${{ secrets.FIREBASE_ADMIN_KEY }}
           EOF
@@ -51,25 +51,25 @@ jobs:
         run: ./gradlew clean build -x test
         shell: bash
 
-      # 7. Docker 이미지 빌드
+      # 7. Docker 이미지 빌드 (DEVELOPMENT 태그)
       - name: Build Docker image
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/ono:latest .
-          docker tag ${{ secrets.DOCKER_USERNAME }}/ono:latest ${{ secrets.DOCKER_USERNAME }}/ono:${{ github.sha }}
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/ono:dev-latest .
+          docker tag ${{ secrets.DOCKER_USERNAME }}/ono:dev-latest ${{ secrets.DOCKER_USERNAME }}/ono:dev-${{ github.sha }}
         shell: bash
 
-      # 8. Docker Hub에 로그인 및 푸시 (선택사항: 다른 서버에도 배포하려면)
+      # 8. Docker Hub에 푸시
       - name: Push to Docker Hub
         run: |
           echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
-          docker push ${{ secrets.DOCKER_USERNAME }}/ono:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/ono:${{ github.sha }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/ono:dev-latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/ono:dev-${{ github.sha }}
         shell: bash
 
-      # 9. .env 파일 생성
+      # 9. .env 파일 생성 (DEVELOPMENT)
       - name: Create .env file
         run: |
-          cat > .env << EOF
+          cat > .env.dev << EOF
           DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
           MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
           SPRING_CRYPTO_SECRET_KEY=${{ secrets.SPRING_CRYPTO_SECRET_KEY }}
@@ -80,33 +80,32 @@ jobs:
           CLOUD_AWS_S3_BUCKET=${{ secrets.CLOUD_AWS_S3_BUCKET }}
           CLOUD_AWS_CREDENTIALS_ACCESS_KEY=${{ secrets.CLOUD_AWS_CREDENTIALS_ACCESS_KEY }}
           CLOUD_AWS_CREDENTIALS_SECRET_KEY=${{ secrets.CLOUD_AWS_CREDENTIALS_SECRET_KEY }}
-          EXTERNAL_API_FAST_API_URL=${{ secrets.EXTERNAL_API_FAST_API_URL }}
-          DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL_DEV=${{ secrets.DISCORD_WEBHOOK_URL }}
           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-          SENTRY_DSN=${{ secrets.SENTRY_DSN }}
+          SENTRY_DSN_DEV=${{ secrets.SENTRY_DSN }}
           ADMIN_IDENTIFIER=${{ secrets.ADMIN_IDENTIFIER }}
           ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
           EOF
         shell: bash
 
-      # 10. Docker Compose로 배포
+      # 10. Docker Compose로 배포 (DEVELOPMENT)
       - name: Deploy with Docker Compose
         run: |
-          # MySQL과 Redis가 없으면 시작 (최초 배포 시)
-          docker-compose up -d mysql redis
+          # MySQL과 Redis 시작 (개발 환경 전용)
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev up -d mysql-dev redis-dev
 
-          # Spring Boot 앱만 재시작 (기존 컨테이너 중지 후 새로 시작)
-          docker-compose stop app || true
-          docker-compose rm -f app || true
-          docker-compose up -d app
+          # Spring Boot 개발 앱만 재시작
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev stop app-dev || true
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev rm -f app-dev || true
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev up -d app-dev
 
           # 헬스체크 대기 (최대 2분)
-          echo "Waiting for application to be healthy..."
-          timeout=120
+          echo "Waiting for development application to be healthy..."
+          timeout=60
           elapsed=0
           while [ $elapsed -lt $timeout ]; do
-            if docker-compose ps app | grep -q "healthy"; then
-              echo "Application is healthy!"
+            if docker-compose -f docker-compose.dev.yml --env-file .env.dev ps app-dev | grep -q "healthy"; then
+              echo "Development application is healthy!"
               break
             fi
             echo "Waiting... ($elapsed seconds)"
@@ -115,27 +114,23 @@ jobs:
           done
 
           # 컨테이너 상태 확인
-          docker-compose ps
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev ps
 
           # 로그 출력 (마지막 50줄)
-          echo "=== Application Logs ==="
-          docker-compose logs --tail=50 app
+          echo "=== Development Application Logs ==="
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev logs --tail=50 app-dev
         shell: bash
 
-      # 11. 오래된 Docker 이미지 정리
+      # 12. 오래된 Docker 이미지 정리
       - name: Clean up old Docker images
         run: |
-          # 24시간 이상 된 dangling 이미지 삭제
           docker image prune -f --filter "until=24h"
-
-          # 사용하지 않는 볼륨 정리 (선택사항)
-          # docker volume prune -f
         shell: bash
-        continue-on-error: true  # 정리 실패해도 워크플로우는 성공으로 처리
+        continue-on-error: true
 
-      # 12. Slack/Discord 알림 (선택사항)
+      # 13. Discord 배포 알림
       - name: Send deployment notification
-        if: always()  # 성공/실패 관계없이 항상 실행
+        if: always()
         run: |
           STATUS="${{ job.status }}"
           COLOR="3066993"  # 파란색 (성공)
@@ -147,8 +142,8 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{
               \"embeds\": [{
-                \"title\": \"🚀 Deployment $STATUS\",
-                \"description\": \"Branch: \`${{ github.ref_name }}\`\nCommit: \`${{ github.sha }}\`\nAuthor: ${{ github.actor }}\",
+                \"title\": \"🔧 Development Deployment $STATUS\",
+                \"description\": \"Environment: **DEVELOPMENT**\nURL: https://ono-dev.seungminki.shop\nBranch: \`${{ github.ref_name }}\`\nCommit: \`${{ github.sha }}\`\nAuthor: ${{ github.actor }}\",
                 \"color\": $COLOR,
                 \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\"
               }]

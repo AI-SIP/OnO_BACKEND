@@ -33,10 +33,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    @Value("${spring.jwt.secret}")
-    private String secret;
-
-    @Value("${spring.site.url}")  // 애플리케이션의 HTTPS 기본 URL을 환경 변수로 받아옴
+    @Value("${spring.site.url}")
     private String siteUrl;
 
     public final JwtTokenFilter jwtTokenFilter;
