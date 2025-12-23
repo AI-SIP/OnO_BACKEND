@@ -91,7 +91,8 @@ services:
 
 networks:
   ono-network:
-    external: true  # prod에서 생성된 네트워크 사용
+    driver: bridge
+    name: ono-network  # prod와 같은 네트워크 이름 사용
 
 volumes:
   mysql_dev_data:

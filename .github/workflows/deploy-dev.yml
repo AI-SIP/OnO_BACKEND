@@ -82,9 +82,9 @@ jobs:
           CLOUD_AWS_S3_BUCKET=${{ secrets.CLOUD_AWS_S3_BUCKET }}
           CLOUD_AWS_CREDENTIALS_ACCESS_KEY=${{ secrets.CLOUD_AWS_CREDENTIALS_ACCESS_KEY }}
           CLOUD_AWS_CREDENTIALS_SECRET_KEY=${{ secrets.CLOUD_AWS_CREDENTIALS_SECRET_KEY }}
-          DISCORD_WEBHOOK_URL_DEV=${{ secrets.DISCORD_WEBHOOK_URL_DEV }}
+          DISCORD_WEBHOOK_URL_DEV=${{ secrets.DISCORD_WEBHOOK_URL }}
           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-          SENTRY_DSN_DEV=${{ secrets.SENTRY_DSN_DEV }}
+          SENTRY_DSN_DEV=${{ secrets.SENTRY_DSN }}
           ADMIN_IDENTIFIER=${{ secrets.ADMIN_IDENTIFIER }}
           ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
           EOF
