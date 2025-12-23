@@ -106,7 +106,7 @@ jobs:
           timeout=120
           elapsed=0
           while [ $elapsed -lt $timeout ]; do
-            if docker-compose -f docker-compose.dev.yml ps app-dev | grep -q "healthy"; then
+            if docker-compose -f docker-compose.dev.yml --env-file .env.dev ps app-dev | grep -q "healthy"; then
               echo "Development application is healthy!"
               break
             fi
@@ -116,11 +116,11 @@ jobs:
           done
 
           # 컨테이너 상태 확인
-          docker-compose -f docker-compose.dev.yml ps
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev ps
 
           # 로그 출력 (마지막 50줄)
           echo "=== Development Application Logs ==="
-          docker-compose -f docker-compose.dev.yml logs --tail=50 app-dev
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev logs --tail=50 app-dev
         shell: bash
 
       # 12. 오래된 Docker 이미지 정리
