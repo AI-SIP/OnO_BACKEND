@@ -94,11 +94,11 @@ jobs:
       - name: Deploy with Docker Compose
         run: |
           # MySQL과 Redis 시작 (개발 환경 전용)
-          docker-compose -f docker-compose.dev.yml up -d mysql-dev redis-dev
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev up -d mysql-dev redis-dev
 
           # Spring Boot 개발 앱만 재시작
-          docker-compose -f docker-compose.dev.yml stop app-dev || true
-          docker-compose -f docker-compose.dev.yml rm -f app-dev || true
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev stop app-dev || true
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev rm -f app-dev || true
           docker-compose -f docker-compose.dev.yml --env-file .env.dev up -d app-dev
 
           # 헬스체크 대기 (최대 2분)
