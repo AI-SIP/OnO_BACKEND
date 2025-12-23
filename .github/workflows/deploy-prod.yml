@@ -29,8 +29,7 @@ jobs:
       - name: Create application-prod.yml
         run: |
           mkdir -p ./src/main/resources
-          cat > ./src/main/resources/application-prod.yml << 'EOF'
-          ${{ secrets.APPLICATION_PROD }}
+          echo "${{ secrets.APPLICATION_PROD }}" > ./src/main/resources/application-prod.yml
           EOF
         shell: bash
 
@@ -101,9 +100,9 @@ jobs:
           docker-compose -f docker-compose.prod.yml --env-file .env.prod rm -f app-prod || true
           docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d app-prod
 
-          # 헬스체크 대기 (최대 2분)
+          # 헬스체크 대기 (최대 1분)
           echo "Waiting for production application to be healthy..."
-          timeout=120
+          timeout=60
           elapsed=0
           while [ $elapsed -lt $timeout ]; do
             if docker-compose -f docker-compose.prod.yml ps app-prod | grep -q "healthy"; then
