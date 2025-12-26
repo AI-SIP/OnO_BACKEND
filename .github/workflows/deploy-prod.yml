@@ -88,24 +88,45 @@ jobs:
           EOF
         shell: bash
 
-      # 10. Docker Compose로 배포 (PRODUCTION)
-      - name: Deploy with Docker Compose
+      # 10. Blue-Green 무중단 배포
+      - name: Blue-Green Deployment
         run: |
           # MySQL과 Redis 시작 (이미 실행 중이면 스킵)
           docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d mysql-prod redis-prod
 
-          # Spring Boot 운영 앱만 재시작
-          docker-compose -f docker-compose.prod.yml --env-file .env.prod stop app-prod || true
-          docker-compose -f docker-compose.prod.yml --env-file .env.prod rm -f app-prod || true
-          docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d app-prod
+          # 현재 활성화된 환경 확인 (Blue가 실행 중이면 Green으로 배포, 그 반대도 동일)
+          if docker ps | grep -q "ono-app-prod-blue"; then
+            CURRENT="blue"
+            TARGET="green"
+            CURRENT_PORT=8080
+            TARGET_PORT=8081
+          else
+            CURRENT="green"
+            TARGET="blue"
+            CURRENT_PORT=8081
+            TARGET_PORT=8080
+          fi
 
-          # 헬스체크 대기 (최대 1분)
-          echo "Waiting for production application to be healthy..."
-          timeout=60
+          echo "Current active environment: $CURRENT (port $CURRENT_PORT)"
+          echo "Deploying to target environment: $TARGET (port $TARGET_PORT)"
+
+          # Target 환경에 새 버전 배포
+          if [ "$TARGET" = "green" ]; then
+            docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile green up -d app-prod-green
+          else
+            docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d app-prod-blue
+          fi
+
+          # 헬스체크 대기 (최대 2분)
+          echo "Waiting for $TARGET environment to be healthy..."
+          timeout=120
           elapsed=0
+          healthy=false
+
           while [ $elapsed -lt $timeout ]; do
-            if docker-compose -f docker-compose.prod.yml ps app-prod | grep -q "healthy"; then
-              echo "Production application is healthy!"
+            if docker ps | grep "ono-app-prod-$TARGET" | grep -q "healthy"; then
+              echo "$TARGET environment is healthy!"
+              healthy=true
               break
             fi
             echo "Waiting... ($elapsed seconds)"
@@ -113,12 +134,43 @@ jobs:
             elapsed=$((elapsed + 5))
           done
 
+          if [ "$healthy" = false ]; then
+            echo "ERROR: $TARGET environment failed to become healthy within $timeout seconds"
+            docker-compose -f docker-compose.prod.yml logs --tail=100 app-prod-$TARGET
+            exit 1
+          fi
+
+          # Nginx 설정 업데이트 (Blue-Green 전환)
+          echo "Switching Nginx to $TARGET environment (port $TARGET_PORT)..."
+          sudo bash /opt/ono/scripts/switch-nginx.sh $TARGET_PORT
+
+          # Nginx 설정 테스트 및 재로드
+          if sudo nginx -t; then
+            sudo nginx -s reload
+            echo "Nginx successfully switched to $TARGET environment"
+          else
+            echo "ERROR: Nginx configuration test failed"
+            # 원래 환경으로 롤백
+            sudo bash /opt/ono/scripts/switch-nginx.sh $CURRENT_PORT
+            exit 1
+          fi
+
+          # 10초 대기 후 이전 환경 종료 (안전을 위한 대기)
+          echo "Waiting 10 seconds before stopping old environment..."
+          sleep 10
+
+          # 이전 환경 종료
+          echo "Stopping old $CURRENT environment..."
+          docker-compose -f docker-compose.prod.yml stop app-prod-$CURRENT || true
+          docker-compose -f docker-compose.prod.yml rm -f app-prod-$CURRENT || true
+
           # 컨테이너 상태 확인
+          echo "=== Current Container Status ==="
           docker-compose -f docker-compose.prod.yml ps
 
           # 로그 출력 (마지막 50줄)
-          echo "=== Production Application Logs ==="
-          docker-compose -f docker-compose.prod.yml logs --tail=50 app-prod
+          echo "=== $TARGET Environment Logs ==="
+          docker-compose -f docker-compose.prod.yml logs --tail=50 app-prod-$TARGET
         shell: bash
 
       # 12. 오래된 Docker 이미지 정리
