@@ -94,16 +94,34 @@ jobs:
           # MySQL과 Redis 시작 (이미 실행 중이면 스킵)
           docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d mysql-prod redis-prod
 
+          # Orphan 컨테이너 정리 (기존 ono-app-prod 등)
+          echo "Cleaning up orphan containers..."
+          docker stop ono-app-prod 2>/dev/null || true
+          docker rm ono-app-prod 2>/dev/null || true
+          docker stop ono-app 2>/dev/null || true
+          docker rm ono-app 2>/dev/null || true
+
           # 현재 활성화된 환경 확인 (Blue가 실행 중이면 Green으로 배포, 그 반대도 동일)
-          if docker ps | grep -q "ono-app-prod-blue"; then
+          BLUE_RUNNING=$(docker ps --filter "name=ono-app-prod-blue" --filter "status=running" -q)
+          GREEN_RUNNING=$(docker ps --filter "name=ono-app-prod-green" --filter "status=running" -q)
+
+          if [ -n "$BLUE_RUNNING" ]; then
+            # Blue가 실행 중이면 Green으로 배포
             CURRENT="blue"
             TARGET="green"
             CURRENT_PORT=8080
             TARGET_PORT=8081
-          else
+          elif [ -n "$GREEN_RUNNING" ]; then
+            # Green이 실행 중이면 Blue로 배포
             CURRENT="green"
             TARGET="blue"
             CURRENT_PORT=8081
+            TARGET_PORT=8080
+          else
+            # 둘 다 실행 중이지 않으면 Blue로 초기 배포
+            CURRENT="none"
+            TARGET="blue"
+            CURRENT_PORT=0
             TARGET_PORT=8080
           fi
 
@@ -159,10 +177,14 @@ jobs:
           echo "Waiting 10 seconds before stopping old environment..."
           sleep 10
 
-          # 이전 환경 종료
-          echo "Stopping old $CURRENT environment..."
-          docker-compose -f docker-compose.prod.yml stop app-prod-$CURRENT || true
-          docker-compose -f docker-compose.prod.yml rm -f app-prod-$CURRENT || true
+          # 이전 환경 종료 (초기 배포가 아닌 경우만)
+          if [ "$CURRENT" != "none" ]; then
+            echo "Stopping old $CURRENT environment..."
+            docker-compose -f docker-compose.prod.yml stop app-prod-$CURRENT || true
+            docker-compose -f docker-compose.prod.yml rm -f app-prod-$CURRENT || true
+          else
+            echo "Initial deployment - no old environment to stop"
+          fi
 
           # 컨테이너 상태 확인
           echo "=== Current Container Status ==="
