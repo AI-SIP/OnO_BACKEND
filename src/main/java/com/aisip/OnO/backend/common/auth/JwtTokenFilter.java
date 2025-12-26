@@ -32,6 +32,24 @@ public class JwtTokenFilter extends OncePerRequestFilter {
     private final RedisTokenService redisTokenService;
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+
+        // JWT 필터를 건너뛸 경로들
+        return path.startsWith("/actuator/health") ||
+                 path.startsWith("/api/auth/") ||
+                 path.equals("/") ||
+                 path.equals("/robots.txt") ||
+                 path.equals("/home") ||
+                 path.startsWith("/images/") ||
+                 path.equals("/login") ||
+                 path.startsWith("/css/") ||
+                 path.startsWith("/js/") ||
+                 path.startsWith("/swagger-ui/") ||
+                 path.startsWith("/v3/api-docs/");
+      }
+
+    @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String bearerToken = request.getHeader(AUTHORIZATION_HEADER);
         String accessToken = null;
