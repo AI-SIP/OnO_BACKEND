@@ -63,6 +63,7 @@ public class SecurityConfig {
                         authorizeRequests
                                 .requestMatchers("/", "/robots.txt", "/home","/images/**", "/login", "/css/**", "/js/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                                 .requestMatchers("/api/auth/**").permitAll()
+                                .requestMatchers("/actuator/health").permitAll()
                                 .requestMatchers("/admin/**").hasRole("ADMIN")
                                 .requestMatchers("/api/fcm/**").hasAnyRole("GUEST", "MEMBER", "ADMIN")
                                 .requestMatchers("/api/users/**").hasAnyRole("GUEST", "MEMBER", "ADMIN")
