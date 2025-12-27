@@ -44,13 +44,13 @@ services:
       retries: 5
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
 
-  # Spring Boot Application - PRODUCTION
-  app-prod:
+  # Spring Boot Application - PRODUCTION (Blue)
+  app-prod-blue:
     image: ${DOCKER_USERNAME}/ono:prod-latest
-    container_name: ono-app-prod
+    container_name: ono-app-prod-blue
     restart: unless-stopped
     ports:
-      - "8080:8080"  # 운영 서버 포트
+      - "8080:8080"  # Blue 포트
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql-prod:3306/ono_db_prod?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
@@ -87,6 +87,52 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
+  # Spring Boot Application - PRODUCTION (Green)
+  app-prod-green:
+    image: ${DOCKER_USERNAME}/ono:prod-latest
+    container_name: ono-app-prod-green
+    restart: unless-stopped
+    ports:
+      - "8081:8080"  # Green 포트 (외부 8081 -> 컨테이너 내부 8080)
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-prod:3306/ono_db_prod?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis-prod
+      SPRING_DATA_REDIS_PORT: 6379
+      # 환경 변수
+      SPRING_CRYPTO_SECRET_KEY: ${SPRING_CRYPTO_SECRET_KEY}
+      JWT_ACCESS_TOKEN_SECRET: ${JWT_ACCESS_TOKEN_SECRET}
+      JWT_ACCESS_TOKEN_EXPIRATION: ${JWT_ACCESS_TOKEN_EXPIRATION}
+      JWT_REFRESH_TOKEN_SECRET: ${JWT_REFRESH_TOKEN_SECRET}
+      JWT_REFRESH_TOKEN_EXPIRATION: ${JWT_REFRESH_TOKEN_EXPIRATION}
+      CLOUD_AWS_S3_BUCKET: ${CLOUD_AWS_S3_BUCKET}
+      CLOUD_AWS_CREDENTIALS_ACCESS_KEY: ${CLOUD_AWS_CREDENTIALS_ACCESS_KEY}
+      CLOUD_AWS_CREDENTIALS_SECRET_KEY: ${CLOUD_AWS_CREDENTIALS_SECRET_KEY}
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      SENTRY_DSN: ${SENTRY_DSN}
+      ADMIN_IDENTIFIER: ${ADMIN_IDENTIFIER}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    volumes:
+      - app_prod_logs:/app/logs
+    depends_on:
+      mysql-prod:
+        condition: service_healthy
+      redis-prod:
+        condition: service_healthy
+    networks:
+      - ono-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    profiles:
+      - green  # 기본적으로는 비활성화, 배포 시에만 활성화
 
 networks:
   ono-network:
