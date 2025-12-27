@@ -160,16 +160,16 @@ jobs:
 
           # Nginx 설정 업데이트 (Blue-Green 전환)
           echo "Switching Nginx to $TARGET environment (port $TARGET_PORT)..."
-          sudo bash /opt/ono/scripts/switch-nginx.sh $TARGET_PORT
+          sudo /opt/ono/scripts/switch-nginx.sh $TARGET_PORT
 
           # Nginx 설정 테스트 및 재로드
-          if sudo nginx -t; then
-            sudo nginx -s reload
+          if sudo /opt/homebrew/bin/nginx -t; then
+            sudo /opt/homebrew/bin/nginx -s reload
             echo "Nginx successfully switched to $TARGET environment"
           else
             echo "ERROR: Nginx configuration test failed"
             # 원래 환경으로 롤백
-            sudo bash /opt/ono/scripts/switch-nginx.sh $CURRENT_PORT
+            sudo /opt/ono/scripts/switch-nginx.sh $CURRENT_PORT
             exit 1
           fi
 
