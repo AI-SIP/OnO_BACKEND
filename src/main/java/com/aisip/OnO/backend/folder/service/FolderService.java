@@ -26,7 +26,6 @@ public class FolderService {
 
     private final ProblemService problemService;
 
-    @Transactional(readOnly = true)
     public FolderResponseDto findRootFolder(Long userId) {
         return folderRepository.findRootFolder(userId)
                 .map(rootFolder -> {
@@ -64,7 +63,6 @@ public class FolderService {
                 : folderList.stream().map(FolderThumbnailResponseDto::from).collect(Collectors.toList());
     }
 
-    @Transactional(readOnly = true)
     public List<FolderResponseDto> findAllUserFolders(Long userId) {
         List<Folder> folders = folderRepository.findAllFoldersWithDetailsByUserId(userId);
 
