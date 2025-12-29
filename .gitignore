@@ -43,6 +43,7 @@ application.properties
 application-aws.properties
 application-dev.properties
 application-prod.properties
+application-local.yml
 application-dev.yml
 application-prod.yml
 FirebaseAdminKey.json
