@@ -2,6 +2,10 @@ package com.aisip.OnO.backend.problem.integration;
 
 
 import com.aisip.OnO.backend.auth.WithMockCustomUser;
+import com.aisip.OnO.backend.user.dto.UserRegisterDto;
+import com.aisip.OnO.backend.user.entity.User;
+import com.aisip.OnO.backend.user.repository.UserRepository;
+import com.aisip.OnO.backend.util.TestIdentifierGenerator;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
@@ -28,6 +32,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
@@ -47,10 +52,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT) // 랜덤 포트로 애플리케이션 실행
 @AutoConfigureMockMvc
+@ActiveProfiles("local")
 class ProblemApiIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Autowired
     private ProblemRepository problemRepository;
@@ -73,9 +82,21 @@ class ProblemApiIntegrationTest {
 
     private List<Problem> problemList;
 
+    private List<ProblemImageData> problemImageDataList;
+
     @BeforeEach
     void setUp() {
-        userId = 1L;
+        UserRegisterDto userRegisterDto = UserRegisterDto.builder()
+                .identifier(TestIdentifierGenerator.generateRandomIdentifier())
+                .platform("GOOGLE")
+                .name("테스트 유저")
+                .email("test@test.com")
+                .build();
+
+        User user = User.from(userRegisterDto);
+        userRepository.save(user);
+        userId = user.getId();
+
         // 인증 설정
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(
@@ -85,6 +106,7 @@ class ProblemApiIntegrationTest {
 
         folderList = new ArrayList<>();
         problemList = new ArrayList<>();
+        problemImageDataList = new ArrayList<>();
 
         for (int f = 1; f <= 2; f++) {
             Folder folder = Folder.from(
@@ -119,7 +141,8 @@ class ProblemApiIntegrationTest {
 
                 imageDataList.forEach(imageData -> {
                     imageData.updateProblem(problem);
-                    problemImageDataRepository.save(imageData);
+                    ProblemImageData saveImageData = problemImageDataRepository.save(imageData);
+                    problemImageDataList.add(saveImageData);
                 });
 
                 problemList.add(problem);
@@ -130,12 +153,14 @@ class ProblemApiIntegrationTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
+        userRepository.deleteById(userId);
+        problemImageDataRepository.deleteAll(problemImageDataList);
+        problemRepository.deleteAll(problemList);
+        folderRepository.deleteAll(folderList);
+
+        problemImageDataList.clear();
         problemList.clear();
         folderList.clear();
-
-        problemImageDataRepository.deleteAll();
-        problemRepository.deleteAll();
-        folderRepository.deleteAll();
     }
 
     @Test
