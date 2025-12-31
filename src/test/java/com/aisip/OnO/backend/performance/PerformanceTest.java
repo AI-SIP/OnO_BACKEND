@@ -1,18 +1,19 @@
 package com.aisip.OnO.backend.performance;
 
-import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNotificationRegisterDto;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
-import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
+import com.aisip.OnO.backend.problem.entity.ProblemImageData;
+import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
-import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
+import com.aisip.OnO.backend.util.RandomFolderGenerator;
+import com.aisip.OnO.backend.util.RandomPracticeNoteGenerator;
+import com.aisip.OnO.backend.util.RandomProblemGenerator;
+import com.aisip.OnO.backend.util.RandomUserGenerator;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +24,6 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 import jakarta.persistence.EntityManager;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -40,9 +40,9 @@ import java.util.Random;
  */
 @Slf4j
 @SpringBootTest
-@ActiveProfiles("dev")
+@ActiveProfiles("local")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class IndexPerformanceTest {
+public class PerformanceTest {
 
     @Autowired
     private ProblemRepository problemRepository;
@@ -56,7 +56,7 @@ public class IndexPerformanceTest {
     @Autowired
     private UserRepository userRepository;
 
-    private static final int USER_COUNT = 5000;
+    private static final int USER_COUNT = 500;
     private static final int FOLDER_PER_USER = 10;
     private static final int PROBLEM_PER_FOLDER = 25;
     private static final int PRACTICE_NOTE_PER_USER = 20;
@@ -71,6 +71,7 @@ public class IndexPerformanceTest {
                       @Autowired FolderRepository folderRepository,
                       @Autowired ProblemRepository problemRepository,
                       @Autowired PracticeNoteRepository practiceNoteRepository,
+                      @Autowired ProblemImageDataRepository problemImageDataRepository,
                       @Autowired PlatformTransactionManager transactionManager,
                       @Autowired EntityManager entityManager) {
         log.info("========================================");
@@ -84,29 +85,18 @@ public class IndexPerformanceTest {
 
         // 1. User 생성
         for (int i = 0; i < USER_COUNT; i++) {
-            UserRegisterDto userDto = new UserRegisterDto(
-                    "test" + i + "@test.com",
-                    "TestUser" + i,
-                    "test_identifier_" + i,
-                    "TEST",
-                    "password"
-            );
-            User user = User.from(userDto);
+            User user = RandomUserGenerator.createRandomUser();
             user = userRepository.save(user);
             testUserIds.add(user.getId());
-            testIdentifiers.add("test_identifier_" + i);
+            testIdentifiers.add(user.getIdentifier());
         }
         log.info("User {} 개 생성 완료", USER_COUNT);
 
         // 2. Folder 생성
         for (Long userId : testUserIds) {
             for (int i = 0; i < FOLDER_PER_USER; i++) {
-                FolderRegisterDto folderDto = new FolderRegisterDto(
-                        "Folder" + i + "_User" + userId,  // folderName
-                        null,  // folderId
-                        null   // parentFolderId
-                );
-                Folder folder = Folder.from(folderDto, userId);
+                Folder folder = RandomFolderGenerator.createRandomFolder(userId);
+
                 folder = folderRepository.save(folder);
                 testFolderIds.add(folder.getId());
             }
@@ -119,18 +109,17 @@ public class IndexPerformanceTest {
         for (Long folderId : testFolderIds) {
             Folder folder = folderRepository.findById(folderId).orElseThrow();
             for (int i = 0; i < PROBLEM_PER_FOLDER; i++) {
-                ProblemRegisterDto problemDto = new ProblemRegisterDto(
-                        null,  // problemId
-                        "Test problem " + i,  // memo
-                        "Reference " + i,  // reference
-                        folderId,  // folderId
-                        LocalDateTime.now(),  // solvedAt
-                        null  // imageDataDtoList
-                );
-                Problem problem = Problem.from(problemDto, folder.getUserId());
+                Problem problem = RandomProblemGenerator.createRandomProblemWithFolder(folder, folder.getUserId());
                 problem.updateFolder(folder);
                 problemRepository.save(problem);
                 problemCount++;
+
+                List<ProblemImageData> imageDataList = RandomProblemGenerator.createDefaultProblemImageDataList(problem.getId());
+
+                imageDataList.forEach(imageData -> {
+                    imageData.updateProblem(problem);
+                    ProblemImageData saveImageData = problemImageDataRepository.save(imageData);
+                });
 
                 // 배치 단위로 flush & clear
                 if (problemCount % batchSize == 0) {
@@ -150,20 +139,7 @@ public class IndexPerformanceTest {
         int practiceNoteCount = 0;
         for (Long userId : testUserIds) {
             for (int i = 0; i < PRACTICE_NOTE_PER_USER; i++) {
-                PracticeNotificationRegisterDto notificationDto = new PracticeNotificationRegisterDto(
-                        1,  // intervalDays
-                        9,  // hour
-                        0,  // minute
-                        "NONE",  // repeatType
-                        null  // weekDays
-                );
-                PracticeNoteRegisterDto practiceNoteDto = new PracticeNoteRegisterDto(
-                        null,  // practiceNoteId
-                        "PracticeNote" + i + "_User" + userId,
-                        null,  // problemIdList
-                        notificationDto
-                );
-                PracticeNote practiceNote = PracticeNote.from(practiceNoteDto, userId);
+                PracticeNote practiceNote = RandomPracticeNoteGenerator.createRandomPracticeNote(userId);
                 practiceNoteRepository.save(practiceNote);
                 practiceNoteCount++;
             }
@@ -196,34 +172,79 @@ public class IndexPerformanceTest {
         TransactionStatus transaction = transactionManager.getTransaction(new DefaultTransactionDefinition());
 
         try {
+            // 외래 키 제약 조건 임시 비활성화 (MySQL)
+            entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 0").executeUpdate();
+            log.info("외래 키 제약 조건 비활성화");
+
+            // testUserIds를 기반으로 테스트 데이터만 삭제
+            String userIdsStr = testUserIds.stream()
+                    .map(String::valueOf)
+                    .reduce((a, b) -> a + "," + b)
+                    .orElse("");
+
+            if (userIdsStr.isEmpty()) {
+                log.warn("삭제할 테스트 유저 ID가 없습니다. 데이터 정리를 건너뜁니다.");
+                return;
+            }
+
             // Native Query로 물리적 삭제 (순서 중요: 자식 → 부모)
-            // 1. problem_practice_note_mapping 삭제
-            int mappingDeleted = entityManager.createNativeQuery("DELETE FROM problem_practice_note_mapping").executeUpdate();
+            // 1. problem_practice_note_mapping 삭제 (problem과 practice_note를 통해 간접 참조)
+            int mappingDeleted = entityManager.createNativeQuery(
+                    "DELETE ppm FROM problem_practice_note_mapping ppm " +
+                    "INNER JOIN problem p ON ppm.problem_id = p.id " +
+                    "WHERE p.user_id IN (" + userIdsStr + ")"
+            ).executeUpdate();
             log.info("problem_practice_note_mapping {} 건 삭제", mappingDeleted);
 
-            // 2. image_data 삭제 (테이블명 수정)
-            int imageDeleted = entityManager.createNativeQuery("DELETE FROM image_data").executeUpdate();
+            // 2. problem_analysis 삭제 (problem을 참조)
+            int analysisDeleted = entityManager.createNativeQuery(
+                    "DELETE pa FROM problem_analysis pa " +
+                    "INNER JOIN problem p ON pa.problem_id = p.id " +
+                    "WHERE p.user_id IN (" + userIdsStr + ")"
+            ).executeUpdate();
+            log.info("problem_analysis {} 건 삭제", analysisDeleted);
+
+            // 3. image_data 삭제 (problem을 참조)
+            int imageDeleted = entityManager.createNativeQuery(
+                    "DELETE id FROM image_data id " +
+                    "INNER JOIN problem p ON id.problem_id = p.id " +
+                    "WHERE p.user_id IN (" + userIdsStr + ")"
+            ).executeUpdate();
             log.info("image_data {} 건 삭제", imageDeleted);
 
-            // 3. problem 삭제
-            int problemDeleted = entityManager.createNativeQuery("DELETE FROM problem").executeUpdate();
+            // 4. problem 삭제 (테스트 유저의 문제만)
+            int problemDeleted = entityManager.createNativeQuery(
+                    "DELETE FROM problem WHERE user_id IN (" + userIdsStr + ")"
+            ).executeUpdate();
             log.info("problem {} 건 삭제", problemDeleted);
 
-            // 4. practice_note 삭제
-            int practiceDeleted = entityManager.createNativeQuery("DELETE FROM practice_note").executeUpdate();
+            // 5. practice_note 삭제 (테스트 유저의 복습노트만)
+            int practiceDeleted = entityManager.createNativeQuery(
+                    "DELETE FROM practice_note WHERE user_id IN (" + userIdsStr + ")"
+            ).executeUpdate();
             log.info("practice_note {} 건 삭제", practiceDeleted);
 
-            // 5. folder 삭제
-            int folderDeleted = entityManager.createNativeQuery("DELETE FROM folder").executeUpdate();
+            // 6. folder 삭제 (테스트 유저의 폴더만, 자기 자신을 참조하므로 FK 체크 비활성화 필요)
+            int folderDeleted = entityManager.createNativeQuery(
+                    "DELETE FROM folder WHERE user_id IN (" + userIdsStr + ")"
+            ).executeUpdate();
             log.info("folder {} 건 삭제", folderDeleted);
 
-            // 6. mission_log 삭제
-            int missionDeleted = entityManager.createNativeQuery("DELETE FROM mission_log").executeUpdate();
+            // 7. mission_log 삭제 (테스트 유저의 미션 로그만)
+            int missionDeleted = entityManager.createNativeQuery(
+                    "DELETE FROM mission_log WHERE user_id IN (" + userIdsStr + ")"
+            ).executeUpdate();
             log.info("mission_log {} 건 삭제", missionDeleted);
 
-            // 7. user 삭제
-            int userDeleted = entityManager.createNativeQuery("DELETE FROM user").executeUpdate();
+            // 8. user 삭제 (테스트 유저만)
+            int userDeleted = entityManager.createNativeQuery(
+                    "DELETE FROM user WHERE id IN (" + userIdsStr + ")"
+            ).executeUpdate();
             log.info("user {} 건 삭제", userDeleted);
+
+            // 외래 키 제약 조건 재활성화
+            entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();
+            log.info("외래 키 제약 조건 재활성화");
 
             // 트랜잭션 커밋
             transactionManager.commit(transaction);
