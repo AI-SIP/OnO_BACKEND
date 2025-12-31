@@ -28,7 +28,7 @@ public class P6SpyExplainAppender implements MessageFormattingStrategy {
         return Boolean.parseBoolean(System.getProperty("p6spy.enable.explain", "false"));
     }
 
-    private static final long SLOW_QUERY_THRESHOLD_MS = 5; // 100ms 이상 느린 쿼리만 EXPLAIN
+    private static final long SLOW_QUERY_THRESHOLD_MS = 1;
 
     @Override
     public String formatMessage(int connectionId, String now, long elapsed,
