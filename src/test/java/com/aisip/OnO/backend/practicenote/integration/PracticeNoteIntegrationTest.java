@@ -6,14 +6,16 @@ import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
 import com.aisip.OnO.backend.practicenote.repository.ProblemPracticeNoteMappingRepository;
-import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
-import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
-import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
+import com.aisip.OnO.backend.practicenote.service.PracticeNotificationScheduler;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
-import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
+import com.aisip.OnO.backend.user.entity.User;
+import com.aisip.OnO.backend.user.repository.UserRepository;
+import com.aisip.OnO.backend.util.RandomPracticeNoteGenerator;
+import com.aisip.OnO.backend.util.RandomProblemGenerator;
+import com.aisip.OnO.backend.util.RandomUserGenerator;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,15 +26,16 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -43,10 +46,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT) // 랜덤 포트로 애플리케이션 실행
 @AutoConfigureMockMvc
+@ActiveProfiles("local")
 public class PracticeNoteIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Autowired
     private ProblemRepository problemRepository;
@@ -63,15 +70,25 @@ public class PracticeNoteIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @MockBean
+    private PracticeNotificationScheduler practiceNotificationScheduler;
+
     private Long userId;
 
     private List<Problem> problemList;
 
     private List<PracticeNote> practiceNoteList;
 
+    private List<ProblemImageData> problemImageDataList;
+
+    private List<ProblemPracticeNoteMapping> practiceNoteMappingList;
+
     @BeforeEach
     void setUp() {
-        userId = 1L;
+        User user = RandomUserGenerator.createRandomUser();
+        userRepository.save(user);
+        userId = user.getId();
+
         // 인증 설정
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(
@@ -79,41 +96,28 @@ public class PracticeNoteIntegrationTest {
                 )
         );
 
+        problemList = new ArrayList<>();
+        problemImageDataList = new ArrayList<>();
         practiceNoteList = new ArrayList<>();
+        practiceNoteMappingList = new ArrayList<>();
 
         /*
         practice 0 : problem 0, 1, 2, 3
         practice 1 : problem 0, 1, 4, 5, 6, 7
         practice 2 : problem 0, 8, 9, 10, 11
          */
-        problemList = new ArrayList<>();
+
         for (int i = 0; i < 12; i++) {
-            Problem problem = Problem.from(
-                    new ProblemRegisterDto(
-                            null,
-                            "memo" + i,
-                            "reference" + i,
-                            null,
-                            LocalDateTime.now(),
-                            null
-                    ),
-                    userId
-            );
+            Problem problem = RandomProblemGenerator.createRandomProblem(userId);
             problemRepository.save(problem);
 
-            List<ProblemImageData> imageDataList = new ArrayList<>();
-            for (int j = 1; j <= 3; j++){
-                ProblemImageDataRegisterDto problemImageDataRegisterDto = new ProblemImageDataRegisterDto(
-                        (long) problem.getId(),
-                        "http://example.com/problemId/" + i + "/image" + j,
-                        ProblemImageType.valueOf(j)
-                );
+            List<ProblemImageData> imageDataList = RandomProblemGenerator.createDefaultProblemImageDataList(problem.getId());
 
-                ProblemImageData imageData = ProblemImageData.from(problemImageDataRegisterDto);
+            imageDataList.forEach(imageData -> {
                 imageData.updateProblem(problem);
-                problemImageDataRepository.save(imageData);
-                imageDataList.add(imageData);
-            }
+                ProblemImageData saveImageData = problemImageDataRepository.save(imageData);
+                problemImageDataList.add(saveImageData);
+            });
             problemList.add(problem);
         }
 
@@ -123,15 +127,9 @@ public class PracticeNoteIntegrationTest {
             for(int j = 0; j < 4; j++){
                 problemIdList.add(problemList.get(i * 4 + j).getId());
             }
-            PracticeNote practiceNote = practiceNoteRepository.save(PracticeNote.from(
-                    new PracticeNoteRegisterDto(
-                            null,
-                            "practiceNote" + i,
-                            problemIdList,
-                            new PracticeNotificationRegisterDto(1, 9, 0, "NONE", null)
-                    ),
-                    userId
-            ));
+
+            PracticeNote practiceNote = RandomPracticeNoteGenerator.createRandomPracticeNote(userId);
+            practiceNoteRepository.save(practiceNote);
 
             for(int j = 0; j < 4; j++){
                 ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from();
@@ -140,6 +138,7 @@ public class PracticeNoteIntegrationTest {
                 problemPracticeNoteMapping.addMappingToProblemAndPractice(problem, practiceNote);
 
                 problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
+                practiceNoteMappingList.add(problemPracticeNoteMapping);
             }
 
             practiceNoteList.add(practiceNote);
@@ -152,6 +151,7 @@ public class PracticeNoteIntegrationTest {
             problemPracticeNoteMapping.addMappingToProblemAndPractice(problemList.get(0), practiceNoteList.get(i));
 
             problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
+            practiceNoteMappingList.add(problemPracticeNoteMapping);
         }
 
         // problem 1번에 대해서만 practiceNote 1번과 추가 매핑
@@ -161,18 +161,21 @@ public class PracticeNoteIntegrationTest {
             problemPracticeNoteMapping.addMappingToProblemAndPractice(problemList.get(1), practiceNoteList.get(i));
 
             problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
+            practiceNoteMappingList.add(problemPracticeNoteMapping);
         }
     }
 
     @AfterEach
     void tearDown() {
+        problemImageDataRepository.deleteAll(problemImageDataList);
+        problemRepository.deleteAll(problemList);
+        practiceNoteRepository.deleteAll(practiceNoteList);
+        problemPracticeNoteMappingRepository.deleteAll(practiceNoteMappingList);
+        userRepository.deleteById(userId);
+
         problemList.clear();
         practiceNoteList.clear();
-
-        problemImageDataRepository.deleteAll();
-        problemRepository.deleteAll();
-        practiceNoteRepository.deleteAll();
-        problemPracticeNoteMappingRepository.deleteAll();
+        problemImageDataList.clear();
     }
 
     @Test
@@ -290,7 +293,7 @@ public class PracticeNoteIntegrationTest {
                 null,
                 practiceTitle,
                 List.of(problemList.get(0).getId(), problemList.get(1).getId(), problemList.get(2).getId()),
-                new com.aisip.OnO.backend.practicenote.dto.PracticeNotificationRegisterDto(1, 9, 0, "NONE", null)
+                new PracticeNotificationRegisterDto(1, 9, 0, "NONE", null)
         );
 
         //when
@@ -307,7 +310,7 @@ public class PracticeNoteIntegrationTest {
         System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
 
         //then
-        List<PracticeNote> dbPracticeNoteList = practiceNoteRepository.findAll();
+        List<PracticeNote> dbPracticeNoteList = practiceNoteRepository.findAllByUserId(userId);
         assertThat(dbPracticeNoteList.size()).isEqualTo(practiceNoteList.size() + 1);
 
         PracticeNote practiceNote = dbPracticeNoteList.get(dbPracticeNoteList.size() - 1);
@@ -407,7 +410,6 @@ public class PracticeNoteIntegrationTest {
         System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
 
         // then
-        assertThat(practiceNoteRepository.findAll()).isEmpty();
-        assertThat(problemPracticeNoteMappingRepository.findAll()).isEmpty();
+        assertThat(practiceNoteRepository.findAllByUserId(userId)).isEmpty();
     }
 }
