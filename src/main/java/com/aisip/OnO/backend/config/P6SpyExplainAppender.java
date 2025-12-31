@@ -28,7 +28,9 @@ public class P6SpyExplainAppender implements MessageFormattingStrategy {
         return Boolean.parseBoolean(System.getProperty("p6spy.enable.explain", "false"));
     }
 
-    private static final long SLOW_QUERY_THRESHOLD_MS = 1;
+    // EXPLAIN을 실행할 쿼리의 최소 실행 시간 (ms)
+    // 0으로 설정하면 모든 SELECT 쿼리에 대해 EXPLAIN 실행
+    private static final long SLOW_QUERY_THRESHOLD_MS = 0;
 
     @Override
     public String formatMessage(int connectionId, String now, long elapsed,
@@ -46,24 +48,26 @@ public class P6SpyExplainAppender implements MessageFormattingStrategy {
         result.append(String.format("[P6Spy] | %s | took %dms | %s | connection %d\n%s\n",
                 now, elapsed, category, connectionId, formattedSql));
 
-        // EXPLAIN 실행 조건:
-        // 1. EXPLAIN 활성화됨 (로컬 환경)
-        // 2. SELECT 쿼리
-        // 3. 느린 쿼리 (threshold 이상)
+        // EXPLAIN 실행 조건 체크
         boolean explainEnabled = isExplainEnabled();
         boolean isSelect = sql.trim().toLowerCase(Locale.ROOT).startsWith("select");
         boolean isSlowQuery = elapsed >= SLOW_QUERY_THRESHOLD_MS;
 
-        // 디버깅용 로그
-        log.debug("EXPLAIN check - enabled: {}, isSelect: {}, isSlowQuery: {}, category: {}",
-                  explainEnabled, isSelect, isSlowQuery, category);
+        // ⭐ category 필터 제거: statement, commit 모두 EXPLAIN 실행
+        // PreparedStatement도 분석하기 위해 category 조건을 완화
+        boolean shouldExplain = explainEnabled && isSelect && isSlowQuery;
 
-        if (explainEnabled && category.equals("statement") && isSelect && isSlowQuery) {
+        if (shouldExplain) {
             try {
                 String explainResult = executeExplain(sql, url);
-                result.append("\n========== EXPLAIN RESULT ==========\n");
+                result.append("\n");
+                result.append("╔════════════════════════════════════════════════════════════════════════════════╗\n");
+                result.append("║                         EXPLAIN RESULT (took " + elapsed + "ms)                          ║\n");
+                result.append("╠════════════════════════════════════════════════════════════════════════════════╣\n");
+                result.append("║ Query: ").append(String.format("%-70s", sql.replaceAll("\\s+", " ").trim().substring(0, Math.min(70, sql.length())))).append(" ║\n");
+                result.append("╠════════════════════════════════════════════════════════════════════════════════╣\n");
                 result.append(explainResult);
-                result.append("====================================\n");
+                result.append("╚════════════════════════════════════════════════════════════════════════════════╝\n");
             } catch (Exception e) {
                 log.warn("Failed to execute EXPLAIN for query: {}", e.getMessage());
             }
