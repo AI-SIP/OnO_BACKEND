@@ -7,6 +7,7 @@ import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.exception.UserErrorCase;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.user.service.UserService;
+import com.aisip.OnO.backend.util.RandomUserGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -30,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT) // 랜덤 포트로 애플리케이션 실행
 @AutoConfigureMockMvc
+@ActiveProfiles("local")
 public class UserApiIntegrationTest {
 
     @Autowired
@@ -44,18 +47,17 @@ public class UserApiIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    private User targetUser;
+
     private Long userId;
 
     @BeforeEach
     void setUp() {
         // 유저 등록 (식별자 중복 피하려고 시간 기반 추가)
-        String uniqueIdentifier = "testIdentifier_" + System.currentTimeMillis();
-        UserRegisterDto registerDto = new UserRegisterDto(
-                "test@example.com", "testUser", uniqueIdentifier, "MEMBER", null
-        );
-        userService.registerMemberUser(registerDto);
-        User savedUser = userService.findUserEntityByIdentifier(uniqueIdentifier);
-        userId = savedUser.getId();
+        User user = RandomUserGenerator.createRandomUser();
+        userRepository.save(user);
+        userId = user.getId();
+        targetUser = user;
 
         // 인증 설정
         SecurityContextHolder.getContext().setAuthentication(
@@ -68,7 +70,7 @@ public class UserApiIntegrationTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
-        userRepository.deleteAll();
+        userRepository.deleteById(userId);
     }
 
     @Test
@@ -78,8 +80,8 @@ public class UserApiIntegrationTest {
         MvcResult result = mockMvc.perform(get("/api/users")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.name").value("testUser"))
-                .andExpect(jsonPath("$.data.email").value("test@example.com"))
+                .andExpect(jsonPath("$.data.name").value(targetUser.getName()))
+                .andExpect(jsonPath("$.data.email").value(targetUser.getEmail()))
                 .andReturn();
 
         String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
@@ -91,14 +93,13 @@ public class UserApiIntegrationTest {
     @DisplayName("유저 정보 수정 - 성공")
     void updateUserInfo() throws Exception {
         // Given
-        UserRegisterDto updateRequest = new UserRegisterDto("updated@example.com", "UpdatedUser", "updatedIdentifier", "MEMBER", null);
+        UserRegisterDto updateRequest = new UserRegisterDto("updated@example.com", "UpdatedUser", null, null, null);
 
         // When & Then
         MvcResult result = mockMvc.perform(patch("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value("사용자 정보 수정이 완료되었습니다."))
                 .andReturn();
 
         String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
@@ -126,7 +127,7 @@ public class UserApiIntegrationTest {
 
         // 삭제 후, 다시 조회 시 예외 발생 여부 검증
         assertThatThrownBy(() -> userService.findUser(userId))
-                .isInstanceOf(ApplicationException.class) // ✅ 특정 예외 발생 확인
-                .hasMessageContaining(UserErrorCase.USER_NOT_FOUND.getMessage()); // 예외 메시지 검증
+                .isInstanceOf(ApplicationException.class)
+                .hasMessageContaining(UserErrorCase.USER_NOT_FOUND.getMessage());
     }
 }

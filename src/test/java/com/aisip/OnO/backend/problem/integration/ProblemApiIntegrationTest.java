@@ -2,8 +2,12 @@ package com.aisip.OnO.backend.problem.integration;
 
 
 import com.aisip.OnO.backend.auth.WithMockCustomUser;
+import com.aisip.OnO.backend.user.entity.User;
+import com.aisip.OnO.backend.user.repository.UserRepository;
+import com.aisip.OnO.backend.util.RandomFolderGenerator;
+import com.aisip.OnO.backend.util.RandomProblemGenerator;
+import com.aisip.OnO.backend.util.RandomUserGenerator;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
-import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
@@ -28,6 +32,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
@@ -44,13 +49,16 @@ import static org.mockito.Mockito.doNothing;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT) // 랜덤 포트로 애플리케이션 실행
 @AutoConfigureMockMvc
+@ActiveProfiles("local")
 class ProblemApiIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Autowired
     private ProblemRepository problemRepository;
@@ -73,9 +81,14 @@ class ProblemApiIntegrationTest {
 
     private List<Problem> problemList;
 
+    private List<ProblemImageData> problemImageDataList;
+
     @BeforeEach
     void setUp() {
-        userId = 1L;
+        User user = RandomUserGenerator.createRandomUser();
+        userRepository.save(user);
+        userId = user.getId();
+
         // 인증 설정
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(
@@ -85,41 +98,25 @@ class ProblemApiIntegrationTest {
 
         folderList = new ArrayList<>();
         problemList = new ArrayList<>();
+        problemImageDataList = new ArrayList<>();
 
         for (int f = 1; f <= 2; f++) {
-            Folder folder = Folder.from(
-                    new FolderRegisterDto("folder" + f, null, null),
-                    null,
-                    userId
-            );
+            Folder folder = RandomFolderGenerator.createRandomFolder(userId);
             folderRepository.save(folder);
             folderList.add(folder);
 
             // 문제 5개 생성 (폴더 1번에 3개, 폴더 2번에 2개)
             for (int i = 1; i <= 3; i++) {
-                Problem problem = Problem.from(
-                        new ProblemRegisterDto(
-                                null,
-                                "memo" + i,
-                                "reference" + i,
-                                (long) f,
-                                LocalDateTime.now(),
-                                new ArrayList<>()
-                        ),
-                        userId
-                );
+                Problem problem = RandomProblemGenerator.createRandomProblemWithFolder(folder, userId);
                 problem.updateFolder(folder);
                 problemRepository.save(problem);
 
-                // 이미지 2개씩 추가
-                List<ProblemImageData> imageDataList = List.of(
-                        ProblemImageData.from(new ProblemImageDataRegisterDto(problem.getId(), "url" + i * f + "_1", ProblemImageType.PROBLEM_IMAGE)),
-                        ProblemImageData.from(new ProblemImageDataRegisterDto(problem.getId(), "url" + i * f + "_2", ProblemImageType.ANSWER_IMAGE))
-                );
+                List<ProblemImageData> imageDataList = RandomProblemGenerator.createDefaultProblemImageDataList(problem.getId());
 
                 imageDataList.forEach(imageData -> {
                     imageData.updateProblem(problem);
-                    problemImageDataRepository.save(imageData);
+                    ProblemImageData saveImageData = problemImageDataRepository.save(imageData);
+                    problemImageDataList.add(saveImageData);
                 });
 
                 problemList.add(problem);
@@ -130,12 +127,14 @@ class ProblemApiIntegrationTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
+        problemImageDataRepository.deleteAll(problemImageDataList);
+        problemRepository.deleteAll(problemList);
+        folderRepository.deleteAll(folderList);
+        userRepository.deleteById(userId);
+
+        problemImageDataList.clear();
         problemList.clear();
         folderList.clear();
-
-        problemImageDataRepository.deleteAll();
-        problemRepository.deleteAll();
-        folderRepository.deleteAll();
     }
 
     @Test
@@ -154,7 +153,7 @@ class ProblemApiIntegrationTest {
                 .andExpect(jsonPath("$.data.solvedAt").isNotEmpty())
                 .andExpect(jsonPath("$.data.createdAt").isNotEmpty())
                 .andExpect(jsonPath("$.data.updatedAt").isNotEmpty())
-                .andExpect(jsonPath("$.data.imageUrlList.length()").value(2))
+                .andExpect(jsonPath("$.data.imageUrlList.length()").value(problemList.get(0).getProblemImageDataList().size()))
                 .andExpect(jsonPath("$.data.imageUrlList[0].imageUrl").value(problemList.get(0).getProblemImageDataList().get(0).getImageUrl()))
                 .andExpect(jsonPath("$.data.imageUrlList[1].imageUrl").value(problemList.get(0).getProblemImageDataList().get(1).getImageUrl()))
                 .andExpect(status().is2xxSuccessful())
@@ -184,7 +183,7 @@ class ProblemApiIntegrationTest {
                 .andExpect(jsonPath("$.data[0].solvedAt").isNotEmpty())
                 .andExpect(jsonPath("$.data[0].createdAt").isNotEmpty())
                 .andExpect(jsonPath("$.data[0].updatedAt").isNotEmpty())
-                .andExpect(jsonPath("$.data[0].imageUrlList.length()").value(2))
+                .andExpect(jsonPath("$.data[0].imageUrlList.length()").value(problemList.get(0).getProblemImageDataList().size()))
                 .andExpect(jsonPath("$.data[0].imageUrlList[0].imageUrl").value(problemList.get(0).getProblemImageDataList().get(0).getImageUrl()))
                 .andExpect(jsonPath("$.data[0].imageUrlList[1].imageUrl").value(problemList.get(0).getProblemImageDataList().get(1).getImageUrl()))
                 .andExpect(status().is2xxSuccessful())
@@ -237,7 +236,7 @@ class ProblemApiIntegrationTest {
                 .andExpect(jsonPath("$.data[0].solvedAt").isNotEmpty())
                 .andExpect(jsonPath("$.data[0].createdAt").isNotEmpty())
                 .andExpect(jsonPath("$.data[0].updatedAt").isNotEmpty())
-                .andExpect(jsonPath("$.data[0].imageUrlList.length()").value(2))
+                .andExpect(jsonPath("$.data[0].imageUrlList.length()").value(problemList.get(0).getProblemImageDataList().size()))
                 .andExpect(jsonPath("$.data[0].imageUrlList[0].imageUrl").value(problemList.get(0).getProblemImageDataList().get(0).getImageUrl()))
                 .andExpect(jsonPath("$.data[0].imageUrlList[1].imageUrl").value(problemList.get(0).getProblemImageDataList().get(1).getImageUrl()))
                 .andReturn();
