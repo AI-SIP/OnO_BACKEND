@@ -53,6 +53,7 @@ services:
     ports:
       - "8082:8080"  # 개발 서버는 8082 포트로 외부 노출
     environment:
+      TZ: Asia/Seoul
       SPRING_PROFILES_ACTIVE: dev
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql-dev:3306/ono_db_dev?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
       SPRING_DATASOURCE_USERNAME: root
