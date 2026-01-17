@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.quartz.SchedulerFactoryBean;
 
 import javax.sql.DataSource;
+import java.util.Properties;
 
 @Configuration
 public class QuartzConfig {
@@ -27,6 +28,12 @@ public class QuartzConfig {
         factory.setStartupDelay(5);
         factory.setAutoStartup(true);
         factory.setWaitForJobsToCompleteOnShutdown(true);
+
+        // Quartz 스케줄러 시간대를 한국 시간으로 설정
+        Properties quartzProperties = new Properties();
+        quartzProperties.setProperty("org.quartz.scheduler.timeZone", "Asia/Seoul");
+        factory.setQuartzProperties(quartzProperties);
+
         return factory;
     }
 }
