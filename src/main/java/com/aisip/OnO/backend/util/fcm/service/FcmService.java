@@ -30,7 +30,7 @@ public class FcmService {
     private final FirebaseMessaging firebaseMessaging;
 
     public void registerToken(FcmTokenRequestDto fcmTokenRequestDto, Long userId) {
-        if(!fcmTokenRepository.existsByToken(fcmTokenRequestDto.token())){
+        if(!fcmTokenRepository.existsByTokenAndUserId(fcmTokenRequestDto.token(), userId)){
             FcmToken fcmToken = FcmToken.From(fcmTokenRequestDto, userId);
             fcmTokenRepository.save(fcmToken);
         }
@@ -71,12 +71,16 @@ public class FcmService {
         List<FcmToken> userFcmTokenList = fcmTokenRepository.findAllByUserId(userId);
 
         userFcmTokenList.forEach(fcmToken -> {
-            sendNotification(new NotificationRequestDto(
-                    fcmToken.getToken(),
-                    notificationRequestDto.title(),
-                    notificationRequestDto.body(),
-                    notificationRequestDto.data()
-            ));
+            try {
+                sendNotification(new NotificationRequestDto(
+                        fcmToken.getToken(),
+                        notificationRequestDto.title(),
+                        notificationRequestDto.body(),
+                        notificationRequestDto.data()
+                ));
+            } catch (ApplicationException e) {
+                log.warn("FCM 전송 실패 (userId: {}, token: {}): {}", userId, fcmToken.getToken(), e.getMessage());
+            }
         });
     }
 }
