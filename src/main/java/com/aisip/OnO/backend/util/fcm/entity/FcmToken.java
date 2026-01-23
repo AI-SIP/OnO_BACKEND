@@ -20,7 +20,7 @@ public class FcmToken extends BaseEntity {
     @Column(nullable = false)
     private Long userId;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String token;
 
     public static FcmToken From(FcmTokenRequestDto fcmTokenRequestDto, Long userId) {
