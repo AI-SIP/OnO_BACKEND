@@ -9,6 +9,7 @@ import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.exception.UserErrorCase;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.user.repository.UserRepository;
+import com.aisip.OnO.backend.util.webhook.DiscordWebhookNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,8 @@ public class UserService {
 
     private final PracticeNoteService practiceNoteService;
 
+    private final DiscordWebhookNotificationService discordWebhookNotificationService;
+
     private User findUserEntity(Long userId){
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
@@ -52,6 +55,7 @@ public class UserService {
                 null
         );
 
+        discordWebhookNotificationService.sendMessage("새로운 게스트 유저가 가입했습니다!", "");
         return User.from(userRegisterDto);
     }
 
@@ -71,6 +75,7 @@ public class UserService {
                 .orElseGet(() -> {
                     User user = User.from(userRegisterDto);
                     userRepository.save(user);
+                    discordWebhookNotificationService.sendMessage("새로운 멤버 유저가 가입했습니다!", "Username: "  + userRegisterDto.name());
                     return UserResponseDto.from(user);
                 });
     }
