@@ -12,8 +12,6 @@ public record ProblemRegisterDto (
 
     Long folderId,
 
-    LocalDateTime solvedAt,
-
-    List<ProblemImageDataRegisterDto> imageDataDtoList
+    LocalDateTime solvedAt
 ) {}
 
