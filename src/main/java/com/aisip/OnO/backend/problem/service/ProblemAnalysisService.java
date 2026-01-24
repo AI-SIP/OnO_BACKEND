@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.problem.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.problem.dto.ProblemAnalysisResponseDto;
+import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemAnalysis;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
@@ -97,7 +98,7 @@ public class ProblemAnalysisService {
                     });
 
             // 3. 이미 완료된 경우 스킵
-            if (analysis.getStatus() == ProblemAnalysis.AnalysisStatus.COMPLETED) {
+            if (analysis.getStatus() == AnalysisStatus.COMPLETED) {
                 log.info("Analysis already completed for problemId: {}", problemId);
                 return;
             }
@@ -191,7 +192,7 @@ public class ProblemAnalysisService {
                         .solution(null)
                         .commonMistakes(null)
                         .studyTips(null)
-                        .status("NOT_STARTED")
+                        .status(AnalysisStatus.NOT_STARTED.toString())
                         .errorMessage(null)
                         .build());
     }
