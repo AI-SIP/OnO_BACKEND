@@ -27,119 +27,40 @@
 ✅ 나만의 태그와 폴더 분류로 원하는 문제를 쉽게 발견
 
 ```
-### 사용법이 궁금하다면? 👉 [**사용자 가이드라인 바로가기**](https://www.notion.so/OnO-e104fd6af0064941acf464e6f77eabb3?pvs=21)
-<br>
 
----
-# 🔔 Notification : 오노 업데이트 및 개선사항
-<br>
+## 🛠 Tech Stack
 
-> 저희는 **OnO의 발전을 위해 끊임없이 노력**하고 있어요!
->
-> 유저의 편리한 사용을 위해서 버그 수정 등의 **업데이트를 최소화**하고 있지만, 기능 개선에 따른 불가피한 업데이트는 **양해부탁드립니다**🙏
->
+### Backend
+<div>
+<img src="https://img.shields.io/badge/Java-007396?style=for-the-badge&logo=OpenJDK&logoColor=white">
+<img src="https://img.shields.io/badge/Spring%20Boot-6DB33F?style=for-the-badge&logo=springboot&logoColor=white">
+<img src="https://img.shields.io/badge/Spring%20Security-6DB33F?style=for-the-badge&logo=springsecurity&logoColor=white">
+<img src="https://img.shields.io/badge/Spring Data JPA-6DB33F?style=for-the-badge&logo=Spring&logoColor=white">
+<img src="https://img.shields.io/badge/Hibernate-59666C?style=for-the-badge&logo=Hibernate&logoColor=white">
+</div>
 
-| Date | Updates | Content |
-| --- | --- | --- |
-| 2026/1/22 | V3.0.0 업데이트 | - 레벨 제도 도입 <br> - 복습노트 알림 기능 도입 <br> - 오답노트 이미지 등록 편의성 개선|
-| 2026/1/22 | **✨ 서비스 재개 ✨** | **OnO가 새롭게 개선되어 돌아왔어요!**|
-| 2024/12/4 | **‼️ 서비스 중지 ‼️** | **개선된 OnO로 돌아오기 위해 잠시 서비스를 중단합니다!**|
-| 2024/11/7 | V2.4.0 업데이트 | - 복습 리스트 기능 도입 ✨ |
-| 2024/10/29 | V2.3.0 업데이트 | - 필기 제거 방식 개선 <br> - OnO의 다양한 캐릭터 아이콘 추가 |
-| 2024/10/22 | V2.2.0 업데이트 | - 노트, 템플릿 캐릭터 도입 <br> - UI/UX 대규모 개선 <br> - 신규 회원 안내 페이지 추가 |
-| 2024/10/14 | V2.1.0 업데이트 | - 오답노트 디자인 개선 <br> - 공책 기능 도입 |
-| 2024/10/7 | 전체 스토어 V2.0.0 업데이트 | ⭐ 대규모 수정 <br> -  UI 대규모 수정 <br> - AI 오답분석 기능 도입 ✨ <br> - 과목별 템플릿 기능 도입  ✨ |
-| 2024/9/23 | 👑 구글 플레이 스토어 출시 (v.1.3.2) | - UI 및 디자인 개선 <br> - 오답 노트 관리 기능 도입✨ <br> - 닉네임 설정 도입✨ |
-| 2024/9/17 | 앱 스토어 v1.3.0 업데이트 | - UI 및 디자인 개선 <br> - 버그 수정 |
-| 2024/9/11 | 앱 스토어 v1.2.0 업데이트 | - UI 및 디자인 개선 <br> - 버그 수정 |
-| 2024/9/4 | 앱 스토어 v1.1.0 업데이트 | - UI 및 디자인 개선 <br> - 테마 컬러 설정 기능 도입 ✨ <br> - 필기 색 스포이드 기능 도입✨ |
-| 2024/8/7 | 👑 앱 스토어 출시 (v1.0.0) | ⭐ M.V.P 출시 <br> - 오답 등록 & 복습 기능 <br> - 파란색 필기 제거 기능 |
-<br>
+### Database
+<div>
+<img src="https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=MySQL&logoColor=white">
+<img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=Redis&logoColor=white">
+</div>
 
----
-# 📢 Feedback : OnO의 발전에 기여해주세요
-피드백 / 건의사항 등의 의견을 아래 문의 방식들 중에 선택하여 자유롭게 공유해 주세요:)
+### Infrastructure
+<div>
+<img src="https://img.shields.io/badge/AWS S3-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white">
+<img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=Docker&logoColor=white">
+<img src="https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=NGINX&logoColor=white">
+<img src="https://img.shields.io/badge/GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white">
+</div>
 
-### 1. 설문조사 참여
+### External API
+<div>
+<img src="https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=OpenAI&logoColor=white">
+<img src="https://img.shields.io/badge/FCM-FFCA28?style=for-the-badge&logo=Firebase&logoColor=black">
+<img src="https://img.shields.io/badge/OAuth 2.0-EB5424?style=for-the-badge&logo=Auth0&logoColor=white">
+</div>
 
-[![image width=300](https://github.com/user-attachments/assets/ca0ee0b8-772f-411a-8ab8-a2ead333cd24)](https://forms.gle/MncQvyT57LQr43Pp7)
-
-
-### 2. 스토어 리뷰
-
-<br>
-스토어 리뷰는 스토어 자체에서 리뷰를 공개하는 정책을 사용하므로, 개인정보가 포함된 경우 설문조사 혹은 이메일을 통해 문의 부탁드립니다.
-
-| **기기 유형** | **스토어 바로가기 링크** |
-| --- | --- |
-| IOS | https://apps.apple.com/kr/app/오노-ono-손쉬운-나만의-오답노트/id6602886624 |
-
-
-### 3. 이메일 작성
-
-<aisip2024@gmail.com>으로 메일을 보내주세요. 빠르게 응대해드리겠습니다.
-
-<br>
-
----
-# 💯 OnO와 함께하는 오답노트 작성 비법 A to Z
-<br>
-
-## 📝 핵심 기능 1. 소셜로그인으로 빠른 회원가입
-회원가입의 불편함을 없애고, 소셜로그인을 통해 간편하게 가입하며 이후 앱 실행 시에는 자동 로그인됩니다. <br>
-
-로그인 후에 뜨는 팝업으로 사용법을 빠르게 익혀보세요! <br>
-<br>
-
-## 📝 핵심 기능 2. 오답노트 작성 
-- 하단 ‘오답노트 작성’ 탭에 이동해주세요!
-
-**오답노트 작성 방법**
-```
-1. 문제 이미지를 등록해주세요.
-2. 이미지에서 원하는 부분만 잘라주세요.
-3. 상단 4개의 항목을 입력해주세요.
-      - 푼 날짜 → 문제를 푼 날짜
-      - 공책 → 문제를 저장하고 싶은 폴더 위치
-      - 제목 → 오답노트의 제목
-      - 메모 → 문제를 풀면서 꼭 기록하고 싶은 사항들
-4. 마지막으로 내가 푼 문제의 해설 이미지를 등록하면 끝!!
-      - 해설 이미지 등록(선택)
-```
-<br>
-
-## 📝 핵심 기능 3. 등록된 오답 관리
-### **오답 관리**
-      - ‘**오답 관리**’ 탭에 이동해주세요!
-      - 우측 가장 아래 버튼을 눌러 공책을 생성할 수 있습니다!
-      - 공책 별로 오답노트를 분류해서 저장하세요!
-      - 내가 저장한 문제를 찾아서 들어가면 복습을 시작할 수 있습니다!
-
-<br>
-
-## 📝 핵심 기능 4. 나만의 복습 리스트를 사용해 복습 *(New!)*
-### **복습 리스트 생성**
-    - 하단 ‘오답 복습’ 탭에 이동해주세요!
-    - 우측 하단의 아이콘을 누르면 다음과 같이 내가 작성한 문제들을 확인할 수 있어요!!
-    - 복습 하고 싶은 문제들을 모두 체크해주세요!        
-    - 복습할 문제들을 모두 선택했다면, 하단의 ‘다음’ 버튼을 클릭!
-    - 생성할 리스트의 이름을 설정해주세요!        
-    - 하단의 ‘복습 리스트 만들기’ 버튼을 누르면 복습 리스트가 생성됩니다~
-
-### **복습 리스트로 복습하기**
-    - 다음과 같이 여러 복습 리스트 중, 내가 복습할 리스트를 ‘👉클릭’ 해주세요!
-    - 복습할 리스트를 클릭하면 다음과 같이 리스트의 상세 정보를 확인할 수 있어요!
-    - 하단의 ‘복습하기’ 버튼을 눌러 복습을 시작하세요!    
-    - 기존 복습하기와 동일하게 푼 날짜와 문제 이미지를 통해 복습을 할 수 있어요!
-    - 복습을 마쳤다면, 정답 확인 버튼을 눌러 메모와 분석 결과, 해설 이미지를 보면서 문제를 맞게 풀었는지 확인하세요!
-    - 문제 복습을 마쳤다면, 하단의 ‘복습 인증’ 버튼을 눌러 내가 푼 풀이를 등록하세요!        
-    - 문제 하단에 ‘복습 기록’ 항목을 통해 나의 풀이 기록을 확인할 수 있어요! 나날이 발전하는 나의 풀이 변화 과정을 지켜보세요!     
-    - 다음 문제에 대해서도 동일한 과정으로 복습을 진행해주세요!
-    - 마지막 문제까지 모두 복습을 마쳤다면, 하단의 ‘복습 마치기’ 버튼을 눌러주세요!    
-    - 복습을 성공적으로 끝마쳤습니다!!
-
-<br>
-<br>
+## - 주요 기능
 
 |기능|화면1|화면2|화면3|화면4|
 |---|---|---|---|---|
@@ -150,18 +71,3 @@
 |복습리스트 생성|![image](https://github.com/user-attachments/assets/62ee1f8a-b944-4ef5-81c3-9f49770d1399)|![image](https://github.com/user-attachments/assets/2f65e445-4116-4b29-8cd0-61987a3f631a)|<img width="220" alt="image" src="https://github.com/user-attachments/assets/be51edd9-c706-41b3-96cd-6c8a9065c2c7" />|
 |복습리스트 실행|![image](https://github.com/user-attachments/assets/118c3cf2-c137-4da5-9492-60dfe393345b)|![image](https://github.com/user-attachments/assets/408c7e4a-9743-4dcf-91a9-3a204e619e28)|![image](https://github.com/user-attachments/assets/ae39099e-cc90-4cfc-bf00-912ca0abfaf4)|![image](https://github.com/user-attachments/assets/05166b86-159f-4464-ab09-5854c433b3d4)|
 
-<br>
-
-# 😮 기타 기능
-
-|기능|설명|화면1|화면2|
-|---|---|---|---|
-|레벨 & 테마 변경 기능|- OnO는 색상 변경을 통해 다양한 테마를 사용할 수 있습니다! <br> - 오답노트를 작성해 레벨을 달성하고, 24개의 다양한 테마를 잠금 해제해보세요!|<img width = "220" src = "https://github.com/user-attachments/assets/eab469fe-1dad-4e25-ae60-a92fc0879422"/>|<img width = "220" src = "https://github.com/user-attachments/assets/160ace4c-875e-434f-9366-1c8a70b1dcf2"/>|
-
-<br>
-
-# 🎉 출시 예정 기능
-- 오답 통계 기능 : 교과과정에 기반해서 나의 오답 현황을 한눈에 리포트로 제공해줍니다.
-- 채점 기능: 정답과 비교하여 채점되며, 힌트 열람 시에는 틀린 것으로 채점됩니다.
-
----
