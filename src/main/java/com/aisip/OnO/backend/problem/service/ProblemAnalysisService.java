@@ -5,8 +5,11 @@ import com.aisip.OnO.backend.problem.dto.ProblemAnalysisResponseDto;
 import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemAnalysis;
+import com.aisip.OnO.backend.problem.entity.ProblemImageData;
+import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.problem.repository.ProblemAnalysisRepository;
+import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.util.ai.OpenAIClient;
 import com.aisip.OnO.backend.util.ai.ProblemAnalysisResult;
@@ -29,6 +32,7 @@ public class ProblemAnalysisService {
     private final ProblemRepository problemRepository;
     private final OpenAIClient openAIClient;
     private final ObjectMapper objectMapper;
+    private final ProblemImageDataRepository problemImageDataRepository;
 
     /**
      * 기존 분석 결과 삭제
@@ -81,15 +85,25 @@ public class ProblemAnalysisService {
      * 비동기로 문제 이미지를 분석합니다.
      */
     @Async
-    public void analyzeProblemAsync(Long problemId, List<String> imageUrls) {
-        log.info("Starting async analysis for problemId: {}, imageUrls: {}", problemId, imageUrls);
+    public void analyzeProblemAsync(Long problemId) {
+        log.info("Starting async analysis for problemId: {}, imageUrls: {}", problemId);
 
         try {
-            // 1. Problem 조회
+            // Problem 조회
             Problem problem = problemRepository.findById(problemId)
                     .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
-            // 2. 기존 분석 조회 또는 새로 생성
+            // 문제 이미지 url 조회
+            List<String> problemImageUrls = problemImageDataRepository.findAllByProblemId(problemId)
+                    .stream()
+                    // 1. Enum 값이 PROBLEM_IMAGE인 데이터만 필터링
+                    .filter(data -> data.getProblemImageType() == ProblemImageType.PROBLEM_IMAGE)
+                    // 2. 해당 객체에서 imageUrl 필드만 추출
+                    .map(ProblemImageData::getImageUrl)
+                    // 3. 리스트로 변환
+                    .toList(); // Java 16 이상 기준 (이하는 .collect(Collectors.toList()))
+
+            // 기존 분석 조회 또는 새로 생성
             ProblemAnalysis analysis = analysisRepository.findByProblemId(problemId)
                     .orElseGet(() -> {
                         ProblemAnalysis newAnalysis = ProblemAnalysis.createProcessing(problem);
@@ -104,7 +118,7 @@ public class ProblemAnalysisService {
             }
 
             // 4. OpenAI API 호출 (여러 이미지를 하나의 문제로 분석)
-            ProblemAnalysisResult result = openAIClient.analyzeImages(imageUrls);
+            ProblemAnalysisResult result = openAIClient.analyzeImages(problemImageUrls);
 
             // 5. keyPoints를 JSON 문자열로 변환
             String keyPointsJson = objectMapper.writeValueAsString(result.getKeyPoints());
