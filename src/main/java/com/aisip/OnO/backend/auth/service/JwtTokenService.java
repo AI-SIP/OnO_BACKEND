@@ -50,15 +50,27 @@ public class JwtTokenService {
         Long userId = jwtTokenizer.getUserIdFromRefreshToken(refreshToken);
         Authority authority = jwtTokenizer.getAuthorityFromRefreshToken(refreshToken);
 
-        // Redis에서 RefreshToken 조회
+        // 1. Redis에서 RefreshToken 조회
         String storedToken = redisTokenService.getRefreshToken(userId);
+
+        // 2. Redis에 없으면 DB에서 조회 후 Redis에 캐싱
         if (storedToken == null) {
-            throw new ApplicationException(AuthErrorCase.REFRESH_TOKEN_NOT_FOUND);
+            RefreshToken refreshTokenEntity = refreshTokenRepository.findByUserId(userId)
+                    .orElseThrow(() -> new ApplicationException(AuthErrorCase.REFRESH_TOKEN_NOT_FOUND));
+
+            storedToken = refreshTokenEntity.getRefreshToken();
+
+            // DB에서 찾은 토큰을 Redis에 다시 캐싱
+            long expiration = jwtTokenizer.getRefreshTokenExpirationSeconds();
+            redisTokenService.saveRefreshToken(userId, storedToken, expiration);
+
+            log.info("RefreshToken cache miss - loaded from DB for userId: {}", userId);
         }
 
-        // RefreshToken 일치 여부 확인
+        // 3. RefreshToken 일치 여부 확인
         if (!storedToken.equals(refreshToken)) {
             redisTokenService.deleteRefreshToken(userId);
+            refreshTokenRepository.deleteByUserId(userId);
             throw new ApplicationException(AuthErrorCase.REFRESH_TOKEN_NOT_EQUAL);
         }
 
