@@ -42,12 +42,6 @@ public class ProblemAnalysis extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String errorMessage;      // 에러 발생 시 메시지
 
-    public enum AnalysisStatus {
-        PROCESSING,   // 분석 중
-        COMPLETED,    // 완료
-        FAILED        // 실패
-    }
-
     public static ProblemAnalysis createProcessing(Problem problem) {
         return ProblemAnalysis.builder()
                 .problem(problem)
@@ -58,7 +52,7 @@ public class ProblemAnalysis extends BaseEntity {
     public static ProblemAnalysis createSkipped(Problem problem) {
         return ProblemAnalysis.builder()
                 .problem(problem)
-                .status(AnalysisStatus.FAILED)
+                .status(AnalysisStatus.NOT_STARTED)
                 .errorMessage("이미지가 없어 분석을 진행하지 않았습니다.")
                 .build();
     }
