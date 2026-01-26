@@ -24,7 +24,6 @@ public class JwtTokenService {
     private final JwtTokenizer jwtTokenizer;
     private final RedisTokenService redisTokenService;
     private final RefreshTokenRepository refreshTokenRepository;
-    private final MissionLogService missionLogService;
 
     /**
      * ✅ 유저 정보를 기반으로 새로운 액세스/리프레시 토큰 생성 (Redis + DB)
@@ -78,9 +77,6 @@ public class JwtTokenService {
             refreshTokenRepository.deleteByUserId(userId);
             throw new ApplicationException(AuthErrorCase.REFRESH_TOKEN_NOT_EQUAL);
         }
-
-        // 데일리 출석 미션 등록 (토큰 갱신 = 로그인)
-        missionLogService.registerLoginMission(userId);
 
         log.info("userId: {} has : refresh access token", userId);
         return generateTokens(userId, authority);

@@ -155,6 +155,10 @@ public class ProblemService {
             problemImageData.updateProblem(problem);
             problemImageDataRepository.save(problemImageData);
 
+            if (imageType.equals(ProblemImageType.SOLVE_IMAGE)) {
+                missionLogService.registerProblemPracticeMission(userId, problemId);
+            }
+
             log.info("Uploaded image to S3: {} for problemId: {}", imageUrl, problemId);
         }
     }
