@@ -1,10 +1,10 @@
 package com.aisip.OnO.backend.problem.entity;
 
 public enum ProblemImageType {
-    PROBLEM_IMAGE(1, "problemImage"),
-    ANSWER_IMAGE(2, "answerImage"),
-    SOLVE_IMAGE(3, "solveImage"),
-    PROCESS_IMAGE(4, "processImage");
+    PROBLEM_IMAGE(1, "PROBLEM_IMAGE"),
+    ANSWER_IMAGE(2, "ANSWER_IMAGE"),
+    SOLVE_IMAGE(3, "SOLVE_IMAGE"),
+    PROCESS_IMAGE(4, "PROCESS_IMAGE");
 
     private final int code;
     private final String description;

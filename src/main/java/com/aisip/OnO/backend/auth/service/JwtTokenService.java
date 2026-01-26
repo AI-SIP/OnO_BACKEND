@@ -27,13 +27,18 @@ public class JwtTokenService {
     private final MissionLogService missionLogService;
 
     /**
-     * ✅ 유저 정보를 기반으로 새로운 액세스/리프레시 토큰 생성 (Redis 사용)
+     * ✅ 유저 정보를 기반으로 새로운 액세스/리프레시 토큰 생성 (Redis + DB)
      */
     public TokenResponseDto generateTokens(Long userId, Authority authority) {
         String accessToken = jwtTokenizer.createAccessToken(String.valueOf(userId), Map.of("authority", authority));
         String refreshToken = jwtTokenizer.createRefreshToken(String.valueOf(userId), Map.of("authority", authority));
 
-        // Redis에 RefreshToken 저장
+        // DB에 RefreshToken 저장 (기존 토큰이 있으면 삭제 후 저장)
+        refreshTokenRepository.deleteByUserId(userId);
+        RefreshToken refreshTokenEntity = RefreshToken.from(userId, authority, refreshToken);
+        refreshTokenRepository.save(refreshTokenEntity);
+
+        // Redis에 RefreshToken 캐싱
         long expiration = jwtTokenizer.getRefreshTokenExpirationSeconds();
         redisTokenService.saveRefreshToken(userId, refreshToken, expiration);
 
@@ -42,7 +47,7 @@ public class JwtTokenService {
     }
 
     /**
-     * ✅ 리프레시 토큰을 이용한 액세스 토큰 갱신 (Redis 사용)
+     * ✅ 리프레시 토큰을 이용한 액세스 토큰 갱신
      */
     public TokenResponseDto refreshAccessToken(String refreshToken) {
         jwtTokenizer.validateRefreshToken(refreshToken);

@@ -14,6 +14,7 @@ import org.springframework.beans.propertyeditors.CustomNumberEditor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -63,21 +64,7 @@ public class ProblemController {
         return CommonResponse.success(problemService.findProblemCountByUser(userId));
     }
 
-    // ✅ 문제 등록
-    @PostMapping("")
-    public CommonResponse<Long> registerProblem(@RequestBody ProblemRegisterDto problemRegisterDto) {
-        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
-        // 문제 등록 + 빈 분석 객체 생성 (동기)
-        Long problemId = problemService.registerProblemWithAnalysis(problemRegisterDto, userId);
-
-        // 이미지 저장 및 분석은 비동기로 처리
-        problemService.saveProblemImages(problemRegisterDto, problemId);
-
-        return CommonResponse.success(problemId);
-    }
-
-    // ✅ 문제 분석 결과 조회 (폴링용)
+    // ✅ 문제 분석 결과 조회
     @GetMapping("/{problemId}/analysis")
     public CommonResponse<ProblemAnalysisResponseDto> getProblemAnalysis(@PathVariable("problemId") Long problemId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -86,13 +73,28 @@ public class ProblemController {
         return CommonResponse.success(analysisResponseDto);
     }
 
-    // ✅ 이미지 데이터 등록
-    @PostMapping("/imageData")
-    public CommonResponse<String> registerProblemImageData(@RequestBody ProblemImageDataRegisterDto problemImageDataRegisterDto) {
+    // ✅ 문제 등록
+    @PostMapping("")
+    public CommonResponse<Long> registerProblem(@RequestBody ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        problemService.registerProblemImageData(problemImageDataRegisterDto, userId);
 
-        return CommonResponse.success("문제가 등록되었습니다.");
+        // 문제 등록 + 빈 분석 객체 생성 (동기)
+        Long problemId = problemService.registerProblem(problemRegisterDto, userId);
+        return CommonResponse.success(problemId);
+    }
+
+    // ✅ 문제 이미지 비동기 업로드
+    @PostMapping("/{problemId}/imageData")
+    public CommonResponse<String> uploadProblemImages(
+            @PathVariable("problemId") Long problemId,
+            @RequestParam("problemImages") List<MultipartFile> problemImages,
+            @RequestParam("problemImageTypes") List<String> problemImageTypes
+    ) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        problemService.uploadProblemImages(problemId, userId, problemImages, problemImageTypes);
+        problemService.analysisProblem(problemId);
+
+        return CommonResponse.success("이미지 업로드가 시작되었습니다.");
     }
 
     // ✅ 문제 수정
@@ -109,15 +111,6 @@ public class ProblemController {
     public CommonResponse<String> updateProblemPath(@RequestBody ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         problemService.updateProblemFolder(problemRegisterDto, userId);
-
-        return CommonResponse.success("문제가 수정되었습니다.");
-    }
-
-    // ✅ 문제 이미지 데이터 변경
-    @PatchMapping("/imageData")
-    public CommonResponse<String> updateProblemImageData(@RequestBody ProblemRegisterDto problemRegisterDto) {
-        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        problemService.updateProblemImageData(problemRegisterDto, userId);
 
         return CommonResponse.success("문제가 수정되었습니다.");
     }
@@ -148,4 +141,5 @@ public class ProblemController {
 
         return CommonResponse.success("문제 이미지 데이터 삭제가 완료되었습니다.");
     }
+
 }
