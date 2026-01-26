@@ -20,6 +20,9 @@ public record UserResponseDto (
     Long problemPracticePoint,
     Long notePracticeLevel,
     Long notePracticePoint,
+    Long totalStudyLevel,
+    Long totalStudyCurrentPoint,
+    Long totalStudyNextLevelThreshold,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {
@@ -36,6 +39,9 @@ public record UserResponseDto (
                 .problemPracticePoint(user.getUserMissionStatus().getProblemPracticePoint())
                 .notePracticeLevel(user.getUserMissionStatus().getNotePracticeLevel())
                 .notePracticePoint(user.getUserMissionStatus().getNotePracticePoint())
+                .totalStudyLevel(user.getUserMissionStatus().getTotalStudyLevel())
+                .totalStudyCurrentPoint(user.getUserMissionStatus().getTotalStudyCurrentPoint())
+                .totalStudyNextLevelThreshold(user.getUserMissionStatus().getTotalStudyNextLevelThreshold())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();
