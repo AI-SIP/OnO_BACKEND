@@ -57,7 +57,8 @@ public class User extends BaseEntity {
                         1L, 0L,  // 데일리 출석
                         1L, 0L,  // 오답노트 작성
                         1L, 0L,  // 문제 복습
-                        1L, 0L   // 복습노트 사용
+                        1L, 0L,  // 복습노트 사용
+                        1L, 0L   // 총 학습 레벨 (레벨 1, 포인트 0으로 시작)
                 ))
                 .build();
     }

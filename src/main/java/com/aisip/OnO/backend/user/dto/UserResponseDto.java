@@ -39,11 +39,20 @@ public record UserResponseDto (
                 .problemPracticePoint(user.getUserMissionStatus().getProblemPracticePoint())
                 .notePracticeLevel(user.getUserMissionStatus().getNotePracticeLevel())
                 .notePracticePoint(user.getUserMissionStatus().getNotePracticePoint())
+                // DB에 저장된 총 학습 레벨 정보 사용 (계산 불필요)
                 .totalStudyLevel(user.getUserMissionStatus().getTotalStudyLevel())
-                .totalStudyCurrentPoint(user.getUserMissionStatus().getTotalStudyCurrentPoint())
-                .totalStudyNextLevelThreshold(user.getUserMissionStatus().getTotalStudyNextLevelThreshold())
+                .totalStudyCurrentPoint(user.getUserMissionStatus().getTotalStudyPoint())
+                .totalStudyNextLevelThreshold(getTotalStudyNextLevelThreshold(user.getUserMissionStatus()))
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();
+    }
+
+    private static Long getTotalStudyNextLevelThreshold(com.aisip.OnO.backend.mission.entity.UserMissionStatus status) {
+        if (status.getTotalStudyLevel() >= 15) {
+            return 0L;
+        }
+        // 개별 능력치 필요 경험치 × 4
+        return (10 + (status.getTotalStudyLevel() - 1) * 10) * 4;
     }
 }
