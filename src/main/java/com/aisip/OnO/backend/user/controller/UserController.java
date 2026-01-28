@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.user.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
+import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.service.UserService;
@@ -14,11 +15,13 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+    private final MissionLogService missionLogService;
 
     // ✅ 사용자 정보 조회
     @GetMapping("")
     public CommonResponse<UserResponseDto> getUserInfo() {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        missionLogService.registerLoginMission(userId);
 
         return CommonResponse.success(userService.findUser(userId));
     }
