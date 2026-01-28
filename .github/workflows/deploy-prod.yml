@@ -23,7 +23,7 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: 'gradle'
+          #cache: 'gradle'
 
       # 3. application-prod.yml 생성
       - name: Create application-prod.yml
