@@ -17,13 +17,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. JDK 17 설정
+      # 2. JDK 17 설정 (캐시 완전 비활성화)
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: 'gradle'
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: 1  # 캐시 다운로드 타임아웃 1분으로 단축
 
       # 3. application-prod.yml 생성
       - name: Create application-prod.yml
