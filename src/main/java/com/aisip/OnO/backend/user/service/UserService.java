@@ -125,4 +125,21 @@ public class UserService {
     private String makeGuestIdentifier() {
         return UUID.randomUUID().toString();
     }
+
+    @Transactional
+    public void updateUserLevel(Long userId, String levelType, Long levelValue, Long pointValue) {
+        User user = findUserEntity(userId);
+
+        switch (levelType) {
+            case "attendance" -> user.getUserMissionStatus().setAttendanceLevel(levelValue, pointValue);
+            case "noteWrite" -> user.getUserMissionStatus().setNoteWriteLevel(levelValue, pointValue);
+            case "problemPractice" -> user.getUserMissionStatus().setProblemPracticeLevel(levelValue, pointValue);
+            case "notePractice" -> user.getUserMissionStatus().setNotePracticeLevel(levelValue, pointValue);
+            case "totalStudy" -> user.getUserMissionStatus().setTotalStudyLevel(levelValue, pointValue);
+            default -> throw new ApplicationException(UserErrorCase.USER_NOT_FOUND);
+        }
+
+        userRepository.save(user);
+        log.info("userId: {} level {} updated to level: {}, point: {}", userId, levelType, levelValue, pointValue);
+    }
 }
