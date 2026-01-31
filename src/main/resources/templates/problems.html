@@ -2,102 +2,166 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
-  <title>전체 문제 목록</title>
-  <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    .problem-table {
-      width: 100%;
-      table-layout: fixed;
-      word-wrap : break-word;
-    }
-
-    .problem-table th, .problem-table td {
-      padding: 10px;
-      vertical-align: middle;
-      text-align: left;
-    }
-
-    .problem-table th {
-      background-color: #e9ecef;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OnO 관리자 - 문제 목록</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+  <!-- Navigation Bar -->
+  <nav class="bg-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <div class="flex items-center">
+          <a th:href="@{/admin/main}">
+            <h1 class="text-2xl font-bold text-indigo-600">OnO 관리자</h1>
+          </a>
+        </div>
+        <div class="flex items-center space-x-4">
+          <a th:href="@{/admin/main}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
+            대시보드
+          </a>
+          <a th:href="@{/admin/users}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
+            유저
+          </a>
+          <a th:href="@{/admin/problems}" class="text-indigo-600 px-3 py-2 rounded-md text-sm font-medium border-b-2 border-indigo-600">
+            문제
+          </a>
+          <a th:href="@{/admin/analysis}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
+            통계
+          </a>
+          <form th:action="@{/logout}" method="post">
+            <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-150">
+              로그아웃
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </nav>
 
-<div class="container mt-5">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>전체 문제 목록</h1>
-    <!-- 총 유저 수를 표시하는 부분 -->
-    <span th:text="'총 문제 수: ' + ${problems.size()}" class="ml-auto"></span>
-  </div>
-  <div class="card">
-    <div class="card-body">
-      <div class = "table-responsive">
-        <table class="table problem-table table-hover table-striped">
-          <thead>
-          <tr>
-            <th style="width:5%">ID</th>
-            <!--
-            <th style="width:10%">작성 유저</th>
-            -->
-            <th style="width:10%">템플릿 타입</th>
-            <th style="width:5%">폴더 ID</th>
-            <th style="width:10%">출처</th>
-            <th style="width:10%">메모</th>
-            <th style="width:20%">분석 결과</th>
-            <th style="width:5%">복습 횟수</th>
-            <th style="width:10%">푼 날짜</th>
-            <th style="width:10%">생성일</th>
-            <th style="width:10%">수정일</th>
-            <th style="width:10%">보정 이미지</th>
-            <th style="width:10%">문제 이미지</th>
-            <th style="width:10%">정답 이미지</th>
-            <th style="width:10%">풀이 이미지</th>
-          </tr>
+  <!-- Main Content -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <div class="mb-6">
+      <h2 class="text-2xl font-bold text-gray-900">문제 관리</h2>
+      <p class="text-gray-600 mt-1">총 <span class="font-semibold text-indigo-600" th:text="${totalProblems}">0</span>개의 문제</p>
+    </div>
+
+    <!-- Problems Table -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">폴더 ID</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">메모</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">출처</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">이미지</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">분석</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">푼 날짜</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작성일</th>
+            </tr>
           </thead>
-          <tbody>
-          <tr th:each="problem : ${problems}">
-            <td th:text="${problem.problemId}">problemId</td>
-            <!--<td th:text="${problem.userName}">userName</td>-->
-            <td th:text="${problem.problemTemplateType}">problemTemplateType</td>
-            <td th:text="${problem.folderId}">folderId</td>
-            <td th:text="${problem.reference}">Reference</td>
-            <td th:text="${problem.memo}">memo</td>
-            <td th:text="${problem.analysis}">analysis</td>
-            <td th:text="${#lists.size(problem.repeats)}">repeats size</td>
-            <td th:text="${@dateFormatter.format(problem.solvedAt)}">2024년 08월 20일 18시 32분 51초</td>
-            <td th:text="${@dateFormatter.format(problem.createdAt)}">2024년 08월 20일 18시 32분 51초</td>
-            <td th:text="${@dateFormatter.format(problem.updateAt)}">2024년 08월 20일 18시 32분 51초</td>
-            <td>
-              <a th:href="@{'/admin/user/image/view?url=' + ${problem.processImageUrl}}">
-                <img th:src="${problem.processImageUrl}" alt="Process Image" class="img-thumbnail" style="max-width: 100px;">
-              </a>
-            </td>
-            <td>
-              <a th:href="@{'/admin/user/image/view?url=' + ${problem.problemImageUrl}}">
-                <img th:src="${problem.problemImageUrl}" alt="Problem Image" class="img-thumbnail" style="max-width: 100px;">
-              </a>
-            </td>
-            <td>
-              <a th:href="@{'/admin/user/image/view?url=' + ${problem.answerImageUrl}}">
-                <img th:src="${problem.answerImageUrl}" alt="Answer Image" class="img-thumbnail" style="max-width: 100px;">
-              </a>
-            </td>
-            <td>
-              <a th:href="@{'/admin/user/image/view?url=' + ${problem.solveImageUrl}}">
-                <img th:src="${problem.solveImageUrl}" alt="Solve Image" class="img-thumbnail" style="max-width: 100px;">
-              </a>
-            </td>
-          </tr>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr th:each="problem : ${problems}" class="hover:bg-gray-50 transition-colors">
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" th:text="${problem.problemId}">1</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600" th:text="${problem.folderId}">1</td>
+              <td class="px-6 py-4 text-sm text-gray-600">
+                <span th:if="${problem.memo != null and !problem.memo.isEmpty()}" th:text="${#strings.abbreviate(problem.memo, 40)}">메모 내용...</span>
+                <span th:unless="${problem.memo != null and !problem.memo.isEmpty()}" class="text-gray-400">-</span>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-600">
+                <span th:if="${problem.reference != null and !problem.reference.isEmpty()}" th:text="${problem.reference}">출처</span>
+                <span th:unless="${problem.reference != null and !problem.reference.isEmpty()}" class="text-gray-400">-</span>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-600">
+                <div class="flex flex-wrap gap-1">
+                  <span th:each="image : ${problem.imageUrlList}" class="inline-block">
+                    <a th:href="@{/admin/user/image/view(url=${image.imageUrl})}" target="_blank"
+                       class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-indigo-100 text-indigo-800 hover:bg-indigo-200"
+                       th:title="${image.imageType}">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                      </svg>
+                    </a>
+                  </span>
+                  <span th:if="${#lists.isEmpty(problem.imageUrlList)}" class="text-gray-400 text-xs">이미지 없음</span>
+                </div>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-600">
+                <span th:if="${problem.analysis != null}"
+                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  분석 완료
+                </span>
+                <span th:unless="${problem.analysis != null}"
+                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                  분석 대기
+                </span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                <span th:if="${problem.solvedAt != null}" th:text="${#temporals.format(problem.solvedAt, 'yyyy-MM-dd')}">2024-01-01</span>
+                <span th:unless="${problem.solvedAt != null}" class="text-gray-400">-</span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600" th:text="${#temporals.format(problem.createdAt, 'yyyy-MM-dd HH:mm')}">2024-01-01 00:00</td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(problems)}">
+              <td colspan="8" class="px-6 py-8 text-center text-gray-500">
+                문제가 없습니다
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
     </div>
-  </div>
-</div>
 
-<!-- Bootstrap JS (Optional) -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Pagination -->
+    <div th:if="${totalPages > 1}" class="mt-6 flex items-center justify-between">
+      <div class="text-sm text-gray-700">
+        <span class="font-medium" th:text="${currentPage * size + 1}">1</span>
+        부터 <span class="font-medium" th:text="${currentPage * size + #lists.size(problems)}">20</span>
+        까지 (총 <span class="font-medium" th:text="${totalProblems}">100</span>개)
+      </div>
+
+      <div class="flex space-x-2">
+        <!-- Previous Button -->
+        <a th:if="${currentPage > 0}"
+           th:href="@{/admin/problems(page=${currentPage - 1}, size=${size})}"
+           class="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+          이전
+        </a>
+        <span th:if="${currentPage == 0}"
+              class="px-4 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-400 cursor-not-allowed">
+          이전
+        </span>
+
+        <!-- Page Numbers -->
+        <div class="flex space-x-1">
+          <th:block th:each="page : ${#numbers.sequence(0, totalPages - 1)}">
+            <a th:if="${page == currentPage}"
+               class="px-4 py-2 bg-indigo-600 border border-indigo-600 rounded-md text-sm font-medium text-white">
+              <span th:text="${page + 1}">1</span>
+            </a>
+            <a th:if="${page != currentPage}"
+               th:href="@{/admin/problems(page=${page}, size=${size})}"
+               class="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+              <span th:text="${page + 1}">1</span>
+            </a>
+          </th:block>
+        </div>
+
+        <!-- Next Button -->
+        <a th:if="${currentPage < totalPages - 1}"
+           th:href="@{/admin/problems(page=${currentPage + 1}, size=${size})}"
+           class="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+          다음
+        </a>
+        <span th:if="${currentPage >= totalPages - 1}"
+              class="px-4 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-400 cursor-not-allowed">
+          다음
+        </span>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
