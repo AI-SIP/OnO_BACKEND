@@ -35,7 +35,7 @@ public class AdminService implements UserDetailsService {
                 user.getId(), // userId를 포함시킵니다.
                 user.getIdentifier(),
                 user.getPassword(),
-                List.of(new SimpleGrantedAuthority("ADMIN"))
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
         );
     }
 }
