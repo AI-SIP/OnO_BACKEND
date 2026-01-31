@@ -2,41 +2,112 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
-  <title>Admin Page</title>
-  <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    .btn-custom {
-      height: 50px; /* 버튼의 높이를 동일하게 설정 */
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .card-body > * {
-      margin-bottom: 20px; /* 요소들 간의 간격을 넓히기 */
-    }
-
-    .card-body > *:last-child {
-      margin-bottom: 0; /* 마지막 요소는 하단 여백 제거 */
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OnO 관리자 - 대시보드</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-<div class="container d-flex align-items-center justify-content-center min-vh-100">
-  <div class="card text-center p-5">
-    <div class="card-body">
-      <h1 class="card-title">관리자 페이지</h1>
-      <p class="card-text">이곳은 관리자만 접근할 수 있는 페이지입니다.</p>
-      <a th:href="@{/admin/users}" class="btn btn-primary btn-custom">전체 유저 조회</a>
-      <a th:href="@{/admin/problems}" class="btn btn-primary btn-custom">전체 문제 조회</a>
-      <a th:href="@{/admin/analysis}" class="btn btn-primary btn-custom">유저 통계</a>
-      <a th:href="@{/logout}" class="btn btn-danger btn-custom">로그아웃</a>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+  <!-- Navigation Bar -->
+  <nav class="bg-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <div class="flex items-center">
+          <h1 class="text-2xl font-bold text-indigo-600">OnO 관리자</h1>
+        </div>
+        <div class="flex items-center space-x-4">
+          <a th:href="@{/admin/main}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
+            대시보드
+          </a>
+          <form th:action="@{/logout}" method="post">
+            <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-150">
+              로그아웃
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <!-- Welcome Section -->
+    <div class="mb-8">
+      <h2 class="text-3xl font-bold text-gray-900 mb-2">관리자 대시보드</h2>
+      <p class="text-gray-600">유저, 문제, 통계를 관리할 수 있습니다.</p>
+    </div>
+
+    <!-- Grid Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Users Card -->
+      <a th:href="@{/admin/users}" class="block group">
+        <div class="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 p-6 border-l-4 border-blue-500">
+          <div class="flex items-center justify-between mb-4">
+            <div class="p-3 bg-blue-100 rounded-full">
+              <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+              </svg>
+            </div>
+            <svg class="w-6 h-6 text-gray-400 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-800 mb-2">유저 관리</h3>
+          <p class="text-gray-600 text-sm">모든 가입 유저 보기 및 관리</p>
+        </div>
+      </a>
+
+      <!-- Problems Card -->
+      <a th:href="@{/admin/problems}" class="block group">
+        <div class="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 p-6 border-l-4 border-green-500">
+          <div class="flex items-center justify-between mb-4">
+            <div class="p-3 bg-green-100 rounded-full">
+              <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+            </div>
+            <svg class="w-6 h-6 text-gray-400 group-hover:text-green-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-800 mb-2">문제 관리</h3>
+          <p class="text-gray-600 text-sm">모든 문제 보기 및 관리</p>
+        </div>
+      </a>
+
+      <!-- Analytics Card -->
+      <a th:href="@{/admin/analysis}" class="block group">
+        <div class="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 p-6 border-l-4 border-purple-500">
+          <div class="flex items-center justify-between mb-4">
+            <div class="p-3 bg-purple-100 rounded-full">
+              <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+              </svg>
+            </div>
+            <svg class="w-6 h-6 text-gray-400 group-hover:text-purple-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-800 mb-2">통계 분석</h3>
+          <p class="text-gray-600 text-sm">시스템 통계 및 인사이트 보기</p>
+        </div>
+      </a>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="mt-12 bg-white rounded-lg shadow-md p-6">
+      <h3 class="text-lg font-semibold text-gray-800 mb-4">빠른 이동</h3>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <a th:href="@{/admin/users(page=0)}" class="text-center p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+          <p class="text-sm text-gray-600">최신 유저 목록 보기</p>
+        </a>
+        <a th:href="@{/admin/problems(page=0)}" class="text-center p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+          <p class="text-sm text-gray-600">최신 문제 목록 보기</p>
+        </a>
+        <a th:href="@{/admin/analysis}" class="text-center p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+          <p class="text-sm text-gray-600">통계 보기</p>
+        </a>
+      </div>
     </div>
   </div>
-</div>
-
-<!-- Bootstrap JS (Optional) -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
