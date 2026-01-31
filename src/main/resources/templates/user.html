@@ -110,7 +110,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <!-- Total Study Level -->
           <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg p-4 cursor-pointer hover:shadow-md transition"
-               onclick="editLevel('totalStudy', '총 학습', ${user.totalStudyLevel}, ${user.totalStudyCurrentPoint})">
+               th:onclick="'editLevel(\'totalStudy\', \'총 학습\', ' + ${user.totalStudyLevel} + ', ' + ${user.totalStudyCurrentPoint} + ')'">
             <label class="text-sm font-medium text-indigo-700">총 학습 레벨</label>
             <div class="mt-2 flex items-baseline">
               <p class="text-3xl font-bold text-indigo-600" th:text="'Lv.' + ${user.totalStudyLevel}">Lv.1</p>
@@ -120,7 +120,7 @@
 
           <!-- Attendance Level -->
           <div class="bg-blue-50 rounded-lg p-4 cursor-pointer hover:shadow-md transition"
-               onclick="editLevel('attendance', '출석', ${user.attendanceLevel}, ${user.attendancePoint})">
+               th:onclick="'editLevel(\'attendance\', \'출석\', ' + ${user.attendanceLevel} + ', ' + ${user.attendancePoint} + ')'">
             <label class="text-sm font-medium text-blue-700">출석</label>
             <div class="mt-2 flex items-baseline">
               <p class="text-2xl font-bold text-blue-600" th:text="'Lv.' + ${user.attendanceLevel}">Lv.1</p>
@@ -130,7 +130,7 @@
 
           <!-- Note Write Level -->
           <div class="bg-green-50 rounded-lg p-4 cursor-pointer hover:shadow-md transition"
-               onclick="editLevel('noteWrite', '오답노트 작성', ${user.noteWriteLevel}, ${user.noteWritePoint})">
+               th:onclick="'editLevel(\'noteWrite\', \'오답노트 작성\', ' + ${user.noteWriteLevel} + ', ' + ${user.noteWritePoint} + ')'">
             <label class="text-sm font-medium text-green-700">오답노트 작성</label>
             <div class="mt-2 flex items-baseline">
               <p class="text-2xl font-bold text-green-600" th:text="'Lv.' + ${user.noteWriteLevel}">Lv.1</p>
@@ -140,7 +140,7 @@
 
           <!-- Problem Practice Level -->
           <div class="bg-purple-50 rounded-lg p-4 cursor-pointer hover:shadow-md transition"
-               onclick="editLevel('problemPractice', '문제 복습', ${user.problemPracticeLevel}, ${user.problemPracticePoint})">
+               th:onclick="'editLevel(\'problemPractice\', \'문제 복습\', ' + ${user.problemPracticeLevel} + ', ' + ${user.problemPracticePoint} + ')'">
             <label class="text-sm font-medium text-purple-700">문제 복습</label>
             <div class="mt-2 flex items-baseline">
               <p class="text-2xl font-bold text-purple-600" th:text="'Lv.' + ${user.problemPracticeLevel}">Lv.1</p>
@@ -150,7 +150,7 @@
 
           <!-- Note Practice Level -->
           <div class="bg-pink-50 rounded-lg p-4 cursor-pointer hover:shadow-md transition"
-               onclick="editLevel('notePractice', '복습노트 사용', ${user.notePracticeLevel}, ${user.notePracticePoint})">
+               th:onclick="'editLevel(\'notePractice\', \'복습노트 사용\', ' + ${user.notePracticeLevel} + ', ' + ${user.notePracticePoint} + ')'">
             <label class="text-sm font-medium text-pink-700">복습노트 사용</label>
             <div class="mt-2 flex items-baseline">
               <p class="text-2xl font-bold text-pink-600" th:text="'Lv.' + ${user.notePracticeLevel}">Lv.1</p>
@@ -199,8 +199,8 @@
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              <tr th:each="problem : ${problems}" class="hover:bg-gray-50">
-                <td class="px-4 py-3 text-sm font-medium text-gray-900" th:text="${problem.problemId}">1</td>
+              <tr th:each="problem : ${problems}" class="hover:bg-gray-50 cursor-pointer" th:onclick="'location.href=\'/admin/problem/' + ${problem.problemId} + '\''">
+                <td class="px-4 py-3 text-sm font-medium text-indigo-600 hover:text-indigo-800" th:text="${problem.problemId}">1</td>
                 <td class="px-4 py-3 text-sm text-gray-600">
                   <span th:if="${problem.memo != null and !problem.memo.isEmpty()}" th:text="${#strings.abbreviate(problem.memo, 30)}">메모...</span>
                   <span th:unless="${problem.memo != null and !problem.memo.isEmpty()}" class="text-gray-400">-</span>
