@@ -2,238 +2,203 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
-  <title>유저 상세 정보</title>
-  <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    .user-details-table, .problem-table {
-      width: 100%;
-      table-layout: fixed;
-      word-wrap : break-word;
-    }
-    .user-details-table th, .user-details-table td,
-    .problem-table th, .problem-table td {
-      padding: 10px;
-      vertical-align: middle;
-      text-align: left;
-    }
-    .user-details-table th {
-      width: 30%;
-      background-color: #f8f9fa;
-    }
-    .user-details-table td, .problem-table td {
-      font-weight: bold;
-    }
-    .user-type {
-      font-weight: bold;
-      color: #007bff; /* 기본 색상, 필요에 따라 동적 변경 가능 */
-    }
-    .problem-table th {
-      background-color: #e9ecef;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OnO 관리자 - 유저 상세</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+  <!-- Navigation Bar -->
+  <nav class="bg-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <div class="flex items-center">
+          <a th:href="@{/admin/main}">
+            <h1 class="text-2xl font-bold text-indigo-600">OnO 관리자</h1>
+          </a>
+        </div>
+        <div class="flex items-center space-x-4">
+          <a th:href="@{/admin/main}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
+            대시보드
+          </a>
+          <a th:href="@{/admin/users}" class="text-indigo-600 px-3 py-2 rounded-md text-sm font-medium border-b-2 border-indigo-600">
+            유저
+          </a>
+          <a th:href="@{/admin/problems}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
+            문제
+          </a>
+          <a th:href="@{/admin/analysis}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
+            통계
+          </a>
+          <form th:action="@{/logout}" method="post">
+            <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-150">
+              로그아웃
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </nav>
 
-<div class="container mt-5">
-  <h1 class="mb-4">유저 상세 정보</h1>
-  <div class="card mb-4">
-    <div class="card-body">
-      <table class="table user-details-table">
-        <tr>
-          <th>User ID</th>
-          <td th:text="${user.userId}">1</td>
-        </tr>
-        <!--
-        <tr>
-          <th>이름</th>
-          <td th:text="${user.userName}">User Name</td>
-        </tr>
-        <tr>
-          <th>이메일</th>
-          <td th:text="${user.userEmail}">user@example.com</td>
-        </tr>
-        -->
-        <tr>
-          <th>식별자</th>
-          <td th:text="${user.userIdentifier}">identifier</td>
-        </tr>
-        <tr>
-          <th>유저 유형</th>
-          <td class="user-type" th:text="${user.authority}">GUEST</td>
-        </tr>
-        <tr>
-          <th>Created At</th>
-          <td th:text="${@dateFormatter.format(user.createdAt)}">2024년 08월 20일 18시 32분 51초</td>
-        </tr>
-        <tr>
-          <th>Updated At</th>
-          <td th:text="${@dateFormatter.format(user.updatedAt)}">2024년 08월 20일 18시 32분 51초</td>
-        </tr>
-      </table>
+  <!-- Main Content -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Back Button -->
+    <div class="mb-4">
+      <a th:href="@{/admin/users}" class="text-indigo-600 hover:text-indigo-800 flex items-center">
+        <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+        </svg>
+        유저 목록으로 돌아가기
+      </a>
+    </div>
 
-      <!-- Buttons aligned in the same row -->
-      <div class="d-flex mt-3">
-        <a th:href="@{/admin/users}" class="btn btn-primary me-2">유저 목록 창으로 이동</a>
-        <button class="btn btn-warning me-2" data-bs-toggle="modal" data-bs-target="#editUserModal">유저 수정</button>
-        <button class="btn btn-danger" onclick="deleteUser()">유저 삭제</button>
+    <!-- User Details Card -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div class="flex justify-between items-start mb-6">
+        <h2 class="text-2xl font-bold text-gray-900">유저 상세 정보</h2>
+        <button onclick="deleteUser()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition">
+          유저 삭제
+        </button>
       </div>
 
-      <!-- 유저 수정 모달 -->
-      <div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title" id="editUserModalLabel">유저 정보 수정</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- User Information -->
+        <div class="space-y-4">
+          <div>
+            <label class="text-sm font-medium text-gray-500">유저 ID</label>
+            <p class="mt-1 text-lg font-semibold text-gray-900" th:text="${user.userId}">1</p>
+          </div>
+          <div>
+            <label class="text-sm font-medium text-gray-500">이름</label>
+            <p class="mt-1 text-lg text-gray-900" th:text="${user.name}">유저 이름</p>
+          </div>
+          <div>
+            <label class="text-sm font-medium text-gray-500">이메일</label>
+            <p class="mt-1 text-lg text-gray-900" th:text="${user.email}">user@example.com</p>
+          </div>
+          <div>
+            <label class="text-sm font-medium text-gray-500">가입일</label>
+            <p class="mt-1 text-lg text-gray-900" th:text="${#temporals.format(user.createdAt, 'yyyy-MM-dd HH:mm:ss')}">2024-01-01 00:00:00</p>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="space-y-4">
+          <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg p-4">
+            <label class="text-sm font-medium text-indigo-700">총 학습 레벨</label>
+            <div class="mt-2 flex items-baseline">
+              <p class="text-3xl font-bold text-indigo-600" th:text="'Lv.' + ${user.totalStudyLevel}">Lv.1</p>
+              <p class="ml-2 text-sm text-indigo-500" th:text="'(' + ${user.totalStudyCurrentPoint} + '/' + ${user.totalStudyNextLevelThreshold} + ' pt)'"> (0/40 pt)</p>
             </div>
-            <form th:action="@{'/admin/user/' + ${user.userId}}" method="post">
-              <div class="modal-body">
-                <div class="mb-3">
-                  <label for="email" class="form-label">이메일</label>
-                  <input type="email" class="form-control" id="email" name="email" th:value="${user.userEmail}" required>
-                </div>
-                <div class="mb-3">
-                  <label for="name" class="form-label">이름</label>
-                  <input type="text" class="form-control" id="name" name="name" th:value="${user.userName}" required>
-                </div>
-                <div class="mb-3">
-                  <label for="identifier" class="form-label">식별자</label>
-                  <input type="text" class="form-control" id="identifier" name="identifier" th:value="${user.userIdentifier}" required>
-                </div>
-                <div class="mb-3">
-                  <label for="type" class="form-label">유저 유형</label>
-                  <select class="form-select" id="type" name="type" required>
-                    <option th:each="type : ${T(com.aisip.OnO.backend.entity.User.UserType).values()}"
-                            th:value="${type}" th:text="${type}"
-                            th:selected="${user.authority == type}">GUEST</option>
-                  </select>
-                </div>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
-                <button type="submit" class="btn btn-primary">수정하기</button>
-              </div>
-            </form>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="bg-blue-50 rounded-lg p-3">
+              <label class="text-xs font-medium text-blue-700">출석</label>
+              <p class="text-lg font-semibold text-blue-600" th:text="'Lv.' + ${user.attendanceLevel}">Lv.1</p>
+            </div>
+            <div class="bg-green-50 rounded-lg p-3">
+              <label class="text-xs font-medium text-green-700">오답노트 작성</label>
+              <p class="text-lg font-semibold text-green-600" th:text="'Lv.' + ${user.noteWriteLevel}">Lv.1</p>
+            </div>
+            <div class="bg-purple-50 rounded-lg p-3">
+              <label class="text-xs font-medium text-purple-700">문제 복습</label>
+              <p class="text-lg font-semibold text-purple-600" th:text="'Lv.' + ${user.problemPracticeLevel}">Lv.1</p>
+            </div>
+            <div class="bg-pink-50 rounded-lg p-3">
+              <label class="text-xs font-medium text-pink-700">복습노트 사용</label>
+              <p class="text-lg font-semibold text-pink-600" th:text="'Lv.' + ${user.notePracticeLevel}">Lv.1</p>
+            </div>
+          </div>
+
+          <div class="bg-gray-50 rounded-lg p-4">
+            <label class="text-sm font-medium text-gray-700">총 문제 수</label>
+            <p class="mt-1 text-2xl font-bold text-gray-900" th:text="${problemCount}">0</p>
           </div>
         </div>
       </div>
-
     </div>
-  </div>
-  <br></br>
 
-  <!-- 문제 목록 및 총 개수 표시 -->
-  <h2 class="mb-4">작성한 문제 목록</h2>
-  <p class="mb-4">총 문제 수: <span th:text="${#lists.size(problems)}">0</span></p>
+    <!-- Problems Section -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <h3 class="text-xl font-bold text-gray-900 mb-4">유저가 작성한 문제</h3>
+      <p class="text-gray-600 mb-4">총 <span class="font-semibold text-indigo-600" th:text="${problemCount}">0</span>개의 문제</p>
 
-  <div class="card">
-    <div class="card-body">
-      <div class = "table-responsive">
-        <table class="table problem-table table-hover table-striped">
-          <thead>
-          <tr>
-            <th style="width:5%">ID</th>
-            <th style="width:10%">작성 유저</th>
-            <th style="width:10%">템플릿 타입</th>
-            <th style="width:5%">폴더 ID</th>
-            <th style="width:10%">출처</th>
-            <th style="width:10%">메모</th>
-            <th style="width:20%">분석 결과</th>
-            <th style="width:5%">복습 횟수</th>
-            <th style="width:10%">푼 날짜</th>
-            <th style="width:10%">생성일</th>
-            <th style="width:10%">수정일</th>
-            <th style="width:10%">보정 이미지</th>
-            <th style="width:10%">문제 이미지</th>
-            <th style="width:10%">정답 이미지</th>
-            <th style="width:10%">풀이 이미지</th>
-          </tr>
+      <div th:if="${problemCount > 0}" class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">메모</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">출처</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">이미지</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">푼 날짜</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">작성일</th>
+            </tr>
           </thead>
-          <tbody>
-          <tr th:each="problem : ${problems}">
-            <td th:text="${problem.problemId}">problemId</td>
-            <td th:text="${problem.userName}">userName</td>
-            <td th:text="${problem.problemTemplateType}">problemTemplateType</td>
-            <td th:text="${problem.folderId}">folderId</td>
-            <td th:text="${problem.reference}">Reference</td>
-            <td th:text="${problem.memo}">memo</td>
-            <td th:text="${problem.analysis}">analysis</td>
-            <td th:text="${#lists.size(problem.repeats)}">repeats size</td>
-            <td th:text="${@dateFormatter.format(problem.solvedAt)}">2024년 08월 20일 18시 32분 51초</td>
-            <td th:text="${@dateFormatter.format(problem.createdAt)}">2024년 08월 20일 18시 32분 51초</td>
-            <td th:text="${@dateFormatter.format(problem.updateAt)}">2024년 08월 20일 18시 32분 51초</td>
-            <td>
-              <a th:href="@{'/admin/user/image/view?url=' + ${problem.processImageUrl}}">
-                <img th:src="${problem.processImageUrl}" alt="Process Image" class="img-thumbnail" style="max-width: 100px;">
-              </a>
-            </td>
-            <td>
-              <a th:href="@{'/admin/user/image/view?url=' + ${problem.problemImageUrl}}">
-                <img th:src="${problem.problemImageUrl}" alt="Problem Image" class="img-thumbnail" style="max-width: 100px;">
-              </a>
-            </td>
-            <td>
-              <a th:href="@{'/admin/user/image/view?url=' + ${problem.answerImageUrl}}">
-                <img th:src="${problem.answerImageUrl}" alt="Answer Image" class="img-thumbnail" style="max-width: 100px;">
-              </a>
-            </td>
-            <td>
-              <a th:href="@{'/admin/user/image/view?url=' + ${problem.solveImageUrl}}">
-                <img th:src="${problem.solveImageUrl}" alt="Solve Image" class="img-thumbnail" style="max-width: 100px;">
-              </a>
-            </td>
-          </tr>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr th:each="problem : ${problems}" class="hover:bg-gray-50">
+              <td class="px-4 py-3 text-sm font-medium text-gray-900" th:text="${problem.problemId}">1</td>
+              <td class="px-4 py-3 text-sm text-gray-600">
+                <span th:if="${problem.memo != null and !problem.memo.isEmpty()}" th:text="${#strings.abbreviate(problem.memo, 30)}">메모...</span>
+                <span th:unless="${problem.memo != null and !problem.memo.isEmpty()}" class="text-gray-400">-</span>
+              </td>
+              <td class="px-4 py-3 text-sm text-gray-600">
+                <span th:if="${problem.reference != null and !problem.reference.isEmpty()}" th:text="${problem.reference}">출처</span>
+                <span th:unless="${problem.reference != null and !problem.reference.isEmpty()}" class="text-gray-400">-</span>
+              </td>
+              <td class="px-4 py-3 text-sm text-gray-600">
+                <div class="flex space-x-1">
+                  <span th:each="image : ${problem.imageUrlList}" class="inline-block">
+                    <a th:href="@{/admin/user/image/view(url=${image.imageUrl})}" target="_blank" class="text-indigo-600 hover:text-indigo-800">
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                      </svg>
+                    </a>
+                  </span>
+                  <span th:if="${#lists.isEmpty(problem.imageUrlList)}" class="text-gray-400">이미지 없음</span>
+                </div>
+              </td>
+              <td class="px-4 py-3 text-sm text-gray-600">
+                <span th:if="${problem.solvedAt != null}" th:text="${#temporals.format(problem.solvedAt, 'yyyy-MM-dd')}">2024-01-01</span>
+                <span th:unless="${problem.solvedAt != null}" class="text-gray-400">-</span>
+              </td>
+              <td class="px-4 py-3 text-sm text-gray-600" th:text="${#temporals.format(problem.createdAt, 'yyyy-MM-dd HH:mm')}">2024-01-01 00:00</td>
+            </tr>
           </tbody>
         </table>
       </div>
+
+      <div th:unless="${problemCount > 0}" class="text-center py-8 text-gray-500">
+        이 유저가 작성한 문제가 없습니다
+      </div>
     </div>
   </div>
-</div>
 
-<!-- Bootstrap JS (Optional) -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<!-- JavaScript for deleting the user -->
-<script>
-  function deleteUser() {
-    if (confirm("정말 유저를 삭제하시겠습니까?")) {
-      var userId = [[${user.userId}]]; // Thymeleaf syntax to insert the user ID
-      fetch(`/admin/user/${userId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-              .then(commonResponse => {
-                if (commonResponse.ok) {
-                  alert("유저를 성공적으로 삭제했습니다.");
-                  window.location.href = "/admin/users";
-                } else {
-                  alert("유저 삭제에 실패했습니다.");
-                }
-              })
-              .catch(error => {
-                console.error("삭제 중 에러가 발생했습니다:", error);
-                alert("유저 삭제에 실패했습니다.");
-              });
+  <!-- Delete User Script -->
+  <script th:inline="javascript">
+    function deleteUser() {
+      if (confirm("정말 이 유저를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
+        const userId = /*[[${user.userId}]]*/ 1;
+        fetch(`/admin/user/${userId}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+        .then(response => {
+          if (response.ok) {
+            alert("유저가 성공적으로 삭제되었습니다");
+            window.location.href = "/admin/users";
+          } else {
+            alert("유저 삭제에 실패했습니다");
+          }
+        })
+        .catch(error => {
+          console.error("유저 삭제 중 에러 발생:", error);
+          alert("유저 삭제에 실패했습니다");
+        });
+      }
     }
-  }
-
-  function openImage(imageUrl) {
-    var imgWindow = window.open("", "_blank", "toolbar=no,scrollbars=no,resizable=yes");
-    imgWindow.document.write(`
-      <html>
-        <head>
-          <title>Image</title>
-        </head>
-        <body style="margin:0;display:flex;align-items:center;justify-content:center;background-color:black;">
-          <img src="${imageUrl}" style="width:100%; height:auto;">
-        </body>
-      </html>
-    `);
-    imgWindow.document.close();
-  }
-</script>
+  </script>
 </body>
 </html>
