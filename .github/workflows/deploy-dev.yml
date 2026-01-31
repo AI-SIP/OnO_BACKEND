@@ -23,7 +23,8 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: 'gradle'
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: 1  # 캐시 다운로드 타임아웃 1분으로 단축
 
       # 3. application-dev.yml 생성 (개발 환경 설정)
       - name: Create application-dev.yml
