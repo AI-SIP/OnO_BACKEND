@@ -2,53 +2,207 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
   <meta charset="UTF-8">
-  <title>통계 목록</title>
-  <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OnO 관리자 - 통계</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+  <!-- Navigation Bar -->
+  <nav class="bg-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <div class="flex items-center">
+          <a th:href="@{/admin/main}">
+            <h1 class="text-2xl font-bold text-indigo-600">OnO 관리자</h1>
+          </a>
+        </div>
+        <div class="flex items-center space-x-4">
+          <a th:href="@{/admin/main}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
+            대시보드
+          </a>
+          <a th:href="@{/admin/users}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
+            유저
+          </a>
+          <a th:href="@{/admin/problems}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
+            문제
+          </a>
+          <a th:href="@{/admin/analysis}" class="text-indigo-600 px-3 py-2 rounded-md text-sm font-medium border-b-2 border-indigo-600">
+            통계
+          </a>
+          <form th:action="@{/logout}" method="post">
+            <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-150">
+              로그아웃
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </nav>
 
-<div class="container mt-5">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>통계 목록</h1>
+  <!-- Main Content -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <div class="mb-8">
+      <h2 class="text-2xl font-bold text-gray-900">시스템 통계</h2>
+      <p class="text-gray-600 mt-1">OnO 애플리케이션 통계 개요</p>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <!-- Total Users -->
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-500 uppercase">총 유저 수</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${allUserCount}">0</p>
+          </div>
+          <div class="p-3 bg-blue-100 rounded-full">
+            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="mt-4">
+          <a th:href="@{/admin/users}" class="text-sm text-blue-600 hover:text-blue-800 font-medium">모든 유저 보기 →</a>
+        </div>
+      </div>
+
+      <!-- Total Problems -->
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-500 uppercase">총 문제 수</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${allProblemCount}">0</p>
+          </div>
+          <div class="p-3 bg-green-100 rounded-full">
+            <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="mt-4">
+          <a th:href="@{/admin/problems}" class="text-sm text-green-600 hover:text-green-800 font-medium">모든 문제 보기 →</a>
+        </div>
+      </div>
+
+      <!-- Average Problems per User -->
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-500 uppercase">유저당 평균 문제 수</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900"
+               th:text="${allUserCount > 0 ? #numbers.formatDecimal(allProblemCount / allUserCount, 1, 2) : '0.00'}">0.00</p>
+          </div>
+          <div class="p-3 bg-purple-100 rounded-full">
+            <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- System Health -->
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-indigo-500">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-500 uppercase">시스템 상태</p>
+            <p class="mt-2 text-xl font-bold text-green-600">정상</p>
+          </div>
+          <div class="p-3 bg-indigo-100 rounded-full">
+            <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="mt-4">
+          <p class="text-sm text-gray-500">모든 시스템 작동 중</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detailed Statistics -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden mb-8">
+      <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+        <h3 class="text-lg font-semibold text-gray-900">상세 통계</h3>
+      </div>
+      <div class="p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <!-- User Statistics -->
+          <div>
+            <h4 class="text-md font-semibold text-gray-800 mb-4 flex items-center">
+              <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+              </svg>
+              유저 통계
+            </h4>
+            <div class="space-y-3">
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">총 유저 수</span>
+                <span class="text-sm font-bold text-gray-900" th:text="${allUserCount}">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Problem Statistics -->
+          <div>
+            <h4 class="text-md font-semibold text-gray-800 mb-4 flex items-center">
+              <svg class="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              문제 통계
+            </h4>
+            <div class="space-y-3">
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">총 문제 수</span>
+                <span class="text-sm font-bold text-gray-900" th:text="${allProblemCount}">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">빠른 이동</h3>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <a th:href="@{/admin/users}" class="flex items-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors group">
+          <div class="p-2 bg-blue-200 rounded-lg group-hover:bg-blue-300 transition-colors">
+            <svg class="w-6 h-6 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+            </svg>
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-gray-900">유저 관리</p>
+            <p class="text-xs text-gray-500">유저 계정 보기 및 수정</p>
+          </div>
+        </a>
+
+        <a th:href="@{/admin/problems}" class="flex items-center p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors group">
+          <div class="p-2 bg-green-200 rounded-lg group-hover:bg-green-300 transition-colors">
+            <svg class="w-6 h-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-gray-900">문제 관리</p>
+            <p class="text-xs text-gray-500">모든 유저 문제 보기</p>
+          </div>
+        </a>
+
+        <a th:href="@{/admin/main}" class="flex items-center p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors group">
+          <div class="p-2 bg-purple-200 rounded-lg group-hover:bg-purple-300 transition-colors">
+            <svg class="w-6 h-6 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+            </svg>
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-gray-900">대시보드</p>
+            <p class="text-xs text-gray-500">메인 대시보드로 돌아가기</p>
+          </div>
+        </a>
+      </div>
+    </div>
   </div>
-  <table class="table table-striped">
-    <thead>
-    <tr>
-      <th scope="col">유저 수</th>
-      <th scope="col">게스트 유저 수</th>
-      <th scope="col">일반 유저 수</th>
-      <th scope="col">총 문제 수</th>
-      <th scope="col">템플릿 업데이트 이전 문제 수</th>
-      <th scope="col">심플 템플릿 문제 수</th>
-      <th scope="col">클린 템플릿 문제 수</th>
-      <th scope="col">스페셜 템플릿 문제 수</th>
-      <th scope="col">문제 이미지 등록 수</th>
-      <th scope="col">정답 이미지 등록 수</th>
-      <th scope="col">풀이 이미지 등록 수</th>
-      <th scope="col">보정 이미지 등록 수</th>
-    </tr>
-    </thead>
-    <tbody>
-    <tr>
-      <td th:text="${allUserCount}">allUserCount</td>
-      <td th:text="${guestMemberCount}">guestMemberCount</td>
-      <td th:text="${memberCount}">memberCount</td>
-      <td th:text="${allProblemCount}">allProblemCount</td>
-      <td th:text="${nullTemplateCount}">nullTemplateCount</td>
-      <td th:text="${simpleTemplateCount}">simpleTemplateCount</td>
-      <td th:text="${cleanTemplateCount}">cleanTemplateCount</td>
-      <td th:text="${specialTemplateCount}">specialTemplateCount</td>
-      <td th:text="${problemImageCount}">problemImageCount</td>
-      <td th:text="${answerImageCount}">answerImageCount</td>
-      <td th:text="${solveImageCount}">solveImageCount</td>
-      <td th:text="${processImageCount}">processImageCount</td>
-    </tr>
-    </tbody>
-  </table>
-</div>
-
-<!-- Bootstrap JS (Optional) -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
