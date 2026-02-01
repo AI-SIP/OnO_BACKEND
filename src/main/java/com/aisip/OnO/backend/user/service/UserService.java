@@ -94,7 +94,10 @@ public class UserService {
     @Transactional(readOnly = true)
     public List<UserResponseDto> findAllUsers() {
         List<User> userList = userRepository.findAll();
-        return userList.stream().map(UserResponseDto::from).collect(Collectors.toList());
+        return userList.stream()
+                .sorted((u1, u2) -> u2.getCreatedAt().compareTo(u1.getCreatedAt())) // 최신순 정렬
+                .map(UserResponseDto::from)
+                .collect(Collectors.toList());
     }
 
     @Transactional

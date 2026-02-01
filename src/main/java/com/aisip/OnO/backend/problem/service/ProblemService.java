@@ -98,6 +98,7 @@ public class ProblemService {
     public List<ProblemResponseDto> findAllProblems() {
         return problemRepository.findAll()
                 .stream()
+                .sorted((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt())) // 최신순 정렬
                 .map(ProblemResponseDto::from)
                 .collect(Collectors.toList());
     }
