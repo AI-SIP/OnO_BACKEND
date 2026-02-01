@@ -28,12 +28,27 @@ public class AdminAnalysisController {
         int allUserCount = userService.findAllUsers().size();
         int allProblemCount = problemService.findAllProblems().size();
 
-        // 최근 30일간 날짜별 출석 유저 수
+        // 최근 30일간 날짜별 출석 유저 수 및 신규 가입자 수
         Map<LocalDate, Long> dailyActiveUsers = missionLogService.getDailyActiveUsersCount(30);
+        Map<LocalDate, Long> dailyNewUsers = userService.getDailyNewUsersCount(30);
+
+        // 최근 30일 신규 가입자 총합
+        long recentNewUsersCount = dailyNewUsers.values().stream()
+                .mapToLong(Long::longValue)
+                .sum();
+
+        // 하루 평균 방문자 수 (최근 30일)
+        double averageDailyVisitors = dailyActiveUsers.values().stream()
+                .mapToLong(Long::longValue)
+                .average()
+                .orElse(0.0);
 
         model.addAttribute("allUserCount", allUserCount);
         model.addAttribute("allProblemCount", allProblemCount);
         model.addAttribute("dailyActiveUsers", dailyActiveUsers);
+        model.addAttribute("dailyNewUsers", dailyNewUsers);
+        model.addAttribute("recentNewUsersCount", recentNewUsersCount);
+        model.addAttribute("averageDailyVisitors", averageDailyVisitors);
 
         return "analysis";
     }

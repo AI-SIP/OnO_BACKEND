@@ -14,7 +14,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -141,5 +146,32 @@ public class UserService {
 
         userRepository.save(user);
         log.info("userId: {} level {} updated to level: {}, point: {}", userId, levelType, levelValue, pointValue);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<LocalDate, Long> getDailyNewUsersCount(int days) {
+        Map<LocalDate, Long> result = new LinkedHashMap<>();
+        LocalDate today = LocalDate.now();
+        List<User> allUsers = userRepository.findAll();
+
+        // 최근 날짜가 위로 오도록 역순으로 조회
+        for (int i = 0; i < days; i++) {
+            LocalDate date = today.minusDays(i);
+            LocalDateTime startOfDay = date.atStartOfDay();
+            LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
+
+            long count = allUsers.stream()
+                    .filter(user -> {
+                        LocalDateTime createdAt = user.getCreatedAt();
+                        return createdAt != null &&
+                                !createdAt.isBefore(startOfDay) &&
+                                !createdAt.isAfter(endOfDay);
+                    })
+                    .count();
+
+            result.put(date, count);
+        }
+
+        return result;
     }
 }
