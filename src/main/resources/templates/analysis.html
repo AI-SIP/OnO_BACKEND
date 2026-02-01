@@ -85,19 +85,40 @@
         </div>
       </div>
 
-      <!-- Average Problems per User -->
+      <!-- Average Daily Visitors -->
       <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-gray-500 uppercase">유저당 평균 문제 수</p>
+            <p class="text-sm font-medium text-gray-500 uppercase">하루 평균 방문자 수</p>
             <p class="mt-2 text-3xl font-bold text-gray-900"
-               th:text="${allUserCount > 0 ? #numbers.formatDecimal(allProblemCount * 1.0 / allUserCount, 1, 2) : '0.00'}">0.00</p>
+               th:text="${#numbers.formatDecimal(averageDailyVisitors, 1, 1)}">0.0</p>
           </div>
           <div class="p-3 bg-purple-100 rounded-full">
             <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
             </svg>
           </div>
+        </div>
+        <div class="mt-4">
+          <p class="text-xs text-gray-500">최근 30일 기준</p>
+        </div>
+      </div>
+
+      <!-- Recent 30 Days New Users -->
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-orange-500">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-500 uppercase">최근 30일 가입자 수</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${recentNewUsersCount}">0</p>
+          </div>
+          <div class="p-3 bg-orange-100 rounded-full">
+            <svg class="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="mt-4">
+          <p class="text-xs text-gray-500">지난 30일간 신규 가입</p>
         </div>
       </div>
 
@@ -174,6 +195,7 @@
               <tr>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">날짜</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">출석 유저 수</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">신규 가입자 수</th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
@@ -181,13 +203,19 @@
                 <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900" th:text="${#temporals.format(entry.key, 'yyyy-MM-dd (E)')}">2024-01-01</td>
                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                   <span class="inline-flex items-center">
-                    <span class="font-semibold" th:text="${entry.value}">0</span>
+                    <span class="font-semibold text-blue-600" th:text="${entry.value}">0</span>
+                    <span class="ml-1 text-gray-500">명</span>
+                  </span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                  <span class="inline-flex items-center">
+                    <span class="font-semibold text-orange-600" th:text="${dailyNewUsers[entry.key]}">0</span>
                     <span class="ml-1 text-gray-500">명</span>
                   </span>
                 </td>
               </tr>
               <tr th:if="${#maps.isEmpty(dailyActiveUsers)}">
-                <td colspan="2" class="px-4 py-8 text-center text-gray-500">
+                <td colspan="3" class="px-4 py-8 text-center text-gray-500">
                   데이터가 없습니다
                 </td>
               </tr>
