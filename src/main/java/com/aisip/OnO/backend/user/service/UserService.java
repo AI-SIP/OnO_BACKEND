@@ -177,4 +177,21 @@ public class UserService {
 
         return result;
     }
+
+    @Transactional(readOnly = true)
+    public List<UserResponseDto> getUsersByDate(LocalDate date) {
+        LocalDateTime startOfDay = date.atStartOfDay();
+        LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
+
+        return userRepository.findAll().stream()
+                .filter(user -> {
+                    LocalDateTime createdAt = user.getCreatedAt();
+                    return createdAt != null &&
+                            !createdAt.isBefore(startOfDay) &&
+                            !createdAt.isAfter(endOfDay);
+                })
+                .sorted((u1, u2) -> u2.getCreatedAt().compareTo(u1.getCreatedAt()))
+                .map(UserResponseDto::from)
+                .collect(Collectors.toList());
+    }
 }

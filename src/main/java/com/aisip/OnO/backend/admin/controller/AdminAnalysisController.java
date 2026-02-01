@@ -2,16 +2,22 @@ package com.aisip.OnO.backend.admin.controller;
 
 import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.problem.service.ProblemService;
+import com.aisip.OnO.backend.user.dto.UserResponseDto;
+import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -51,5 +57,38 @@ public class AdminAnalysisController {
         model.addAttribute("averageDailyVisitors", averageDailyVisitors);
 
         return "analysis";
+    }
+
+    @GetMapping("/analysis/daily-new-users")
+    public String getDailyNewUsers(
+            @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            Model model) {
+
+        List<UserResponseDto> users = userService.getUsersByDate(date);
+
+        model.addAttribute("date", date);
+        model.addAttribute("users", users);
+        model.addAttribute("type", "new");
+        model.addAttribute("title", "신규 가입자");
+
+        return "daily-users";
+    }
+
+    @GetMapping("/analysis/daily-active-users")
+    public String getDailyActiveUsers(
+            @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            Model model) {
+
+        List<User> activeUsers = missionLogService.getActiveUsersByDate(date);
+        List<UserResponseDto> users = activeUsers.stream()
+                .map(UserResponseDto::from)
+                .collect(Collectors.toList());
+
+        model.addAttribute("date", date);
+        model.addAttribute("users", users);
+        model.addAttribute("type", "active");
+        model.addAttribute("title", "출석 유저");
+
+        return "daily-users";
     }
 }

@@ -202,14 +202,26 @@
               <tr th:each="entry : ${dailyActiveUsers}" class="hover:bg-gray-50">
                 <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900" th:text="${#temporals.format(entry.key, 'yyyy-MM-dd (E)')}">2024-01-01</td>
                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                  <span class="inline-flex items-center">
+                  <a th:if="${entry.value > 0}"
+                     th:href="@{/admin/analysis/daily-active-users(date=${entry.key})}"
+                     class="inline-flex items-center hover:underline">
                     <span class="font-semibold text-blue-600" th:text="${entry.value}">0</span>
+                    <span class="ml-1 text-gray-500">명</span>
+                  </a>
+                  <span th:if="${entry.value == 0}" class="inline-flex items-center">
+                    <span class="font-semibold text-gray-400" th:text="${entry.value}">0</span>
                     <span class="ml-1 text-gray-500">명</span>
                   </span>
                 </td>
                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                  <span class="inline-flex items-center">
+                  <a th:if="${dailyNewUsers[entry.key] > 0}"
+                     th:href="@{/admin/analysis/daily-new-users(date=${entry.key})}"
+                     class="inline-flex items-center hover:underline">
                     <span class="font-semibold text-orange-600" th:text="${dailyNewUsers[entry.key]}">0</span>
+                    <span class="ml-1 text-gray-500">명</span>
+                  </a>
+                  <span th:if="${dailyNewUsers[entry.key] == 0}" class="inline-flex items-center">
+                    <span class="font-semibold text-gray-400" th:text="${dailyNewUsers[entry.key]}">0</span>
                     <span class="ml-1 text-gray-500">명</span>
                   </span>
                 </td>

@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.mission.repository;
 
 import com.aisip.OnO.backend.mission.entity.MissionType;
+import com.aisip.OnO.backend.user.entity.User;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
 
@@ -107,6 +108,21 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
         }
 
         return result;
+    }
+
+    @Override
+    public java.util.List<User> getActiveUsersByDate(LocalDate date) {
+        LocalDateTime startOfDay = date.atStartOfDay();
+        LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
+
+        return queryFactory
+                .select(missionLog.user)
+                .distinct()
+                .from(missionLog)
+                .where(missionLog.missionType.eq(MissionType.USER_LOGIN)
+                        .and(missionLog.createdAt.between(startOfDay, endOfDay))
+                )
+                .fetch();
     }
 
     private LocalDateTime getStartOfToday() {
