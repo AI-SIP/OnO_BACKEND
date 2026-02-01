@@ -89,7 +89,8 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
         Map<LocalDate, Long> result = new LinkedHashMap<>();
         LocalDate today = LocalDate.now();
 
-        for (int i = days - 1; i >= 0; i--) {
+        // 최근 날짜가 위로 오도록 역순으로 조회
+        for (int i = 0; i < days; i++) {
             LocalDate date = today.minusDays(i);
             LocalDateTime startOfDay = date.atStartOfDay();
             LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
