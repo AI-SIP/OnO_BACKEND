@@ -8,7 +8,9 @@ import com.aisip.OnO.backend.mission.exception.MissionErrorCase;
 import com.aisip.OnO.backend.mission.repository.MissionLogRepository;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
@@ -149,5 +151,10 @@ public class MissionLogService {
     @Transactional(readOnly = true)
     public List<MissionLog> findAllByUserId(Long userId) {
         return missionLogRepository.findAllByUserId(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<LocalDate, Long> getDailyActiveUsersCount(int days) {
+        return missionLogRepository.getDailyActiveUsersCount(days);
     }
 }

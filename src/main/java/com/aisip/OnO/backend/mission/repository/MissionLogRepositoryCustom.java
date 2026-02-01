@@ -1,5 +1,8 @@
 package com.aisip.OnO.backend.mission.repository;
 
+import java.time.LocalDate;
+import java.util.Map;
+
 public interface MissionLogRepositoryCustom {
     boolean alreadyWriteProblemsTodayMoreThan3(Long userId);
 
@@ -10,4 +13,6 @@ public interface MissionLogRepositoryCustom {
     boolean alreadyLogin(Long userId);
 
     Long getPointSumToday(Long userId);
+
+    Map<LocalDate, Long> getDailyActiveUsersCount(int days);
 }

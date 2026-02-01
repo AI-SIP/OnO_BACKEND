@@ -7,6 +7,8 @@ import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static com.aisip.OnO.backend.mission.entity.QMissionLog.missionLog;
 
@@ -80,6 +82,30 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
 
         return result != null ? result : 0;
 
+    }
+
+    @Override
+    public Map<LocalDate, Long> getDailyActiveUsersCount(int days) {
+        Map<LocalDate, Long> result = new LinkedHashMap<>();
+        LocalDate today = LocalDate.now();
+
+        for (int i = days - 1; i >= 0; i--) {
+            LocalDate date = today.minusDays(i);
+            LocalDateTime startOfDay = date.atStartOfDay();
+            LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
+
+            Long count = queryFactory
+                    .select(missionLog.user.id.countDistinct())
+                    .from(missionLog)
+                    .where(missionLog.missionType.eq(MissionType.USER_LOGIN)
+                            .and(missionLog.createdAt.between(startOfDay, endOfDay))
+                    )
+                    .fetchOne();
+
+            result.put(date, count != null ? count : 0L);
+        }
+
+        return result;
     }
 
     private LocalDateTime getStartOfToday() {
