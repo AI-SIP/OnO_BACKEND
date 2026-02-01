@@ -64,8 +64,9 @@
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr th:each="problem : ${problems}" class="hover:bg-gray-50 transition-colors">
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" th:text="${problem.problemId}">1</td>
+            <tr th:each="problem : ${problems}" class="hover:bg-gray-50 transition-colors cursor-pointer"
+                th:onclick="'location.href=\'/admin/problem/' + ${problem.problemId} + '\''">
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-indigo-600 hover:text-indigo-800" th:text="${problem.problemId}">1</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600" th:text="${problem.folderId}">1</td>
               <td class="px-6 py-4 text-sm text-gray-600">
                 <span th:if="${problem.memo != null and !problem.memo.isEmpty()}" th:text="${#strings.abbreviate(problem.memo, 40)}">메모 내용...</span>
