@@ -2,7 +2,7 @@ name: Deploy to Production Server (Mac Mini)
 
 on:
   push:
-    branches: ["feat/admin"]  # main 브랜치에 푸시될 때 운영 배포
+    branches: ["main"]  # main 브랜치에 푸시될 때 운영 배포
   workflow_dispatch:  # 수동 실행 가능
 
 permissions:
