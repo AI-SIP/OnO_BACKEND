@@ -36,7 +36,7 @@ public class ProblemController {
     @GetMapping("/{problemId}")
     public CommonResponse<ProblemResponseDto> getProblem(@PathVariable("problemId") Long problemId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        ProblemResponseDto problemResponseDto = problemService.findProblem(problemId, userId);
+        ProblemResponseDto problemResponseDto = problemService.findProblem(problemId);
 
         return CommonResponse.success(problemResponseDto);
     }
