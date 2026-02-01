@@ -161,7 +161,11 @@
             </span>
             <span th:if="${problem.analysis.status == 'PENDING'}"
                   class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-              분석 대기중
+              분석중
+            </span>
+            <span th:if="${problem.analysis.status == 'NOT_STARTED'}"
+                  class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+              분석 대기
             </span>
             <span th:if="${problem.analysis.status == 'FAILED'}"
                   class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
@@ -207,9 +211,9 @@
         </div>
         <div th:unless="${problem.analysis != null}" class="text-center py-8">
           <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600">
-            분석 대기
+            미등록
           </span>
-          <p class="mt-2 text-sm text-gray-500">아직 AI 분석이 완료되지 않았습니다</p>
+          <p class="mt-2 text-sm text-gray-500">아직 AI 분석이 등록되지 않았습니다</p>
         </div>
       </div>
     </div>

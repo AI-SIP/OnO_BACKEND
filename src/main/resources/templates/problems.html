@@ -80,24 +80,36 @@
                 <div class="flex flex-wrap gap-1">
                   <span th:each="image : ${problem.imageUrlList}" class="inline-block">
                     <a th:href="@{/admin/user/image/view(url=${image.imageUrl})}" target="_blank"
-                       class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-indigo-100 text-indigo-800 hover:bg-indigo-200"
+                       class="block border border-gray-200 rounded hover:border-indigo-400 transition"
                        th:title="${image.problemImageType}">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                      </svg>
+                      <img th:src="${image.imageUrl}"
+                           alt="문제 이미지"
+                           class="w-12 h-12 object-cover rounded">
                     </a>
                   </span>
                   <span th:if="${#lists.isEmpty(problem.imageUrlList)}" class="text-gray-400 text-xs">이미지 없음</span>
                 </div>
               </td>
               <td class="px-6 py-4 text-sm text-gray-600">
-                <span th:if="${problem.analysis != null}"
+                <span th:if="${problem.analysis != null and problem.analysis.status == 'COMPLETED'}"
                       class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                   분석 완료
                 </span>
-                <span th:unless="${problem.analysis != null}"
-                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                <span th:if="${problem.analysis != null and problem.analysis.status == 'PENDING'}"
+                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                  분석중
+                </span>
+                <span th:if="${problem.analysis != null and problem.analysis.status == 'NOT_STARTED'}"
+                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                   분석 대기
+                </span>
+                <span th:if="${problem.analysis != null and problem.analysis.status == 'FAILED'}"
+                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                  분석 실패
+                </span>
+                <span th:if="${problem.analysis == null}"
+                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                  미등록
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
