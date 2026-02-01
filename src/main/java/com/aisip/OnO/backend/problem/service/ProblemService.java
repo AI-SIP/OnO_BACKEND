@@ -45,11 +45,10 @@ public class ProblemService {
     private final ProblemAnalysisService analysisService;
 
     @Transactional(readOnly = true)
-    public ProblemResponseDto findProblem(Long problemId, Long userId) {
+    public ProblemResponseDto findProblem(Long problemId) {
         Problem problem = problemRepository.findProblemWithImageData(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
-        log.info("userId: {} find problemId: {}", userId, problemId);
         return ProblemResponseDto.from(problem);
     }
 
