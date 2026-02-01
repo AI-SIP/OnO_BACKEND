@@ -59,11 +59,11 @@
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">총 학습 레벨</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">문제 수</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">가입일</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작업</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr th:each="user, iterStat : ${users}" class="hover:bg-gray-50 transition-colors">
+            <tr th:each="user, iterStat : ${users}" class="hover:bg-gray-50 transition-colors cursor-pointer"
+                th:onclick="'location.href=\'/admin/user/' + ${user.userId} + '\''">
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" th:text="${user.userId}">1</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" th:text="${user.name}">유저 이름</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600" th:text="${user.email}">user@example.com</td>
@@ -75,12 +75,9 @@
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" th:text="${problemCounts[iterStat.index]}">0</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600" th:text="${#temporals.format(user.createdAt, 'yyyy-MM-dd HH:mm')}">2024-01-01 00:00</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <a th:href="@{/admin/user/{id}(id=${user.userId})}" class="text-indigo-600 hover:text-indigo-900">상세 보기</a>
-              </td>
             </tr>
             <tr th:if="${#lists.isEmpty(users)}">
-              <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+              <td colspan="6" class="px-6 py-8 text-center text-gray-500">
                 유저가 없습니다
               </td>
             </tr>
