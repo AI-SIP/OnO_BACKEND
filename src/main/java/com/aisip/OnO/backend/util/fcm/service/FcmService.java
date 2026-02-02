@@ -30,7 +30,7 @@ public class FcmService {
     private final FirebaseMessaging firebaseMessaging;
 
     public void registerToken(FcmTokenRequestDto fcmTokenRequestDto, Long userId) {
-        if(!fcmTokenRepository.existsByTokenAndUserId(fcmTokenRequestDto.token(), userId)){
+        if(!fcmTokenRepository.existsByUserIdAndToken(userId, fcmTokenRequestDto.token())){
             FcmToken fcmToken = FcmToken.From(fcmTokenRequestDto, userId);
             fcmTokenRepository.save(fcmToken);
         }
