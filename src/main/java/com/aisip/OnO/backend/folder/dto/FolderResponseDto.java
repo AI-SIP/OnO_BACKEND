@@ -14,6 +14,8 @@ public record FolderResponseDto (
 
     Long folderId,
 
+    Long userId,
+
     String folderName,
 
     FolderThumbnailResponseDto parentFolder,
@@ -41,6 +43,7 @@ public record FolderResponseDto (
 
         return FolderResponseDto.builder()
                 .folderId(folder.getId())
+                .userId(folder.getUserId())
                 .folderName(folder.getName())
                 .parentFolder(parentFolder)
                 .subFolderList(subFolderList)

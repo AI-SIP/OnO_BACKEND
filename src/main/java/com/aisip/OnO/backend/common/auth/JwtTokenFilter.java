@@ -41,6 +41,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                  path.equals("/robots.txt") ||
                  path.equals("/home") ||
                  path.startsWith("/images/") ||
+                 path.equals("/perform-login") ||
                  path.equals("/login") ||
                  path.startsWith("/css/") ||
                  path.startsWith("/js/") ||
