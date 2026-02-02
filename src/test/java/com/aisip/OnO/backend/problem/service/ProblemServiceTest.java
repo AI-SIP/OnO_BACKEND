@@ -121,7 +121,7 @@ class ProblemServiceTest {
         Long problemId = problem.getId();
 
         // when
-        ProblemResponseDto problemResponseDto = problemService.findProblem(problemId, userId);
+        ProblemResponseDto problemResponseDto = problemService.findProblem(problemId);
 
         // then
         assertThat(problemResponseDto.memo()).isEqualTo(problem.getMemo());

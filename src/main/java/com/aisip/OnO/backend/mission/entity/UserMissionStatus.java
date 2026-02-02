@@ -116,4 +116,30 @@ public class UserMissionStatus {
     private Long getTotalStudyThresholdForLevel(Long level) {
         return getThresholdForLevel(level) * 4;
     }
+
+    // 관리자용: 개별 능력치 직접 설정
+    public void setAttendanceLevel(Long level, Long point) {
+        this.attendanceLevel = level;
+        this.attendancePoint = point;
+    }
+
+    public void setNoteWriteLevel(Long level, Long point) {
+        this.noteWriteLevel = level;
+        this.noteWritePoint = point;
+    }
+
+    public void setProblemPracticeLevel(Long level, Long point) {
+        this.problemPracticeLevel = level;
+        this.problemPracticePoint = point;
+    }
+
+    public void setNotePracticeLevel(Long level, Long point) {
+        this.notePracticeLevel = level;
+        this.notePracticePoint = point;
+    }
+
+    public void setTotalStudyLevel(Long level, Long point) {
+        this.totalStudyLevel = level;
+        this.totalStudyPoint = point;
+    }
 }

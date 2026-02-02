@@ -14,7 +14,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -89,7 +94,10 @@ public class UserService {
     @Transactional(readOnly = true)
     public List<UserResponseDto> findAllUsers() {
         List<User> userList = userRepository.findAll();
-        return userList.stream().map(UserResponseDto::from).collect(Collectors.toList());
+        return userList.stream()
+                .sorted((u1, u2) -> u2.getCreatedAt().compareTo(u1.getCreatedAt())) // 최신순 정렬
+                .map(UserResponseDto::from)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -124,5 +132,66 @@ public class UserService {
 
     private String makeGuestIdentifier() {
         return UUID.randomUUID().toString();
+    }
+
+    @Transactional
+    public void updateUserLevel(Long userId, String levelType, Long levelValue, Long pointValue) {
+        User user = findUserEntity(userId);
+
+        switch (levelType) {
+            case "attendance" -> user.getUserMissionStatus().setAttendanceLevel(levelValue, pointValue);
+            case "noteWrite" -> user.getUserMissionStatus().setNoteWriteLevel(levelValue, pointValue);
+            case "problemPractice" -> user.getUserMissionStatus().setProblemPracticeLevel(levelValue, pointValue);
+            case "notePractice" -> user.getUserMissionStatus().setNotePracticeLevel(levelValue, pointValue);
+            case "totalStudy" -> user.getUserMissionStatus().setTotalStudyLevel(levelValue, pointValue);
+            default -> throw new ApplicationException(UserErrorCase.USER_NOT_FOUND);
+        }
+
+        userRepository.save(user);
+        log.info("userId: {} level {} updated to level: {}, point: {}", userId, levelType, levelValue, pointValue);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<LocalDate, Long> getDailyNewUsersCount(int days) {
+        Map<LocalDate, Long> result = new LinkedHashMap<>();
+        LocalDate today = LocalDate.now();
+        List<User> allUsers = userRepository.findAll();
+
+        // 최근 날짜가 위로 오도록 역순으로 조회
+        for (int i = 0; i < days; i++) {
+            LocalDate date = today.minusDays(i);
+            LocalDateTime startOfDay = date.atStartOfDay();
+            LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
+
+            long count = allUsers.stream()
+                    .filter(user -> {
+                        LocalDateTime createdAt = user.getCreatedAt();
+                        return createdAt != null &&
+                                !createdAt.isBefore(startOfDay) &&
+                                !createdAt.isAfter(endOfDay);
+                    })
+                    .count();
+
+            result.put(date, count);
+        }
+
+        return result;
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserResponseDto> getUsersByDate(LocalDate date) {
+        LocalDateTime startOfDay = date.atStartOfDay();
+        LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
+
+        return userRepository.findAll().stream()
+                .filter(user -> {
+                    LocalDateTime createdAt = user.getCreatedAt();
+                    return createdAt != null &&
+                            !createdAt.isBefore(startOfDay) &&
+                            !createdAt.isAfter(endOfDay);
+                })
+                .sorted((u1, u2) -> u2.getCreatedAt().compareTo(u1.getCreatedAt()))
+                .map(UserResponseDto::from)
+                .collect(Collectors.toList());
     }
 }

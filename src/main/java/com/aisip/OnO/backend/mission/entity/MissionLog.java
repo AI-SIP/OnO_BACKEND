@@ -15,7 +15,10 @@ import org.hibernate.annotations.SQLRestriction;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @SQLDelete(sql = "UPDATE mission_log SET deleted_at = now() WHERE id = ?")
 @SQLRestriction("deleted_at IS NULL")
-@Table(name = "mission_log")
+@Table(name = "mission_log", indexes = {
+        @Index(name = "idx_mission_log_type_created", columnList = "mission_type, created_at"),
+        @Index(name = "idx_mission_log_user_created", columnList = "user_id, created_at")
+})
 public class MissionLog extends BaseEntity {
 
     @Id

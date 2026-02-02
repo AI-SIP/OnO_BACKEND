@@ -92,7 +92,7 @@ class ProblemControllerTest {
     void getProblem() throws Exception {
         //given
         Long problemId = 1L;
-        given(problemService.findProblem(problemId, 1L)).willReturn(problemResponseDtoList.get(0));
+        given(problemService.findProblem(problemId)).willReturn(problemResponseDtoList.get(0));
 
         // When & Then
         mockMvc.perform(get("/api/problems/" + problemId)

@@ -45,11 +45,10 @@ public class ProblemService {
     private final ProblemAnalysisService analysisService;
 
     @Transactional(readOnly = true)
-    public ProblemResponseDto findProblem(Long problemId, Long userId) {
+    public ProblemResponseDto findProblem(Long problemId) {
         Problem problem = problemRepository.findProblemWithImageData(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
-        log.info("userId: {} find problemId: {}", userId, problemId);
         return ProblemResponseDto.from(problem);
     }
 
@@ -99,6 +98,7 @@ public class ProblemService {
     public List<ProblemResponseDto> findAllProblems() {
         return problemRepository.findAll()
                 .stream()
+                .sorted((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt())) // 최신순 정렬
                 .map(ProblemResponseDto::from)
                 .collect(Collectors.toList());
     }
