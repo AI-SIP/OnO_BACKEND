@@ -119,8 +119,7 @@ class FolderRepositoryTest {
                                     "memo" + i,
                                     "reference" + i,
                                     targetFolder.getId(),
-                                    LocalDateTime.now(),
-                                    null
+                                    LocalDateTime.now()
                             ),
                             userId
                     )

@@ -56,6 +56,9 @@ class UserControllerTest {
                 0L,
                 1L,
                 0L,
+                1L,
+                0L,
+                40L,
                 LocalDateTime.now(),  // createdAt
                 LocalDateTime.now()  // updatedAt,
 
