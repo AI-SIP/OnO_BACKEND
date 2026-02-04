@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.util;
 
+import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
@@ -62,14 +63,14 @@ public class BulkDataGenerator {
 
         long startTime = System.currentTimeMillis();
 
-        // 1. 폴더 생성 (루트 폴더 없이)
-        //List<Folder> folders = generateFolders(userId, folderCount, null);
-        List<Folder> folders = folderRepository.findAllByUserId(userId);
+        // 1. 폴더 생성
+        List<Folder> folders = generateFolders(userId, folderCount);
+        //List<Folder> folders = folderRepository.findAllByUserId(userId);
         //log.info("폴더 {} 개 생성 완료", folders.size());
 
         // 2. 문제 생성 (이미지 포함)
-        //List<Problem> problems = generateProblems(userId, folders, problemsPerFolder);
-        List<Problem> problems = problemRepository.findAllByUserId(userId);
+        List<Problem> problems = generateProblems(userId, folders, problemsPerFolder);
+        //List<Problem> problems = problemRepository.findAllByUserId(userId);
         //log.info("문제 {} 개 생성 완료", problems.size());
 
         // 3. 복습노트 생성
@@ -98,51 +99,40 @@ public class BulkDataGenerator {
      * 폴더 대량 생성 (지정된 루트 폴더 하위에 생성)
      * @param userId 유저 ID
      * @param count 생성할 폴더 개수
-     * @param rootFolderId 루트 폴더 ID (null이면 루트 폴더도 생성)
      */
-    private List<Folder> generateFolders(Long userId, int count, Long rootFolderId) {
+    private List<Folder> generateFolders(Long userId, int count) {
         List<Folder> folders = new ArrayList<>();
 
-        // 루트 폴더가 지정되어 있으면 해당 폴더 하위에 생성
-        if (rootFolderId != null) {
-            Folder rootFolder = folderRepository.findById(rootFolderId)
-                    .orElseThrow(() -> new IllegalArgumentException("루트 폴더를 찾을 수 없습니다: " + rootFolderId));
+        Optional<Folder> optionalRootFolder = folderRepository.findRootFolder(userId);
+        Folder rootFolder;
 
-            // 모든 폴더를 루트 폴더의 자식으로 생성 (70%)과 그 하위 폴더(30%)
-            int directChildCount = (int) (count * 0.7);
-
-            // 루트 폴더의 직접 자식 폴더 생성
-            for (int i = 0; i < directChildCount; i++) {
-                Folder subFolder = RandomFolderGenerator.createRandomSubFolder(rootFolder, userId);
-                folders.add(folderRepository.save(subFolder));
-            }
-
-            // 생성된 폴더들의 자식 폴더 생성
-            int deepChildCount = count - directChildCount;
-            for (int i = 0; i < deepChildCount; i++) {
-                if (!folders.isEmpty()) {
-                    Folder parentFolder = folders.get(random.nextInt(folders.size()));
-                    Folder subFolder = RandomFolderGenerator.createRandomSubFolder(parentFolder, userId);
-                    folders.add(folderRepository.save(subFolder));
-                }
-            }
+        if(optionalRootFolder.isEmpty()) {
+            FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
+                    "책장",
+                    null,
+                    null
+            );
+            rootFolder = folderRepository.save(Folder.from(folderRegisterDto, userId));
         } else {
-            // 루트 폴더가 지정되지 않은 경우 기존 로직 (루트 폴더도 생성)
-            // 루트 폴더 생성 (전체의 70%)
-            int rootFolderCount = (int) (count * 0.7);
-            for (int i = 0; i < rootFolderCount; i++) {
-                Folder folder = RandomFolderGenerator.createRandomFolder(userId);
-                folders.add(folderRepository.save(folder));
-            }
+            rootFolder = optionalRootFolder.get();
+        }
 
-            // 서브 폴더 생성 (전체의 30%)
-            int subFolderCount = count - rootFolderCount;
-            for (int i = 0; i < subFolderCount; i++) {
-                if (!folders.isEmpty()) {
-                    Folder parentFolder = folders.get(random.nextInt(folders.size()));
-                    Folder subFolder = RandomFolderGenerator.createRandomSubFolder(parentFolder, userId);
-                    folders.add(folderRepository.save(subFolder));
-                }
+        // 모든 폴더를 루트 폴더의 자식으로 생성 (70%)과 그 하위 폴더(30%)
+        int directChildCount = (int) (count * 0.7);
+
+        // 루트 폴더의 직접 자식 폴더 생성
+        for (int i = 0; i < directChildCount; i++) {
+            Folder subFolder = RandomFolderGenerator.createRandomSubFolder(rootFolder, userId);
+            folders.add(folderRepository.save(subFolder));
+        }
+
+        // 생성된 폴더들의 자식 폴더 생성
+        int deepChildCount = count - directChildCount;
+        for (int i = 0; i < deepChildCount; i++) {
+            if (!folders.isEmpty()) {
+                Folder parentFolder = folders.get(random.nextInt(folders.size()));
+                Folder subFolder = RandomFolderGenerator.createRandomSubFolder(parentFolder, userId);
+                folders.add(folderRepository.save(subFolder));
             }
         }
 
@@ -297,7 +287,7 @@ public class BulkDataGenerator {
         long startTime = System.currentTimeMillis();
 
         // 1. 루트 폴더 하위에 폴더 생성
-        List<Folder> folders = generateFolders(userId, folderCount, rootFolderId);
+        List<Folder> folders = generateFolders(userId, folderCount);
         log.info("폴더 {} 개 생성 완료 (루트 폴더 {} 하위)", folders.size(), rootFolderId);
 
         // 2. 문제 생성 (이미지 포함)
