@@ -86,4 +86,22 @@ public class PracticeNoteRepositoryImpl implements PracticeNoteRepositoryCustom 
                 .where(problemPracticeNoteMapping.problem.id.in(deleteProblemIdList))
                 .execute();
     }
+
+    @Override
+    public List<PracticeNote> findPracticeNotesByUserWithCursor(Long userId, Long cursor, int size) {
+        var query = queryFactory
+                .selectFrom(practiceNote)
+                .join(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping).fetchJoin()
+                .where(practiceNote.userId.eq(userId));
+
+        // 커서가 있으면 해당 ID 이후부터 조회
+        if (cursor != null) {
+            query.where(practiceNote.id.gt(cursor));
+        }
+
+        return query
+                .orderBy(practiceNote.id.asc())
+                .limit(size + 1)  // hasNext 판단을 위해 +1개 조회
+                .fetch();
+    }
 }
