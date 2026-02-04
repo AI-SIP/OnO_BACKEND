@@ -7,6 +7,8 @@ import java.util.Optional;
 
 public interface FolderRepositoryCustom {
 
+    Optional<Long> findRootFolderId(Long userId);
+
     Optional<Folder> findRootFolder(Long userId);
 
     Optional<Folder> findFolderWithDetailsByFolderId(Long folderId);

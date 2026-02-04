@@ -20,10 +20,21 @@ public class FolderRepositoryImpl implements FolderRepositoryCustom {
     }
 
     @Override
+    public Optional<Long> findRootFolderId(Long userId) {
+        Long folderId = queryFactory
+                .select(folder.id)
+                .from(folder)
+                .where(folder.userId.eq(userId).and(folder.parentFolder.isNull()))
+                .fetchOne();
+
+        return Optional.ofNullable(folderId);
+    }
+
+    @Override
     public Optional<Folder> findRootFolder(Long userId) {
         Folder rootFolder = queryFactory
-                    .select(folder)
-                    .from(folder)
+                    .selectFrom(folder)
+                    .leftJoin(folder.subFolderList, new QFolder("subFolder")).fetchJoin()
                     .where(folder.userId.eq(userId).and(folder.parentFolder.isNull()))
                     .fetchOne();
 
