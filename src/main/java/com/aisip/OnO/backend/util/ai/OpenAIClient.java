@@ -79,7 +79,7 @@ public class OpenAIClient {
 
         } catch (Exception e) {
             log.error("Error analyzing images: {}", e.getMessage(), e);
-            throw new RuntimeException("이미지 분석 중 오류가 발생했습니다: " + e.getMessage(), e);
+            throw new RuntimeException("AI 이미지 분석 중 오류가 발생했습니다: " + e.getMessage(), e);
         }
     }
 
@@ -189,7 +189,7 @@ public class OpenAIClient {
 
         } catch (Exception e) {
             log.error("Error parsing response: {}", response, e);
-            throw new RuntimeException("응답 파싱 중 오류가 발생했습니다.", e);
+            throw new RuntimeException("AI 분석 결과 응답 파싱 중 오류가 발생했습니다.", e);
         }
     }
 
