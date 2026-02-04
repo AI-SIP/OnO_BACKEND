@@ -16,4 +16,13 @@ public interface FolderRepositoryCustom {
     List<Folder> findAllFoldersWithDetailsByUserId(Long userId);
 
     List<Long> findProblemIdsByFolder(Long folderId);
+
+    /**
+     * 커서 기반 하위 폴더 조회
+     * @param folderId 부모 폴더 ID
+     * @param cursor 마지막으로 조회한 폴더 ID (null이면 처음부터)
+     * @param size 조회할 개수
+     * @return 하위 폴더 리스트 (size+1개 조회하여 hasNext 판단)
+     */
+    List<Folder> findSubFoldersWithCursor(Long folderId, Long cursor, int size);
 }

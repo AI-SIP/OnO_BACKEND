@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.folder.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
+import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.folder.dto.FolderDeleteRequestDto;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
@@ -35,6 +36,18 @@ public class FolderController {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         return CommonResponse.success(folderService.findFolder(folderId));
+    }
+
+    // ✅ V2 API: 커서 기반 하위 폴더 조회 (무한 스크롤)
+    @GetMapping("/{folderId}/subfolders/V2")
+    public CommonResponse<CursorPageResponse<FolderThumbnailResponseDto>> getSubFoldersWithCursor(
+            @PathVariable("folderId") Long folderId,
+            @RequestParam(value = "cursor", required = false) Long cursor,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        log.info("userId: {} get subfolders for folderId: {} with cursor: {}, size: {}", userId, folderId, cursor, size);
+
+        return CommonResponse.success(folderService.findSubFoldersWithCursor(folderId, cursor, size));
     }
 
     // ✅ 모든 폴더 조회

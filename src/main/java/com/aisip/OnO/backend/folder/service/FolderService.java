@@ -1,12 +1,14 @@
 package com.aisip.OnO.backend.folder.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
 import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
+import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.service.ProblemService;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -167,5 +169,28 @@ public class FolderService {
 
         folderRepository.deleteAll(folderList);
         log.info("userId : {} delete all user folders", userId);
+    }
+
+    /**
+     * V2 API: 커서 기반 하위 폴더 조회
+     * @param folderId 부모 폴더 ID
+     * @param cursor 마지막으로 조회한 폴더 ID (null이면 처음부터)
+     * @param size 조회할 개수
+     * @return 커서 기반 페이징 응답
+     */
+    @Transactional(readOnly = true)
+    public CursorPageResponse<FolderThumbnailResponseDto> findSubFoldersWithCursor(Long folderId, Long cursor, int size) {
+        List<Folder> folders = folderRepository.findSubFoldersWithCursor(folderId, cursor, size);
+
+        boolean hasNext = folders.size() > size;
+        List<Folder> content = hasNext ? folders.subList(0, size) : folders;
+        Long nextCursor = hasNext ? content.get(content.size() - 1).getId() : null;
+
+        List<FolderThumbnailResponseDto> dtoList = content.stream()
+                .map(FolderThumbnailResponseDto::from)
+                .collect(Collectors.toList());
+
+        log.info("folderId: {} find subfolders with cursor: {}, size: {}, hasNext: {}", folderId, cursor, size, hasNext);
+        return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
     }
 }
