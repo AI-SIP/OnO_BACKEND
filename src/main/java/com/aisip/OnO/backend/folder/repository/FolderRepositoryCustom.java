@@ -25,4 +25,13 @@ public interface FolderRepositoryCustom {
      * @return 하위 폴더 리스트 (size+1개 조회하여 hasNext 판단)
      */
     List<Folder> findSubFoldersWithCursor(Long folderId, Long cursor, int size);
+
+    /**
+     * 커서 기반 유저의 모든 폴더 썸네일 조회
+     * @param userId 유저 ID
+     * @param cursor 마지막으로 조회한 폴더 ID (null이면 처음부터)
+     * @param size 조회할 개수
+     * @return 폴더 리스트 (size+1개 조회하여 hasNext 판단)
+     */
+    List<Folder> findAllUserFolderThumbnailsWithCursor(Long userId, Long cursor, int size);
 }

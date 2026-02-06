@@ -193,4 +193,27 @@ public class FolderService {
         log.info("folderId: {} find subfolders with cursor: {}, size: {}, hasNext: {}", folderId, cursor, size, hasNext);
         return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
     }
+
+    /**
+     * V2 API: 커서 기반 유저의 모든 폴더 썸네일 조회
+     * @param userId 유저 ID
+     * @param cursor 마지막으로 조회한 폴더 ID (null이면 처음부터)
+     * @param size 조회할 개수
+     * @return 커서 기반 페이징 응답
+     */
+    @Transactional(readOnly = true)
+    public CursorPageResponse<FolderThumbnailResponseDto> findAllUserFolderThumbnailsWithCursor(Long userId, Long cursor, int size) {
+        List<Folder> folders = folderRepository.findAllUserFolderThumbnailsWithCursor(userId, cursor, size);
+
+        boolean hasNext = folders.size() > size;
+        List<Folder> content = hasNext ? folders.subList(0, size) : folders;
+        Long nextCursor = hasNext ? content.get(content.size() - 1).getId() : null;
+
+        List<FolderThumbnailResponseDto> dtoList = content.stream()
+                .map(FolderThumbnailResponseDto::from)
+                .collect(Collectors.toList());
+
+        log.info("userId: {} find all folder thumbnails with cursor: {}, size: {}, hasNext: {}", userId, cursor, size, hasNext);
+        return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
+    }
 }

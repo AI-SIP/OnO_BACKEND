@@ -58,6 +58,17 @@ public class FolderController {
         return CommonResponse.success(folderService.findAllUserFolderThumbnails(userId));
     }
 
+    // ✅ V2 API: 커서 기반 모든 폴더 썸네일 조회 (무한 스크롤)
+    @GetMapping("/thumbnails/V2")
+    public CommonResponse<CursorPageResponse<FolderThumbnailResponseDto>> getAllUserFolderThumbnailsWithCursor(
+            @RequestParam(value = "cursor", required = false) Long cursor,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        log.info("userId: {} get all folder thumbnails with cursor: {}, size: {}", userId, cursor, size);
+
+        return CommonResponse.success(folderService.findAllUserFolderThumbnailsWithCursor(userId, cursor, size));
+    }
+
     // ✅ 유저의 전체 폴더 상세 정보 조회
     @GetMapping()
     public CommonResponse<List<FolderResponseDto>> getAllUserFolderDetails() {

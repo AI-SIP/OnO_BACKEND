@@ -89,4 +89,21 @@ public class FolderRepositoryImpl implements FolderRepositoryCustom {
                 .limit(size + 1)  // hasNext 판단을 위해 +1개 조회
                 .fetch();
     }
+
+    @Override
+    public List<Folder> findAllUserFolderThumbnailsWithCursor(Long userId, Long cursor, int size) {
+        var query = queryFactory
+                .selectFrom(folder)
+                .where(folder.userId.eq(userId));
+
+        // 커서가 있으면 해당 ID 이후부터 조회
+        if (cursor != null) {
+            query.where(folder.id.gt(cursor));
+        }
+
+        return query
+                .orderBy(folder.id.asc())
+                .limit(size + 1)  // hasNext 판단을 위해 +1개 조회
+                .fetch();
+    }
 }
