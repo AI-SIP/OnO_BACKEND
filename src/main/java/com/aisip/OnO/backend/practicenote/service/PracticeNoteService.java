@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.practicenote.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.practicenote.dto.*;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
@@ -191,5 +192,28 @@ public class PracticeNoteService {
 
     public void deleteProblemsFromAllPractice(List<Long> deleteProblemIdList) {
         practiceNoteRepository.deleteProblemsFromAllPractice(deleteProblemIdList);
+    }
+
+    /**
+     * V2 API: 커서 기반 복습노트 썸네일 조회
+     * @param userId 유저 ID
+     * @param cursor 마지막으로 조회한 복습노트 ID (null이면 처음부터)
+     * @param size 조회할 개수
+     * @return 커서 기반 페이징 응답
+     */
+    @Transactional(readOnly = true)
+    public CursorPageResponse<PracticeNoteThumbnailResponseDto> findPracticeThumbnailsByUserWithCursor(Long userId, Long cursor, int size) {
+        List<PracticeNote> practiceNotes = practiceNoteRepository.findPracticeNotesByUserWithCursor(userId, cursor, size);
+
+        boolean hasNext = practiceNotes.size() > size;
+        List<PracticeNote> content = hasNext ? practiceNotes.subList(0, size) : practiceNotes;
+        Long nextCursor = hasNext ? content.get(content.size() - 1).getId() : null;
+
+        List<PracticeNoteThumbnailResponseDto> dtoList = content.stream()
+                .map(PracticeNoteThumbnailResponseDto::from)
+                .collect(Collectors.toList());
+
+        log.info("userId: {} find practice thumbnails with cursor: {}, size: {}, hasNext: {}", userId, cursor, size, hasNext);
+        return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
     }
 }

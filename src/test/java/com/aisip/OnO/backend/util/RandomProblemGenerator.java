@@ -35,8 +35,7 @@ public class RandomProblemGenerator {
                 DEFAULT_MEMO_PREFIX + "_" + randomSuffix,
                 DEFAULT_REFERENCE_PREFIX + "_" + randomSuffix,
                 null,
-                LocalDateTime.now(),
-                null
+                LocalDateTime.now()
         );
 
         return Problem.from(problemRegisterDto, userId);
@@ -55,8 +54,7 @@ public class RandomProblemGenerator {
                 memo,
                 reference,
                 null,
-                LocalDateTime.now(),
-                null
+                LocalDateTime.now()
         );
 
         return Problem.from(problemRegisterDto, userId);
@@ -76,8 +74,7 @@ public class RandomProblemGenerator {
                 DEFAULT_MEMO_PREFIX + "_" + randomSuffix,
                 DEFAULT_REFERENCE_PREFIX + "_" + randomSuffix,
                 folder.getId(),
-                LocalDateTime.now(),
-                null
+                LocalDateTime.now()
         );
 
         Problem problem = Problem.from(problemRegisterDto, userId);
@@ -99,8 +96,7 @@ public class RandomProblemGenerator {
                 DEFAULT_MEMO_PREFIX + "_" + randomSuffix,
                 DEFAULT_REFERENCE_PREFIX + "_" + randomSuffix,
                 null,
-                solvedAt,
-                null
+                solvedAt
         );
 
         return Problem.from(problemRegisterDto, userId);
@@ -124,8 +120,7 @@ public class RandomProblemGenerator {
                 DEFAULT_MEMO_PREFIX + "_" + randomSuffix,
                 DEFAULT_REFERENCE_PREFIX + "_" + randomSuffix,
                 null,
-                LocalDateTime.now(),
-                null
+                LocalDateTime.now()
         );
 
         Problem problem = Problem.from(problemRegisterDto, userId);

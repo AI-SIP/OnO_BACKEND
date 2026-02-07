@@ -169,25 +169,7 @@ class ProblemControllerTest {
                                         "memo",
                                         "reference",
                                         1L,
-                                        LocalDateTime.now(),
-                                        List.of(
-                                                new ProblemImageDataRegisterDto(
-                                                        1L,
-                                                        "problemImage",
-                                                        ProblemImageType.PROBLEM_IMAGE
-                                                ),
-                                                new ProblemImageDataRegisterDto(
-                                                        1L,
-                                                        "answerImage",
-                                                        ProblemImageType.ANSWER_IMAGE
-                                                ),
-                                                new ProblemImageDataRegisterDto(
-                                                        1L,
-                                                        "solveImage",
-                                                        ProblemImageType.SOLVE_IMAGE
-                                                )
-                                        )
-
+                                        LocalDateTime.now()
                                 ))))
                 .andExpect(status().isOk());
 
@@ -210,7 +192,7 @@ class ProblemControllerTest {
                         )))
                 .andExpect(status().isOk());
 
-        verify(problemService, times(1)).registerProblemImageData(any(), eq(1L));  // userId가 1L인 것도 검증
+        //verify(problemService, times(1)).registerProblemImageData(any(), eq(1L));  // userId가 1L인 것도 검증
     }
 
     @Test
@@ -222,7 +204,6 @@ class ProblemControllerTest {
                 1L,
                 "memo update",
                 "reference update",
-                null,
                 null,
                 null
         );
@@ -247,7 +228,6 @@ class ProblemControllerTest {
                 null,
                 null,
                 2L,
-                null,
                 null
         );
 

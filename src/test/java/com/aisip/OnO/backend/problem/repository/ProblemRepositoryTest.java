@@ -97,8 +97,7 @@ class ProblemRepositoryTest {
                     "memo" + i,
                     "reference" + i,
                     savedFolder.getId(),
-                    LocalDateTime.now(),
-                    null
+                    LocalDateTime.now()
             );
             Problem problem = problemRepository.save(Problem.from(
                     problemRegisterDto,

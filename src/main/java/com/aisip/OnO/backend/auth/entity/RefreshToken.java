@@ -10,6 +10,9 @@ import java.util.UUID;
 @NoArgsConstructor
 @Builder(access = AccessLevel.PRIVATE)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(name = "refresh_token", indexes = {
+        @Index(name = "idx_refresh_token_user_id", columnList = "user_id")
+})
 public class RefreshToken {
 
     @Id

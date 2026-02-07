@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.folder.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
+import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.folder.dto.FolderDeleteRequestDto;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
@@ -37,12 +38,35 @@ public class FolderController {
         return CommonResponse.success(folderService.findFolder(folderId));
     }
 
+    // ✅ V2 API: 커서 기반 하위 폴더 조회 (무한 스크롤)
+    @GetMapping("/{folderId}/subfolders/V2")
+    public CommonResponse<CursorPageResponse<FolderThumbnailResponseDto>> getSubFoldersWithCursor(
+            @PathVariable("folderId") Long folderId,
+            @RequestParam(value = "cursor", required = false) Long cursor,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        log.info("userId: {} get subfolders for folderId: {} with cursor: {}, size: {}", userId, folderId, cursor, size);
+
+        return CommonResponse.success(folderService.findSubFoldersWithCursor(folderId, cursor, size));
+    }
+
     // ✅ 모든 폴더 조회
     @GetMapping("/thumbnails")
     public CommonResponse<List<FolderThumbnailResponseDto>> getAllUserFolderThumbnails() {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         return CommonResponse.success(folderService.findAllUserFolderThumbnails(userId));
+    }
+
+    // ✅ V2 API: 커서 기반 모든 폴더 썸네일 조회 (무한 스크롤)
+    @GetMapping("/thumbnails/V2")
+    public CommonResponse<CursorPageResponse<FolderThumbnailResponseDto>> getAllUserFolderThumbnailsWithCursor(
+            @RequestParam(value = "cursor", required = false) Long cursor,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        log.info("userId: {} get all folder thumbnails with cursor: {}, size: {}", userId, cursor, size);
+
+        return CommonResponse.success(folderService.findAllUserFolderThumbnailsWithCursor(userId, cursor, size));
     }
 
     // ✅ 유저의 전체 폴더 상세 정보 조회

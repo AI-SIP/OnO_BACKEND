@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.problem.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
@@ -242,5 +243,28 @@ public class ProblemService {
                 });
 
         log.info("userId: {} delete all user problems", userId);
+    }
+
+    /**
+     * V2 API: 커서 기반 폴더의 문제 조회
+     * @param folderId 폴더 ID
+     * @param cursor 마지막으로 조회한 문제 ID (null이면 처음부터)
+     * @param size 조회할 개수
+     * @return 커서 기반 페이징 응답
+     */
+    @Transactional(readOnly = true)
+    public CursorPageResponse<ProblemResponseDto> findProblemsByFolderWithCursor(Long folderId, Long cursor, int size) {
+        List<Problem> problems = problemRepository.findProblemsByFolderWithCursor(folderId, cursor, size);
+
+        boolean hasNext = problems.size() > size;
+        List<Problem> content = hasNext ? problems.subList(0, size) : problems;
+        Long nextCursor = hasNext ? content.get(content.size() - 1).getId() : null;
+
+        List<ProblemResponseDto> dtoList = content.stream()
+                .map(ProblemResponseDto::from)
+                .collect(Collectors.toList());
+
+        log.info("folderId: {} find problems with cursor: {}, size: {}, hasNext: {}", folderId, cursor, size, hasNext);
+        return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
     }
 }
