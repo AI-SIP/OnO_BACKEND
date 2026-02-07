@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.problem.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
+import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
@@ -16,6 +17,7 @@ import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
+import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -44,6 +46,10 @@ public class ProblemService {
     private final MissionLogService missionLogService;
 
     private final ProblemAnalysisService analysisService;
+
+    private final PracticeNoteRepository practiceNoteRepository;
+
+    private final S3DeleteProducer s3DeleteProducer;
 
     @Transactional(readOnly = true)
     public ProblemResponseDto findProblem(Long problemId) {
@@ -194,19 +200,39 @@ public class ProblemService {
         }
     }
 
+    /**
+     * 문제 삭제 (비동기 S3 파일 삭제 적용)
+     * - DB 삭제: 동기 (즉시 완료)
+     * - S3 파일 삭제: 비동기 (RabbitMQ Producer로 전송)
+     * - PracticeNote 매핑 삭제: 동기 (데이터 정합성)
+     */
     @Transactional
     public void deleteProblem(Long problemId) {
+        // 1. 이미지 데이터 조회
+        List<ProblemImageData> imageDataList = problemImageDataRepository.findAllByProblemId(problemId);
 
-        List<ProblemImageData> imageDataList= problemImageDataRepository.findAllByProblemId(problemId);
+        // 2. DB에서 이미지 메타데이터 삭제 (동기 - 빠름)
+        problemImageDataRepository.deleteAll(imageDataList);
 
-        imageDataList.forEach(imageData -> {
-            fileUploadService.deleteImageFileFromS3(imageData.getImageUrl());
-            problemImageDataRepository.delete(imageData);
-        });
+        // 3. PracticeNote 매핑 삭제 (동기 - 데이터 정합성 보장)
+        practiceNoteRepository.deleteProblemFromAllPractice(problemId);
 
+        // 4. 문제 삭제 (Soft Delete)
         problemRepository.deleteById(problemId);
 
-        log.info("problemId: {} has deleted", problemId);
+        log.info("problemId: {} DB 삭제 완료", problemId);
+
+        // 5. S3 파일 삭제는 비동기로 처리 (RabbitMQ Producer)
+        imageDataList.forEach(imageData -> {
+            try {
+                s3DeleteProducer.sendDeleteMessage(imageData.getImageUrl(), problemId);
+            } catch (Exception e) {
+                log.error("S3 삭제 메시지 전송 실패 - problemId: {}, imageUrl: {}, error: {}",
+                        problemId, imageData.getImageUrl(), e.getMessage());
+            }
+        });
+
+        log.info("problemId: {} S3 삭제 메시지 전송 완료 ({}개)", problemId, imageDataList.size());
     }
 
     @Transactional
