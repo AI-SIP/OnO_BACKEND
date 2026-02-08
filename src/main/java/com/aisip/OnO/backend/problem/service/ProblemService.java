@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.problem.service;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
+import com.aisip.OnO.backend.config.rabbitmq.producer.ProblemAnalysisProducer;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
@@ -50,6 +51,8 @@ public class ProblemService {
     private final PracticeNoteRepository practiceNoteRepository;
 
     private final S3DeleteProducer s3DeleteProducer;
+
+    private final ProblemAnalysisProducer analysisProducer;
 
     @Transactional(readOnly = true)
     public ProblemResponseDto findProblem(Long problemId) {
@@ -170,10 +173,20 @@ public class ProblemService {
         }
     }
 
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    /**
+     * GPT 문제 분석 요청 (RabbitMQ 방식)
+     * - PROCESSING 상태의 분석 엔티티 생성 (동기)
+     * - RabbitMQ에 분석 메시지 전송 (비동기)
+     */
+    @Transactional
     public void analysisProblem(Long problemId) {
-        analysisService.analyzeProblemAsync(problemId);
+        // 1. PROCESSING 상태의 분석 엔티티 미리 생성 (동시성 문제 해결)
+        analysisService.createPendingAnalysis(problemId);
+
+        // 2. RabbitMQ에 분석 메시지 전송
+        analysisProducer.sendAnalysisMessage(problemId);
+
+        log.info("GPT 분석 요청 전송 완료 - problemId: {}", problemId);
     }
 
     @Transactional

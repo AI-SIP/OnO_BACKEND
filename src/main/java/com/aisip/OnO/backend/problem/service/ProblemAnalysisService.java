@@ -82,8 +82,72 @@ public class ProblemAnalysisService {
     }
 
     /**
-     * 비동기로 문제 이미지를 분석합니다.
+     * 동기적으로 문제 이미지를 분석합니다 (RabbitMQ Consumer에서 호출)
+     * - 동시성 문제 해결: 이미 생성된 PROCESSING 엔티티만 조회하여 업데이트
      */
+    @Transactional
+    public void analyzeProblemSync(Long problemId) {
+        log.info("Starting sync analysis for problemId: {}", problemId);
+
+        try {
+            // 1. Problem 조회
+            Problem problem = problemRepository.findById(problemId)
+                    .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
+
+            // 2. 문제 이미지 url 조회
+            List<String> problemImageUrls = problemImageDataRepository.findAllByProblemId(problemId)
+                    .stream()
+                    .filter(data -> data.getProblemImageType().equals(ProblemImageType.PROBLEM_IMAGE))
+                    .map(ProblemImageData::getImageUrl)
+                    .toList();
+
+            // 3. 기존 분석 조회 (동시성 문제 해결: 새로 생성하지 않고 조회만)
+            ProblemAnalysis analysis = analysisRepository.findByProblemId(problemId)
+                    .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
+
+            // 4. 이미 완료된 경우 스킵
+            if (analysis.getStatus().equals(AnalysisStatus.COMPLETED)) {
+                log.info("Analysis already completed for problemId: {}", problemId);
+                return;
+            }
+
+            // 5. OpenAI API 호출 (여러 이미지를 하나의 문제로 분석)
+            ProblemAnalysisResult result = openAIClient.analyzeImages(problemImageUrls);
+
+            // 6. keyPoints를 JSON 문자열로 변환
+            String keyPointsJson;
+            try {
+                keyPointsJson = objectMapper.writeValueAsString(result.getKeyPoints());
+            } catch (Exception jsonException) {
+                log.error("JSON 변환 실패 for problemId: {}", problemId, jsonException);
+                throw new RuntimeException("JSON 변환 실패", jsonException);
+            }
+
+            // 7. 분석 결과 업데이트 (COMPLETED)
+            analysis.updateWithSuccess(
+                    result.getSubject(),
+                    result.getProblemType(),
+                    keyPointsJson,
+                    result.getSolution(),
+                    result.getCommonMistakes(),
+                    result.getStudyTips()
+            );
+
+            analysisRepository.save(analysis);
+            log.info("Analysis completed successfully for problemId: {}", problemId);
+
+        } catch (Exception e) {
+            log.error("Error during sync analysis for problemId: {}", problemId, e);
+            handleAnalysisError(problemId, e);
+            throw e; // RabbitMQ 재시도를 위해 예외 다시 던짐
+        }
+    }
+
+    /**
+     * 비동기로 문제 이미지를 분석합니다 (기존 @Async 방식, deprecated)
+     * @deprecated RabbitMQ 방식(analyzeProblemSync)을 사용하세요
+     */
+    @Deprecated
     @Async
     public void analyzeProblemAsync(Long problemId) {
         log.info("Starting async analysis for problemId: {}, imageUrls: {}", problemId);
