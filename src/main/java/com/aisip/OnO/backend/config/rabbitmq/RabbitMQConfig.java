@@ -21,6 +21,7 @@ public class RabbitMQConfig {
     // ==================== Exchange 정의 ====================
     public static final String FILE_EXCHANGE = "file.exchange";
     public static final String ANALYSIS_EXCHANGE = "analysis.exchange";
+    public static final String NOTIFICATION_EXCHANGE = "notification.exchange";
 
     // ==================== Queue 정의 ====================
     public static final String S3_DELETE_QUEUE = "s3.delete.queue";
@@ -29,9 +30,13 @@ public class RabbitMQConfig {
     public static final String GPT_ANALYSIS_QUEUE = "gpt.analysis.queue";
     public static final String GPT_ANALYSIS_DLQ = "gpt.analysis.dlq";
 
+    public static final String FCM_NOTIFICATION_QUEUE = "fcm.notification.queue";
+    public static final String FCM_NOTIFICATION_DLQ = "fcm.notification.dlq";
+
     // ==================== Routing Key 정의 ====================
     public static final String S3_DELETE_ROUTING_KEY = "s3.delete";
     public static final String GPT_ANALYSIS_ROUTING_KEY = "gpt.analysis";
+    public static final String FCM_NOTIFICATION_ROUTING_KEY = "fcm.notification";
 
     /**
      * JSON 메시지 컨버터 (객체를 JSON으로 직렬화/역직렬화)
@@ -150,5 +155,48 @@ public class RabbitMQConfig {
                 .bind(gptAnalysisQueue())
                 .to(analysisExchange())
                 .with(GPT_ANALYSIS_ROUTING_KEY);
+    }
+
+    // ==================== Notification Exchange & Queue ====================
+
+    /**
+     * 알림 관련 Exchange (Direct)
+     */
+    @Bean
+    public DirectExchange notificationExchange() {
+        return new DirectExchange(NOTIFICATION_EXCHANGE);
+    }
+
+    /**
+     * FCM 푸시 알림 Queue
+     * - DLQ 설정 포함
+     * - TTL: 5분 (300,000ms) - 알림은 빠르게 전송되어야 함
+     */
+    @Bean
+    public Queue fcmNotificationQueue() {
+        return QueueBuilder.durable(FCM_NOTIFICATION_QUEUE)
+                .withArgument("x-dead-letter-exchange", "")
+                .withArgument("x-dead-letter-routing-key", FCM_NOTIFICATION_DLQ)
+                .withArgument("x-message-ttl", 300000) // 5분 TTL
+                .build();
+    }
+
+    /**
+     * FCM 알림 실패 시 저장되는 DLQ
+     */
+    @Bean
+    public Queue fcmNotificationDLQ() {
+        return QueueBuilder.durable(FCM_NOTIFICATION_DLQ).build();
+    }
+
+    /**
+     * FCM 알림 Queue와 Exchange 바인딩
+     */
+    @Bean
+    public Binding fcmNotificationBinding() {
+        return BindingBuilder
+                .bind(fcmNotificationQueue())
+                .to(notificationExchange())
+                .with(FCM_NOTIFICATION_ROUTING_KEY);
     }
 }

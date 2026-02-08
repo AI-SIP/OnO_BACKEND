@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.util.fcm.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.config.rabbitmq.producer.FcmNotificationProducer;
 import com.aisip.OnO.backend.util.fcm.dto.FcmTokenRequestDto;
 import com.aisip.OnO.backend.util.fcm.dto.FcmTokenResponseDto;
 import com.aisip.OnO.backend.util.fcm.dto.NotificationRequestDto;
@@ -28,6 +29,8 @@ public class FcmService {
     private final FcmTokenRepository fcmTokenRepository;
 
     private final FirebaseMessaging firebaseMessaging;
+
+    private final FcmNotificationProducer fcmNotificationProducer;
 
     public void registerToken(FcmTokenRequestDto fcmTokenRequestDto, Long userId) {
         if(!fcmTokenRepository.existsByUserIdAndToken(userId, fcmTokenRequestDto.token())){
@@ -67,7 +70,29 @@ public class FcmService {
         }
     }
 
+    /**
+     * 사용자의 모든 디바이스로 푸시 알림 전송 (RabbitMQ 비동기 방식)
+     * - 기존 동기 방식에서 RabbitMQ 비동기 방식으로 변경
+     * - Quartz Job이나 API에서 호출 시 즉시 반환
+     */
     public void sendNotificationToAllUserDevice(Long userId, NotificationRequestDto notificationRequestDto) {
+        // RabbitMQ Producer로 메시지 전송 (비동기)
+        fcmNotificationProducer.sendNotificationMessage(
+                userId,
+                notificationRequestDto.title(),
+                notificationRequestDto.body(),
+                notificationRequestDto.data()
+        );
+
+        log.info("FCM 알림 메시지 큐 전송 완료 - userId: {}, title: {}", userId, notificationRequestDto.title());
+    }
+
+    /**
+     * [DEPRECATED] 동기 방식 알림 전송 (테스트용으로만 사용)
+     * @deprecated RabbitMQ 방식(sendNotificationToAllUserDevice)을 사용하세요
+     */
+    @Deprecated
+    public void sendNotificationToAllUserDeviceSync(Long userId, NotificationRequestDto notificationRequestDto) {
         List<FcmToken> userFcmTokenList = fcmTokenRepository.findAllByUserId(userId);
 
         userFcmTokenList.forEach(fcmToken -> {
