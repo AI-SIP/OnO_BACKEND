@@ -45,6 +45,28 @@ services:
     # 개발 환경 Redis는 메모리 제한을 더 작게 설정
     command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
 
+  # RabbitMQ Message Queue - DEVELOPMENT
+  rabbitmq-dev:
+    image: rabbitmq:3.13-management-alpine
+    container_name: ono-rabbitmq-dev
+    restart: unless-stopped
+    ports:
+      - "5673:5672"   # 외부 포트 5673으로 노출 (prod와 충돌 방지)
+      - "15673:15672" # 관리 UI 포트
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-admin}
+      TZ: Asia/Seoul
+    volumes:
+      - rabbitmq_dev_data:/var/lib/rabbitmq
+    networks:
+      - ono-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Spring Boot Application - DEVELOPMENT
   app-dev:
     image: ${DOCKER_USERNAME}/ono:dev-latest
@@ -60,6 +82,10 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis-dev
       SPRING_DATA_REDIS_PORT: 6379
+      SPRING_RABBITMQ_HOST: rabbitmq-dev
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-admin}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-admin}
       # 환경 변수
       SPRING_CRYPTO_SECRET_KEY: ${SPRING_CRYPTO_SECRET_KEY}
       JWT_ACCESS_TOKEN_SECRET: ${JWT_ACCESS_TOKEN_SECRET}
@@ -81,6 +107,8 @@ services:
         condition: service_healthy
       redis-dev:
         condition: service_healthy
+      rabbitmq-dev:
+        condition: service_healthy
     networks:
       - ono-network
     healthcheck:
@@ -99,6 +127,8 @@ volumes:
   mysql_dev_data:
     driver: local
   redis_dev_data:
+    driver: local
+  rabbitmq_dev_data:
     driver: local
   app_dev_logs:
     driver: local

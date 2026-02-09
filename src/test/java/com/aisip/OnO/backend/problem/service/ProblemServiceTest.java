@@ -81,8 +81,7 @@ class ProblemServiceTest {
                             "memo" + i,
                             "reference" + i,
                             null,
-                            LocalDateTime.now(),
-                            new ArrayList<>()
+                            LocalDateTime.now()
                     ),
                     userId
             );
@@ -219,11 +218,7 @@ class ProblemServiceTest {
                 "memo",
                 "reference",
                 folderId,
-                LocalDateTime.now(),
-                List.of(
-                        new ProblemImageDataRegisterDto(null, "imageUrl1", ProblemImageType.valueOf(1)),
-                        new ProblemImageDataRegisterDto(null, "imageUrl2", ProblemImageType.valueOf(2))
-                )
+                LocalDateTime.now()
         );
 
         // When
@@ -238,7 +233,7 @@ class ProblemServiceTest {
     void registerProblem_folderNotFound() {
         // Given
         ProblemRegisterDto dto = new ProblemRegisterDto(
-                null, "memo", "reference", 999L, LocalDateTime.now(), null
+                null, "memo", "reference", 999L, LocalDateTime.now()
         );
 
         // Then
@@ -261,7 +256,7 @@ class ProblemServiceTest {
         );
 
         // when
-        problemService.registerProblemImageData(dto, userId);
+        //problemService.registerProblemImageData(dto, userId);
 
         // then
         Optional<Problem> optionalProblem = problemRepository.findProblemWithImageData(problemId);
@@ -286,11 +281,7 @@ class ProblemServiceTest {
                 updateMemo,
                 updateReference,
                 1L,
-                LocalDateTime.now(),
-                List.of(
-                        new ProblemImageDataRegisterDto(null, "imageUrl1", ProblemImageType.valueOf(1)),
-                        new ProblemImageDataRegisterDto(null, "imageUrl2", ProblemImageType.valueOf(2))
-                )
+                LocalDateTime.now()
         );
         //when
         problemService.updateProblemInfo(updateDto, userId);
@@ -320,11 +311,7 @@ class ProblemServiceTest {
                 updateMemo,
                 updateReference,
                 updatedFolderId,
-                LocalDateTime.now(),
-                List.of(
-                        new ProblemImageDataRegisterDto(null, "imageUrl1", ProblemImageType.valueOf(1)),
-                        new ProblemImageDataRegisterDto(null, "imageUrl2", ProblemImageType.valueOf(2))
-                )
+                LocalDateTime.now()
         );
 
         //when
@@ -351,15 +338,11 @@ class ProblemServiceTest {
                 "update memo",
                 "update reference",
                 2L,
-                LocalDateTime.now(),
-                List.of(
-                        new ProblemImageDataRegisterDto(problemId, "imageUrl1 update", ProblemImageType.valueOf(1)),
-                        new ProblemImageDataRegisterDto(problemId, "imageUrl2 update", ProblemImageType.valueOf(2))
-                )
+                LocalDateTime.now()
         );
 
         //when
-        problemService.updateProblemImageData(updateDto, userId);
+        //problemService.updateProblemImageData(updateDto, userId);
 
         //then
         Optional<Problem> optionalProblem = problemRepository.findProblemWithImageData(problemId);

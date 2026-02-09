@@ -91,8 +91,7 @@ class PracticeNoteServiceTest {
                             "memo" + i,
                             "reference" + i,
                             rootFolder.getId(),
-                            LocalDateTime.now(),
-                            null
+                            LocalDateTime.now()
                     ),
                     userId
             );

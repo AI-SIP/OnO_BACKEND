@@ -44,6 +44,28 @@ services:
       retries: 5
     command: redis-server --appendonly yes
 
+  # RabbitMQ Message Queue
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: ono-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"   # AMQP 프로토콜
+      - "15672:15672" # 관리 UI
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-admin}
+      TZ: Asia/Seoul
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - ono-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Spring Boot Application
   app:
     image: ${DOCKER_USERNAME}/ono:latest
@@ -58,6 +80,10 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-admin}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-admin}
       # 추가 환경 변수는 .env 파일에서 주입
       SPRING_CRYPTO_SECRET_KEY: ${SPRING_CRYPTO_SECRET_KEY}
       JWT_ACCESS_TOKEN_SECRET: ${JWT_ACCESS_TOKEN_SECRET}
@@ -79,6 +105,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - ono-network
     healthcheck:
@@ -96,6 +124,8 @@ volumes:
   mysql_data:
     driver: local
   redis_data:
+    driver: local
+  rabbitmq_data:
     driver: local
   app_logs:
     driver: local

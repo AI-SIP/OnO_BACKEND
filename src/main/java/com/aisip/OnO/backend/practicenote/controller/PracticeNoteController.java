@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.practicenote.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
+import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.practicenote.dto.*;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,18 @@ public class PracticeNoteController {
         log.info("userId: {} get all problem practice thumbnails", userId);
 
         return CommonResponse.success(practiceNoteService.findAllPracticeThumbnailsByUser(userId));
+    }
+
+    // ✅ V2 API: 커서 기반 복습노트 썸네일 조회 (무한 스크롤)
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/thumbnail/V2")
+    public CommonResponse<CursorPageResponse<PracticeNoteThumbnailResponseDto>> getAllPracticeThumbnailWithCursor(
+            @RequestParam(value = "cursor", required = false) Long cursor,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        log.info("userId: {} get practice thumbnails with cursor: {}, size: {}", userId, cursor, size);
+
+        return CommonResponse.success(practiceNoteService.findPracticeThumbnailsByUserWithCursor(userId, cursor, size));
     }
 
     @ResponseStatus(HttpStatus.OK)

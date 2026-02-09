@@ -276,8 +276,7 @@ class ProblemApiIntegrationTest {
                 "memo",
                 "reference",
                 folderRepository.findAllByUserId(userId).get(0).getId(),
-                LocalDateTime.now(),
-                problemImageDataRegisterDtoList
+                LocalDateTime.now()
         );
 
         // when & then
@@ -401,7 +400,6 @@ class ProblemApiIntegrationTest {
                 updateMemo,
                 updateReference,
                 null,
-                null,
                 null
         );
 
@@ -439,7 +437,6 @@ class ProblemApiIntegrationTest {
                 null,
                 null,
                 updateFolderId,
-                null,
                 null
         );
 
@@ -494,8 +491,7 @@ class ProblemApiIntegrationTest {
                 null,
                 null,
                 null,
-                null,
-                imageDataRegisterDtoList
+                null
         );
 
         // when & then

@@ -42,7 +42,7 @@ import java.util.Random;
 @SpringBootTest
 @ActiveProfiles("local")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class PerformanceTest {
+public class LargePerformanceTest {
 
     @Autowired
     private ProblemRepository problemRepository;

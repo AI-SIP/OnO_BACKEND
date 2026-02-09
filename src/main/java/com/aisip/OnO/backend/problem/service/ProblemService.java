@@ -1,6 +1,9 @@
 package com.aisip.OnO.backend.problem.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.common.response.CursorPageResponse;
+import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
+import com.aisip.OnO.backend.config.rabbitmq.producer.ProblemAnalysisProducer;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
@@ -15,6 +18,7 @@ import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
+import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -43,6 +47,12 @@ public class ProblemService {
     private final MissionLogService missionLogService;
 
     private final ProblemAnalysisService analysisService;
+
+    private final PracticeNoteRepository practiceNoteRepository;
+
+    private final S3DeleteProducer s3DeleteProducer;
+
+    private final ProblemAnalysisProducer analysisProducer;
 
     @Transactional(readOnly = true)
     public ProblemResponseDto findProblem(Long problemId) {
@@ -163,10 +173,20 @@ public class ProblemService {
         }
     }
 
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    /**
+     * GPT 문제 분석 요청 (RabbitMQ 방식)
+     * - PROCESSING 상태의 분석 엔티티 생성 (동기)
+     * - RabbitMQ에 분석 메시지 전송 (비동기)
+     */
+    @Transactional
     public void analysisProblem(Long problemId) {
-        analysisService.analyzeProblemAsync(problemId);
+        // 1. PROCESSING 상태의 분석 엔티티 미리 생성 (동시성 문제 해결)
+        analysisService.createPendingAnalysis(problemId);
+
+        // 2. RabbitMQ에 분석 메시지 전송
+        analysisProducer.sendAnalysisMessage(problemId);
+
+        log.info("GPT 분석 요청 전송 완료 - problemId: {}", problemId);
     }
 
     @Transactional
@@ -193,19 +213,39 @@ public class ProblemService {
         }
     }
 
+    /**
+     * 문제 삭제 (비동기 S3 파일 삭제 적용)
+     * - DB 삭제: 동기 (즉시 완료)
+     * - S3 파일 삭제: 비동기 (RabbitMQ Producer로 전송)
+     * - PracticeNote 매핑 삭제: 동기 (데이터 정합성)
+     */
     @Transactional
     public void deleteProblem(Long problemId) {
+        // 1. 이미지 데이터 조회
+        List<ProblemImageData> imageDataList = problemImageDataRepository.findAllByProblemId(problemId);
 
-        List<ProblemImageData> imageDataList= problemImageDataRepository.findAllByProblemId(problemId);
+        // 2. DB에서 이미지 메타데이터 삭제 (동기 - 빠름)
+        problemImageDataRepository.deleteAll(imageDataList);
 
-        imageDataList.forEach(imageData -> {
-            fileUploadService.deleteImageFileFromS3(imageData.getImageUrl());
-            problemImageDataRepository.delete(imageData);
-        });
+        // 3. PracticeNote 매핑 삭제 (동기 - 데이터 정합성 보장)
+        practiceNoteRepository.deleteProblemFromAllPractice(problemId);
 
+        // 4. 문제 삭제 (Soft Delete)
         problemRepository.deleteById(problemId);
 
-        log.info("problemId: {} has deleted", problemId);
+        log.info("problemId: {} DB 삭제 완료", problemId);
+
+        // 5. S3 파일 삭제는 비동기로 처리 (RabbitMQ Producer)
+        imageDataList.forEach(imageData -> {
+            try {
+                s3DeleteProducer.sendDeleteMessage(imageData.getImageUrl(), problemId);
+            } catch (Exception e) {
+                log.error("S3 삭제 메시지 전송 실패 - problemId: {}, imageUrl: {}, error: {}",
+                        problemId, imageData.getImageUrl(), e.getMessage());
+            }
+        });
+
+        log.info("problemId: {} S3 삭제 메시지 전송 완료 ({}개)", problemId, imageDataList.size());
     }
 
     @Transactional
@@ -242,5 +282,28 @@ public class ProblemService {
                 });
 
         log.info("userId: {} delete all user problems", userId);
+    }
+
+    /**
+     * V2 API: 커서 기반 폴더의 문제 조회
+     * @param folderId 폴더 ID
+     * @param cursor 마지막으로 조회한 문제 ID (null이면 처음부터)
+     * @param size 조회할 개수
+     * @return 커서 기반 페이징 응답
+     */
+    @Transactional(readOnly = true)
+    public CursorPageResponse<ProblemResponseDto> findProblemsByFolderWithCursor(Long folderId, Long cursor, int size) {
+        List<Problem> problems = problemRepository.findProblemsByFolderWithCursor(folderId, cursor, size);
+
+        boolean hasNext = problems.size() > size;
+        List<Problem> content = hasNext ? problems.subList(0, size) : problems;
+        Long nextCursor = hasNext ? content.get(content.size() - 1).getId() : null;
+
+        List<ProblemResponseDto> dtoList = content.stream()
+                .map(ProblemResponseDto::from)
+                .collect(Collectors.toList());
+
+        log.info("folderId: {} find problems with cursor: {}, size: {}, hasNext: {}", folderId, cursor, size, hasNext);
+        return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
     }
 }

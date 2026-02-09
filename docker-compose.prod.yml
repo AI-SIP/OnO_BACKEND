@@ -44,6 +44,28 @@ services:
       retries: 5
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
 
+  # RabbitMQ Message Queue - PRODUCTION
+  rabbitmq-prod:
+    image: rabbitmq:3.13-management-alpine
+    container_name: ono-rabbitmq-prod
+    restart: unless-stopped
+    ports:
+      - "5672:5672"   # AMQP 프로토콜
+      - "15672:15672" # 관리 UI
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-admin}
+      TZ: Asia/Seoul
+    volumes:
+      - rabbitmq_prod_data:/var/lib/rabbitmq
+    networks:
+      - ono-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Spring Boot Application - PRODUCTION (Blue)
   app-prod-blue:
     image: ${DOCKER_USERNAME}/ono:prod-latest
@@ -59,6 +81,10 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis-prod
       SPRING_DATA_REDIS_PORT: 6379
+      SPRING_RABBITMQ_HOST: rabbitmq-prod
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-admin}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-admin}
       # 환경 변수
       SPRING_CRYPTO_SECRET_KEY: ${SPRING_CRYPTO_SECRET_KEY}
       JWT_ACCESS_TOKEN_SECRET: ${JWT_ACCESS_TOKEN_SECRET}
@@ -79,6 +105,8 @@ services:
       mysql-prod:
         condition: service_healthy
       redis-prod:
+        condition: service_healthy
+      rabbitmq-prod:
         condition: service_healthy
     networks:
       - ono-network
@@ -104,6 +132,10 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis-prod
       SPRING_DATA_REDIS_PORT: 6379
+      SPRING_RABBITMQ_HOST: rabbitmq-prod
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-admin}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-admin}
       # 환경 변수
       SPRING_CRYPTO_SECRET_KEY: ${SPRING_CRYPTO_SECRET_KEY}
       JWT_ACCESS_TOKEN_SECRET: ${JWT_ACCESS_TOKEN_SECRET}
@@ -125,6 +157,8 @@ services:
         condition: service_healthy
       redis-prod:
         condition: service_healthy
+      rabbitmq-prod:
+        condition: service_healthy
     networks:
       - ono-network
     healthcheck:
@@ -144,6 +178,8 @@ volumes:
   mysql_prod_data:
     driver: local
   redis_prod_data:
+    driver: local
+  rabbitmq_prod_data:
     driver: local
   app_prod_logs:
     driver: local

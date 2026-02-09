@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.problem.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
+import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.problem.dto.ProblemAnalysisResponseDto;
 import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
@@ -55,6 +56,18 @@ public class ProblemController {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         return CommonResponse.success(problemService.findFolderProblemList(folderId));
+    }
+
+    // ✅ V2 API: 커서 기반 폴더의 문제 조회 (무한 스크롤)
+    @GetMapping("/folder/{folderId}/V2")
+    public CommonResponse<CursorPageResponse<ProblemResponseDto>> getProblemsWithCursorByUserId(
+            @PathVariable("folderId") Long folderId,
+            @RequestParam(value = "cursor", required = false) Long cursor,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        log.info("userId: {} get problems for folderId: {} with cursor: {}, size: {}", userId, folderId, cursor, size);
+
+        return CommonResponse.success(problemService.findProblemsByFolderWithCursor(folderId, cursor, size));
     }
 
     // ✅ 사용자의 문제 개수 조회
