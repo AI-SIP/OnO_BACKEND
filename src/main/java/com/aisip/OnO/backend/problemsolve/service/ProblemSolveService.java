@@ -40,10 +40,10 @@ public class ProblemSolveService {
     @Transactional(readOnly = true)
     public ProblemSolveResponseDto getPracticeRecord(Long practiceRecordId, Long userId) {
         ProblemSolve problemSolve = problemSolveRepository.findByIdWithImages(practiceRecordId)
-                .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PRACTICE_RECORD_NOT_FOUND));
+                .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND));
 
         if (!Objects.equals(problemSolve.getUserId(), userId)) {
-            throw new ApplicationException(ProblemSolveErrorCase.PRACTICE_RECORD_USER_UNMATCHED);
+            throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_USER_UNMATCHED);
         }
 
         return ProblemSolveResponseDto.from(problemSolve);
@@ -113,10 +113,10 @@ public class ProblemSolveService {
     @Transactional
     public void uploadPracticeRecordImages(Long practiceRecordId, Long userId, List<MultipartFile> images) {
         ProblemSolve problemSolve = problemSolveRepository.findById(practiceRecordId)
-                .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PRACTICE_RECORD_NOT_FOUND));
+                .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND));
 
         if (!Objects.equals(problemSolve.getUserId(), userId)) {
-            throw new ApplicationException(ProblemSolveErrorCase.PRACTICE_RECORD_USER_UNMATCHED);
+            throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_USER_UNMATCHED);
         }
 
         for (int i = 0; i < images.size(); i++) {
@@ -134,10 +134,10 @@ public class ProblemSolveService {
     @Transactional
     public void updatePracticeRecord(ProblemSolveUpdateDto dto, Long userId) {
         ProblemSolve problemSolve = problemSolveRepository.findById(dto.practiceRecordId())
-                .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PRACTICE_RECORD_NOT_FOUND));
+                .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND));
 
         if (!Objects.equals(problemSolve.getUserId(), userId)) {
-            throw new ApplicationException(ProblemSolveErrorCase.PRACTICE_RECORD_USER_UNMATCHED);
+            throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_USER_UNMATCHED);
         }
 
         // improvements를 JSON 문자열로 변환
@@ -164,10 +164,10 @@ public class ProblemSolveService {
     @Transactional
     public void deletePracticeRecord(Long practiceRecordId, Long userId) {
         ProblemSolve problemSolve = problemSolveRepository.findByIdWithImages(practiceRecordId)
-                .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PRACTICE_RECORD_NOT_FOUND));
+                .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND));
 
         if (!Objects.equals(problemSolve.getUserId(), userId)) {
-            throw new ApplicationException(ProblemSolveErrorCase.PRACTICE_RECORD_USER_UNMATCHED);
+            throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_USER_UNMATCHED);
         }
 
         List<ProblemSolveImageData> images = problemSolve.getImages();
