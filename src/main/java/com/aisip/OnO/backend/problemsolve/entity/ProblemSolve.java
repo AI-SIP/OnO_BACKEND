@@ -82,11 +82,11 @@ public class ProblemSolve extends BaseEntity {
 
     public void addImage(ProblemSolveImageData image) {
         this.images.add(image);
-        image.updatePracticeRecord(this);
+        image.updateProblemSolve(this);
     }
 
-    public void updateRecord(AnswerStatus answerStatus, String reflection, String improvements,
-                              Integer timeSpentSeconds) {
+    public void updateSolve(AnswerStatus answerStatus, String reflection, String improvements,
+                            Integer timeSpentSeconds) {
         this.answerStatus = answerStatus;
         this.reflection = reflection;
         this.improvements = improvements;

@@ -39,7 +39,7 @@ public class ProblemSolveImageData extends BaseEntity {
                 .build();
     }
 
-    public void updatePracticeRecord(ProblemSolve problemSolve) {
+    public void updateProblemSolve(ProblemSolve problemSolve) {
         this.problemSolve = problemSolve;
     }
 }

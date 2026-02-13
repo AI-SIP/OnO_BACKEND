@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface ProblemSolveImageDataRepository extends JpaRepository<ProblemSolveImageData, Long> {
 
-    List<ProblemSolveImageData> findAllByPracticeRecordId(Long practiceRecordId);
+    List<ProblemSolveImageData> findAllByProblemSolveId(Long problemSolveId);
 
     void deleteByImageUrl(String imageUrl);
 }

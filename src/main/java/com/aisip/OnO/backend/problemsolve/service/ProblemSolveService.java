@@ -38,8 +38,8 @@ public class ProblemSolveService {
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
-    public ProblemSolveResponseDto getPracticeRecord(Long practiceRecordId, Long userId) {
-        ProblemSolve problemSolve = problemSolveRepository.findByIdWithImages(practiceRecordId)
+    public ProblemSolveResponseDto getProblemSolve(Long problemSolveId, Long userId) {
+        ProblemSolve problemSolve = problemSolveRepository.findByIdWithImages(problemSolveId)
                 .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND));
 
         if (!Objects.equals(problemSolve.getUserId(), userId)) {
@@ -50,7 +50,7 @@ public class ProblemSolveService {
     }
 
     @Transactional(readOnly = true)
-    public List<ProblemSolveResponseDto> getPracticeRecordsByProblemId(Long problemId, Long userId) {
+    public List<ProblemSolveResponseDto> getProblemSolvesByProblemId(Long problemId, Long userId) {
         Problem problem = problemRepository.findById(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
@@ -66,7 +66,7 @@ public class ProblemSolveService {
     }
 
     @Transactional(readOnly = true)
-    public List<ProblemSolveResponseDto> getUserPracticeRecords(Long userId) {
+    public List<ProblemSolveResponseDto> getUserProblemSolves(Long userId) {
         List<ProblemSolve> problemSolves = problemSolveRepository.findAllByUserId(userId);
 
         return problemSolves.stream()
@@ -75,7 +75,7 @@ public class ProblemSolveService {
     }
 
     @Transactional
-    public Long createPracticeRecord(ProblemSolveRegisterDto dto, Long userId) {
+    public Long createProblemSolve(ProblemSolveRegisterDto dto, Long userId) {
         Problem problem = problemRepository.findById(dto.problemId())
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
@@ -105,14 +105,14 @@ public class ProblemSolveService {
         );
 
         problemSolveRepository.save(problemSolve);
-        log.info("userId: {} created practice record: {}", userId, problemSolve.getId());
+        log.info("userId: {} created problem solve: {}", userId, problemSolve.getId());
 
         return problemSolve.getId();
     }
 
     @Transactional
-    public void uploadPracticeRecordImages(Long practiceRecordId, Long userId, List<MultipartFile> images) {
-        ProblemSolve problemSolve = problemSolveRepository.findById(practiceRecordId)
+    public void uploadProblemSolveImages(Long problemSolveId, Long userId, List<MultipartFile> images) {
+        ProblemSolve problemSolve = problemSolveRepository.findById(problemSolveId)
                 .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND));
 
         if (!Objects.equals(problemSolve.getUserId(), userId)) {
@@ -127,13 +127,13 @@ public class ProblemSolveService {
             problemSolve.addImage(problemSolveImageData);
             problemSolveImageDataRepository.save(problemSolveImageData);
 
-            log.info("Uploaded practice record image to S3: {} for practiceRecordId: {}", imageUrl, practiceRecordId);
+            log.info("Uploaded problem solve image to S3: {} for problemSolveId: {}", imageUrl, problemSolveId);
         }
     }
 
     @Transactional
-    public void updatePracticeRecord(ProblemSolveUpdateDto dto, Long userId) {
-        ProblemSolve problemSolve = problemSolveRepository.findById(dto.practiceRecordId())
+    public void updateProblemSolve(ProblemSolveUpdateDto dto, Long userId) {
+        ProblemSolve problemSolve = problemSolveRepository.findById(dto.problemSolveId())
                 .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND));
 
         if (!Objects.equals(problemSolve.getUserId(), userId)) {
@@ -151,19 +151,19 @@ public class ProblemSolveService {
             }
         }
 
-        problemSolve.updateRecord(
+        problemSolve.updateSolve(
                 dto.answerStatus(),
                 dto.reflection(),
                 improvementsJson,
                 dto.timeSpentSeconds()
         );
 
-        log.info("userId: {} updated practice record: {}", userId, problemSolve.getId());
+        log.info("userId: {} updated problem solve: {}", userId, problemSolve.getId());
     }
 
     @Transactional
-    public void deletePracticeRecord(Long practiceRecordId, Long userId) {
-        ProblemSolve problemSolve = problemSolveRepository.findByIdWithImages(practiceRecordId)
+    public void deleteProblemSolve(Long problemSolveId, Long userId) {
+        ProblemSolve problemSolve = problemSolveRepository.findByIdWithImages(problemSolveId)
                 .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND));
 
         if (!Objects.equals(problemSolve.getUserId(), userId)) {
@@ -173,22 +173,22 @@ public class ProblemSolveService {
         List<ProblemSolveImageData> images = problemSolve.getImages();
 
         problemSolveRepository.delete(problemSolve);
-        log.info("userId: {} deleted practice record: {}", userId, practiceRecordId);
+        log.info("userId: {} deleted problem solve: {}", userId, problemSolveId);
 
         images.forEach(image -> {
             try {
-                s3DeleteProducer.sendDeleteMessage(image.getImageUrl(), practiceRecordId);
+                s3DeleteProducer.sendDeleteMessage(image.getImageUrl(), problemSolveId);
             } catch (Exception e) {
-                log.error("S3 삭제 메시지 전송 실패 - practiceRecordId: {}, imageUrl: {}, error: {}",
-                        practiceRecordId, image.getImageUrl(), e.getMessage());
+                log.error("S3 삭제 메시지 전송 실패 - problemSolveId: {}, imageUrl: {}, error: {}",
+                        problemSolveId, image.getImageUrl(), e.getMessage());
             }
         });
 
-        log.info("practiceRecordId: {} S3 삭제 메시지 전송 완료 ({}개)", practiceRecordId, images.size());
+        log.info("problemSolveId: {} S3 삭제 메시지 전송 완료 ({}개)", problemSolveId, images.size());
     }
 
     @Transactional
-    public void deleteAllPracticeRecordsByProblemId(Long problemId) {
+    public void deleteAllProblemSolvesByProblemId(Long problemId) {
         List<ProblemSolve> problemSolves = problemSolveRepository.findAllByProblemIdWithImages(problemId);
 
         problemSolves.forEach(record -> {
@@ -198,18 +198,18 @@ public class ProblemSolveService {
                 try {
                     s3DeleteProducer.sendDeleteMessage(image.getImageUrl(), record.getId());
                 } catch (Exception e) {
-                    log.error("S3 삭제 메시지 전송 실패 - practiceRecordId: {}, imageUrl: {}, error: {}",
+                    log.error("S3 삭제 메시지 전송 실패 - problemSolveId: {}, imageUrl: {}, error: {}",
                             record.getId(), image.getImageUrl(), e.getMessage());
                 }
             });
         });
 
         problemSolveRepository.deleteAllByProblemId(problemId);
-        log.info("problemId: {} 의 모든 연습 기록 삭제 완료", problemId);
+        log.info("problemId: {} 의 모든 복습 기록 삭제 완료", problemId);
     }
 
     @Transactional(readOnly = true)
-    public Long getPracticeRecordCountByProblemId(Long problemId, Long userId) {
+    public Long getProblemSolveCountByProblemId(Long problemId, Long userId) {
         Problem problem = problemRepository.findById(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
@@ -221,7 +221,7 @@ public class ProblemSolveService {
     }
 
     @Transactional(readOnly = true)
-    public Long getUserPracticeRecordCount(Long userId) {
+    public Long getUserProblemSolveCount(Long userId) {
         return problemSolveRepository.countByUserId(userId);
     }
 }

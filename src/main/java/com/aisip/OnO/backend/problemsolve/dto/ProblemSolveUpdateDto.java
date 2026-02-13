@@ -6,7 +6,7 @@ import com.aisip.OnO.backend.problemsolve.entity.ImprovementType;
 import java.util.List;
 
 public record ProblemSolveUpdateDto(
-        Long practiceRecordId,
+        Long problemSolveId,
         AnswerStatus answerStatus,
         String reflection,
         List<ImprovementType> improvements,

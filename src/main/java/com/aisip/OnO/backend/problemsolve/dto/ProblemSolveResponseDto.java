@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 
 @Builder
 public record ProblemSolveResponseDto(
-        Long id,
+        Long problemSolveId,
         Long problemId,
         Long userId,
         @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
@@ -48,7 +48,7 @@ public record ProblemSolveResponseDto(
         }
 
         return ProblemSolveResponseDto.builder()
-                .id(problemSolve.getId())
+                .problemSolveId(problemSolve.getId())
                 .problemId(problemSolve.getProblem().getId())
                 .userId(problemSolve.getUserId())
                 .practicedAt(problemSolve.getPracticedAt())

@@ -12,8 +12,8 @@ public interface ProblemSolveRepository extends JpaRepository<ProblemSolve, Long
 
     @Query("SELECT pr FROM ProblemSolve pr " +
             "LEFT JOIN FETCH pr.images " +
-            "WHERE pr.id = :practiceRecordId")
-    Optional<ProblemSolve> findByIdWithImages(@Param("practiceRecordId") Long practiceRecordId);
+            "WHERE pr.id = :problemSolveId")
+    Optional<ProblemSolve> findByIdWithImages(@Param("problemSolveId") Long problemSolveId);
 
     @Query("SELECT pr FROM ProblemSolve pr " +
             "LEFT JOIN FETCH pr.images " +
