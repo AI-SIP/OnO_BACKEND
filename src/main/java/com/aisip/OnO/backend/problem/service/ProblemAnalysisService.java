@@ -82,6 +82,30 @@ public class ProblemAnalysisService {
     }
 
     /**
+     * 분석 상태를 PROCESSING으로 업데이트 (이미지 있을 때)
+     */
+    public void updateToProcessing(Long problemId) {
+        ProblemAnalysis analysis = analysisRepository.findByProblemId(problemId)
+                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
+
+        analysis.updateToProcessing();
+        analysisRepository.save(analysis);
+        log.info("Updated analysis to PROCESSING for problemId: {}", problemId);
+    }
+
+    /**
+     * 분석 상태를 NO_IMAGE로 업데이트 (이미지 없을 때)
+     */
+    public void updateToNoImage(Long problemId) {
+        ProblemAnalysis analysis = analysisRepository.findByProblemId(problemId)
+                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
+
+        analysis.updateToNoImage();
+        analysisRepository.save(analysis);
+        log.info("Updated analysis to NO_IMAGE for problemId: {}", problemId);
+    }
+
+    /**
      * 동기적으로 문제 이미지를 분석합니다 (RabbitMQ Consumer에서 호출)
      * - 동시성 문제 해결: 이미 생성된 PROCESSING 엔티티만 조회하여 업데이트
      */

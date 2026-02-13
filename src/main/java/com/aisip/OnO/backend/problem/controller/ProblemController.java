@@ -110,6 +110,17 @@ public class ProblemController {
         return CommonResponse.success("이미지 업로드가 시작되었습니다.");
     }
 
+    // ✅ 문제 이미지 비동기 업로드
+    @PatchMapping("/{problemId}/no-image")
+    public CommonResponse<String> updateProblemAnalysisStatus(
+            @PathVariable("problemId") Long problemId
+    ) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        analysisService.updateToNoImage(problemId);
+
+        return CommonResponse.success("이미지 업로드가 시작되었습니다.");
+    }
+
     // ✅ 문제 수정
     @PatchMapping("/info")
     public CommonResponse<String> updateProblemInfo(@RequestBody ProblemRegisterDto problemRegisterDto) {

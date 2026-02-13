@@ -73,4 +73,14 @@ public class ProblemAnalysis extends BaseEntity {
         this.status = AnalysisStatus.FAILED;
         this.errorMessage = errorMessage;
     }
+
+    public void updateToProcessing() {
+        this.status = AnalysisStatus.PROCESSING;
+        this.errorMessage = null;
+    }
+
+    public void updateToNoImage() {
+        this.status = AnalysisStatus.NO_IMAGE;
+        this.errorMessage = "이미지가 없어 분석을 진행할 수 없습니다.";
+    }
 }

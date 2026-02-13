@@ -144,6 +144,11 @@ public class ProblemService {
     //@Transactional(propagation = Propagation.REQUIRES_NEW)
     @Transactional
     public void uploadProblemImages(Long problemId, Long userId, List<MultipartFile> images, List<String> imageTypeStrings) {
+
+        if (images == null || imageTypeStrings == null) {
+            return;
+        }
+
         // 1. 문제 조회 및 권한 확인
         Problem problem = findProblemEntity(problemId, userId);
 
@@ -175,18 +180,29 @@ public class ProblemService {
 
     /**
      * GPT 문제 분석 요청 (RabbitMQ 방식)
-     * - PROCESSING 상태의 분석 엔티티 생성 (동기)
-     * - RabbitMQ에 분석 메시지 전송 (비동기)
+     * - 이미지 유무 확인 후 상태 업데이트
+     * - 이미지 있음: NOT_STARTED → PROCESSING → RabbitMQ 전송
+     * - 이미지 없음: NOT_STARTED → NO_IMAGE
      */
     @Transactional
     public void analysisProblem(Long problemId) {
-        // 1. PROCESSING 상태의 분석 엔티티 미리 생성 (동시성 문제 해결)
-        analysisService.createPendingAnalysis(problemId);
+        // 1. 문제 이미지 개수 확인
+        long problemImageCount = problemImageDataRepository.findAllByProblemId(problemId)
+                .stream()
+                .filter(data -> data.getProblemImageType().equals(ProblemImageType.PROBLEM_IMAGE))
+                .count();
 
-        // 2. RabbitMQ에 분석 메시지 전송
-        analysisProducer.sendAnalysisMessage(problemId);
-
-        log.info("GPT 분석 요청 전송 완료 - problemId: {}", problemId);
+        // 2. 이미지 유무에 따라 분기 처리
+        if (problemImageCount == 0) {
+            // 이미지 없음 → NO_IMAGE 상태로 업데이트
+            analysisService.updateToNoImage(problemId);
+            log.info("분석 불가 (이미지 없음) - problemId: {}", problemId);
+        } else {
+            // 이미지 있음 → PROCESSING 상태로 업데이트 후 RabbitMQ 전송
+            analysisService.updateToProcessing(problemId);
+            analysisProducer.sendAnalysisMessage(problemId);
+            log.info("GPT 분석 요청 전송 완료 - problemId: {}, 이미지 개수: {}", problemId, problemImageCount);
+        }
     }
 
     @Transactional
