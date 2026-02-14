@@ -6,8 +6,8 @@ import lombok.Getter;
 public enum MissionType {
     USER_LOGIN(15L, AbilityType.ATTENDANCE),
     PROBLEM_WRITE(10L, AbilityType.NOTE_WRITE),
-    PROBLEM_PRACTICE(10L, AbilityType.PROBLEM_PRACTICE),
-    NOTE_PRACTICE(10L, AbilityType.NOTE_PRACTICE);
+    PROBLEM_PRACTICE(5L, AbilityType.PROBLEM_PRACTICE),
+    NOTE_PRACTICE(15L, AbilityType.NOTE_PRACTICE);
 
     private final Long point;
     private final AbilityType abilityType;
