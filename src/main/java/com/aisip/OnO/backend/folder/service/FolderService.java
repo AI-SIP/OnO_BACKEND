@@ -24,21 +24,21 @@ import java.util.stream.Collectors;
 @Transactional
 public class FolderService {
 
+    private static final String ROOT_FOLDER_NAME = "책장";
+    private static final String DEFAULT_SUB_FOLDER_NAME = "공책";
+
     private final FolderRepository folderRepository;
 
     private final ProblemService problemService;
 
     public FolderResponseDto findRootFolder(Long userId) {
-        return folderRepository.findRootFolder(userId)
-                .map(rootFolder -> {
-                    log.info("userId : {} find root folder id: {}", userId, rootFolder.getId());
-                    List<Long> problemIdList = folderRepository.findProblemIdsByFolder(rootFolder.getId());
-                    return FolderResponseDto.from(rootFolder, problemIdList);
-                })
-                .orElseGet(() -> {
-                    log.info("userId : {} create root folder", userId);
-                    return createRootFolder(userId);
-                });
+        Folder rootFolder = folderRepository.findRootFolder(userId)
+                .orElse(createRootFolderEntity(userId));
+
+        log.info("userId : {} find root folder id: {}", userId, rootFolder.getId());
+
+        List<Long> problemIdList = folderRepository.findProblemIdsByFolder(rootFolder.getId());
+        return FolderResponseDto.from(rootFolder, problemIdList);
     }
 
     @Transactional(readOnly = true)
@@ -77,18 +77,23 @@ public class FolderService {
                 }).toList();
     }
 
-    public FolderResponseDto createRootFolder(Long userId) {
-        FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
-                "책장",
-                null,
-                null
-        );
+    private Folder createRootFolderEntity(Long userId) {
 
-        Folder rootFolder = Folder.from(folderRegisterDto, userId);
+        Folder rootFolder = Folder.from(new FolderRegisterDto(ROOT_FOLDER_NAME, null, null), userId);
         folderRepository.save(rootFolder);
 
-        log.info("userId : {} create root folder id: {}", userId, rootFolder.getId());
-        return FolderResponseDto.from(rootFolder, List.of());
+        log.info("root folder created");
+
+        createDefaultSubFolder(rootFolder, userId);
+        return rootFolder;
+    }
+
+    private void createDefaultSubFolder(Folder rootFolder, Long userId) {
+        Folder defaultSubFolder = Folder.from(new FolderRegisterDto(DEFAULT_SUB_FOLDER_NAME, null, rootFolder.getId()), userId);
+        defaultSubFolder.updateParentFolder(rootFolder);
+        folderRepository.save(defaultSubFolder);
+
+        log.info("sub folder created");
     }
 
     public Long createFolder(FolderRegisterDto folderRegisterDto, Long userId) {

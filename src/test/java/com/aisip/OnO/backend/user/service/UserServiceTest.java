@@ -1,11 +1,15 @@
 package com.aisip.OnO.backend.user.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.folder.service.FolderService;
+import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
+import com.aisip.OnO.backend.problem.service.ProblemService;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.exception.UserErrorCase;
 import com.aisip.OnO.backend.user.repository.UserRepository;
+import com.aisip.OnO.backend.util.webhook.DiscordWebhookNotificationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,6 +32,14 @@ class UserServiceTest {
 
     @Mock
     private UserRepository userRepository;  // Mock 객체로 UserRepository 생성 -> 실제 DB와는 연결 X
+    @Mock
+    private FolderService folderService;
+    @Mock
+    private ProblemService problemService;
+    @Mock
+    private PracticeNoteService practiceNoteService;
+    @Mock
+    private DiscordWebhookNotificationService discordWebhookNotificationService;
 
     @InjectMocks
     private UserService userService;    // Mock으로 선언된 userRepository를 자동으로 주입해준다.
@@ -108,6 +120,7 @@ class UserServiceTest {
         assertThat(response.email()).contains("guest");
 
         verify(userRepository, times(1)).save(any(User.class));
+        verify(folderService, times(1)).ensureOnboardingFolders(any(Long.class));
     }
 
     @Test
@@ -129,6 +142,7 @@ class UserServiceTest {
 
         // save()가 반드시 한 번 호출되어야 함
         verify(userRepository, times(1)).save(any(User.class));
+        verify(folderService, times(1)).ensureOnboardingFolders(any(Long.class));
     }
 
     @Test
@@ -148,6 +162,7 @@ class UserServiceTest {
 
         // 기존 유저가 존재하면 save()가 호출되지 않아야 함
         verify(userRepository, never()).save(any(User.class));
+        verify(folderService, times(1)).ensureOnboardingFolders(any(Long.class));
     }
 
     @Test
