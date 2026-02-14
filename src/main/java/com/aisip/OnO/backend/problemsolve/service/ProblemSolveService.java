@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.problemsolve.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveRegisterDto;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveResponseDto;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveUpdateDto;
@@ -33,6 +34,7 @@ public class ProblemSolveService {
     private final ProblemSolveRepository problemSolveRepository;
     private final ProblemSolveImageDataRepository problemSolveImageDataRepository;
     private final ProblemRepository problemRepository;
+    private final MissionLogService missionLogService;
     private final FileUploadService fileUploadService;
     private final S3DeleteProducer s3DeleteProducer;
     private final ObjectMapper objectMapper;
@@ -105,6 +107,7 @@ public class ProblemSolveService {
         );
 
         problemSolveRepository.save(problemSolve);
+        missionLogService.registerProblemPracticeMission(userId, problem.getId());
         log.info("userId: {} created problem solve: {}", userId, problemSolve.getId());
 
         return problemSolve.getId();
