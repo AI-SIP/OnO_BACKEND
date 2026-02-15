@@ -31,9 +31,26 @@ public class FolderService {
 
     private final ProblemService problemService;
 
+    public void initializeDefaultFoldersIfAbsent(Long userId) {
+        Folder rootFolder = folderRepository.findByUserIdAndParentFolderIsNull(userId)
+                .orElseGet(() -> {
+                    Folder createdRoot = Folder.from(new FolderRegisterDto(ROOT_FOLDER_NAME, null, null), userId);
+                    folderRepository.save(createdRoot);
+                    log.info("userId : {} root folder created", userId);
+                    return createdRoot;
+                });
+
+        boolean hasDefaultSubFolder = rootFolder.getSubFolderList().stream()
+                .anyMatch(subFolder -> DEFAULT_SUB_FOLDER_NAME.equals(subFolder.getName()));
+
+        if (!hasDefaultSubFolder) {
+            createDefaultSubFolder(rootFolder, userId);
+        }
+    }
+
     public FolderResponseDto findRootFolder(Long userId) {
         Folder rootFolder = folderRepository.findRootFolder(userId)
-                .orElse(createRootFolderEntity(userId));
+                .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
 
         log.info("userId : {} find root folder id: {}", userId, rootFolder.getId());
 
@@ -70,22 +87,11 @@ public class FolderService {
 
         log.info("userId : {} find All user folders", userId);
         return folders.isEmpty()
-                ? List.of(findRootFolder(userId))
+                ? List.of()
                 : folders.stream().map(folder -> {
                     List<Long> problemIdList = folderRepository.findProblemIdsByFolder(folder.getId());
                     return FolderResponseDto.from(folder, problemIdList);
                 }).toList();
-    }
-
-    private Folder createRootFolderEntity(Long userId) {
-
-        Folder rootFolder = Folder.from(new FolderRegisterDto(ROOT_FOLDER_NAME, null, null), userId);
-        folderRepository.save(rootFolder);
-
-        log.info("root folder created");
-
-        createDefaultSubFolder(rootFolder, userId);
-        return rootFolder;
     }
 
     private void createDefaultSubFolder(Folder rootFolder, Long userId) {
@@ -93,7 +99,7 @@ public class FolderService {
         defaultSubFolder.updateParentFolder(rootFolder);
         folderRepository.save(defaultSubFolder);
 
-        log.info("sub folder created");
+        log.info("userId : {} default sub folder created", userId);
     }
 
     public Long createFolder(FolderRegisterDto folderRegisterDto, Long userId) {
