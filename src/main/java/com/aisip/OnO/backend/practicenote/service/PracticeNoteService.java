@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional
 public class PracticeNoteService {
+    private static final String DEFAULT_PRACTICE_NOTE_TITLE = "복습노트";
 
     private final ProblemRepository problemRepository;
 
@@ -60,6 +61,15 @@ public class PracticeNoteService {
 
         log.info("userId: {} register practiceId: {}", userId, practiceNote.getId());
         return practiceNote.getId();
+    }
+
+    public Long registerDefaultPractice(Long userId) {
+        return registerPractice(new PracticeNoteRegisterDto(
+                null,
+                DEFAULT_PRACTICE_NOTE_TITLE,
+                List.of(),
+                null
+        ), userId);
     }
 
     public void registerPracticeNotification(Long userId, Long practiceId, String practiceTitle, PracticeNotificationRegisterDto notificationRegisterDto) {

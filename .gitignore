@@ -48,6 +48,8 @@ application-dev.yml
 application-prod.yml
 FirebaseAdminKey.json
 
+**/db/migration/
+
 ### Environment variables
 .env
 

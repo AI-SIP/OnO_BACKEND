@@ -32,7 +32,7 @@ public class PracticeNoteRepositoryImpl implements PracticeNoteRepositoryCustom 
     public Optional<PracticeNote> findPracticeNoteWithDetails(Long practiceNoteId) {
         PracticeNote result = queryFactory
                 .selectFrom(practiceNote)
-                .join(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping).fetchJoin()
+                .leftJoin(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping).fetchJoin()
                 .where(practiceNote.id.eq(practiceNoteId))
                 .orderBy(practiceNote.id.asc())
                 .fetchOne();
@@ -44,7 +44,7 @@ public class PracticeNoteRepositoryImpl implements PracticeNoteRepositoryCustom 
     public List<PracticeNote> findAllUserPracticeNotesWithDetails(Long userId) {
         return queryFactory
                 .selectFrom(practiceNote)
-                .join(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping).fetchJoin()
+                .leftJoin(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping).fetchJoin()
                 .where(practiceNote.userId.eq(userId))
                 .orderBy(practiceNote.id.asc())
                 .fetch();
@@ -91,7 +91,7 @@ public class PracticeNoteRepositoryImpl implements PracticeNoteRepositoryCustom 
     public List<PracticeNote> findPracticeNotesByUserWithCursor(Long userId, Long cursor, int size) {
         var query = queryFactory
                 .selectFrom(practiceNote)
-                .join(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping).fetchJoin()
+                .leftJoin(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping).fetchJoin()
                 .where(practiceNote.userId.eq(userId));
 
         // 커서가 있으면 해당 ID 이후부터 조회

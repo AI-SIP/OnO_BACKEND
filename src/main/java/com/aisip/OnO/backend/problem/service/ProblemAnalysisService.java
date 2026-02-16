@@ -82,6 +82,30 @@ public class ProblemAnalysisService {
     }
 
     /**
+     * 분석 상태를 PROCESSING으로 업데이트 (이미지 있을 때)
+     */
+    public void updateToProcessing(Long problemId) {
+        ProblemAnalysis analysis = analysisRepository.findByProblemId(problemId)
+                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
+
+        analysis.updateToProcessing();
+        analysisRepository.save(analysis);
+        log.info("Updated analysis to PROCESSING for problemId: {}", problemId);
+    }
+
+    /**
+     * 분석 상태를 NO_IMAGE로 업데이트 (이미지 없을 때)
+     */
+    public void updateToNoImage(Long problemId) {
+        ProblemAnalysis analysis = analysisRepository.findByProblemId(problemId)
+                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
+
+        analysis.updateToNoImage();
+        analysisRepository.save(analysis);
+        log.info("Updated analysis to NO_IMAGE for problemId: {}", problemId);
+    }
+
+    /**
      * 동기적으로 문제 이미지를 분석합니다 (RabbitMQ Consumer에서 호출)
      * - 동시성 문제 해결: 이미 생성된 PROCESSING 엔티티만 조회하여 업데이트
      */
@@ -103,7 +127,7 @@ public class ProblemAnalysisService {
 
             // 3. 기존 분석 조회 (동시성 문제 해결: 새로 생성하지 않고 조회만)
             ProblemAnalysis analysis = analysisRepository.findByProblemId(problemId)
-                    .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
+                    .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_ANALYSIS_NOT_FOUND));
 
             // 4. 이미 완료된 경우 스킵
             if (analysis.getStatus().equals(AnalysisStatus.COMPLETED)) {
@@ -136,6 +160,16 @@ public class ProblemAnalysisService {
             analysisRepository.save(analysis);
             log.info("Analysis completed successfully for problemId: {}", problemId);
 
+        } catch (ApplicationException e) {
+            // 삭제된 문제는 재시도 가치가 없어 상위 Consumer에서 비재시도 처리한다.
+            if (e.getErrorCase() == ProblemErrorCase.PROBLEM_NOT_FOUND) {
+                log.warn("Skipping analysis because problem was deleted or missing. problemId: {}", problemId);
+                throw e;
+            }
+
+            log.error("Application error during sync analysis for problemId: {}", problemId, e);
+            handleAnalysisError(problemId, e);
+            throw e;
         } catch (Exception e) {
             log.error("Error during sync analysis for problemId: {}", problemId, e);
             handleAnalysisError(problemId, e);

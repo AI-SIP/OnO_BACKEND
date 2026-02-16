@@ -245,7 +245,35 @@ class FolderServiceTest {
 
         assertThat(rootFolder.folderName()).isEqualTo("책장");
         assertThat(rootFolder.parentFolder()).isNull();
-        assertThat(rootFolder.subFolderList()).isEmpty();
+        assertThat(rootFolder.subFolderList()).hasSize(1);
+        assertThat(rootFolder.subFolderList().get(0).folderName()).isEqualTo("시작하기");
+    }
+
+    @Test
+    @DisplayName("온보딩 폴더 보장 - 루트가 없으면 루트와 기본 하위 폴더 생성")
+    void ensureOnboardingFolders_CreateRootAndDefaultSubFolder() {
+        Long newUserId = 999L;
+
+        folderService.ensureOnboardingFolders(newUserId);
+
+        Optional<Folder> optionalRoot = folderRepository.findRootFolder(newUserId);
+        assertThat(optionalRoot).isPresent();
+        assertThat(optionalRoot.get().getName()).isEqualTo("책장");
+        assertThat(optionalRoot.get().getSubFolderList()).hasSize(1);
+        assertThat(optionalRoot.get().getSubFolderList().get(0).getName()).isEqualTo("시작하기");
+    }
+
+    @Test
+    @DisplayName("온보딩 폴더 보장 - 이미 하위 폴더가 있으면 중복 생성하지 않음")
+    void ensureOnboardingFolders_NoDuplicateSubFolder() {
+        FolderResponseDto root = folderService.createRootFolder(userId);
+
+        folderService.ensureOnboardingFolders(userId);
+        folderService.ensureOnboardingFolders(userId);
+
+        Optional<Folder> optionalRoot = folderRepository.findFolderWithDetailsByFolderId(root.folderId());
+        assertThat(optionalRoot).isPresent();
+        assertThat(optionalRoot.get().getSubFolderList()).hasSize(1);
     }
 
     @Test
