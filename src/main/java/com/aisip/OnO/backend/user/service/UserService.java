@@ -20,7 +20,6 @@ import java.time.LocalTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,6 +68,8 @@ public class UserService {
 
         User user = createGuestUser();
         userRepository.save(user);
+        folderService.initializeDefaultFoldersIfAbsent(user.getId());
+        practiceNoteService.registerDefaultPractice(user.getId());
 
         return UserResponseDto.from(user);
     }
@@ -80,6 +81,8 @@ public class UserService {
                 .orElseGet(() -> {
                     User user = User.from(userRegisterDto);
                     userRepository.save(user);
+                    folderService.initializeDefaultFoldersIfAbsent(user.getId());
+                    practiceNoteService.registerDefaultPractice(user.getId());
                     discordWebhookNotificationService.sendMessage("새로운 멤버 유저가 가입했습니다!", "Username: "  + userRegisterDto.name());
                     return UserResponseDto.from(user);
                 });

@@ -24,21 +24,38 @@ import java.util.stream.Collectors;
 @Transactional
 public class FolderService {
 
+    private static final String ROOT_FOLDER_NAME = "책장";
+    private static final String DEFAULT_SUB_FOLDER_NAME = "공책";
+
     private final FolderRepository folderRepository;
 
     private final ProblemService problemService;
 
-    public FolderResponseDto findRootFolder(Long userId) {
-        return folderRepository.findRootFolder(userId)
-                .map(rootFolder -> {
-                    log.info("userId : {} find root folder id: {}", userId, rootFolder.getId());
-                    List<Long> problemIdList = folderRepository.findProblemIdsByFolder(rootFolder.getId());
-                    return FolderResponseDto.from(rootFolder, problemIdList);
-                })
+    public void initializeDefaultFoldersIfAbsent(Long userId) {
+        Folder rootFolder = folderRepository.findByUserIdAndParentFolderIsNull(userId)
                 .orElseGet(() -> {
-                    log.info("userId : {} create root folder", userId);
-                    return createRootFolder(userId);
+                    Folder createdRoot = Folder.from(new FolderRegisterDto(ROOT_FOLDER_NAME, null, null), userId);
+                    folderRepository.save(createdRoot);
+                    log.info("userId : {} root folder created", userId);
+                    return createdRoot;
                 });
+
+        boolean hasDefaultSubFolder = rootFolder.getSubFolderList().stream()
+                .anyMatch(subFolder -> DEFAULT_SUB_FOLDER_NAME.equals(subFolder.getName()));
+
+        if (!hasDefaultSubFolder) {
+            createDefaultSubFolder(rootFolder, userId);
+        }
+    }
+
+    public FolderResponseDto findRootFolder(Long userId) {
+        Folder rootFolder = folderRepository.findRootFolder(userId)
+                .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
+
+        log.info("userId : {} find root folder id: {}", userId, rootFolder.getId());
+
+        List<Long> problemIdList = folderRepository.findProblemIdsByFolder(rootFolder.getId());
+        return FolderResponseDto.from(rootFolder, problemIdList);
     }
 
     @Transactional(readOnly = true)
@@ -70,25 +87,19 @@ public class FolderService {
 
         log.info("userId : {} find All user folders", userId);
         return folders.isEmpty()
-                ? List.of(findRootFolder(userId))
+                ? List.of()
                 : folders.stream().map(folder -> {
                     List<Long> problemIdList = folderRepository.findProblemIdsByFolder(folder.getId());
                     return FolderResponseDto.from(folder, problemIdList);
                 }).toList();
     }
 
-    public FolderResponseDto createRootFolder(Long userId) {
-        FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
-                "책장",
-                null,
-                null
-        );
+    private void createDefaultSubFolder(Folder rootFolder, Long userId) {
+        Folder defaultSubFolder = Folder.from(new FolderRegisterDto(DEFAULT_SUB_FOLDER_NAME, null, rootFolder.getId()), userId);
+        defaultSubFolder.updateParentFolder(rootFolder);
+        folderRepository.save(defaultSubFolder);
 
-        Folder rootFolder = Folder.from(folderRegisterDto, userId);
-        folderRepository.save(rootFolder);
-
-        log.info("userId : {} create root folder id: {}", userId, rootFolder.getId());
-        return FolderResponseDto.from(rootFolder, List.of());
+        log.info("userId : {} default sub folder created", userId);
     }
 
     public Long createFolder(FolderRegisterDto folderRegisterDto, Long userId) {

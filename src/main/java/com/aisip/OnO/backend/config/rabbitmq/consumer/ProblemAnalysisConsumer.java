@@ -1,7 +1,9 @@
 package com.aisip.OnO.backend.config.rabbitmq.consumer;
 
+import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.config.rabbitmq.RabbitMQConfig;
 import com.aisip.OnO.backend.config.rabbitmq.message.ProblemAnalysisMessage;
+import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.problem.service.ProblemAnalysisService;
 import com.aisip.OnO.backend.util.webhook.DiscordWebhookNotificationService;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +40,18 @@ public class ProblemAnalysisConsumer {
 
             log.info("[GPT Analysis Consumer] 분석 성공 - problemId: {}", message.getProblemId());
 
+        } catch (ApplicationException e) {
+            if (e.getErrorCase() == ProblemErrorCase.PROBLEM_NOT_FOUND) {
+                log.warn("[GPT Analysis Consumer] 문제가 이미 삭제/미존재하여 분석 스킵 - problemId: {}",
+                        message.getProblemId());
+                return;
+            }
+
+            log.error("[GPT Analysis Consumer] 분석 실패 - problemId: {}, retryCount: {}, error: {}",
+                    message.getProblemId(), message.getRetryCount(), e.getMessage());
+
+            // 예외를 던지면 RabbitMQ가 자동으로 재시도 or DLQ로 전송
+            throw new RuntimeException("GPT 문제 분석 실패: " + message.getProblemId(), e);
         } catch (Exception e) {
             log.error("[GPT Analysis Consumer] 분석 실패 - problemId: {}, retryCount: {}, error: {}",
                     message.getProblemId(), message.getRetryCount(), e.getMessage());
