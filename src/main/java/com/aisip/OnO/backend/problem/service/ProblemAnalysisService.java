@@ -33,6 +33,7 @@ public class ProblemAnalysisService {
     private final OpenAIClient openAIClient;
     private final ObjectMapper objectMapper;
     private final ProblemImageDataRepository problemImageDataRepository;
+    private final ProblemAnalysisFailureService problemAnalysisFailureService;
 
     /**
      * 기존 분석 결과 삭제
@@ -314,13 +315,7 @@ public class ProblemAnalysisService {
      */
     private void handleAnalysisError(Long problemId, Exception e) {
         try {
-            ProblemAnalysis analysis = analysisRepository.findByProblemId(problemId)
-                    .orElse(null);
-
-            if (analysis != null) {
-                analysis.updateWithFailure(e.getMessage());
-                analysisRepository.save(analysis);
-            }
+            problemAnalysisFailureService.markFailed(problemId, e.getMessage());
         } catch (Exception ex) {
             log.error("Error handling analysis error for problemId: {}", problemId, ex);
         }
