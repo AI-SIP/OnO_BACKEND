@@ -5,6 +5,7 @@ import com.aisip.OnO.backend.config.rabbitmq.RabbitMQConfig;
 import com.aisip.OnO.backend.config.rabbitmq.message.ProblemAnalysisMessage;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.problem.service.ProblemAnalysisService;
+import com.aisip.OnO.backend.util.ai.NonRetryableAnalysisException;
 import com.aisip.OnO.backend.util.webhook.DiscordWebhookNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +41,11 @@ public class ProblemAnalysisConsumer {
 
             log.info("[GPT Analysis Consumer] 분석 성공 - problemId: {}", message.getProblemId());
 
+        } catch (NonRetryableAnalysisException e) {
+            log.warn("[GPT Analysis Consumer] 비재시도 분석 실패 처리 - problemId: {}, error: {}",
+                    message.getProblemId(), e.getMessage());
+            // 상태는 Service에서 FAILED로 업데이트됨. 재큐잉 없이 종료(ACK)
+            return;
         } catch (ApplicationException e) {
             if (e.getErrorCase() == ProblemErrorCase.PROBLEM_NOT_FOUND) {
                 log.warn("[GPT Analysis Consumer] 문제가 이미 삭제/미존재하여 분석 스킵 - problemId: {}",

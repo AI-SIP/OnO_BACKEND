@@ -10,6 +10,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
@@ -77,6 +78,16 @@ public class OpenAIClient {
             // 6. JSON 응답 파싱
             return parseResponse(content);
 
+        } catch (HttpClientErrorException e) {
+            String responseBody = e.getResponseBodyAsString();
+            if (isNonRetryableQuotaError(e, responseBody)) {
+                throw new NonRetryableAnalysisException("OpenAI 할당량이 초과되어 분석을 진행할 수 없습니다.", e);
+            }
+            log.error("Error analyzing images: {}", e.getMessage(), e);
+            throw new RuntimeException("AI 이미지 분석 중 오류가 발생했습니다: " + e.getMessage(), e);
+        } catch (NonRetryableAnalysisException e) {
+            log.warn("Non-retryable image analysis failure: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("Error analyzing images: {}", e.getMessage(), e);
             throw new RuntimeException("AI 이미지 분석 중 오류가 발생했습니다: " + e.getMessage(), e);
@@ -175,6 +186,10 @@ public class OpenAIClient {
             // JSON 형식이 아닌 경우 처리
             String jsonContent = extractJsonFromResponse(response);
 
+            if (!looksLikeJsonObject(jsonContent) && isImageNotAnalyzableResponse(jsonContent)) {
+                throw new NonRetryableAnalysisException("분석이 불가능한 이미지입니다.");
+            }
+
             @SuppressWarnings("unchecked")
             Map<String, Object> parsed = objectMapper.readValue(jsonContent, Map.class);
 
@@ -188,6 +203,10 @@ public class OpenAIClient {
                     .build();
 
         } catch (Exception e) {
+            if (e instanceof NonRetryableAnalysisException nonRetryableAnalysisException) {
+                log.warn("Non-retryable analysis response detected: {}", response);
+                throw nonRetryableAnalysisException;
+            }
             log.error("Error parsing response: {}", response, e);
             throw new RuntimeException("AI 분석 결과 응답 파싱 중 오류가 발생했습니다.", e);
         }
@@ -205,5 +224,23 @@ public class OpenAIClient {
             response = response.substring(0, response.length() - 3);
         }
         return response.trim();
+    }
+
+    private boolean looksLikeJsonObject(String content) {
+        return content.startsWith("{") && content.endsWith("}");
+    }
+
+    private boolean isImageNotAnalyzableResponse(String content) {
+        return content.contains("분석할 수 없")
+                || content.contains("인식할 수 없")
+                || content.contains("명확하지 않")
+                || content.contains("이미지가")
+                || content.contains("이미지에 있는 문제")
+                || content.contains("죄송하지만")
+                || content.contains("다른 이미지를 제공");
+    }
+
+    private boolean isNonRetryableQuotaError(HttpClientErrorException e, String responseBody) {
+        return e.getStatusCode().value() == 429 && responseBody != null && responseBody.contains("insufficient_quota");
     }
 }
