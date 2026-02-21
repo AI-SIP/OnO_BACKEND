@@ -11,6 +11,7 @@ import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.problem.repository.ProblemAnalysisRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
+import com.aisip.OnO.backend.util.ai.NonRetryableAnalysisException;
 import com.aisip.OnO.backend.util.ai.OpenAIClient;
 import com.aisip.OnO.backend.util.ai.ProblemAnalysisResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -169,6 +170,10 @@ public class ProblemAnalysisService {
             }
 
             log.error("Application error during sync analysis for problemId: {}", problemId, e);
+            handleAnalysisError(problemId, e);
+            throw e;
+        } catch (NonRetryableAnalysisException e) {
+            log.warn("Non-retryable analysis failure for problemId: {}, reason: {}", problemId, e.getMessage());
             handleAnalysisError(problemId, e);
             throw e;
         } catch (Exception e) {
