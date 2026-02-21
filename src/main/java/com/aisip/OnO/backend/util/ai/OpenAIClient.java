@@ -1,7 +1,9 @@
 package com.aisip.OnO.backend.util.ai;
 
 import com.aisip.OnO.backend.util.ai.dto.*;
+import com.fasterxml.jackson.core.json.JsonReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,6 +26,9 @@ public class OpenAIClient {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private static final ObjectMapper LENIENT_OBJECT_MAPPER = JsonMapper.builder()
+            .enable(JsonReadFeature.ALLOW_BACKSLASH_ESCAPING_ANY_CHARACTER)
+            .build();
 
     @Value("${openai.model}")
     private String model;
@@ -155,6 +160,8 @@ public class OpenAIClient {
 
             [응답 형식]
             반드시 아래의 JSON 구조를 지키며, JSON 외에 다른 설명은 포함하지 마세요.
+            문자열 값에는 LaTeX/마크다운 수식 표기나 이스케이프 문자를 사용하지 마세요.
+            수식은 일반 한국어 문장으로 풀어서 작성하세요.
             {
               "subject": "과목명",
               "problemType": "문제 유형",
@@ -186,12 +193,17 @@ public class OpenAIClient {
             // JSON 형식이 아닌 경우 처리
             String jsonContent = extractJsonFromResponse(response);
 
-            if (!looksLikeJsonObject(jsonContent) && isImageNotAnalyzableResponse(jsonContent)) {
-                throw new NonRetryableAnalysisException("분석이 불가능한 이미지입니다.");
+            if (!looksLikeJsonObject(jsonContent)) {
+                if (isImageNotAnalyzableResponse(jsonContent)) {
+                    throw new NonRetryableAnalysisException("분석이 불가능한 이미지입니다.");
+                }
+                if (isRefusalResponse(jsonContent)) {
+                    throw new NonRetryableAnalysisException("AI가 요청을 거절하여 분석을 진행할 수 없습니다.");
+                }
+                throw new NonRetryableAnalysisException("AI가 JSON 형식이 아닌 응답을 반환했습니다.");
             }
 
-            @SuppressWarnings("unchecked")
-            Map<String, Object> parsed = objectMapper.readValue(jsonContent, Map.class);
+            Map<String, Object> parsed = readJsonMap(jsonContent);
 
             return ProblemAnalysisResult.builder()
                     .subject((String) parsed.get("subject"))
@@ -240,7 +252,32 @@ public class OpenAIClient {
                 || content.contains("다른 이미지를 제공");
     }
 
+    private boolean isRefusalResponse(String content) {
+        String lower = content.toLowerCase();
+        return lower.contains("i'm sorry")
+                || lower.contains("i am sorry")
+                || lower.contains("can't assist")
+                || lower.contains("cannot assist")
+                || lower.contains("can't help")
+                || lower.contains("cannot help")
+                || lower.contains("unable to assist")
+                || lower.contains("unable to help")
+                || lower.contains("sorry, i")
+                || lower.contains("i cannot")
+                || lower.contains("i can't");
+    }
+
     private boolean isNonRetryableQuotaError(HttpClientErrorException e, String responseBody) {
         return e.getStatusCode().value() == 429 && responseBody != null && responseBody.contains("insufficient_quota");
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> readJsonMap(String jsonContent) throws Exception {
+        try {
+            return objectMapper.readValue(jsonContent, Map.class);
+        } catch (Exception strictParseException) {
+            log.warn("Strict JSON parse failed, retrying with lenient parser: {}", strictParseException.getMessage());
+            return LENIENT_OBJECT_MAPPER.readValue(jsonContent, Map.class);
+        }
     }
 }
