@@ -193,8 +193,14 @@ public class OpenAIClient {
             // JSON 형식이 아닌 경우 처리
             String jsonContent = extractJsonFromResponse(response);
 
-            if (!looksLikeJsonObject(jsonContent) && isImageNotAnalyzableResponse(jsonContent)) {
-                throw new NonRetryableAnalysisException("분석이 불가능한 이미지입니다.");
+            if (!looksLikeJsonObject(jsonContent)) {
+                if (isImageNotAnalyzableResponse(jsonContent)) {
+                    throw new NonRetryableAnalysisException("분석이 불가능한 이미지입니다.");
+                }
+                if (isRefusalResponse(jsonContent)) {
+                    throw new NonRetryableAnalysisException("AI가 요청을 거절하여 분석을 진행할 수 없습니다.");
+                }
+                throw new NonRetryableAnalysisException("AI가 JSON 형식이 아닌 응답을 반환했습니다.");
             }
 
             Map<String, Object> parsed = readJsonMap(jsonContent);
@@ -244,6 +250,21 @@ public class OpenAIClient {
                 || content.contains("이미지에 있는 문제")
                 || content.contains("죄송하지만")
                 || content.contains("다른 이미지를 제공");
+    }
+
+    private boolean isRefusalResponse(String content) {
+        String lower = content.toLowerCase();
+        return lower.contains("i'm sorry")
+                || lower.contains("i am sorry")
+                || lower.contains("can't assist")
+                || lower.contains("cannot assist")
+                || lower.contains("can't help")
+                || lower.contains("cannot help")
+                || lower.contains("unable to assist")
+                || lower.contains("unable to help")
+                || lower.contains("sorry, i")
+                || lower.contains("i cannot")
+                || lower.contains("i can't");
     }
 
     private boolean isNonRetryableQuotaError(HttpClientErrorException e, String responseBody) {
