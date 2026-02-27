@@ -137,7 +137,7 @@ public class LearningReportService {
         List<LearningReportQueryRepository.DailySolveCount> rows =
                 reportRepository.findDailySolveCounts(userId, start, end);
         for (LearningReportQueryRepository.DailySolveCount row : rows) {
-            String key = trendKey(row.practicedDate(), trendType);
+            String key = trendKey(row.practicedDate(), startDate, trendType);
             bucket.computeIfPresent(key, (k, v) -> v + defaultLong(row.solveCount()));
         }
 
@@ -161,7 +161,7 @@ public class LearningReportService {
         }
 
         if (trendType == TrendType.WEEKLY) {
-            int weekCount = weekCountInRange(startDate, endDate);
+            int weekCount = weekCountInCalendarRange(startDate, endDate);
             for (int week = 1; week <= weekCount; week++) {
                 buckets.put(weekLabel(week), 0L);
             }
@@ -176,12 +176,12 @@ public class LearningReportService {
         return buckets;
     }
 
-    private String trendKey(LocalDate date, TrendType trendType) {
+    private String trendKey(LocalDate date, LocalDate rangeStartDate, TrendType trendType) {
         if (trendType == TrendType.DAILY) {
             return date.toString();
         }
         if (trendType == TrendType.WEEKLY) {
-            return weekLabel(weekOfMonth(date));
+            return weekLabel(weekOfCalendarRange(date, rangeStartDate));
         }
         return yearMonthLabel(date);
     }
@@ -190,13 +190,16 @@ public class LearningReportService {
         return date.getYear() + "-" + String.format("%02d", date.getMonthValue());
     }
 
-    private int weekOfMonth(LocalDate date) {
-        return ((date.getDayOfMonth() - 1) / 7) + 1;
+    private int weekOfCalendarRange(LocalDate date, LocalDate rangeStartDate) {
+        LocalDate firstWeekStart = rangeStartDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
+        LocalDate weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
+        return (int) java.time.temporal.ChronoUnit.WEEKS.between(firstWeekStart, weekStart) + 1;
     }
 
-    private int weekCountInRange(LocalDate startDate, LocalDate endDate) {
-        int dayCount = (int) java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate) + 1;
-        return ((dayCount - 1) / 7) + 1;
+    private int weekCountInCalendarRange(LocalDate startDate, LocalDate endDate) {
+        LocalDate firstWeekStart = startDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
+        LocalDate lastWeekStart = endDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
+        return (int) java.time.temporal.ChronoUnit.WEEKS.between(firstWeekStart, lastWeekStart) + 1;
     }
 
     private String weekLabel(int week) {
@@ -382,7 +385,7 @@ public class LearningReportService {
     }
 
     private DateRange weekRange(LocalDate targetDate) {
-        LocalDate start = targetDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate start = targetDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
         return new DateRange(start, start.plusDays(6));
     }
 

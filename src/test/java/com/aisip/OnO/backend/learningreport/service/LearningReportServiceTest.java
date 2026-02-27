@@ -83,13 +83,14 @@ class LearningReportServiceTest {
         Map<String, Long> weeklyTrend = weekly.trend().stream()
                 .collect(Collectors.toMap(t -> t.label(), t -> t.reviewCount()));
         assertThat(weeklyTrend)
+                .containsEntry("2026-02-15", 0L)
                 .containsEntry("2026-02-16", 1L)
                 .containsEntry("2026-02-17", 1L)
                 .containsEntry("2026-02-18", 1L)
                 .containsEntry("2026-02-19", 0L)
                 .containsEntry("2026-02-20", 1L)
                 .containsEntry("2026-02-21", 0L)
-                .containsEntry("2026-02-22", 0L);
+                .doesNotContainKey("2026-02-22");
 
         Map<String, Long> weeklyWeakAreaMap = weekly.weakAreas().stream()
                 .collect(Collectors.toMap(w -> w.topic(), w -> w.wrongCount()));
@@ -106,7 +107,8 @@ class LearningReportServiceTest {
                 .containsEntry("1주차", 1L)
                 .containsEntry("2주차", 1L)
                 .containsEntry("3주차", 4L)
-                .containsEntry("4주차", 0L);
+                .containsEntry("4주차", 0L)
+                .doesNotContainKey("5주차");
 
         LearningPeriodReport total = report.total();
         assertThat(total.reviewCount()).isEqualTo(8L);
