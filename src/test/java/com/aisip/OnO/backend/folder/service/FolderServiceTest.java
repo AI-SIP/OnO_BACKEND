@@ -238,42 +238,41 @@ class FolderServiceTest {
     }
 
     @Test
-    @DisplayName("루트 폴더 생성 로직 테스트")
-    void createRootFolder() {
-        //when
-        FolderResponseDto rootFolder = folderService.createRootFolder(userId);
-
-        assertThat(rootFolder.folderName()).isEqualTo("책장");
-        assertThat(rootFolder.parentFolder()).isNull();
-        assertThat(rootFolder.subFolderList()).hasSize(1);
-        assertThat(rootFolder.subFolderList().get(0).folderName()).isEqualTo("시작하기");
-    }
-
-    @Test
-    @DisplayName("온보딩 폴더 보장 - 루트가 없으면 루트와 기본 하위 폴더 생성")
-    void ensureOnboardingFolders_CreateRootAndDefaultSubFolder() {
+    @DisplayName("초기 폴더 보장 - 루트가 없으면 루트와 기본 하위 폴더 생성")
+    void initializeDefaultFoldersIfAbsent_CreateRootAndDefaultSubFolder() {
         Long newUserId = 999L;
 
-        folderService.ensureOnboardingFolders(newUserId);
+        folderService.initializeDefaultFoldersIfAbsent(newUserId);
 
         Optional<Folder> optionalRoot = folderRepository.findRootFolder(newUserId);
         assertThat(optionalRoot).isPresent();
         assertThat(optionalRoot.get().getName()).isEqualTo("책장");
         assertThat(optionalRoot.get().getSubFolderList()).hasSize(1);
-        assertThat(optionalRoot.get().getSubFolderList().get(0).getName()).isEqualTo("시작하기");
+        assertThat(optionalRoot.get().getSubFolderList().get(0).getName()).isEqualTo("공책");
     }
 
     @Test
-    @DisplayName("온보딩 폴더 보장 - 이미 하위 폴더가 있으면 중복 생성하지 않음")
-    void ensureOnboardingFolders_NoDuplicateSubFolder() {
-        FolderResponseDto root = folderService.createRootFolder(userId);
+    @DisplayName("초기 폴더 보장 - 이미 기본 하위 폴더가 있으면 중복 생성하지 않음")
+    void initializeDefaultFoldersIfAbsent_NoDuplicateSubFolder() {
+        Long newUserId = 1000L;
+        Folder root = folderRepository.save(Folder.from(
+                new FolderRegisterDto("책장", null, null),
+                newUserId
+        ));
+        Folder defaultSubFolder = Folder.from(
+                new FolderRegisterDto("공책", null, root.getId()),
+                newUserId
+        );
+        defaultSubFolder.updateParentFolder(root);
+        folderRepository.save(defaultSubFolder);
 
-        folderService.ensureOnboardingFolders(userId);
-        folderService.ensureOnboardingFolders(userId);
+        folderService.initializeDefaultFoldersIfAbsent(newUserId);
+        folderService.initializeDefaultFoldersIfAbsent(newUserId);
 
-        Optional<Folder> optionalRoot = folderRepository.findFolderWithDetailsByFolderId(root.folderId());
+        Optional<Folder> optionalRoot = folderRepository.findFolderWithDetailsByFolderId(root.getId());
         assertThat(optionalRoot).isPresent();
         assertThat(optionalRoot.get().getSubFolderList()).hasSize(1);
+        assertThat(optionalRoot.get().getSubFolderList().get(0).getName()).isEqualTo("공책");
     }
 
     @Test
