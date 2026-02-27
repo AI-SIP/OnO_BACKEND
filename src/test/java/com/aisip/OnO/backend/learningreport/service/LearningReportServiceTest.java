@@ -14,6 +14,7 @@ import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveRepository;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
+import org.assertj.core.data.Offset;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +29,7 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
+@SpringBootTest(properties = "learning-report.ai.enabled=false")
 @ActiveProfiles("local")
 @Transactional
 class LearningReportServiceTest {
@@ -117,6 +118,8 @@ class LearningReportServiceTest {
         assertThat(weeklyComparison.averageAccuracyChangeRate()).isEqualTo(100.0);
         assertThat(weeklyComparison.consecutiveLearningDaysChangeRate()).isEqualTo(200.0);
         assertThat(weeklyComparison.averageStudyTimeChangeRate()).isEqualTo(400.0);
+        assertThat(report.recommendations()).isNotNull();
+        assertThat(report.recommendations().actions()).hasSize(3);
     }
 
     @Test
@@ -169,7 +172,7 @@ class LearningReportServiceTest {
         ));
     }
 
-    private static org.assertj.core.data.Offset<Double> within(double value) {
-        return org.assertj.core.data.Offset.offset(value);
+    private static Offset<Double> within(double value) {
+        return Offset.offset(value);
     }
 }
