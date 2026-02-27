@@ -1,7 +1,9 @@
 package com.aisip.OnO.backend.util.ai;
 
+import com.aisip.OnO.backend.learningreport.dto.LearningRecommendations;
 import com.aisip.OnO.backend.util.ai.dto.*;
 import com.fasterxml.jackson.core.json.JsonReadFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +20,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -38,6 +41,9 @@ public class OpenAIClient {
 
     @Value("${openai.api.url}")
     private String apiUrl;
+
+    @Value("${learning-report.ai.enabled:true}")
+    private boolean learningReportAiEnabled;
 
     /**
      * 여러 이미지 URL을 분석하여 문제에 대한 정보를 추출합니다.
@@ -104,6 +110,54 @@ public class OpenAIClient {
      */
     public ProblemAnalysisResult analyzeImage(String imageUrl) {
         return analyzeImages(List.of(imageUrl));
+    }
+
+    public Optional<LearningRecommendations> recommendLearningReport(Map<String, Object> summaryPayload) {
+        if (!learningReportAiEnabled) {
+            return Optional.empty();
+        }
+
+        try {
+            String summaryJson = objectMapper.writeValueAsString(summaryPayload);
+            List<Message> messages = List.of(
+                    Message.builder()
+                            .role("system")
+                            .content(createLearningReportSystemPrompt())
+                            .build(),
+                    Message.builder()
+                            .role("user")
+                            .content("학습 요약 데이터: " + summaryJson)
+                            .build()
+            );
+
+            ChatCompletionRequest request = ChatCompletionRequest.builder()
+                    .model(model)
+                    .messages(messages)
+                    .maxTokens(700)
+                    .temperature(0.3)
+                    .build();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(apiKey);
+
+            ResponseEntity<ChatCompletionResponse> response = restTemplate.postForEntity(
+                    apiUrl,
+                    new HttpEntity<>(request, headers),
+                    ChatCompletionResponse.class
+            );
+
+            String content = response.getBody()
+                    .getChoices()
+                    .get(0)
+                    .getMessage()
+                    .getContent();
+
+            return parseLearningRecommendation(content);
+        } catch (Exception e) {
+            log.warn("AI learning recommendation failed, fallback to rule-based: {}", e.getMessage());
+            return Optional.empty();
+        }
     }
 
     /**
@@ -188,6 +242,23 @@ public class OpenAIClient {
         }
     }
 
+    private String createLearningReportSystemPrompt() {
+        return """
+                너는 학습 리포트 코치다.
+                입력으로 받은 요약 지표를 바탕으로 학습 피드백을 JSON으로만 반환해라.
+                반드시 아래 스키마를 지켜라.
+                {
+                  "strengths": ["문장", "문장"],
+                  "gaps": ["문장", "문장"],
+                  "actions": ["실행 가능한 액션", "실행 가능한 액션", "실행 가능한 액션"],
+                  "nextWeekGoal": "수치가 포함된 1문장 목표",
+                  "confidence": 0~100 사이 숫자
+                }
+                한국어로 작성하고, 각 배열은 2~3개로 제한해라.
+                JSON 외 텍스트를 출력하지 마라.
+                """;
+    }
+
     private ProblemAnalysisResult parseResponse(String response) {
         try {
             // JSON 형식이 아닌 경우 처리
@@ -236,6 +307,47 @@ public class OpenAIClient {
             response = response.substring(0, response.length() - 3);
         }
         return response.trim();
+    }
+
+    private Optional<LearningRecommendations> parseLearningRecommendation(String response) {
+        try {
+            String jsonContent = extractJsonFromResponse(response);
+            JsonNode root = objectMapper.readTree(jsonContent);
+
+            LearningRecommendations recommendations = LearningRecommendations.builder()
+                    .strengths(readStringArray(root, "strengths"))
+                    .gaps(readStringArray(root, "gaps"))
+                    .actions(readStringArray(root, "actions"))
+                    .nextWeekGoal(readString(root, "nextWeekGoal", "다음 주 목표를 설정해 3회 이상 복습해보세요."))
+                    .confidence(readDouble(root, "confidence", 70.0))
+                    .build();
+
+            return Optional.of(recommendations);
+        } catch (Exception e) {
+            log.warn("AI learning recommendation parsing failed: {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private List<String> readStringArray(JsonNode root, String field) {
+        JsonNode node = root.path(field);
+        if (!node.isArray()) {
+            return List.of();
+        }
+        return java.util.stream.StreamSupport.stream(node.spliterator(), false)
+                .filter(JsonNode::isTextual)
+                .map(JsonNode::asText)
+                .toList();
+    }
+
+    private String readString(JsonNode root, String field, String defaultValue) {
+        JsonNode node = root.path(field);
+        return node.isTextual() ? node.asText() : defaultValue;
+    }
+
+    private Double readDouble(JsonNode root, String field, Double defaultValue) {
+        JsonNode node = root.path(field);
+        return node.isNumber() ? node.asDouble() : defaultValue;
     }
 
     private boolean looksLikeJsonObject(String content) {

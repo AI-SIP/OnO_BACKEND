@@ -21,11 +21,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.util.ReflectionTestUtils.setField;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -120,7 +122,8 @@ class UserServiceTest {
         assertThat(response.email()).contains("guest");
 
         verify(userRepository, times(1)).save(any(User.class));
-        verify(folderService, times(1)).ensureOnboardingFolders(any(Long.class));
+        verify(folderService, times(1)).initializeDefaultFoldersIfAbsent(any(Long.class));
+        verify(practiceNoteService, times(1)).registerDefaultPractice(any(Long.class));
     }
 
     @Test
@@ -142,7 +145,8 @@ class UserServiceTest {
 
         // save()가 반드시 한 번 호출되어야 함
         verify(userRepository, times(1)).save(any(User.class));
-        verify(folderService, times(1)).ensureOnboardingFolders(any(Long.class));
+        verify(folderService, times(1)).initializeDefaultFoldersIfAbsent(any(Long.class));
+        verify(practiceNoteService, times(1)).registerDefaultPractice(any(Long.class));
     }
 
     @Test
@@ -162,7 +166,8 @@ class UserServiceTest {
 
         // 기존 유저가 존재하면 save()가 호출되지 않아야 함
         verify(userRepository, never()).save(any(User.class));
-        verify(folderService, times(1)).ensureOnboardingFolders(any(Long.class));
+        verify(folderService, never()).initializeDefaultFoldersIfAbsent(any(Long.class));
+        verify(practiceNoteService, never()).registerDefaultPractice(any(Long.class));
     }
 
     @Test
@@ -189,6 +194,8 @@ class UserServiceTest {
         // Given
         User user1 = User.from(new UserRegisterDto("user1@example.com", "user1", "id1", "MEMBER", null));
         User user2 = User.from(new UserRegisterDto("user2@example.com", "user2", "id2", "MEMBER", null));
+        setField(user1, "createdAt", LocalDateTime.of(2026, 2, 1, 10, 0));
+        setField(user2, "createdAt", LocalDateTime.of(2026, 2, 2, 10, 0));
 
         when(userRepository.findAll()).thenReturn(List.of(user1, user2));
 
@@ -197,8 +204,8 @@ class UserServiceTest {
 
         // Then
         assertThat(users).hasSize(2);
-        assertThat(users.get(0).name()).isEqualTo("user1");
-        assertThat(users.get(1).name()).isEqualTo("user2");
+        assertThat(users.get(0).name()).isEqualTo("user2");
+        assertThat(users.get(1).name()).isEqualTo("user1");
 
         verify(userRepository, times(1)).findAll();
     }
@@ -237,6 +244,10 @@ class UserServiceTest {
         userService.deleteUserById(userId);
 
         // Then
+        verify(practiceNoteService, times(1)).deleteAllPracticesByUser(userId);
+        verify(problemService, times(1)).deleteAllUserProblems(userId);
+        verify(folderService, times(1)).deleteAllUserFolders(userId);
         verify(userRepository, times(1)).deleteById(userId);
+        verify(userRepository, times(1)).flush();
     }
 }
