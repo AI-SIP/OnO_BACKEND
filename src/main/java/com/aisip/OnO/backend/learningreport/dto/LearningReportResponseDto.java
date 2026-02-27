@@ -8,5 +8,6 @@ public record LearningReportResponseDto(
         LearningPeriodReport monthly,
         LearningPeriodReport total,
         LearningComparison weeklyComparison,
-        LearningComparison monthlyComparison
+        LearningComparison monthlyComparison,
+        LearningRecommendations recommendations
 ) {}

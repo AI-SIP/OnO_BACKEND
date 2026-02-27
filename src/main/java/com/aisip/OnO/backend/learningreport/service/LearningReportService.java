@@ -3,9 +3,11 @@ package com.aisip.OnO.backend.learningreport.service;
 import com.aisip.OnO.backend.learningreport.dto.LearningReportResponseDto;
 import com.aisip.OnO.backend.learningreport.dto.LearningComparison;
 import com.aisip.OnO.backend.learningreport.dto.LearningPeriodReport;
+import com.aisip.OnO.backend.learningreport.dto.LearningRecommendations;
 import com.aisip.OnO.backend.learningreport.dto.LearningTrendPoint;
 import com.aisip.OnO.backend.learningreport.dto.LearningWeakArea;
 import com.aisip.OnO.backend.learningreport.repository.LearningReportQueryRepository;
+import com.aisip.OnO.backend.util.ai.OpenAIClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,7 +17,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.temporal.TemporalAdjusters;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeMap;
 
 @Service
@@ -26,6 +30,7 @@ public class LearningReportService {
     private static final int TOP_WEAK_AREAS_LIMIT = 3;
 
     private final LearningReportQueryRepository reportRepository;
+    private final OpenAIClient openAIClient;
 
     public LearningReportResponseDto getLearningReport(Long userId, LocalDate baseDate) {
         LocalDate targetDate = baseDate == null ? LocalDate.now() : baseDate;
@@ -40,13 +45,19 @@ public class LearningReportService {
         LearningPeriodReport monthly = buildPeriodReport(userId, "MONTHLY", monthRange, TrendType.DAILY);
         LearningPeriodReport previousMonthly = buildPeriodReport(userId, "PREVIOUS_MONTHLY", previousMonthRange, TrendType.DAILY);
         LearningPeriodReport total = buildTotalReport(userId, targetDate);
+        LearningComparison weeklyComparison = buildComparison("WEEKLY", "PREVIOUS_WEEKLY", weekly, previousWeekly);
+        LearningComparison monthlyComparison = buildComparison("MONTHLY", "PREVIOUS_MONTHLY", monthly, previousMonthly);
+        LearningRecommendations recommendations = buildRecommendations(
+                userId, weekly, monthly, total, weeklyComparison, monthlyComparison
+        );
 
         return LearningReportResponseDto.builder()
                 .weekly(weekly)
                 .monthly(monthly)
                 .total(total)
-                .weeklyComparison(buildComparison("WEEKLY", "PREVIOUS_WEEKLY", weekly, previousWeekly))
-                .monthlyComparison(buildComparison("MONTHLY", "PREVIOUS_MONTHLY", monthly, previousMonthly))
+                .weeklyComparison(weeklyComparison)
+                .monthlyComparison(monthlyComparison)
+                .recommendations(recommendations)
                 .build();
     }
 
@@ -223,6 +234,118 @@ public class LearningReportService {
 
     private Long defaultLong(Long value) {
         return value == null ? 0L : value;
+    }
+
+    private LearningRecommendations buildRecommendations(
+            Long userId,
+            LearningPeriodReport weekly,
+            LearningPeriodReport monthly,
+            LearningPeriodReport total,
+            LearningComparison weeklyComparison,
+            LearningComparison monthlyComparison
+    ) {
+        LearningRecommendations fallback = buildRuleBasedRecommendations(weekly, monthly, total, weeklyComparison, monthlyComparison);
+
+        Map<String, Object> summaryPayload = new LinkedHashMap<>();
+        summaryPayload.put("userId", userId);
+        summaryPayload.put("weekly", weekly);
+        summaryPayload.put("monthly", monthly);
+        summaryPayload.put("total", total);
+        summaryPayload.put("weeklyComparison", weeklyComparison);
+        summaryPayload.put("monthlyComparison", monthlyComparison);
+        summaryPayload.put("ruleBasedRecommendations", fallback);
+
+        return openAIClient.recommendLearningReport(summaryPayload)
+                .map(ai -> mergeRecommendations(fallback, ai))
+                .orElse(fallback);
+    }
+
+    private LearningRecommendations mergeRecommendations(LearningRecommendations fallback, LearningRecommendations ai) {
+        return LearningRecommendations.builder()
+                .strengths(safeList(ai.strengths(), fallback.strengths()))
+                .gaps(safeList(ai.gaps(), fallback.gaps()))
+                .actions(safeList(ai.actions(), fallback.actions()))
+                .nextWeekGoal(safeString(ai.nextWeekGoal(), fallback.nextWeekGoal()))
+                .confidence(ai.confidence() == null ? fallback.confidence() : ai.confidence())
+                .build();
+    }
+
+    private LearningRecommendations buildRuleBasedRecommendations(
+            LearningPeriodReport weekly,
+            LearningPeriodReport monthly,
+            LearningPeriodReport total,
+            LearningComparison weeklyComparison,
+            LearningComparison monthlyComparison
+    ) {
+        List<String> strengths = new java.util.ArrayList<>();
+        List<String> gaps = new java.util.ArrayList<>();
+        List<String> actions = new java.util.ArrayList<>();
+
+        if (weekly.consecutiveLearningDays() >= 3) {
+            strengths.add("최근 주차에 연속 학습 흐름이 안정적으로 유지되고 있습니다.");
+        }
+        if (weeklyComparison.averageAccuracyChangeRate() > 0) {
+            strengths.add("이전 주 대비 정답률이 상승했습니다.");
+        }
+        if (monthlyComparison.reviewCountChangeRate() > 0) {
+            strengths.add("이전 달 대비 복습량이 증가해 학습 루틴이 강화되고 있습니다.");
+        }
+        if (strengths.isEmpty()) {
+            strengths.add("기록이 누적되고 있어 개인화 분석의 정확도가 점점 좋아지고 있습니다.");
+        }
+
+        if (weekly.averageAccuracy() < 50.0) {
+            gaps.add("최근 주간 정답률이 낮아 취약 유형에 대한 집중 복습이 필요합니다.");
+        }
+        if (weekly.averageStudyTimeMinutes() < 5.0) {
+            gaps.add("문제당 학습 시간이 짧아 오답 원인 점검이 충분하지 않을 수 있습니다.");
+        }
+        if (!weekly.weakAreas().isEmpty()) {
+            gaps.add("오답이 반복된 유형이 있어 개념 복습 우선순위 조정이 필요합니다.");
+        }
+        if (gaps.isEmpty()) {
+            gaps.add("큰 약점은 없지만 학습량 변동을 줄이면 성과를 더 안정화할 수 있습니다.");
+        }
+
+        String topWeakArea = weekly.weakAreas().isEmpty() ? "최근 오답 유형" : weekly.weakAreas().get(0).topic();
+        actions.add(topWeakArea + " 유형 문제를 다음 주에 3문제 이상 재풀이하세요.");
+        actions.add("오답 문제를 푼 뒤 5분 동안 틀린 이유와 개선점을 1문장씩 기록하세요.");
+        actions.add("연속 학습일 목표를 최소 " + Math.max(3, weekly.consecutiveLearningDays()) + "일로 설정하세요.");
+
+        int nextWeekReviewTarget = Math.max(weekly.reviewCount().intValue() + 2, 5);
+        String nextWeekGoal = "다음 주에는 복습 " + nextWeekReviewTarget + "회, 평균 정답률 "
+                + Math.max(60, weekly.averageAccuracy().intValue()) + "%를 목표로 하세요.";
+
+        Double confidence = total.reviewCount() >= 20 ? 85.0 : 70.0;
+
+        return LearningRecommendations.builder()
+                .strengths(limitSize(strengths, 3))
+                .gaps(limitSize(gaps, 3))
+                .actions(limitSize(actions, 3))
+                .nextWeekGoal(nextWeekGoal)
+                .confidence(confidence)
+                .build();
+    }
+
+    private List<String> safeList(List<String> target, List<String> fallback) {
+        if (target == null || target.isEmpty()) {
+            return fallback;
+        }
+        return limitSize(target, 3);
+    }
+
+    private String safeString(String target, String fallback) {
+        if (target == null || target.isBlank()) {
+            return fallback;
+        }
+        return target;
+    }
+
+    private List<String> limitSize(List<String> source, int limit) {
+        if (source.size() <= limit) {
+            return source;
+        }
+        return source.subList(0, limit);
     }
 
     private enum TrendType {
