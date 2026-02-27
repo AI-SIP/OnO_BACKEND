@@ -100,6 +100,13 @@ class LearningReportServiceTest {
         assertThat(monthly.averageAccuracy()).isCloseTo(41.666666, within(0.001));
         assertThat(monthly.consecutiveLearningDays()).isEqualTo(3);
         assertThat(monthly.averageStudyTimeMinutes()).isCloseTo(3.833333, within(0.0001));
+        Map<String, Long> monthlyTrend = monthly.trend().stream()
+                .collect(Collectors.toMap(t -> t.label(), t -> t.reviewCount()));
+        assertThat(monthlyTrend)
+                .containsEntry("1주차", 1L)
+                .containsEntry("2주차", 1L)
+                .containsEntry("3주차", 4L)
+                .containsEntry("4주차", 0L);
 
         LearningPeriodReport total = report.total();
         assertThat(total.reviewCount()).isEqualTo(8L);

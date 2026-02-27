@@ -42,8 +42,8 @@ public class LearningReportService {
 
         LearningPeriodReport weekly = buildPeriodReport(userId, "WEEKLY", weekRange, TrendType.DAILY);
         LearningPeriodReport previousWeekly = buildPeriodReport(userId, "PREVIOUS_WEEKLY", previousWeekRange, TrendType.DAILY);
-        LearningPeriodReport monthly = buildPeriodReport(userId, "MONTHLY", monthRange, TrendType.DAILY);
-        LearningPeriodReport previousMonthly = buildPeriodReport(userId, "PREVIOUS_MONTHLY", previousMonthRange, TrendType.DAILY);
+        LearningPeriodReport monthly = buildPeriodReport(userId, "MONTHLY", monthRange, TrendType.WEEKLY);
+        LearningPeriodReport previousMonthly = buildPeriodReport(userId, "PREVIOUS_MONTHLY", previousMonthRange, TrendType.WEEKLY);
         LearningPeriodReport total = buildTotalReport(userId, targetDate);
         LearningComparison weeklyComparison = buildComparison("WEEKLY", "PREVIOUS_WEEKLY", weekly, previousWeekly);
         LearningComparison monthlyComparison = buildComparison("MONTHLY", "PREVIOUS_MONTHLY", monthly, previousMonthly);
@@ -160,6 +160,14 @@ public class LearningReportService {
             return buckets;
         }
 
+        if (trendType == TrendType.WEEKLY) {
+            int weekCount = weekCountInRange(startDate, endDate);
+            for (int week = 1; week <= weekCount; week++) {
+                buckets.put(weekLabel(week), 0L);
+            }
+            return buckets;
+        }
+
         LocalDate cursor = startDate.withDayOfMonth(1);
         while (!cursor.isAfter(endDate)) {
             buckets.put(yearMonthLabel(cursor), 0L);
@@ -169,11 +177,30 @@ public class LearningReportService {
     }
 
     private String trendKey(LocalDate date, TrendType trendType) {
-        return trendType == TrendType.DAILY ? date.toString() : yearMonthLabel(date);
+        if (trendType == TrendType.DAILY) {
+            return date.toString();
+        }
+        if (trendType == TrendType.WEEKLY) {
+            return weekLabel(weekOfMonth(date));
+        }
+        return yearMonthLabel(date);
     }
 
     private String yearMonthLabel(LocalDate date) {
         return date.getYear() + "-" + String.format("%02d", date.getMonthValue());
+    }
+
+    private int weekOfMonth(LocalDate date) {
+        return ((date.getDayOfMonth() - 1) / 7) + 1;
+    }
+
+    private int weekCountInRange(LocalDate startDate, LocalDate endDate) {
+        int dayCount = (int) java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate) + 1;
+        return ((dayCount - 1) / 7) + 1;
+    }
+
+    private String weekLabel(int week) {
+        return week + "주차";
     }
 
     private List<LearningWeakArea> buildWeakAreasInPeriod(Long userId, LocalDateTime start, LocalDateTime end) {
@@ -350,6 +377,7 @@ public class LearningReportService {
 
     private enum TrendType {
         DAILY,
+        WEEKLY,
         MONTHLY
     }
 
