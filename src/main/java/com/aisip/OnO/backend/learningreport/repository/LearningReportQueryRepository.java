@@ -10,6 +10,7 @@ import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Date;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -83,8 +84,8 @@ public class LearningReportQueryRepository {
     }
 
     public List<DailySolveCount> findDailySolveCounts(Long userId, LocalDateTime start, LocalDateTime end) {
-        DateExpression<LocalDate> practicedDate = Expressions.dateTemplate(
-                LocalDate.class, "DATE({0})", problemSolve.practicedAt
+        DateExpression<Date> practicedDate = Expressions.dateTemplate(
+                Date.class, "DATE({0})", problemSolve.practicedAt
         );
 
         List<Tuple> rows = queryFactory
@@ -98,15 +99,15 @@ public class LearningReportQueryRepository {
 
         return rows.stream()
                 .map(row -> new DailySolveCount(
-                        row.get(practicedDate),
+                        row.get(practicedDate).toLocalDate(),
                         row.get(problemSolve.count())
                 ))
                 .toList();
     }
 
     public List<LocalDate> findDistinctPracticeDatesInPeriod(Long userId, LocalDateTime start, LocalDateTime end) {
-        DateExpression<LocalDate> practicedDate = Expressions.dateTemplate(
-                LocalDate.class, "DATE({0})", problemSolve.practicedAt
+        DateExpression<Date> practicedDate = Expressions.dateTemplate(
+                Date.class, "DATE({0})", problemSolve.practicedAt
         );
 
         return queryFactory
@@ -116,12 +117,15 @@ public class LearningReportQueryRepository {
                 .where(problemSolve.userId.eq(userId)
                         .and(problemSolve.practicedAt.between(start, end)))
                 .orderBy(practicedDate.asc())
-                .fetch();
+                .fetch()
+                .stream()
+                .map(Date::toLocalDate)
+                .toList();
     }
 
     public List<LocalDate> findDistinctPracticeDatesTotal(Long userId) {
-        DateExpression<LocalDate> practicedDate = Expressions.dateTemplate(
-                LocalDate.class, "DATE({0})", problemSolve.practicedAt
+        DateExpression<Date> practicedDate = Expressions.dateTemplate(
+                Date.class, "DATE({0})", problemSolve.practicedAt
         );
 
         return queryFactory
@@ -130,7 +134,10 @@ public class LearningReportQueryRepository {
                 .from(problemSolve)
                 .where(problemSolve.userId.eq(userId))
                 .orderBy(practicedDate.asc())
-                .fetch();
+                .fetch()
+                .stream()
+                .map(Date::toLocalDate)
+                .toList();
     }
 
     public List<WeakAreaCount> findTopWeakAreasInPeriod(Long userId, LocalDateTime start, LocalDateTime end, int limit) {
