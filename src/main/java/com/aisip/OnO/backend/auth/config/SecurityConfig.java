@@ -80,6 +80,7 @@ public class SecurityConfig {
         http.authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
                                 .requestMatchers(EndpointRequest.toAnyEndpoint()).permitAll()
+                                .requestMatchers(request -> request.getRequestURI() != null && request.getRequestURI().contains("/actuator/")).permitAll()
                                 .requestMatchers(
                                         "/",
                                         "/robots.txt",

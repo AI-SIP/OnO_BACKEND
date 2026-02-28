@@ -15,7 +15,7 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException) throws IOException {
 
         String requestURI = request.getRequestURI();
-        if(requestURI.startsWith("/actuator/") ||
+        if(requestURI.contains("/actuator/") ||
             requestURI.equals("/grafana") ||
             requestURI.startsWith("/grafana/") ||
             requestURI.equals("/prometheus") ||
