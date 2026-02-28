@@ -139,6 +139,34 @@ services:
       - ono-network
     depends_on:
       - app-dev
+      - redis-exporter-dev
+      - rabbitmq-exporter-dev
+    profiles:
+      - monitoring
+
+  redis-exporter-dev:
+    image: oliver006/redis_exporter:v1.67.0
+    container_name: ono-redis-exporter-dev
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis-dev:6379
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
+  rabbitmq-exporter-dev:
+    image: kbudde/rabbitmq-exporter:latest
+    container_name: ono-rabbitmq-exporter-dev
+    restart: unless-stopped
+    environment:
+      RABBIT_URL: http://rabbitmq-dev:15672
+      RABBIT_USER: ${RABBITMQ_USER:-admin}
+      RABBIT_PASSWORD: ${RABBITMQ_PASSWORD:-admin}
+      PUBLISH_PORT: 9419
+      OUTPUT_FORMAT: JSON
+    networks:
+      - ono-network
     profiles:
       - monitoring
 

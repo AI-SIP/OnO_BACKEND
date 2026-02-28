@@ -6,6 +6,8 @@ import com.fasterxml.jackson.core.json.JsonReadFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +31,7 @@ public class OpenAIClient {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final MeterRegistry meterRegistry;
     private static final ObjectMapper LENIENT_OBJECT_MAPPER = JsonMapper.builder()
             .enable(JsonReadFeature.ALLOW_BACKSLASH_ESCAPING_ANY_CHARACTER)
             .build();
@@ -49,6 +52,7 @@ public class OpenAIClient {
      * 여러 이미지 URL을 분석하여 문제에 대한 정보를 추출합니다.
      */
     public ProblemAnalysisResult analyzeImages(List<String> imageUrls) {
+        Timer.Sample sample = Timer.start(meterRegistry);
         try {
             log.info("Starting image analysis for {} images", imageUrls.size());
 
@@ -87,9 +91,11 @@ public class OpenAIClient {
             log.info("Received response from OpenAI: {}", content);
 
             // 6. JSON 응답 파싱
+            recordExternalCall("openai", "analyze_images", "success", sample);
             return parseResponse(content);
 
         } catch (HttpClientErrorException e) {
+            recordExternalCall("openai", "analyze_images", "failure", sample);
             String responseBody = e.getResponseBodyAsString();
             if (isNonRetryableQuotaError(e, responseBody)) {
                 throw new NonRetryableAnalysisException("OpenAI 할당량이 초과되어 분석을 진행할 수 없습니다.", e);
@@ -97,9 +103,11 @@ public class OpenAIClient {
             log.error("Error analyzing images: {}", e.getMessage(), e);
             throw new RuntimeException("AI 이미지 분석 중 오류가 발생했습니다: " + e.getMessage(), e);
         } catch (NonRetryableAnalysisException e) {
+            recordExternalCall("openai", "analyze_images", "failure", sample);
             log.warn("Non-retryable image analysis failure: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
+            recordExternalCall("openai", "analyze_images", "failure", sample);
             log.error("Error analyzing images: {}", e.getMessage(), e);
             throw new RuntimeException("AI 이미지 분석 중 오류가 발생했습니다: " + e.getMessage(), e);
         }
@@ -117,6 +125,7 @@ public class OpenAIClient {
             return Optional.empty();
         }
 
+        Timer.Sample sample = Timer.start(meterRegistry);
         try {
             String summaryJson = objectMapper.writeValueAsString(summaryPayload);
             List<Message> messages = List.of(
@@ -153,11 +162,25 @@ public class OpenAIClient {
                     .getMessage()
                     .getContent();
 
+            recordExternalCall("openai", "recommend_learning_report", "success", sample);
             return parseLearningRecommendation(content);
         } catch (Exception e) {
+            recordExternalCall("openai", "recommend_learning_report", "failure", sample);
             log.warn("AI learning recommendation failed, fallback to rule-based: {}", e.getMessage());
             return Optional.empty();
         }
+    }
+
+    private void recordExternalCall(String dependency, String operation, String outcome, Timer.Sample sample) {
+        sample.stop(
+                Timer.builder("ono.external.requests")
+                        .description("External dependency call latency")
+                        .publishPercentileHistogram()
+                        .tag("dependency", dependency)
+                        .tag("operation", operation)
+                        .tag("outcome", outcome)
+                        .register(meterRegistry)
+        );
     }
 
     /**

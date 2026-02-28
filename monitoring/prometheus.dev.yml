@@ -7,3 +7,11 @@ scrape_configs:
     metrics_path: "/actuator/prometheus"
     static_configs:
       - targets: ["app-dev:8080"]
+
+  - job_name: "ono-redis-dev"
+    static_configs:
+      - targets: ["ono-redis-exporter-dev:9121"]
+
+  - job_name: "ono-rabbitmq-dev"
+    static_configs:
+      - targets: ["ono-rabbitmq-exporter-dev:9419"]

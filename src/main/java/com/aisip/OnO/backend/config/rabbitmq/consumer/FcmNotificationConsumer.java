@@ -9,6 +9,8 @@ import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.Notification;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -29,6 +31,7 @@ public class FcmNotificationConsumer {
     private final FcmTokenRepository fcmTokenRepository;
     private final FirebaseMessaging firebaseMessaging;
     private final DiscordWebhookNotificationService discordWebhookNotificationService;
+    private final MeterRegistry meterRegistry;
 
     /**
      * FCM 푸시 알림 메시지 수신 및 처리
@@ -85,6 +88,7 @@ public class FcmNotificationConsumer {
      * 특정 디바이스로 FCM 전송
      */
     private void sendToDevice(String token, FcmNotificationMessage message) throws FirebaseMessagingException {
+        Timer.Sample sample = Timer.start(meterRegistry);
         Message fcmMessage = Message.builder()
                 .setToken(token)
                 .setNotification(Notification.builder()
@@ -94,8 +98,14 @@ public class FcmNotificationConsumer {
                 .putAllData(message.getData())
                 .build();
 
-        String messageId = firebaseMessaging.send(fcmMessage);
-        log.debug("[FCM Notification Consumer] FCM 전송 성공 - messageId: {}", messageId);
+        try {
+            String messageId = firebaseMessaging.send(fcmMessage);
+            recordExternalCall("firebase", "send_notification_async", "success", sample);
+            log.debug("[FCM Notification Consumer] FCM 전송 성공 - messageId: {}", messageId);
+        } catch (FirebaseMessagingException e) {
+            recordExternalCall("firebase", "send_notification_async", "failure", sample);
+            throw e;
+        }
     }
 
     /**
@@ -130,5 +140,17 @@ public class FcmNotificationConsumer {
         } catch (Exception e) {
             log.error("[FCM Notification DLQ] Discord 알림 전송 실패: {}", e.getMessage());
         }
+    }
+
+    private void recordExternalCall(String dependency, String operation, String outcome, Timer.Sample sample) {
+        sample.stop(
+                Timer.builder("ono.external.requests")
+                        .description("External dependency call latency")
+                        .publishPercentileHistogram()
+                        .tag("dependency", dependency)
+                        .tag("operation", operation)
+                        .tag("outcome", outcome)
+                        .register(meterRegistry)
+        );
     }
 }
