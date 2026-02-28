@@ -126,8 +126,6 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
-      - --web.external-url=https://ono-dev.seungminki.shop/prometheus/
-      - --web.route-prefix=/prometheus
     ports:
       - "9091:9090"
     volumes:
