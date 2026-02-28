@@ -12,7 +12,9 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
 @Entity
-@Table(name = "problem_solve")
+@Table(name = "problem_solve", indexes = {
+        @Index(name = "idx_problem_solve_user_practiced_at", columnList = "user_id, practiced_at")
+})
 @Getter
 @Builder(access = AccessLevel.PRIVATE)
 @AllArgsConstructor(access = AccessLevel.PROTECTED)

@@ -8,11 +8,15 @@ import com.aisip.OnO.backend.learningreport.dto.LearningTrendPoint;
 import com.aisip.OnO.backend.learningreport.dto.LearningWeakArea;
 import com.aisip.OnO.backend.learningreport.repository.LearningReportQueryRepository;
 import com.aisip.OnO.backend.util.ai.OpenAIClient;
+import com.aisip.OnO.backend.util.redis.RedisSingleDataService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -22,18 +26,28 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class LearningReportService {
 
     private static final int TOP_WEAK_AREAS_LIMIT = 3;
+    private static final String CACHE_KEY_PREFIX = "LEARNING_REPORT";
 
     private final LearningReportQueryRepository reportRepository;
     private final OpenAIClient openAIClient;
+    private final RedisSingleDataService redisSingleDataService;
+    private final ObjectMapper objectMapper;
 
     public LearningReportResponseDto getLearningReport(Long userId, LocalDate baseDate) {
-        LocalDate targetDate = baseDate == null ? LocalDate.now() : baseDate;
+        LocalDate targetDate = resolveTargetDate(baseDate);
+        String cacheKey = buildCacheKey(userId, LocalDate.now(), targetDate);
+
+        LearningReportResponseDto cached = readCache(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
 
         DateRange weekRange = weekRange(targetDate);
         DateRange previousWeekRange = previousWeekRange(weekRange);
@@ -51,7 +65,7 @@ public class LearningReportService {
                 userId, weekly, monthly, total, weeklyComparison, monthlyComparison
         );
 
-        return LearningReportResponseDto.builder()
+        LearningReportResponseDto report = LearningReportResponseDto.builder()
                 .weekly(weekly)
                 .monthly(monthly)
                 .total(total)
@@ -59,6 +73,9 @@ public class LearningReportService {
                 .monthlyComparison(monthlyComparison)
                 .recommendations(recommendations)
                 .build();
+
+        writeCache(cacheKey, report);
+        return report;
     }
 
     private LearningPeriodReport buildPeriodReport(
@@ -404,5 +421,42 @@ public class LearningReportService {
     }
 
     private record DateRange(LocalDate start, LocalDate end) {
+    }
+
+    private LocalDate resolveTargetDate(LocalDate baseDate) {
+        return baseDate == null ? LocalDate.now().minusDays(1) : baseDate;
+    }
+
+    private String buildCacheKey(Long userId, LocalDate requestDate, LocalDate targetDate) {
+        return CACHE_KEY_PREFIX + ":" + requestDate + ":" + userId + ":" + targetDate;
+    }
+
+    private LearningReportResponseDto readCache(String cacheKey) {
+        try {
+            String cachedJson = redisSingleDataService.getSingleData(cacheKey);
+            if (cachedJson == null || cachedJson.isBlank()) {
+                return null;
+            }
+            return objectMapper.readValue(cachedJson, LearningReportResponseDto.class);
+        } catch (Exception e) {
+            log.warn("Failed to read learning report cache. key={}, reason={}", cacheKey, e.getMessage());
+            return null;
+        }
+    }
+
+    private void writeCache(String cacheKey, LearningReportResponseDto report) {
+        try {
+            String json = objectMapper.writeValueAsString(report);
+            redisSingleDataService.setSingleData(cacheKey, json, ttlUntilNextMidnight());
+        } catch (Exception e) {
+            log.warn("Failed to write learning report cache. key={}, reason={}", cacheKey, e.getMessage());
+        }
+    }
+
+    private Duration ttlUntilNextMidnight() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay();
+        Duration ttl = Duration.between(now, nextMidnight);
+        return ttl.isNegative() || ttl.isZero() ? Duration.ofSeconds(1) : ttl;
     }
 }
