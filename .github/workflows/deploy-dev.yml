@@ -100,6 +100,9 @@ jobs:
       # 10. Docker Compose로 배포 (DEVELOPMENT)
       - name: Deploy with Docker Compose
         run: |
+          # 최신 dev 이미지 강제 pull (tag 캐시로 구버전 실행되는 문제 방지)
+          docker pull ${{ secrets.DOCKER_USERNAME }}/ono:dev-latest
+
           # MySQL과 Redis 시작 (개발 환경 전용)
           docker-compose -f docker-compose.dev.yml --env-file .env.dev up -d mysql-dev redis-dev
 
@@ -107,6 +110,10 @@ jobs:
           docker-compose -f docker-compose.dev.yml --env-file .env.dev stop app-dev || true
           docker-compose -f docker-compose.dev.yml --env-file .env.dev rm -f app-dev || true
           docker-compose -f docker-compose.dev.yml --env-file .env.dev up -d app-dev
+
+          # 실제 기동 이미지 확인
+          docker inspect ono-app-dev --format='Running Image: {{.Config.Image}}'
+          docker inspect ono-app-dev --format='Image ID: {{.Image}}'
 
           # 헬스체크 대기 (최대 2분)
           echo "Waiting for development application to be healthy..."
