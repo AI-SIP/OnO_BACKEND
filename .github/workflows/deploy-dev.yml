@@ -100,7 +100,6 @@ jobs:
       # 10. Docker Compose로 배포 (DEVELOPMENT)
       - name: Deploy with Docker Compose
         run: |
-          export COMPOSE_PROJECT_NAME=ono-dev
           # MySQL과 Redis 시작 (개발 환경 전용)
           docker-compose -f docker-compose.dev.yml --env-file .env.dev up -d mysql-dev redis-dev
 
@@ -134,7 +133,6 @@ jobs:
       # 11. Monitoring Stack 배포 (DEVELOPMENT)
       - name: Deploy Monitoring Stack
         run: |
-          export COMPOSE_PROJECT_NAME=ono-dev
           docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring stop prometheus-dev grafana-dev || true
           docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring rm -f prometheus-dev grafana-dev || true
           docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring up -d --force-recreate \
