@@ -134,9 +134,9 @@ jobs:
       - name: Deploy Monitoring Stack
         run: |
           docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring up -d --force-recreate --remove-orphans \
-            prometheus-dev grafana-dev rabbitmq-exporter-dev redis-exporter-dev mysqld-exporter-dev cadvisor-dev
+            prometheus-dev grafana-dev
           docker-compose -f docker-compose.dev.yml --env-file .env.dev ps \
-            prometheus-dev grafana-dev rabbitmq-exporter-dev redis-exporter-dev mysqld-exporter-dev cadvisor-dev
+            prometheus-dev grafana-dev
         shell: bash
 
       # 12. 오래된 Docker 이미지 정리

@@ -16,6 +16,10 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
 
         String requestURI = request.getRequestURI();
         if(requestURI.startsWith("/actuator/") ||
+            requestURI.equals("/grafana") ||
+            requestURI.startsWith("/grafana/") ||
+            requestURI.equals("/prometheus") ||
+            requestURI.startsWith("/prometheus/") ||
             requestURI.startsWith("/api/auth") ||
                 requestURI.equals("/") ||
                 requestURI.equals("/robots.txt") ||

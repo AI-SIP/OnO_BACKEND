@@ -7,19 +7,3 @@ scrape_configs:
     metrics_path: "/actuator/prometheus"
     static_configs:
       - targets: ["app-dev:8080"]
-
-  - job_name: "rabbitmq-exporter-dev"
-    static_configs:
-      - targets: ["rabbitmq-exporter-dev:9419"]
-
-  - job_name: "redis-exporter-dev"
-    static_configs:
-      - targets: ["redis-exporter-dev:9121"]
-
-  - job_name: "mysqld-exporter-dev"
-    static_configs:
-      - targets: ["mysqld-exporter-dev:9104"]
-
-  - job_name: "cadvisor-dev"
-    static_configs:
-      - targets: ["cadvisor-dev:8080"]

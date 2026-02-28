@@ -37,6 +37,10 @@ public class JwtTokenFilter extends OncePerRequestFilter {
 
         // JWT 필터를 건너뛸 경로들
         return path.startsWith("/actuator/") ||
+                 path.equals("/grafana") ||
+                 path.startsWith("/grafana/") ||
+                 path.equals("/prometheus") ||
+                 path.startsWith("/prometheus/") ||
                  path.equals("/") ||
                  path.equals("/robots.txt") ||
                  path.equals("/home") ||

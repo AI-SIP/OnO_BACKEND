@@ -126,6 +126,8 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
+      - --web.external-url=${PROMETHEUS_DEV_EXTERNAL_URL:-http://localhost:9091}
+      - --web.route-prefix=${PROMETHEUS_DEV_ROUTE_PREFIX:-/}
     ports:
       - "9091:9090"
     volumes:
@@ -135,10 +137,6 @@ services:
       - ono-network
     depends_on:
       - app-dev
-      - rabbitmq-exporter-dev
-      - redis-exporter-dev
-      - mysqld-exporter-dev
-      - cadvisor-dev
     profiles:
       - monitoring
 
@@ -152,69 +150,14 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
-      GF_SERVER_ROOT_URL: https://ono-dev.seungminki.shop/grafana/
-      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SERVER_ROOT_URL: ${GRAFANA_DEV_ROOT_URL:-http://localhost:3001}
+      GF_SERVER_SERVE_FROM_SUB_PATH: ${GRAFANA_DEV_SERVE_FROM_SUB_PATH:-false}
     volumes:
       - grafana_dev_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning/dev:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
     depends_on:
       - prometheus-dev
-    networks:
-      - ono-network
-    profiles:
-      - monitoring
-
-  rabbitmq-exporter-dev:
-    image: kbudde/rabbitmq-exporter:latest
-    container_name: ono-rabbitmq-exporter-dev
-    restart: unless-stopped
-    environment:
-      RABBIT_URL: http://rabbitmq-dev:15672
-      RABBIT_USER: ${RABBITMQ_USER:-admin}
-      RABBIT_PASSWORD: ${RABBITMQ_PASSWORD:-admin}
-      PUBLISH_PORT: 9419
-      OUTPUT_FORMAT: JSON
-    networks:
-      - ono-network
-    profiles:
-      - monitoring
-
-  redis-exporter-dev:
-    image: oliver006/redis_exporter:v1.67.0
-    container_name: ono-redis-exporter-dev
-    restart: unless-stopped
-    environment:
-      REDIS_ADDR: redis://redis-dev:6379
-    networks:
-      - ono-network
-    profiles:
-      - monitoring
-
-  mysqld-exporter-dev:
-    image: prom/mysqld-exporter:v0.15.1
-    container_name: ono-mysqld-exporter-dev
-    restart: unless-stopped
-    environment:
-      MYSQLD_EXPORTER_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
-    command:
-      - --mysqld.username=root
-      - --mysqld.address=mysql-dev:3306
-    networks:
-      - ono-network
-    profiles:
-      - monitoring
-
-  cadvisor-dev:
-    image: gcr.io/cadvisor/cadvisor:v0.49.1
-    container_name: ono-cadvisor-dev
-    restart: unless-stopped
-    privileged: true
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
     networks:
       - ono-network
     profiles:

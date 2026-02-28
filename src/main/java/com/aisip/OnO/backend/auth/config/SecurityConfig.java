@@ -63,7 +63,22 @@ public class SecurityConfig {
         http.authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
                                 .requestMatchers(EndpointRequest.toAnyEndpoint()).permitAll()
-                                .requestMatchers("/", "/robots.txt", "/home","/images/**", "/login", "/css/**", "/js/**", "/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()
+                                .requestMatchers(
+                                        "/",
+                                        "/robots.txt",
+                                        "/home",
+                                        "/images/**",
+                                        "/login",
+                                        "/css/**",
+                                        "/js/**",
+                                        "/swagger-ui/**",
+                                        "/v3/api-docs/**",
+                                        "/actuator/**",
+                                        "/grafana",
+                                        "/grafana/**",
+                                        "/prometheus",
+                                        "/prometheus/**"
+                                ).permitAll()
                                 .requestMatchers("/api/auth/logout").hasAnyRole("GUEST", "MEMBER", "ADMIN")
                                 .requestMatchers("/api/auth/**").permitAll()
                                 .requestMatchers("/admin/**").hasRole("ADMIN")
