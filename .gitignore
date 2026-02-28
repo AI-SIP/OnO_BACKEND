@@ -52,6 +52,11 @@ FirebaseAdminKey.json
 
 ### Environment variables
 .env
+monitoring/.env
+monitoring/.env.*
+monitoring/grafana/provisioning/datasources/*.local.yml
+monitoring/grafana/provisioning/dashboards/*.local.yml
+monitoring/README.md
 
 ### macOS
 .DS_Store
