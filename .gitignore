@@ -52,6 +52,7 @@ FirebaseAdminKey.json
 
 ### Environment variables
 .env
+.env.dev
 monitoring/.env
 monitoring/.env.*
 monitoring/grafana/provisioning/datasources/*.local.yml
