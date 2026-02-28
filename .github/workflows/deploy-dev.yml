@@ -81,11 +81,15 @@ jobs:
           CLOUD_AWS_S3_BUCKET=${{ secrets.CLOUD_AWS_S3_BUCKET }}
           CLOUD_AWS_CREDENTIALS_ACCESS_KEY=${{ secrets.CLOUD_AWS_CREDENTIALS_ACCESS_KEY }}
           CLOUD_AWS_CREDENTIALS_SECRET_KEY=${{ secrets.CLOUD_AWS_CREDENTIALS_SECRET_KEY }}
+          DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_WEBHOOK_URL_DEV=${{ secrets.DISCORD_WEBHOOK_URL }}
           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          SENTRY_DSN=${{ secrets.SENTRY_DSN }}
           SENTRY_DSN_DEV=${{ secrets.SENTRY_DSN }}
           ADMIN_IDENTIFIER=${{ secrets.ADMIN_IDENTIFIER }}
           ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+          GRAFANA_ADMIN_USER=${{ secrets.GRAFANA_ADMIN_USER_DEV }}
+          GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD_DEV }}
           EOF
         shell: bash
 
@@ -120,6 +124,13 @@ jobs:
           # 로그 출력 (마지막 50줄)
           echo "=== Development Application Logs ==="
           docker-compose -f docker-compose.dev.yml --env-file .env.dev logs --tail=50 app-dev
+        shell: bash
+
+      # 11. Monitoring Stack 배포 (DEVELOPMENT)
+      - name: Deploy Monitoring Stack
+        run: |
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring up -d prometheus-dev grafana-dev
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev ps prometheus-dev grafana-dev
         shell: bash
 
       # 12. 오래된 Docker 이미지 정리

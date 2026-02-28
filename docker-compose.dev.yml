@@ -118,6 +118,42 @@ services:
       retries: 3
       start_period: 60s
 
+  # Prometheus - DEVELOPMENT (Profile: monitoring)
+  prometheus-dev:
+    image: prom/prometheus:latest
+    container_name: ono-prometheus-dev
+    restart: unless-stopped
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./monitoring/prometheus.dev.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_dev_data:/prometheus
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
+  # Grafana - DEVELOPMENT (Profile: monitoring)
+  grafana-dev:
+    image: grafana/grafana:latest
+    container_name: ono-grafana-dev
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - grafana_dev_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning/dev:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+    depends_on:
+      - prometheus-dev
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
 networks:
   ono-network:
     driver: bridge
@@ -131,4 +167,8 @@ volumes:
   rabbitmq_dev_data:
     driver: local
   app_dev_logs:
+    driver: local
+  prometheus_dev_data:
+    driver: local
+  grafana_dev_data:
     driver: local
