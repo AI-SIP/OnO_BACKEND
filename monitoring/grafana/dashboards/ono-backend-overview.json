@@ -74,7 +74,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(http_server_requests_seconds_count{application=\"$application\"}[1m]))",
+          "expr": "sum(rate(http_server_requests_seconds_count{job=~\"$job\"}[1m]))",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -135,7 +135,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "1000 * (sum(rate(http_server_requests_seconds_sum{application=\"$application\"}[5m])) / sum(rate(http_server_requests_seconds_count{application=\"$application\"}[5m])))",
+          "expr": "1000 * (sum(rate(http_server_requests_seconds_sum{job=~\"$job\"}[5m])) / sum(rate(http_server_requests_seconds_count{job=~\"$job\"}[5m])))",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -196,7 +196,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(http_server_requests_seconds_count{application=\"$application\",status=~\"5..\"}[5m])) / sum(rate(http_server_requests_seconds_count{application=\"$application\"}[5m]))",
+          "expr": "sum(rate(http_server_requests_seconds_count{job=~\"$job\",status=~\"5..\"}[5m])) / sum(rate(http_server_requests_seconds_count{job=~\"$job\"}[5m]))",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -261,7 +261,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "system_cpu_usage{application=\"$application\"}",
+          "expr": "system_cpu_usage{job=~\"$job\"}",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -307,7 +307,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (uri, method) (rate(http_server_requests_seconds_count{application=\"$application\",uri!~\"/actuator.*\"}[5m]))",
+          "expr": "sum by (uri, method) (rate(http_server_requests_seconds_count{job=~\"$job\",uri!~\"/actuator.*\"}[5m]))",
           "legendFormat": "{{method}} {{uri}}",
           "range": true,
           "refId": "A"
@@ -353,14 +353,14 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{application=\"$application\",uri!~\"/actuator.*\"}[5m]))) * 1000",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job=~\"$job\",uri!~\"/actuator.*\"}[5m]))) * 1000",
           "legendFormat": "p95",
           "range": true,
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket{application=\"$application\",uri!~\"/actuator.*\"}[5m]))) * 1000",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket{job=~\"$job\",uri!~\"/actuator.*\"}[5m]))) * 1000",
           "legendFormat": "p99",
           "range": true,
           "refId": "B"
@@ -406,14 +406,14 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(jvm_memory_used_bytes{application=\"$application\",area=\"heap\"})",
+          "expr": "sum(jvm_memory_used_bytes{job=~\"$job\",area=\"heap\"})",
           "legendFormat": "Heap Used",
           "range": true,
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "sum(jvm_memory_max_bytes{application=\"$application\",area=\"heap\"})",
+          "expr": "sum(jvm_memory_max_bytes{job=~\"$job\",area=\"heap\"})",
           "legendFormat": "Heap Max",
           "range": true,
           "refId": "B"
@@ -459,21 +459,21 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "hikaricp_connections_active{application=\"$application\"}",
+          "expr": "hikaricp_connections_active{job=~\"$job\"}",
           "legendFormat": "Active",
           "range": true,
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "hikaricp_connections_idle{application=\"$application\"}",
+          "expr": "hikaricp_connections_idle{job=~\"$job\"}",
           "legendFormat": "Idle",
           "range": true,
           "refId": "B"
         },
         {
           "editorMode": "code",
-          "expr": "hikaricp_connections_pending{application=\"$application\"}",
+          "expr": "hikaricp_connections_pending{job=~\"$job\"}",
           "legendFormat": "Pending",
           "range": true,
           "refId": "C"
@@ -495,22 +495,22 @@
       {
         "current": {
           "selected": false,
-          "text": "backend",
-          "value": "backend"
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(http_server_requests_seconds_count, application)",
+        "definition": "label_values(up, job)",
         "hide": 0,
-        "includeAll": false,
-        "label": "application",
+        "includeAll": true,
+        "label": "job",
         "multi": false,
-        "name": "application",
+        "name": "job",
         "options": [],
         "query": {
-          "query": "label_values(http_server_requests_seconds_count, application)",
+          "query": "label_values(up, job)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -529,6 +529,6 @@
   "timezone": "browser",
   "title": "OnO Backend Overview",
   "uid": "ono-backend-overview",
-  "version": 1,
+  "version": 3,
   "weekStart": ""
 }
