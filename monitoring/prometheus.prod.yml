@@ -12,3 +12,11 @@ scrape_configs:
     metrics_path: "/actuator/prometheus"
     static_configs:
       - targets: ["app-prod-green:8080"]
+
+  - job_name: "ono-redis-prod"
+    static_configs:
+      - targets: ["ono-redis-exporter-prod:9121"]
+
+  - job_name: "ono-rabbitmq-prod"
+    static_configs:
+      - targets: ["ono-rabbitmq-exporter-prod:9419"]

@@ -189,6 +189,35 @@ services:
     volumes:
       - ./monitoring/prometheus.prod.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_prod_data:/prometheus
+    depends_on:
+      - redis-exporter-prod
+      - rabbitmq-exporter-prod
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
+  redis-exporter-prod:
+    image: oliver006/redis_exporter:v1.67.0
+    container_name: ono-redis-exporter-prod
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis-prod:6379
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
+  rabbitmq-exporter-prod:
+    image: kbudde/rabbitmq-exporter:latest
+    container_name: ono-rabbitmq-exporter-prod
+    restart: unless-stopped
+    environment:
+      RABBIT_URL: http://rabbitmq-prod:15672
+      RABBIT_USER: ${RABBITMQ_USER:-admin}
+      RABBIT_PASSWORD: ${RABBITMQ_PASSWORD:-admin}
+      PUBLISH_PORT: 9419
+      OUTPUT_FORMAT: JSON
     networks:
       - ono-network
     profiles:

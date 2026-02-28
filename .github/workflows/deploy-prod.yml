@@ -73,6 +73,8 @@ jobs:
           cat > .env.prod << EOF
           DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
           MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+          RABBITMQ_USER=${{ secrets.RABBITMQ_USER }}
+          RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_PASSWORD }}
           SPRING_CRYPTO_SECRET_KEY=${{ secrets.SPRING_CRYPTO_SECRET_KEY }}
           JWT_ACCESS_TOKEN_SECRET=${{ secrets.JWT_ACCESS_TOKEN_SECRET }}
           JWT_ACCESS_TOKEN_EXPIRATION=1800000
@@ -208,12 +210,12 @@ jobs:
       # 11. Monitoring Stack 배포 (PRODUCTION, Non-blocking)
       - name: Deploy Monitoring Stack
         run: |
-          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring stop prometheus-prod grafana-prod || true
-          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring rm -f prometheus-prod grafana-prod || true
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring stop prometheus-prod grafana-prod redis-exporter-prod rabbitmq-exporter-prod || true
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring rm -f prometheus-prod grafana-prod redis-exporter-prod rabbitmq-exporter-prod || true
           docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring up -d --force-recreate \
-            prometheus-prod grafana-prod
+            redis-exporter-prod rabbitmq-exporter-prod prometheus-prod grafana-prod
           docker-compose -f docker-compose.prod.yml --env-file .env.prod ps \
-            prometheus-prod grafana-prod
+            redis-exporter-prod rabbitmq-exporter-prod prometheus-prod grafana-prod
         shell: bash
 
       # 11-1. Monitoring 연동 검증 (PRODUCTION, Non-blocking)
