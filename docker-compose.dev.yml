@@ -100,6 +100,8 @@ services:
       SENTRY_DSN: ${SENTRY_DSN}
       ADMIN_IDENTIFIER: ${ADMIN_IDENTIFIER}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
+      MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED: "true"
     volumes:
       - app_dev_logs:/app/logs
     depends_on:
