@@ -99,6 +99,8 @@ services:
       SENTRY_DSN: ${SENTRY_DSN}
       ADMIN_IDENTIFIER: ${ADMIN_IDENTIFIER}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
+      MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED: "true"
     volumes:
       - app_prod_logs:/app/logs
     depends_on:
@@ -150,6 +152,8 @@ services:
       SENTRY_DSN: ${SENTRY_DSN}
       ADMIN_IDENTIFIER: ${ADMIN_IDENTIFIER}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
+      MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED: "true"
     volumes:
       - app_prod_logs:/app/logs
     depends_on:
@@ -185,11 +189,6 @@ services:
     volumes:
       - ./monitoring/prometheus.prod.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_prod_data:/prometheus
-    depends_on:
-      - rabbitmq-exporter-prod
-      - redis-exporter-prod
-      - mysqld-exporter-prod
-      - cadvisor-prod
     networks:
       - ono-network
     profiles:
@@ -213,61 +212,6 @@ services:
       - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
     depends_on:
       - prometheus-prod
-    networks:
-      - ono-network
-    profiles:
-      - monitoring
-
-  rabbitmq-exporter-prod:
-    image: kbudde/rabbitmq-exporter:latest
-    container_name: ono-rabbitmq-exporter-prod
-    restart: unless-stopped
-    environment:
-      RABBIT_URL: http://rabbitmq-prod:15672
-      RABBIT_USER: ${RABBITMQ_USER:-admin}
-      RABBIT_PASSWORD: ${RABBITMQ_PASSWORD:-admin}
-      PUBLISH_PORT: 9419
-      OUTPUT_FORMAT: JSON
-    networks:
-      - ono-network
-    profiles:
-      - monitoring
-
-  redis-exporter-prod:
-    image: oliver006/redis_exporter:v1.67.0
-    container_name: ono-redis-exporter-prod
-    restart: unless-stopped
-    environment:
-      REDIS_ADDR: redis://redis-prod:6379
-    networks:
-      - ono-network
-    profiles:
-      - monitoring
-
-  mysqld-exporter-prod:
-    image: prom/mysqld-exporter:v0.15.1
-    container_name: ono-mysqld-exporter-prod
-    restart: unless-stopped
-    environment:
-      MYSQLD_EXPORTER_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-    command:
-      - --mysqld.username=root
-      - --mysqld.address=mysql-prod:3306
-    networks:
-      - ono-network
-    profiles:
-      - monitoring
-
-  cadvisor-prod:
-    image: gcr.io/cadvisor/cadvisor:v0.49.1
-    container_name: ono-cadvisor-prod
-    restart: unless-stopped
-    privileged: true
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
     networks:
       - ono-network
     profiles:
