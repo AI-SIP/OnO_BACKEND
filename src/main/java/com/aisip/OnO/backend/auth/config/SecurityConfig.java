@@ -8,6 +8,7 @@ import com.aisip.OnO.backend.common.auth.CustomAuthenticationEntryPoint;
 import com.aisip.OnO.backend.common.auth.JwtTokenFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -61,6 +62,7 @@ public class SecurityConfig {
 
         http.authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
+                                .requestMatchers(EndpointRequest.toAnyEndpoint()).permitAll()
                                 .requestMatchers("/", "/robots.txt", "/home","/images/**", "/login", "/css/**", "/js/**", "/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()
                                 .requestMatchers("/api/auth/logout").hasAnyRole("GUEST", "MEMBER", "ADMIN")
                                 .requestMatchers("/api/auth/**").permitAll()
