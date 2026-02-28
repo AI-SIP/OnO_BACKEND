@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: 'OnO Dashboards'
+    orgId: 1
+    folder: 'OnO'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards
