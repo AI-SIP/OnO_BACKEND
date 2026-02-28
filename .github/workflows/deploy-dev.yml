@@ -90,6 +90,10 @@ jobs:
           ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
           GRAFANA_ADMIN_USER=${{ secrets.GRAFANA_ADMIN_USER }}
           GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+          GRAFANA_DEV_ROOT_URL=https://ono-dev.seungminki.shop/grafana/
+          GRAFANA_DEV_SERVE_FROM_SUB_PATH=true
+          PROMETHEUS_DEV_EXTERNAL_URL=https://ono-dev.seungminki.shop/prometheus/
+          PROMETHEUS_DEV_ROUTE_PREFIX=/prometheus
           EOF
         shell: bash
 
@@ -129,8 +133,10 @@ jobs:
       # 11. Monitoring Stack 배포 (DEVELOPMENT)
       - name: Deploy Monitoring Stack
         run: |
-          docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring up -d prometheus-dev grafana-dev
-          docker-compose -f docker-compose.dev.yml --env-file .env.dev ps prometheus-dev grafana-dev
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring up -d --force-recreate --remove-orphans \
+            prometheus-dev grafana-dev rabbitmq-exporter-dev redis-exporter-dev mysqld-exporter-dev cadvisor-dev
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev ps \
+            prometheus-dev grafana-dev rabbitmq-exporter-dev redis-exporter-dev mysqld-exporter-dev cadvisor-dev
         shell: bash
 
       # 12. 오래된 Docker 이미지 정리

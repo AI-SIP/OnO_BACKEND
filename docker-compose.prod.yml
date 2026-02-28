@@ -170,6 +170,109 @@ services:
     profiles:
       - green  # 기본적으로는 비활성화, 배포 시에만 활성화
 
+  # Prometheus - PRODUCTION (Profile: monitoring)
+  prometheus-prod:
+    image: prom/prometheus:latest
+    container_name: ono-prometheus-prod
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.external-url=${PROMETHEUS_PROD_EXTERNAL_URL:-http://localhost:9090}
+      - --web.route-prefix=${PROMETHEUS_PROD_ROUTE_PREFIX:-/}
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.prod.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_prod_data:/prometheus
+    depends_on:
+      - rabbitmq-exporter-prod
+      - redis-exporter-prod
+      - mysqld-exporter-prod
+      - cadvisor-prod
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
+  # Grafana - PRODUCTION (Profile: monitoring)
+  grafana-prod:
+    image: grafana/grafana:latest
+    container_name: ono-grafana-prod
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_SERVER_ROOT_URL: ${GRAFANA_PROD_ROOT_URL:-http://localhost:3000}
+      GF_SERVER_SERVE_FROM_SUB_PATH: ${GRAFANA_PROD_SERVE_FROM_SUB_PATH:-false}
+    volumes:
+      - grafana_prod_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning/prod:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+    depends_on:
+      - prometheus-prod
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
+  rabbitmq-exporter-prod:
+    image: kbudde/rabbitmq-exporter:latest
+    container_name: ono-rabbitmq-exporter-prod
+    restart: unless-stopped
+    environment:
+      RABBIT_URL: http://rabbitmq-prod:15672
+      RABBIT_USER: ${RABBITMQ_USER:-admin}
+      RABBIT_PASSWORD: ${RABBITMQ_PASSWORD:-admin}
+      PUBLISH_PORT: 9419
+      OUTPUT_FORMAT: JSON
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
+  redis-exporter-prod:
+    image: oliver006/redis_exporter:v1.67.0
+    container_name: ono-redis-exporter-prod
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis-prod:6379
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
+  mysqld-exporter-prod:
+    image: prom/mysqld-exporter:v0.15.1
+    container_name: ono-mysqld-exporter-prod
+    restart: unless-stopped
+    environment:
+      MYSQLD_EXPORTER_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    command:
+      - --mysqld.username=root
+      - --mysqld.address=mysql-prod:3306
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
+  cadvisor-prod:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: ono-cadvisor-prod
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
 networks:
   ono-network:
     driver: bridge
@@ -182,4 +285,8 @@ volumes:
   rabbitmq_prod_data:
     driver: local
   app_prod_logs:
+    driver: local
+  prometheus_prod_data:
+    driver: local
+  grafana_prod_data:
     driver: local
