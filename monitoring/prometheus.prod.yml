@@ -15,3 +15,7 @@ scrape_configs:
     metrics_path: "/actuator/prometheus"
     static_configs:
       - targets: ["app-prod-green:8080"]
+
+  - job_name: "ono-mysql-prod"
+    static_configs:
+      - targets: ["mysql-exporter-prod:9104"]

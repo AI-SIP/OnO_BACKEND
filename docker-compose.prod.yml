@@ -190,6 +190,22 @@ services:
       - ./monitoring/prometheus.prod.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/alerts:/etc/prometheus/alerts:ro
       - prometheus_prod_data:/prometheus
+    depends_on:
+      - mysql-exporter-prod
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
+  mysql-exporter-prod:
+    image: prom/mysqld-exporter:latest
+    container_name: ono-mysql-exporter-prod
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: root:${MYSQL_ROOT_PASSWORD}@(mysql-prod:3306)/
+    depends_on:
+      mysql-prod:
+        condition: service_healthy
     networks:
       - ono-network
     profiles:

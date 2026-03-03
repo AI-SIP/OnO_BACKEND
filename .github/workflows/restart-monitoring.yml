@@ -56,16 +56,16 @@ jobs:
         if: ${{ github.event.inputs.target == 'dev' }}
         run: |
           docker compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring up -d --force-recreate \
-            prometheus-dev grafana-dev
+            mysql-exporter-dev prometheus-dev grafana-dev
           docker compose -f docker-compose.dev.yml --env-file .env.dev ps \
-            prometheus-dev grafana-dev
+            mysql-exporter-dev prometheus-dev grafana-dev
         shell: bash
 
       - name: Restart monitoring stack (prod)
         if: ${{ github.event.inputs.target == 'prod' }}
         run: |
           docker compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring up -d --force-recreate \
-            prometheus-prod grafana-prod
+            mysql-exporter-prod prometheus-prod grafana-prod
           docker compose -f docker-compose.prod.yml --env-file .env.prod ps \
-            prometheus-prod grafana-prod
+            mysql-exporter-prod prometheus-prod grafana-prod
         shell: bash

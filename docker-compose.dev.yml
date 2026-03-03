@@ -140,6 +140,21 @@ services:
       - ono-network
     depends_on:
       - app-dev
+      - mysql-exporter-dev
+    profiles:
+      - monitoring
+
+  mysql-exporter-dev:
+    image: prom/mysqld-exporter:latest
+    container_name: ono-mysql-exporter-dev
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: root:${MYSQL_ROOT_PASSWORD}@(mysql-dev:3306)/
+    depends_on:
+      mysql-dev:
+        condition: service_healthy
+    networks:
+      - ono-network
     profiles:
       - monitoring
 
