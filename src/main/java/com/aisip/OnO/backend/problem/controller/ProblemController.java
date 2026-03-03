@@ -4,8 +4,8 @@ import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.problem.dto.ProblemAnalysisResponseDto;
 import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
-import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
+import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2Dto;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.service.ProblemAnalysisService;
 import com.aisip.OnO.backend.problem.service.ProblemService;
@@ -86,6 +86,15 @@ public class ProblemController {
         return CommonResponse.success(analysisResponseDto);
     }
 
+    // ✅ 문제 분석 요청 (비동기 트리거)
+    @PostMapping("/{problemId}/analysis")
+    public CommonResponse<String> requestProblemAnalysis(@PathVariable("problemId") Long problemId) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        problemService.analysisProblem(problemId);
+
+        return CommonResponse.success("문제 분석 요청이 접수되었습니다.");
+    }
+
     // ✅ 문제 등록
     @PostMapping("")
     public CommonResponse<Long> registerProblem(@RequestBody ProblemRegisterDto problemRegisterDto) {
@@ -93,6 +102,15 @@ public class ProblemController {
 
         // 문제 등록 + 빈 분석 객체 생성 (동기)
         Long problemId = problemService.registerProblem(problemRegisterDto, userId);
+        return CommonResponse.success(problemId);
+    }
+
+    // ✅ 문제 등록 v2 (이미지 URL 동시 저장)
+    @PostMapping("/v2")
+    public CommonResponse<Long> registerProblemV2(@RequestBody ProblemRegisterV2Dto problemRegisterV2Dto) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        Long problemId = problemService.registerProblemV2(problemRegisterV2Dto, userId);
         return CommonResponse.success(problemId);
     }
 
