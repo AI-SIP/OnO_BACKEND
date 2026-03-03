@@ -210,12 +210,12 @@ jobs:
       # 11. Monitoring Stack 배포 (PRODUCTION, Non-blocking)
       - name: Deploy Monitoring Stack
         run: |
-          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring stop prometheus-prod grafana-prod || true
-          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring rm -f prometheus-prod grafana-prod || true
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring stop prometheus-prod grafana-prod mysql-exporter-prod || true
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring rm -f prometheus-prod grafana-prod mysql-exporter-prod || true
           docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring up -d --force-recreate \
-            prometheus-prod grafana-prod
+            mysql-exporter-prod prometheus-prod grafana-prod
           docker-compose -f docker-compose.prod.yml --env-file .env.prod ps \
-            prometheus-prod grafana-prod
+            mysql-exporter-prod prometheus-prod grafana-prod
         shell: bash
 
       # 11-1. Monitoring 연동 검증 (PRODUCTION, Non-blocking)

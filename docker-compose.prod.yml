@@ -101,6 +101,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
       MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED: "true"
+      MANAGEMENT_SERVER_PORT: 8081
     volumes:
       - app_prod_logs:/app/logs
     depends_on:
@@ -113,7 +114,7 @@ services:
     networks:
       - ono-network
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8081/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -154,6 +155,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
       MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED: "true"
+      MANAGEMENT_SERVER_PORT: 8081
     volumes:
       - app_prod_logs:/app/logs
     depends_on:
@@ -166,7 +168,7 @@ services:
     networks:
       - ono-network
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8081/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -190,6 +192,22 @@ services:
       - ./monitoring/prometheus.prod.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/alerts:/etc/prometheus/alerts:ro
       - prometheus_prod_data:/prometheus
+    depends_on:
+      - mysql-exporter-prod
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
+  mysql-exporter-prod:
+    image: prom/mysqld-exporter:latest
+    container_name: ono-mysql-exporter-prod
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: root:${MYSQL_ROOT_PASSWORD}@(mysql-prod:3306)/
+    depends_on:
+      mysql-prod:
+        condition: service_healthy
     networks:
       - ono-network
     profiles:

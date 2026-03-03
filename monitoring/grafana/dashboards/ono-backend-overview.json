@@ -74,7 +74,7 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(http_server_requests_seconds_count{job=~\"$job\"}[1m]))",
+          "expr": "sum(rate(http_server_requests_seconds_count{job=~\"$job\",uri!~\"/actuator.*\"}[5m])) or vector(0)",
           "legendFormat": "",
           "range": true,
           "refId": "A"
