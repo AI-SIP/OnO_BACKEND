@@ -142,12 +142,12 @@ jobs:
       # 11. Monitoring Stack 배포 (DEVELOPMENT)
       - name: Deploy Monitoring Stack
         run: |
-          docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring stop prometheus-dev grafana-dev redis-exporter-dev rabbitmq-exporter-dev || true
-          docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring rm -f prometheus-dev grafana-dev redis-exporter-dev rabbitmq-exporter-dev || true
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring stop prometheus-dev grafana-dev || true
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring rm -f prometheus-dev grafana-dev || true
           docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring up -d --force-recreate \
-            redis-exporter-dev rabbitmq-exporter-dev prometheus-dev grafana-dev
+            prometheus-dev grafana-dev
           docker-compose -f docker-compose.dev.yml --env-file .env.dev ps \
-            redis-exporter-dev rabbitmq-exporter-dev prometheus-dev grafana-dev
+            prometheus-dev grafana-dev
         shell: bash
 
       # 11-1. Monitoring 연동 검증 (DEVELOPMENT)
