@@ -155,7 +155,7 @@ jobs:
         run: |
           # app-dev 내부 actuator 메트릭 엔드포인트가 200인지 확인
           echo "Checking app-dev actuator metrics endpoint..."
-          if ! docker exec ono-app-dev sh -lc 'wget -qO- http://localhost:8080/actuator/prometheus | head -n 5' >/tmp/app_metrics_head.txt; then
+          if ! docker exec ono-app-dev sh -lc 'wget -qO- http://localhost:8081/actuator/prometheus | head -n 5' >/tmp/app_metrics_head.txt; then
             echo "ERROR: app-dev actuator/prometheus endpoint is not reachable"
             docker logs --tail=200 ono-app-dev || true
             exit 1
@@ -163,9 +163,9 @@ jobs:
 
           # prometheus 컨테이너 관점에서도 app-dev 메트릭 엔드포인트가 200인지 확인
           echo "Checking app-dev actuator metrics endpoint from prometheus-dev..."
-          if ! docker exec ono-prometheus-dev sh -lc 'wget -qO- http://app-dev:8080/actuator/prometheus | head -n 5' >/tmp/prom_metrics_head.txt; then
+          if ! docker exec ono-prometheus-dev sh -lc 'wget -qO- http://app-dev:8081/actuator/prometheus | head -n 5' >/tmp/prom_metrics_head.txt; then
             echo "ERROR: prometheus-dev cannot fetch app-dev actuator/prometheus"
-            docker exec ono-prometheus-dev sh -lc 'wget -S -O- http://app-dev:8080/actuator/prometheus >/dev/null' || true
+            docker exec ono-prometheus-dev sh -lc 'wget -S -O- http://app-dev:8081/actuator/prometheus >/dev/null' || true
             docker logs --tail=200 ono-app-dev || true
             exit 1
           fi

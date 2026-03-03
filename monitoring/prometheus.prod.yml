@@ -9,12 +9,12 @@ scrape_configs:
   - job_name: "ono-backend-prod-blue"
     metrics_path: "/actuator/prometheus"
     static_configs:
-      - targets: ["app-prod-blue:8080"]
+      - targets: ["app-prod-blue:8081"]
 
   - job_name: "ono-backend-prod-green"
     metrics_path: "/actuator/prometheus"
     static_configs:
-      - targets: ["app-prod-green:8080"]
+      - targets: ["app-prod-green:8081"]
 
   - job_name: "ono-mysql-prod"
     static_configs:

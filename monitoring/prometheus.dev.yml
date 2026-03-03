@@ -9,7 +9,7 @@ scrape_configs:
   - job_name: "ono-backend-dev"
     metrics_path: "/actuator/prometheus"
     static_configs:
-      - targets: ["app-dev:8080"]
+      - targets: ["app-dev:8081"]
 
   - job_name: "ono-mysql-dev"
     static_configs:
