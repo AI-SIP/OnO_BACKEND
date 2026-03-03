@@ -30,7 +30,7 @@ jobs:
       - name: Create application-dev.yml
         run: |
           mkdir -p ./src/main/resources
-          echo "${{ secrets.APPLICATION_DEV }}" > ./src/main/resources/application.yml
+          echo "${{ secrets.APPLICATION_DEV }}" > ./src/main/resources/application-dev.yml
         shell: bash
 
       # 4. Firebase Admin Key 생성
@@ -73,6 +73,8 @@ jobs:
           cat > .env.dev << EOF
           DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
           MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+          RABBITMQ_USER=${{ secrets.RABBITMQ_USER }}
+          RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_PASSWORD }}
           SPRING_CRYPTO_SECRET_KEY=${{ secrets.SPRING_CRYPTO_SECRET_KEY }}
           JWT_ACCESS_TOKEN_SECRET=${{ secrets.JWT_ACCESS_TOKEN_SECRET }}
           JWT_ACCESS_TOKEN_EXPIRATION=1800000
@@ -81,17 +83,28 @@ jobs:
           CLOUD_AWS_S3_BUCKET=${{ secrets.CLOUD_AWS_S3_BUCKET }}
           CLOUD_AWS_CREDENTIALS_ACCESS_KEY=${{ secrets.CLOUD_AWS_CREDENTIALS_ACCESS_KEY }}
           CLOUD_AWS_CREDENTIALS_SECRET_KEY=${{ secrets.CLOUD_AWS_CREDENTIALS_SECRET_KEY }}
+          DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}
           DISCORD_WEBHOOK_URL_DEV=${{ secrets.DISCORD_WEBHOOK_URL }}
           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          SENTRY_DSN=${{ secrets.SENTRY_DSN }}
           SENTRY_DSN_DEV=${{ secrets.SENTRY_DSN }}
           ADMIN_IDENTIFIER=${{ secrets.ADMIN_IDENTIFIER }}
           ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+          GRAFANA_ADMIN_USER=${{ secrets.GRAFANA_ADMIN_USER }}
+          GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+          GRAFANA_DEV_ROOT_URL=https://ono-dev.seungminki.shop/grafana/
+          GRAFANA_DEV_SERVE_FROM_SUB_PATH=true
+          PROMETHEUS_DEV_EXTERNAL_URL=https://ono-dev.seungminki.shop/prometheus/
+          PROMETHEUS_DEV_ROUTE_PREFIX=/prometheus
           EOF
         shell: bash
 
       # 10. Docker Compose로 배포 (DEVELOPMENT)
       - name: Deploy with Docker Compose
         run: |
+          # 최신 dev 이미지 강제 pull (tag 캐시로 구버전 실행되는 문제 방지)
+          docker pull ${{ secrets.DOCKER_USERNAME }}/ono:dev-latest
+
           # MySQL과 Redis 시작 (개발 환경 전용)
           docker-compose -f docker-compose.dev.yml --env-file .env.dev up -d mysql-dev redis-dev
 
@@ -99,6 +112,10 @@ jobs:
           docker-compose -f docker-compose.dev.yml --env-file .env.dev stop app-dev || true
           docker-compose -f docker-compose.dev.yml --env-file .env.dev rm -f app-dev || true
           docker-compose -f docker-compose.dev.yml --env-file .env.dev up -d app-dev
+
+          # 실제 기동 이미지 확인
+          docker inspect ono-app-dev --format='Running Image: {{.Config.Image}}'
+          docker inspect ono-app-dev --format='Image ID: {{.Image}}'
 
           # 헬스체크 대기 (최대 2분)
           echo "Waiting for development application to be healthy..."
@@ -120,6 +137,56 @@ jobs:
           # 로그 출력 (마지막 50줄)
           echo "=== Development Application Logs ==="
           docker-compose -f docker-compose.dev.yml --env-file .env.dev logs --tail=50 app-dev
+        shell: bash
+
+      # 11. Monitoring Stack 배포 (DEVELOPMENT)
+      - name: Deploy Monitoring Stack
+        run: |
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring stop prometheus-dev grafana-dev || true
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring rm -f prometheus-dev grafana-dev || true
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring up -d --force-recreate \
+            prometheus-dev grafana-dev
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev ps \
+            prometheus-dev grafana-dev
+        shell: bash
+
+      # 11-1. Monitoring 연동 검증 (DEVELOPMENT)
+      - name: Verify Monitoring Integration
+        run: |
+          # app-dev 내부 actuator 메트릭 엔드포인트가 200인지 확인
+          echo "Checking app-dev actuator metrics endpoint..."
+          if ! docker exec ono-app-dev sh -lc 'wget -qO- http://localhost:8080/actuator/prometheus | head -n 5' >/tmp/app_metrics_head.txt; then
+            echo "ERROR: app-dev actuator/prometheus endpoint is not reachable"
+            docker logs --tail=200 ono-app-dev || true
+            exit 1
+          fi
+
+          # prometheus 컨테이너 관점에서도 app-dev 메트릭 엔드포인트가 200인지 확인
+          echo "Checking app-dev actuator metrics endpoint from prometheus-dev..."
+          if ! docker exec ono-prometheus-dev sh -lc 'wget -qO- http://app-dev:8080/actuator/prometheus | head -n 5' >/tmp/prom_metrics_head.txt; then
+            echo "ERROR: prometheus-dev cannot fetch app-dev actuator/prometheus"
+            docker exec ono-prometheus-dev sh -lc 'wget -S -O- http://app-dev:8080/actuator/prometheus >/dev/null' || true
+            docker logs --tail=200 ono-app-dev || true
+            exit 1
+          fi
+
+          # Prometheus가 app-dev를 up=1로 스크랩하는지 확인 (최대 60초 대기)
+          echo "Checking Prometheus scrape status for ono-backend-dev..."
+          for i in $(seq 1 12); do
+            result=$(docker exec ono-prometheus-dev sh -lc 'wget -qO- "http://localhost:9090/prometheus/api/v1/query?query=up{job=\"ono-backend-dev\"}"' || true)
+            if echo "$result" | grep -q '"value":\[.*,"1"\]'; then
+              echo "Prometheus scrape is UP"
+              exit 0
+            fi
+            echo "Waiting scrape up... ($i/12)"
+            sleep 5
+          done
+
+          echo "ERROR: Prometheus scrape for ono-backend-dev is still down"
+          docker exec ono-prometheus-dev sh -lc 'wget -qO- "http://localhost:9090/prometheus/api/v1/targets"' || true
+          docker logs --tail=200 ono-app-dev || true
+          docker logs --tail=200 ono-prometheus-dev || true
+          exit 1
         shell: bash
 
       # 12. 오래된 Docker 이미지 정리

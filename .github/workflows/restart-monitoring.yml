@@ -1,0 +1,71 @@
+name: Restart Monitoring Stack
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+        default: dev
+
+permissions:
+  contents: read
+
+jobs:
+  restart-monitoring:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create .env files
+        run: |
+          cat > .env.dev << EOF
+          DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+          MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+          RABBITMQ_USER=${{ secrets.RABBITMQ_USER }}
+          RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_PASSWORD }}
+          GRAFANA_ADMIN_USER=${{ secrets.GRAFANA_ADMIN_USER }}
+          GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+          GRAFANA_DEV_ROOT_URL=https://ono-dev.seungminki.shop/grafana/
+          GRAFANA_DEV_SERVE_FROM_SUB_PATH=true
+          PROMETHEUS_DEV_EXTERNAL_URL=https://ono-dev.seungminki.shop/prometheus/
+          PROMETHEUS_DEV_ROUTE_PREFIX=/prometheus
+          EOF
+
+          cat > .env.prod << EOF
+          DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+          MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+          RABBITMQ_USER=${{ secrets.RABBITMQ_USER }}
+          RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_PASSWORD }}
+          GRAFANA_ADMIN_USER=${{ secrets.GRAFANA_ADMIN_USER }}
+          GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+          GRAFANA_PROD_ROOT_URL=https://ono-prod.seungminki.shop/grafana/
+          GRAFANA_PROD_SERVE_FROM_SUB_PATH=true
+          PROMETHEUS_PROD_EXTERNAL_URL=https://ono-prod.seungminki.shop/prometheus/
+          PROMETHEUS_PROD_ROUTE_PREFIX=/prometheus
+          EOF
+        shell: bash
+
+      - name: Restart monitoring stack (dev)
+        if: ${{ github.event.inputs.target == 'dev' }}
+        run: |
+          docker compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring up -d --force-recreate \
+            prometheus-dev grafana-dev
+          docker compose -f docker-compose.dev.yml --env-file .env.dev ps \
+            prometheus-dev grafana-dev
+        shell: bash
+
+      - name: Restart monitoring stack (prod)
+        if: ${{ github.event.inputs.target == 'prod' }}
+        run: |
+          docker compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring up -d --force-recreate \
+            prometheus-prod grafana-prod
+          docker compose -f docker-compose.prod.yml --env-file .env.prod ps \
+            prometheus-prod grafana-prod
+        shell: bash

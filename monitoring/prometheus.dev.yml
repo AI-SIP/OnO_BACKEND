@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 60s
+  evaluation_interval: 60s
+
+rule_files:
+  - /etc/prometheus/alerts/ono-alerts.yml
+
+scrape_configs:
+  - job_name: "ono-backend-dev"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["app-dev:8080"]

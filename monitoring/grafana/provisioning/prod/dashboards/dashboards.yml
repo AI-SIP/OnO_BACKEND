@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: 'OnO Dashboards Prod'
+    orgId: 1
+    folder: 'OnO Prod'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards

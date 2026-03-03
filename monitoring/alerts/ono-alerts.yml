@@ -1,0 +1,64 @@
+groups:
+  - name: ono-backend-alerts
+    rules:
+      - alert: OnOBackendDownDev
+        expr: up{job="ono-backend-dev"} == 0
+        for: 3m
+        labels:
+          severity: critical
+          service: ono-backend
+          env: dev
+        annotations:
+          summary: "OnO backend dev target is down"
+          description: "Prometheus cannot scrape ono-backend-dev for more than 3 minutes."
+
+      - alert: OnOBackendDownProd
+        expr: max(up{job=~"ono-backend-prod-(blue|green)"}) == 0
+        for: 3m
+        labels:
+          severity: critical
+          service: ono-backend
+          env: prod
+        annotations:
+          summary: "OnO backend prod targets are down"
+          description: "Both blue/green prod targets are unavailable for more than 3 minutes."
+
+      - alert: OnOBackendHighCPU
+        expr: system_cpu_usage{job=~"ono-backend-.*"} > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          service: ono-backend
+        annotations:
+          summary: "High CPU usage on {{ $labels.job }}"
+          description: "system_cpu_usage is above 85% for 5 minutes."
+
+      - alert: OnOBackendHighJvmHeap
+        expr: (sum by (job) (jvm_memory_used_bytes{job=~"ono-backend-.*",area="heap"}) / clamp_min(sum by (job) (jvm_memory_max_bytes{job=~"ono-backend-.*",area="heap"}), 1)) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          service: ono-backend
+        annotations:
+          summary: "High JVM heap usage on {{ $labels.job }}"
+          description: "Heap usage ratio is above 85% for 10 minutes."
+
+      - alert: OnOBackendHighApiP95
+        expr: histogram_quantile(0.95, sum by (job, le) (rate(http_server_requests_seconds_bucket{job=~"ono-backend-.*",uri!~"/actuator.*"}[5m]))) > 1.5
+        for: 10m
+        labels:
+          severity: warning
+          service: ono-backend
+        annotations:
+          summary: "High API p95 latency on {{ $labels.job }}"
+          description: "HTTP API p95 latency is above 1.5s for 10 minutes."
+
+      - alert: OnOBackendHigh5xxRatio
+        expr: (sum by (job) (rate(http_server_requests_seconds_count{job=~"ono-backend-.*",status=~"5.."}[5m])) / clamp_min(sum by (job) (rate(http_server_requests_seconds_count{job=~"ono-backend-.*"}[5m])), 1e-9)) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          service: ono-backend
+        annotations:
+          summary: "High 5xx ratio on {{ $labels.job }}"
+          description: "5xx ratio is above 5% for 10 minutes."
