@@ -100,6 +100,9 @@ services:
       SENTRY_DSN: ${SENTRY_DSN}
       ADMIN_IDENTIFIER: ${ADMIN_IDENTIFIER}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
+      MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED: "true"
+      MANAGEMENT_SERVER_PORT: 8081
     volumes:
       - app_dev_logs:/app/logs
     depends_on:
@@ -112,11 +115,72 @@ services:
     networks:
       - ono-network
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8081/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
+
+  # Prometheus - DEVELOPMENT (Profile: monitoring)
+  prometheus-dev:
+    image: prom/prometheus:latest
+    container_name: ono-prometheus-dev
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.external-url=${PROMETHEUS_DEV_EXTERNAL_URL:-http://localhost:9091}
+      - --web.route-prefix=${PROMETHEUS_DEV_ROUTE_PREFIX:-/}
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./monitoring/prometheus.dev.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts:/etc/prometheus/alerts:ro
+      - prometheus_dev_data:/prometheus
+    networks:
+      - ono-network
+    depends_on:
+      - app-dev
+      - mysql-exporter-dev
+    profiles:
+      - monitoring
+
+  mysql-exporter-dev:
+    image: prom/mysqld-exporter:latest
+    container_name: ono-mysql-exporter-dev
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: root:${MYSQL_ROOT_PASSWORD}@(mysql-dev:3306)/
+    depends_on:
+      mysql-dev:
+        condition: service_healthy
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
+  # Grafana - DEVELOPMENT (Profile: monitoring)
+  grafana-dev:
+    image: grafana/grafana:latest
+    container_name: ono-grafana-dev
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_SERVER_ROOT_URL: ${GRAFANA_DEV_ROOT_URL:-http://localhost:3001}
+      GF_SERVER_SERVE_FROM_SUB_PATH: ${GRAFANA_DEV_SERVE_FROM_SUB_PATH:-false}
+    volumes:
+      - grafana_dev_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning/dev:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+    depends_on:
+      - prometheus-dev
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
 
 networks:
   ono-network:
@@ -131,4 +195,8 @@ volumes:
   rabbitmq_dev_data:
     driver: local
   app_dev_logs:
+    driver: local
+  prometheus_dev_data:
+    driver: local
+  grafana_dev_data:
     driver: local

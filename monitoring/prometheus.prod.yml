@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 60s
+  evaluation_interval: 60s
+
+rule_files:
+  - /etc/prometheus/alerts/ono-alerts.yml
+
+scrape_configs:
+  - job_name: "ono-backend-prod-blue"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["app-prod-blue:8081"]
+
+  - job_name: "ono-backend-prod-green"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["app-prod-green:8081"]
+
+  - job_name: "ono-mysql-prod"
+    static_configs:
+      - targets: ["mysql-exporter-prod:9104"]

@@ -9,6 +9,7 @@ import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
+import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2Dto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
@@ -21,9 +22,7 @@ import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
@@ -134,6 +133,59 @@ public class ProblemService {
 
         log.info("userId: {} register problemId: {}", userId, problem.getId());
 
+        return problem.getId();
+    }
+
+    /**
+     * 문제 등록 v2
+     * - 문제 등록 + 이미지 URL 기반 이미지 엔티티 생성 + 빈 분석 객체 생성
+     */
+    @Transactional
+    public Long registerProblemV2(ProblemRegisterV2Dto problemRegisterV2Dto, Long userId) {
+        Folder folder = folderRepository.findById(problemRegisterV2Dto.folderId())
+                .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
+
+        ProblemRegisterDto baseDto = new ProblemRegisterDto(
+                problemRegisterV2Dto.problemId(),
+                problemRegisterV2Dto.memo(),
+                problemRegisterV2Dto.reference(),
+                problemRegisterV2Dto.folderId(),
+                problemRegisterV2Dto.solvedAt()
+        );
+
+        Problem problem = Problem.from(baseDto, userId);
+        problem.updateFolder(folder);
+        problemRepository.save(problem);
+
+        if (problemRegisterV2Dto.problemImageUrls() != null) {
+            problemRegisterV2Dto.problemImageUrls().stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(url -> !url.isEmpty())
+                    .forEach(url -> {
+                        ProblemImageData imageData = ProblemImageData.from(
+                                new ProblemImageDataRegisterDto(problem.getId(), url, ProblemImageType.PROBLEM_IMAGE));
+                        imageData.updateProblem(problem);
+                        problemImageDataRepository.save(imageData);
+                    });
+        }
+
+        if (problemRegisterV2Dto.answerImageUrls() != null) {
+            problemRegisterV2Dto.answerImageUrls().stream()
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(url -> !url.isEmpty())
+                    .forEach(url -> {
+                        ProblemImageData imageData = ProblemImageData.from(
+                                new ProblemImageDataRegisterDto(problem.getId(), url, ProblemImageType.ANSWER_IMAGE));
+                        imageData.updateProblem(problem);
+                        problemImageDataRepository.save(imageData);
+                    });
+        }
+        analysisService.createSkippedAnalysis(problem.getId());
+        missionLogService.registerProblemWriteMission(userId);
+
+        log.info("userId: {} register problem(v2) problemId: {}", userId, problem.getId());
         return problem.getId();
     }
 

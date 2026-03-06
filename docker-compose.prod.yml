@@ -99,6 +99,9 @@ services:
       SENTRY_DSN: ${SENTRY_DSN}
       ADMIN_IDENTIFIER: ${ADMIN_IDENTIFIER}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
+      MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED: "true"
+      MANAGEMENT_SERVER_PORT: 8081
     volumes:
       - app_prod_logs:/app/logs
     depends_on:
@@ -111,7 +114,7 @@ services:
     networks:
       - ono-network
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8081/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -150,6 +153,9 @@ services:
       SENTRY_DSN: ${SENTRY_DSN}
       ADMIN_IDENTIFIER: ${ADMIN_IDENTIFIER}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
+      MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED: "true"
+      MANAGEMENT_SERVER_PORT: 8081
     volumes:
       - app_prod_logs:/app/logs
     depends_on:
@@ -162,13 +168,73 @@ services:
     networks:
       - ono-network
     healthcheck:
-      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8081/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
     profiles:
       - green  # 기본적으로는 비활성화, 배포 시에만 활성화
+
+  # Prometheus - PRODUCTION (Profile: monitoring)
+  prometheus-prod:
+    image: prom/prometheus:latest
+    container_name: ono-prometheus-prod
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.external-url=${PROMETHEUS_PROD_EXTERNAL_URL:-http://localhost:9090}
+      - --web.route-prefix=${PROMETHEUS_PROD_ROUTE_PREFIX:-/}
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.prod.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts:/etc/prometheus/alerts:ro
+      - prometheus_prod_data:/prometheus
+    depends_on:
+      - mysql-exporter-prod
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
+  mysql-exporter-prod:
+    image: prom/mysqld-exporter:latest
+    container_name: ono-mysql-exporter-prod
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: root:${MYSQL_ROOT_PASSWORD}@(mysql-prod:3306)/
+    depends_on:
+      mysql-prod:
+        condition: service_healthy
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
+  # Grafana - PRODUCTION (Profile: monitoring)
+  grafana-prod:
+    image: grafana/grafana:latest
+    container_name: ono-grafana-prod
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_SERVER_ROOT_URL: ${GRAFANA_PROD_ROOT_URL:-http://localhost:3000}
+      GF_SERVER_SERVE_FROM_SUB_PATH: ${GRAFANA_PROD_SERVE_FROM_SUB_PATH:-false}
+    volumes:
+      - grafana_prod_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning/prod:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+    depends_on:
+      - prometheus-prod
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
 
 networks:
   ono-network:
@@ -182,4 +248,8 @@ volumes:
   rabbitmq_prod_data:
     driver: local
   app_prod_logs:
+    driver: local
+  prometheus_prod_data:
+    driver: local
+  grafana_prod_data:
     driver: local

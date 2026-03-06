@@ -12,6 +12,8 @@ import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.Notification;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +31,7 @@ public class FcmService {
     private final FcmTokenRepository fcmTokenRepository;
 
     private final FirebaseMessaging firebaseMessaging;
+    private final MeterRegistry meterRegistry;
 
     private final FcmNotificationProducer fcmNotificationProducer;
 
@@ -52,6 +55,7 @@ public class FcmService {
     }
 
     public void sendNotification(NotificationRequestDto dto) {
+        Timer.Sample sample = Timer.start(meterRegistry);
         Message msg = Message.builder()
                 .setToken(dto.token())
                 .setNotification(Notification.builder()
@@ -63,8 +67,10 @@ public class FcmService {
 
         try {
             String messageId = firebaseMessaging.send(msg);
+            recordExternalCall("firebase", "send_notification_sync", "success", sample);
             log.info("FCM 메시지 전송 성공: {}", messageId);
         } catch (FirebaseMessagingException e) {
+            recordExternalCall("firebase", "send_notification_sync", "failure", sample);
             log.error("FCM 전송 실패", e);
             throw new ApplicationException(FcmErrorCase.FCM_SEND_FAILED);
         }
@@ -85,6 +91,18 @@ public class FcmService {
         );
 
         log.info("FCM 알림 메시지 큐 전송 완료 - userId: {}, title: {}", userId, notificationRequestDto.title());
+    }
+
+    private void recordExternalCall(String dependency, String operation, String outcome, Timer.Sample sample) {
+        sample.stop(
+                Timer.builder("ono.external.requests")
+                        .description("External dependency call latency")
+                        .publishPercentileHistogram()
+                        .tag("dependency", dependency)
+                        .tag("operation", operation)
+                        .tag("outcome", outcome)
+                        .register(meterRegistry)
+        );
     }
 
     /**

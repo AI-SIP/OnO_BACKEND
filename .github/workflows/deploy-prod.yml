@@ -30,7 +30,7 @@ jobs:
       - name: Create application-prod.yml
         run: |
           mkdir -p ./src/main/resources
-          echo "${{ secrets.APPLICATION_PROD }}" > ./src/main/resources/application.yml
+          echo "${{ secrets.APPLICATION_PROD }}" > ./src/main/resources/application-prod.yml
         shell: bash
 
       # 4. Firebase Admin Key 생성
@@ -73,6 +73,8 @@ jobs:
           cat > .env.prod << EOF
           DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
           MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+          RABBITMQ_USER=${{ secrets.RABBITMQ_USER }}
+          RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_PASSWORD }}
           SPRING_CRYPTO_SECRET_KEY=${{ secrets.SPRING_CRYPTO_SECRET_KEY }}
           JWT_ACCESS_TOKEN_SECRET=${{ secrets.JWT_ACCESS_TOKEN_SECRET }}
           JWT_ACCESS_TOKEN_EXPIRATION=1800000
@@ -86,12 +88,21 @@ jobs:
           SENTRY_DSN=${{ secrets.SENTRY_DSN }}
           ADMIN_IDENTIFIER=${{ secrets.ADMIN_IDENTIFIER }}
           ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+          GRAFANA_ADMIN_USER=${{ secrets.GRAFANA_ADMIN_USER }}
+          GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+          GRAFANA_PROD_ROOT_URL=https://ono-prod.seungminki.shop/grafana/
+          GRAFANA_PROD_SERVE_FROM_SUB_PATH=true
+          PROMETHEUS_PROD_EXTERNAL_URL=https://ono-prod.seungminki.shop/prometheus/
+          PROMETHEUS_PROD_ROUTE_PREFIX=/prometheus
           EOF
         shell: bash
 
       # 10. Blue-Green 무중단 배포
       - name: Blue-Green Deployment
         run: |
+          # 최신 prod 이미지 강제 pull (tag 캐시로 구버전 실행되는 문제 방지)
+          docker pull ${{ secrets.DOCKER_USERNAME }}/ono:prod-latest
+
           # MySQL과 Redis 시작 (이미 실행 중이면 스킵)
           docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d mysql-prod redis-prod
 
@@ -194,6 +205,39 @@ jobs:
           # 로그 출력 (마지막 50줄)
           echo "=== $TARGET Environment Logs ==="
           docker-compose -f docker-compose.prod.yml logs --tail=50 app-prod-$TARGET
+        shell: bash
+
+      # 11. Monitoring Stack 배포 (PRODUCTION, Non-blocking)
+      - name: Deploy Monitoring Stack
+        run: |
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring stop prometheus-prod grafana-prod mysql-exporter-prod || true
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring rm -f prometheus-prod grafana-prod mysql-exporter-prod || true
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring up -d --force-recreate \
+            mysql-exporter-prod prometheus-prod grafana-prod
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod ps \
+            mysql-exporter-prod prometheus-prod grafana-prod
+        shell: bash
+
+      # 11-1. Monitoring 연동 검증 (PRODUCTION, Non-blocking)
+      - name: Verify Monitoring Integration
+        continue-on-error: true
+        run: |
+          echo "Checking Prometheus scrape status for production jobs..."
+
+          # 최대 60초 동안 active blue/green 중 하나라도 up=1인지 확인
+          for i in $(seq 1 12); do
+            result=$(docker exec ono-prometheus-prod sh -lc 'wget -qO- "http://localhost:9090/prometheus/api/v1/query?query=max(up{job=~\"ono-backend-prod-(blue|green)\"})"' || true)
+            if echo "$result" | grep -q '"value":\[.*,"1"\]'; then
+              echo "Prometheus scrape is UP for at least one production target"
+              exit 0
+            fi
+            echo "Waiting scrape up... ($i/12)"
+            sleep 5
+          done
+
+          echo "WARNING: Prometheus scrape for production targets is still down"
+          docker exec ono-prometheus-prod sh -lc 'wget -qO- "http://localhost:9090/prometheus/api/v1/targets"' || true
+          docker logs --tail=200 ono-prometheus-prod || true
         shell: bash
 
       # 12. 오래된 Docker 이미지 정리
