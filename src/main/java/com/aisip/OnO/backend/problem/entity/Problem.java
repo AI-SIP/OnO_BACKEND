@@ -22,7 +22,7 @@ import java.util.List;
 @SQLRestriction("deleted_at IS NULL")
 @Table(name = "problem", indexes = {
         @Index(name = "idx_problem_folder_id", columnList = "folder_id"),
-        @Index(name = "idx_problem_user_id", columnList = "userId")
+        @Index(name = "idx_problem_user_created", columnList = "user_id, created_at")
 })
 public class Problem extends BaseEntity {
 

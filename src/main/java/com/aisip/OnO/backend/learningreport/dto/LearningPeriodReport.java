@@ -11,6 +11,8 @@ public record LearningPeriodReport(
         LocalDate startDate,
         LocalDate endDate,
         Long reviewCount,
+        Long noteWriteCount,
+        Long notePracticeCount,
         Double averageAccuracy,
         Integer consecutiveLearningDays,
         Double averageStudyTimeMinutes,

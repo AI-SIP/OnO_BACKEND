@@ -3,6 +3,10 @@ package com.aisip.OnO.backend.learningreport.service;
 import com.aisip.OnO.backend.learningreport.dto.LearningComparison;
 import com.aisip.OnO.backend.learningreport.dto.LearningPeriodReport;
 import com.aisip.OnO.backend.learningreport.dto.LearningReportResponseDto;
+import com.aisip.OnO.backend.mission.dto.MissionRegisterDto;
+import com.aisip.OnO.backend.mission.entity.MissionLog;
+import com.aisip.OnO.backend.mission.entity.MissionType;
+import com.aisip.OnO.backend.mission.repository.MissionLogRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemAnalysis;
@@ -19,6 +23,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import jakarta.persistence.EntityManager;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,6 +54,12 @@ class LearningReportServiceTest {
     @Autowired
     private ProblemSolveRepository problemSolveRepository;
 
+    @Autowired
+    private MissionLogRepository missionLogRepository;
+
+    @Autowired
+    private EntityManager entityManager;
+
     @Test
     @DisplayName("학습 리포트 조회 - 주간/월간/누적 집계가 올바르게 계산된다")
     void getLearningReport_success() {
@@ -56,9 +67,11 @@ class LearningReportServiceTest {
         User otherUser = createUser("other-user");
         Long userId = targetUser.getId();
 
-        Problem algebraProblem = createProblemWithAnalysis(userId, "대수");
-        Problem geometryProblem = createProblemWithAnalysis(userId, "기하");
-        Problem trigProblem = createProblemWithAnalysis(userId, "삼각함수");
+        Problem algebraProblem = createProblemWithAnalysis(userId, "대수", LocalDateTime.of(2026, 2, 16, 8, 0));
+        Problem geometryProblem = createProblemWithAnalysis(userId, "기하", LocalDateTime.of(2026, 2, 1, 8, 0));
+        Problem trigProblem = createProblemWithAnalysis(userId, "삼각함수", LocalDateTime.of(2026, 1, 11, 8, 0));
+        createProblemWrite(userId, LocalDateTime.of(2026, 2, 20, 8, 0));
+        createProblemWrite(userId, LocalDateTime.of(2026, 1, 10, 8, 0));
 
         createSolve(algebraProblem, userId, LocalDateTime.of(2026, 2, 16, 9, 0), AnswerStatus.CORRECT, 600);
         createSolve(algebraProblem, userId, LocalDateTime.of(2026, 2, 17, 9, 0), AnswerStatus.WRONG, 300);
@@ -69,13 +82,21 @@ class LearningReportServiceTest {
         createSolve(trigProblem, userId, LocalDateTime.of(2026, 1, 10, 9, 0), AnswerStatus.CORRECT, 120);
         createSolve(algebraProblem, userId, LocalDateTime.of(2026, 1, 11, 9, 0), AnswerStatus.WRONG, 120);
 
-        Problem otherUserProblem = createProblemWithAnalysis(otherUser.getId(), "확률");
+        createNotePracticeMission(targetUser, 101L, LocalDateTime.of(2026, 2, 17, 11, 0));
+        createNotePracticeMission(targetUser, 102L, LocalDateTime.of(2026, 2, 21, 11, 0));
+        createNotePracticeMission(targetUser, 103L, LocalDateTime.of(2026, 2, 3, 11, 0));
+        createNotePracticeMission(targetUser, 104L, LocalDateTime.of(2026, 1, 10, 11, 0));
+
+        Problem otherUserProblem = createProblemWithAnalysis(otherUser.getId(), "확률", LocalDateTime.of(2026, 2, 17, 8, 0));
         createSolve(otherUserProblem, otherUser.getId(), LocalDateTime.of(2026, 2, 17, 9, 0), AnswerStatus.WRONG, 999);
+        createNotePracticeMission(otherUser, 201L, LocalDateTime.of(2026, 2, 18, 11, 0));
 
         LearningReportResponseDto report = learningReportService.getLearningReport(userId, LocalDate.of(2026, 2, 21));
 
         LearningPeriodReport weekly = report.weekly();
         assertThat(weekly.reviewCount()).isEqualTo(4L);
+        assertThat(weekly.noteWriteCount()).isEqualTo(2L);
+        assertThat(weekly.notePracticeCount()).isEqualTo(2L);
         assertThat(weekly.averageAccuracy()).isEqualTo(37.5);
         assertThat(weekly.consecutiveLearningDays()).isEqualTo(3);
         assertThat(weekly.averageStudyTimeMinutes()).isEqualTo(5.0);
@@ -98,20 +119,24 @@ class LearningReportServiceTest {
 
         LearningPeriodReport monthly = report.monthly();
         assertThat(monthly.reviewCount()).isEqualTo(6L);
+        assertThat(monthly.noteWriteCount()).isEqualTo(3L);
+        assertThat(monthly.notePracticeCount()).isEqualTo(3L);
         assertThat(monthly.averageAccuracy()).isCloseTo(41.666666, within(0.001));
         assertThat(monthly.consecutiveLearningDays()).isEqualTo(3);
         assertThat(monthly.averageStudyTimeMinutes()).isCloseTo(3.833333, within(0.0001));
         Map<String, Long> monthlyTrend = monthly.trend().stream()
                 .collect(Collectors.toMap(t -> t.label(), t -> t.reviewCount()));
         assertThat(monthlyTrend)
-                .containsEntry("1주차", 1L)
-                .containsEntry("2주차", 1L)
-                .containsEntry("3주차", 4L)
-                .containsEntry("4주차", 0L)
-                .doesNotContainKey("5주차");
+                .containsEntry("지난 4주", 0L)
+                .containsEntry("지난 3주", 1L)
+                .containsEntry("지난 2주", 1L)
+                .containsEntry("지난 1주", 4L)
+                .doesNotContainKey("지난 5주");
 
         LearningPeriodReport total = report.total();
         assertThat(total.reviewCount()).isEqualTo(8L);
+        assertThat(total.noteWriteCount()).isEqualTo(5L);
+        assertThat(total.notePracticeCount()).isEqualTo(4L);
         assertThat(total.averageAccuracy()).isCloseTo(43.75, within(0.0001));
 
         Map<String, Long> totalTrend = total.trend().stream()
@@ -139,8 +164,14 @@ class LearningReportServiceTest {
         LearningReportResponseDto report = learningReportService.getLearningReport(user.getId(), LocalDate.of(2026, 2, 21));
 
         assertThat(report.weekly().reviewCount()).isEqualTo(0L);
+        assertThat(report.weekly().noteWriteCount()).isEqualTo(0L);
+        assertThat(report.weekly().notePracticeCount()).isEqualTo(0L);
         assertThat(report.monthly().reviewCount()).isEqualTo(0L);
+        assertThat(report.monthly().noteWriteCount()).isEqualTo(0L);
+        assertThat(report.monthly().notePracticeCount()).isEqualTo(0L);
         assertThat(report.total().reviewCount()).isEqualTo(0L);
+        assertThat(report.total().noteWriteCount()).isEqualTo(0L);
+        assertThat(report.total().notePracticeCount()).isEqualTo(0L);
         assertThat(report.weekly().averageAccuracy()).isEqualTo(0.0);
         assertThat(report.monthly().averageStudyTimeMinutes()).isEqualTo(0.0);
         assertThat(report.total().weakAreas()).isEmpty();
@@ -157,11 +188,12 @@ class LearningReportServiceTest {
                 .build()));
     }
 
-    private Problem createProblemWithAnalysis(Long userId, String problemType) {
+    private Problem createProblemWithAnalysis(Long userId, String problemType, LocalDateTime createdAt) {
         Problem problemEntity = problemRepository.save(Problem.from(
                 new ProblemRegisterDto(null, "memo-" + problemType, "ref-" + problemType, null, LocalDateTime.now()),
                 userId
         ));
+        updateProblemCreatedAt(problemEntity.getId(), createdAt);
 
         ProblemAnalysis analysis = ProblemAnalysis.createProcessing(problemEntity);
         analysis.updateWithSuccess("수학", problemType, "[]", "solution", "mistake", "tip");
@@ -179,6 +211,39 @@ class LearningReportServiceTest {
                 null,
                 seconds
         ));
+    }
+
+    private void createProblemWrite(Long userId, LocalDateTime createdAt) {
+        Problem problemEntity = problemRepository.save(Problem.from(
+                new ProblemRegisterDto(null, "memo-write-" + createdAt, "ref-write-" + createdAt, null, LocalDateTime.now()),
+                userId
+        ));
+        updateProblemCreatedAt(problemEntity.getId(), createdAt);
+    }
+
+    private void updateProblemCreatedAt(Long problemId, LocalDateTime createdAt) {
+        entityManager.flush();
+        entityManager.createNativeQuery("UPDATE problem SET created_at = :createdAt WHERE id = :id")
+                .setParameter("createdAt", createdAt)
+                .setParameter("id", problemId)
+                .executeUpdate();
+    }
+
+    private void createNotePracticeMission(User user, Long referenceId, LocalDateTime createdAt) {
+        MissionLog missionLog = missionLogRepository.save(MissionLog.from(
+                MissionRegisterDto.builder()
+                        .userId(user.getId())
+                        .missionType(MissionType.NOTE_PRACTICE)
+                        .referenceId(referenceId)
+                        .build(),
+                user
+        ));
+
+        entityManager.flush();
+        entityManager.createNativeQuery("UPDATE mission_log SET created_at = :createdAt WHERE id = :id")
+                .setParameter("createdAt", createdAt)
+                .setParameter("id", missionLog.getId())
+                .executeUpdate();
     }
 
     private static Offset<Double> within(double value) {

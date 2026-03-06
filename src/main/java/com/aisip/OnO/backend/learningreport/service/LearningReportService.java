@@ -83,6 +83,8 @@ public class LearningReportService {
         LocalDateTime end = range.end().atTime(23, 59, 59);
 
         Long reviewCount = defaultLong(reportRepository.countReviewsInPeriod(userId, start, end));
+        Long noteWriteCount = defaultLong(reportRepository.countNoteWritesInPeriod(userId, start, end));
+        Long notePracticeCount = defaultLong(reportRepository.countNotePracticesInPeriod(userId, start, end));
         Double avgAccuracy = toPercent(reportRepository.averageAccuracyInPeriod(userId, start, end));
         Double avgStudyTime = secondsToMinutes(reportRepository.averageStudyTimeInPeriod(userId, start, end));
         List<LocalDate> practiceDates = reportRepository.findDistinctPracticeDatesInPeriod(userId, start, end);
@@ -92,6 +94,8 @@ public class LearningReportService {
                 .startDate(range.start())
                 .endDate(range.end())
                 .reviewCount(reviewCount)
+                .noteWriteCount(noteWriteCount)
+                .notePracticeCount(notePracticeCount)
                 .averageAccuracy(avgAccuracy)
                 .consecutiveLearningDays(calculateLongestStreak(practiceDates))
                 .averageStudyTimeMinutes(avgStudyTime)
@@ -102,6 +106,8 @@ public class LearningReportService {
 
     private LearningPeriodReport buildTotalReport(Long userId, LocalDate baseDate) {
         Long reviewCount = defaultLong(reportRepository.countReviewsTotal(userId));
+        Long noteWriteCount = defaultLong(reportRepository.countNoteWritesTotal(userId));
+        Long notePracticeCount = defaultLong(reportRepository.countNotePracticesTotal(userId));
         Double avgAccuracy = toPercent(reportRepository.averageAccuracyTotal(userId));
         Double avgStudyTime = secondsToMinutes(reportRepository.averageStudyTimeTotal(userId));
         List<LocalDate> practiceDates = reportRepository.findDistinctPracticeDatesTotal(userId);
@@ -114,6 +120,8 @@ public class LearningReportService {
                 .startDate(null)
                 .endDate(baseDate)
                 .reviewCount(reviewCount)
+                .noteWriteCount(noteWriteCount)
+                .notePracticeCount(notePracticeCount)
                 .averageAccuracy(avgAccuracy)
                 .consecutiveLearningDays(calculateLongestStreak(practiceDates))
                 .averageStudyTimeMinutes(avgStudyTime)
