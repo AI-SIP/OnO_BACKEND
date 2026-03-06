@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.learningreport.repository;
 
+import com.aisip.OnO.backend.mission.entity.MissionType;
 import com.aisip.OnO.backend.problemsolve.entity.AnswerStatus;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.dsl.CaseBuilder;
@@ -18,6 +19,7 @@ import java.util.List;
 import static com.aisip.OnO.backend.problem.entity.QProblem.problem;
 import static com.aisip.OnO.backend.problem.entity.QProblemAnalysis.problemAnalysis;
 import static com.aisip.OnO.backend.problemsolve.entity.QProblemSolve.problemSolve;
+import static com.aisip.OnO.backend.mission.entity.QMissionLog.missionLog;
 
 @Repository
 public class LearningReportQueryRepository {
@@ -42,6 +44,42 @@ public class LearningReportQueryRepository {
                 .select(problemSolve.count())
                 .from(problemSolve)
                 .where(problemSolve.userId.eq(userId))
+                .fetchOne();
+    }
+
+    public Long countNoteWritesInPeriod(Long userId, LocalDateTime start, LocalDateTime end) {
+        return queryFactory
+                .select(problem.count())
+                .from(problem)
+                .where(problem.userId.eq(userId)
+                        .and(problem.createdAt.between(start, end)))
+                .fetchOne();
+    }
+
+    public Long countNoteWritesTotal(Long userId) {
+        return queryFactory
+                .select(problem.count())
+                .from(problem)
+                .where(problem.userId.eq(userId))
+                .fetchOne();
+    }
+
+    public Long countNotePracticesInPeriod(Long userId, LocalDateTime start, LocalDateTime end) {
+        return queryFactory
+                .select(missionLog.count())
+                .from(missionLog)
+                .where(missionLog.user.id.eq(userId)
+                        .and(missionLog.missionType.eq(MissionType.NOTE_PRACTICE))
+                        .and(missionLog.createdAt.between(start, end)))
+                .fetchOne();
+    }
+
+    public Long countNotePracticesTotal(Long userId) {
+        return queryFactory
+                .select(missionLog.count())
+                .from(missionLog)
+                .where(missionLog.user.id.eq(userId)
+                        .and(missionLog.missionType.eq(MissionType.NOTE_PRACTICE)))
                 .fetchOne();
     }
 

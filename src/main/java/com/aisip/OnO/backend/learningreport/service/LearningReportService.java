@@ -15,16 +15,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
-import java.time.temporal.TemporalAdjusters;
+import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 @Slf4j
 @Service
@@ -85,6 +83,8 @@ public class LearningReportService {
         LocalDateTime end = range.end().atTime(23, 59, 59);
 
         Long reviewCount = defaultLong(reportRepository.countReviewsInPeriod(userId, start, end));
+        Long noteWriteCount = defaultLong(reportRepository.countNoteWritesInPeriod(userId, start, end));
+        Long notePracticeCount = defaultLong(reportRepository.countNotePracticesInPeriod(userId, start, end));
         Double avgAccuracy = toPercent(reportRepository.averageAccuracyInPeriod(userId, start, end));
         Double avgStudyTime = secondsToMinutes(reportRepository.averageStudyTimeInPeriod(userId, start, end));
         List<LocalDate> practiceDates = reportRepository.findDistinctPracticeDatesInPeriod(userId, start, end);
@@ -94,6 +94,8 @@ public class LearningReportService {
                 .startDate(range.start())
                 .endDate(range.end())
                 .reviewCount(reviewCount)
+                .noteWriteCount(noteWriteCount)
+                .notePracticeCount(notePracticeCount)
                 .averageAccuracy(avgAccuracy)
                 .consecutiveLearningDays(calculateLongestStreak(practiceDates))
                 .averageStudyTimeMinutes(avgStudyTime)
@@ -104,6 +106,8 @@ public class LearningReportService {
 
     private LearningPeriodReport buildTotalReport(Long userId, LocalDate baseDate) {
         Long reviewCount = defaultLong(reportRepository.countReviewsTotal(userId));
+        Long noteWriteCount = defaultLong(reportRepository.countNoteWritesTotal(userId));
+        Long notePracticeCount = defaultLong(reportRepository.countNotePracticesTotal(userId));
         Double avgAccuracy = toPercent(reportRepository.averageAccuracyTotal(userId));
         Double avgStudyTime = secondsToMinutes(reportRepository.averageStudyTimeTotal(userId));
         List<LocalDate> practiceDates = reportRepository.findDistinctPracticeDatesTotal(userId);
@@ -116,6 +120,8 @@ public class LearningReportService {
                 .startDate(null)
                 .endDate(baseDate)
                 .reviewCount(reviewCount)
+                .noteWriteCount(noteWriteCount)
+                .notePracticeCount(notePracticeCount)
                 .averageAccuracy(avgAccuracy)
                 .consecutiveLearningDays(calculateLongestStreak(practiceDates))
                 .averageStudyTimeMinutes(avgStudyTime)
@@ -143,18 +149,16 @@ public class LearningReportService {
                 .build();
     }
 
-    private List<LearningTrendPoint> buildTrend(
-            Long userId, LocalDate startDate, LocalDate endDate, TrendType trendType
-    ) {
+    private List<LearningTrendPoint> buildTrend(Long userId, LocalDate startDate, LocalDate endDate, TrendType trendType) {
         LocalDateTime start = startDate.atStartOfDay();
         LocalDateTime end = endDate.atTime(23, 59, 59);
 
-        TreeMap<String, Long> bucket = initializeTrendBuckets(startDate, endDate, trendType);
+        Map<String, Long> bucket = initializeTrendBuckets(startDate, endDate, trendType);
 
         List<LearningReportQueryRepository.DailySolveCount> rows =
                 reportRepository.findDailySolveCounts(userId, start, end);
         for (LearningReportQueryRepository.DailySolveCount row : rows) {
-            String key = trendKey(row.practicedDate(), startDate, trendType);
+            String key = trendKey(row.practicedDate(), endDate, trendType);
             bucket.computeIfPresent(key, (k, v) -> v + defaultLong(row.solveCount()));
         }
 
@@ -166,8 +170,8 @@ public class LearningReportService {
                 .toList();
     }
 
-    private TreeMap<String, Long> initializeTrendBuckets(LocalDate startDate, LocalDate endDate, TrendType trendType) {
-        TreeMap<String, Long> buckets = new TreeMap<>();
+    private Map<String, Long> initializeTrendBuckets(LocalDate startDate, LocalDate endDate, TrendType trendType) {
+        Map<String, Long> buckets = new LinkedHashMap<>();
         if (trendType == TrendType.DAILY) {
             LocalDate cursor = startDate;
             while (!cursor.isAfter(endDate)) {
@@ -178,8 +182,8 @@ public class LearningReportService {
         }
 
         if (trendType == TrendType.WEEKLY) {
-            int weekCount = weekCountInCalendarRange(startDate, endDate);
-            for (int week = 1; week <= weekCount; week++) {
+            // 최근 4주(지난 4주 -> 지난 1주) 버킷 고정
+            for (int week = 4; week >= 1; week--) {
                 buckets.put(weekLabel(week), 0L);
             }
             return buckets;
@@ -193,12 +197,12 @@ public class LearningReportService {
         return buckets;
     }
 
-    private String trendKey(LocalDate date, LocalDate rangeStartDate, TrendType trendType) {
+    private String trendKey(LocalDate date, LocalDate rangeEndDate, TrendType trendType) {
         if (trendType == TrendType.DAILY) {
             return date.toString();
         }
         if (trendType == TrendType.WEEKLY) {
-            return weekLabel(weekOfCalendarRange(date, rangeStartDate));
+            return weekLabel(weekOfRollingRange(date, rangeEndDate));
         }
         return yearMonthLabel(date);
     }
@@ -207,20 +211,16 @@ public class LearningReportService {
         return date.getYear() + "-" + String.format("%02d", date.getMonthValue());
     }
 
-    private int weekOfCalendarRange(LocalDate date, LocalDate rangeStartDate) {
-        LocalDate firstWeekStart = rangeStartDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
-        LocalDate weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
-        return (int) java.time.temporal.ChronoUnit.WEEKS.between(firstWeekStart, weekStart) + 1;
-    }
-
-    private int weekCountInCalendarRange(LocalDate startDate, LocalDate endDate) {
-        LocalDate firstWeekStart = startDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
-        LocalDate lastWeekStart = endDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
-        return (int) java.time.temporal.ChronoUnit.WEEKS.between(firstWeekStart, lastWeekStart) + 1;
+    private int weekOfRollingRange(LocalDate date, LocalDate rangeEndDate) {
+        long diffDays = ChronoUnit.DAYS.between(date, rangeEndDate);
+        if (diffDays < 0) {
+            return 1;
+        }
+        return (int) (diffDays / 7) + 1;
     }
 
     private String weekLabel(int week) {
-        return week + "주차";
+        return "지난 " + week + "주";
     }
 
     private List<LearningWeakArea> buildWeakAreasInPeriod(Long userId, LocalDateTime start, LocalDateTime end) {
@@ -402,22 +402,21 @@ public class LearningReportService {
     }
 
     private DateRange weekRange(LocalDate targetDate) {
-        LocalDate start = targetDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY));
-        return new DateRange(start, start.plusDays(6));
+        return new DateRange(targetDate.minusDays(6), targetDate);
     }
 
     private DateRange previousWeekRange(DateRange weekRange) {
-        return new DateRange(weekRange.start().minusWeeks(1), weekRange.start().minusDays(1));
+        LocalDate end = weekRange.start().minusDays(1);
+        return new DateRange(end.minusDays(6), end);
     }
 
     private DateRange monthRange(LocalDate targetDate) {
-        LocalDate start = targetDate.withDayOfMonth(1);
-        LocalDate end = YearMonth.from(targetDate).atEndOfMonth();
-        return new DateRange(start, end);
+        return new DateRange(targetDate.minusDays(27), targetDate);
     }
 
     private DateRange previousMonthRange(DateRange monthRange) {
-        return new DateRange(monthRange.start().minusMonths(1), monthRange.start().minusDays(1));
+        LocalDate end = monthRange.start().minusDays(1);
+        return new DateRange(end.minusDays(27), end);
     }
 
     private record DateRange(LocalDate start, LocalDate end) {
