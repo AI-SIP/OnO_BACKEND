@@ -1,23 +1,18 @@
-name: Deploy to Development Server (Mac Mini)
+name: Deploy to Development Server (Manual Fallback)
 
 on:
-  workflow_run:
-    workflows: ["CI Build & Push Dev Image"]
-    types: [completed]
   workflow_dispatch:
+    inputs:
+      app_tag:
+        description: "Docker image tag (ex: dev-latest or dev-<sha>)"
+        required: true
+        default: "dev-latest"
 
 permissions:
   contents: read
 
 jobs:
   deploy-dev:
-    if: >-
-      ${{
-        github.event_name == 'workflow_dispatch' ||
-        (github.event_name == 'workflow_run' &&
-         github.event.workflow_run.conclusion == 'success' &&
-         github.event.workflow_run.head_branch == 'feat/deploy')
-      }}
     runs-on: self-hosted
     concurrency:
       group: deploy-dev
@@ -26,20 +21,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Resolve deployment metadata
         run: |
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            echo "DEPLOY_SHA=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_ENV"
-            echo "DEPLOY_BRANCH=${{ github.event.workflow_run.head_branch }}" >> "$GITHUB_ENV"
-            echo "APP_TAG=dev-${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_ENV"
-          else
-            echo "DEPLOY_SHA=${{ github.sha }}" >> "$GITHUB_ENV"
-            echo "DEPLOY_BRANCH=${{ github.ref_name }}" >> "$GITHUB_ENV"
-            echo "APP_TAG=dev-latest" >> "$GITHUB_ENV"
-          fi
+          echo "DEPLOY_SHA=${{ github.sha }}" >> "$GITHUB_ENV"
+          echo "DEPLOY_BRANCH=${{ github.ref_name }}" >> "$GITHUB_ENV"
+          echo "APP_TAG=${{ github.event.inputs.app_tag }}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Create .env file
@@ -107,57 +94,6 @@ jobs:
           docker-compose -f docker-compose.dev.yml --env-file .env.dev logs --tail=50 app-dev
         shell: bash
 
-      - name: Deploy Monitoring Stack
-        run: |
-          docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring stop prometheus-dev grafana-dev mysql-exporter-dev || true
-          docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring rm -f prometheus-dev grafana-dev mysql-exporter-dev || true
-          docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring up -d --force-recreate \
-            mysql-exporter-dev prometheus-dev grafana-dev
-          docker-compose -f docker-compose.dev.yml --env-file .env.dev ps \
-            mysql-exporter-dev prometheus-dev grafana-dev
-        shell: bash
-
-      - name: Verify Monitoring Integration
-        run: |
-          echo "Checking app-dev actuator metrics endpoint..."
-          if ! docker exec ono-app-dev sh -lc 'wget -qO- http://localhost:8081/actuator/prometheus | head -n 5' >/tmp/app_metrics_head.txt; then
-            echo "ERROR: app-dev actuator/prometheus endpoint is not reachable"
-            docker logs --tail=200 ono-app-dev || true
-            exit 1
-          fi
-
-          echo "Checking app-dev actuator metrics endpoint from prometheus-dev..."
-          if ! docker exec ono-prometheus-dev sh -lc 'wget -qO- http://app-dev:8081/actuator/prometheus | head -n 5' >/tmp/prom_metrics_head.txt; then
-            echo "ERROR: prometheus-dev cannot fetch app-dev actuator/prometheus"
-            docker exec ono-prometheus-dev sh -lc 'wget -S -O- http://app-dev:8081/actuator/prometheus >/dev/null' || true
-            docker logs --tail=200 ono-app-dev || true
-            exit 1
-          fi
-
-          echo "Checking Prometheus scrape status for ono-backend-dev..."
-          for i in $(seq 1 12); do
-            result=$(docker exec ono-prometheus-dev sh -lc 'wget -qO- "http://localhost:9090/prometheus/api/v1/query?query=up{job=\"ono-backend-dev\"}"' || true)
-            if echo "$result" | grep -q '"value":\[.*,"1"\]'; then
-              echo "Prometheus scrape is UP"
-              exit 0
-            fi
-            echo "Waiting scrape up... ($i/12)"
-            sleep 5
-          done
-
-          echo "ERROR: Prometheus scrape for ono-backend-dev is still down"
-          docker exec ono-prometheus-dev sh -lc 'wget -qO- "http://localhost:9090/prometheus/api/v1/targets"' || true
-          docker logs --tail=200 ono-app-dev || true
-          docker logs --tail=200 ono-prometheus-dev || true
-          exit 1
-        shell: bash
-
-      - name: Clean up old Docker images
-        run: |
-          docker image prune -f --filter "until=24h"
-        shell: bash
-        continue-on-error: true
-
       - name: Send deployment notification
         if: always()
         run: |
@@ -171,8 +107,8 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{
               \"embeds\": [{
-                \"title\": \"🔧 Development Deployment $STATUS\",
-                \"description\": \"Environment: **DEVELOPMENT**\\nURL: https://ono-dev.seungminki.shop\\nBranch: \\`${DEPLOY_BRANCH}\\`\\nCommit: \\`${DEPLOY_SHA}\\`\\nAuthor: ${{ github.actor }}\",
+                \"title\": \"🔧 Development Deployment (Manual) $STATUS\",
+                \"description\": \"Environment: **DEVELOPMENT**\\nURL: https://ono-dev.seungminki.shop\\nBranch: \\`${DEPLOY_BRANCH}\\`\\nTag: \\`${APP_TAG}\\`\\nAuthor: ${{ github.actor }}\",
                 \"color\": $COLOR,
                 \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\"
               }]
