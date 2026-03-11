@@ -1,76 +1,50 @@
 name: Deploy to Production Server (Mac Mini)
 
 on:
-  push:
-    branches: ["main"]  # main 브랜치에 푸시될 때 운영 배포
-  workflow_dispatch:  # 수동 실행 가능
+  workflow_run:
+    workflows: ["CI Build & Push Prod Image"]
+    types: [completed]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  build-and-deploy-prod:
-    runs-on: self-hosted  # Mac Mini의 Self-hosted Runner 사용
+  deploy-prod:
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'workflow_run' &&
+         github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.head_branch == 'main')
+      }}
+    runs-on: self-hosted
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
 
     steps:
-      # 1. 코드 체크아웃
       - name: Checkout code
         uses: actions/checkout@v4
-
-      # 2. JDK 17 설정 (캐시 완전 비활성화)
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
-        env:
-          SEGMENT_DOWNLOAD_TIMEOUT_MINS: 1  # 캐시 다운로드 타임아웃 1분으로 단축
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
-      # 3. application-prod.yml 생성
-      - name: Create application-prod.yml
+      - name: Resolve deployment metadata
         run: |
-          mkdir -p ./src/main/resources
-          echo "${{ secrets.APPLICATION_PROD }}" > ./src/main/resources/application-prod.yml
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "DEPLOY_SHA=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_ENV"
+            echo "DEPLOY_BRANCH=${{ github.event.workflow_run.head_branch }}" >> "$GITHUB_ENV"
+            echo "APP_TAG=prod-${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_ENV"
+          else
+            echo "DEPLOY_SHA=${{ github.sha }}" >> "$GITHUB_ENV"
+            echo "DEPLOY_BRANCH=${{ github.ref_name }}" >> "$GITHUB_ENV"
+            echo "APP_TAG=prod-latest" >> "$GITHUB_ENV"
+          fi
         shell: bash
 
-      # 4. Firebase Admin Key 생성
-      - name: Create FirebaseAdminKey.json
-        run: |
-          rm -rf ./FirebaseAdminKey.json
-          cat > ./FirebaseAdminKey.json << 'EOF'
-          ${{ secrets.FIREBASE_ADMIN_KEY }}
-          EOF
-        shell: bash
-
-      # 5. Gradle 빌드 권한 부여
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-        shell: bash
-
-      # 6. Gradle 빌드 (테스트 제외)
-      - name: Build with Gradle
-        run: ./gradlew clean build -x test
-        shell: bash
-
-      # 7. Docker 이미지 빌드 (PRODUCTION 태그)
-      - name: Build Docker image
-        run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/ono:prod-latest .
-          docker tag ${{ secrets.DOCKER_USERNAME }}/ono:prod-latest ${{ secrets.DOCKER_USERNAME }}/ono:prod-${{ github.sha }}
-        shell: bash
-
-      # 8. Docker Hub에 푸시
-      - name: Push to Docker Hub
-        run: |
-          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
-          docker push ${{ secrets.DOCKER_USERNAME }}/ono:prod-latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/ono:prod-${{ github.sha }}
-        shell: bash
-
-      # 9. .env 파일 생성 (PRODUCTION)
       - name: Create .env file
         run: |
-          cat > .env.prod << EOF
+          cat > .env.prod << EOFENV
           DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
           MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
           RABBITMQ_USER=${{ secrets.RABBITMQ_USER }}
@@ -94,43 +68,38 @@ jobs:
           GRAFANA_PROD_SERVE_FROM_SUB_PATH=true
           PROMETHEUS_PROD_EXTERNAL_URL=https://ono-prod.seungminki.shop/prometheus/
           PROMETHEUS_PROD_ROUTE_PREFIX=/prometheus
-          EOF
+          EOFENV
         shell: bash
 
-      # 10. Blue-Green 무중단 배포
       - name: Blue-Green Deployment
         run: |
-          # 최신 prod 이미지 강제 pull (tag 캐시로 구버전 실행되는 문제 방지)
-          docker pull ${{ secrets.DOCKER_USERNAME }}/ono:prod-latest
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
 
-          # MySQL과 Redis 시작 (이미 실행 중이면 스킵)
+          docker pull ${{ secrets.DOCKER_USERNAME }}/ono:${APP_TAG}
+          docker tag ${{ secrets.DOCKER_USERNAME }}/ono:${APP_TAG} ${{ secrets.DOCKER_USERNAME }}/ono:prod-latest
+
           docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d mysql-prod redis-prod
 
-          # Orphan 컨테이너 정리 (기존 ono-app-prod 등)
           echo "Cleaning up orphan containers..."
           docker stop ono-app-prod 2>/dev/null || true
           docker rm ono-app-prod 2>/dev/null || true
           docker stop ono-app 2>/dev/null || true
           docker rm ono-app 2>/dev/null || true
 
-          # 현재 활성화된 환경 확인 (Blue가 실행 중이면 Green으로 배포, 그 반대도 동일)
           BLUE_RUNNING=$(docker ps --filter "name=ono-app-prod-blue" --filter "status=running" -q)
           GREEN_RUNNING=$(docker ps --filter "name=ono-app-prod-green" --filter "status=running" -q)
 
           if [ -n "$BLUE_RUNNING" ]; then
-            # Blue가 실행 중이면 Green으로 배포
             CURRENT="blue"
             TARGET="green"
             CURRENT_PORT=8080
             TARGET_PORT=8081
           elif [ -n "$GREEN_RUNNING" ]; then
-            # Green이 실행 중이면 Blue로 배포
             CURRENT="green"
             TARGET="blue"
             CURRENT_PORT=8081
             TARGET_PORT=8080
           else
-            # 둘 다 실행 중이지 않으면 Blue로 초기 배포
             CURRENT="none"
             TARGET="blue"
             CURRENT_PORT=0
@@ -140,14 +109,12 @@ jobs:
           echo "Current active environment: $CURRENT (port $CURRENT_PORT)"
           echo "Deploying to target environment: $TARGET (port $TARGET_PORT)"
 
-          # Target 환경에 새 버전 배포
           if [ "$TARGET" = "green" ]; then
             docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile green up -d app-prod-green
           else
             docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d app-prod-blue
           fi
 
-          # 헬스체크 대기 (최대 2분)
           echo "Waiting for $TARGET environment to be healthy..."
           timeout=120
           elapsed=0
@@ -170,26 +137,21 @@ jobs:
             exit 1
           fi
 
-          # Nginx 설정 업데이트 (Blue-Green 전환)
           echo "Switching Nginx to $TARGET environment (port $TARGET_PORT)..."
           sudo /opt/ono/scripts/switch-nginx.sh $TARGET_PORT
 
-          # Nginx 설정 테스트 및 재로드
           if sudo /opt/homebrew/bin/nginx -t; then
             sudo /opt/homebrew/bin/nginx -s reload
             echo "Nginx successfully switched to $TARGET environment"
           else
             echo "ERROR: Nginx configuration test failed"
-            # 원래 환경으로 롤백
             sudo /opt/ono/scripts/switch-nginx.sh $CURRENT_PORT
             exit 1
           fi
 
-          # 10초 대기 후 이전 환경 종료 (안전을 위한 대기)
           echo "Waiting 10 seconds before stopping old environment..."
           sleep 10
 
-          # 이전 환경 종료 (초기 배포가 아닌 경우만)
           if [ "$CURRENT" != "none" ]; then
             echo "Stopping old $CURRENT environment..."
             docker-compose -f docker-compose.prod.yml stop app-prod-$CURRENT || true
@@ -198,16 +160,13 @@ jobs:
             echo "Initial deployment - no old environment to stop"
           fi
 
-          # 컨테이너 상태 확인
           echo "=== Current Container Status ==="
           docker-compose -f docker-compose.prod.yml ps
 
-          # 로그 출력 (마지막 50줄)
           echo "=== $TARGET Environment Logs ==="
           docker-compose -f docker-compose.prod.yml logs --tail=50 app-prod-$TARGET
         shell: bash
 
-      # 11. Monitoring Stack 배포 (PRODUCTION, Non-blocking)
       - name: Deploy Monitoring Stack
         run: |
           docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring stop prometheus-prod grafana-prod mysql-exporter-prod || true
@@ -218,13 +177,11 @@ jobs:
             mysql-exporter-prod prometheus-prod grafana-prod
         shell: bash
 
-      # 11-1. Monitoring 연동 검증 (PRODUCTION, Non-blocking)
       - name: Verify Monitoring Integration
         continue-on-error: true
         run: |
           echo "Checking Prometheus scrape status for production jobs..."
 
-          # 최대 60초 동안 active blue/green 중 하나라도 up=1인지 확인
           for i in $(seq 1 12); do
             result=$(docker exec ono-prometheus-prod sh -lc 'wget -qO- "http://localhost:9090/prometheus/api/v1/query?query=max(up{job=~\"ono-backend-prod-(blue|green)\"})"' || true)
             if echo "$result" | grep -q '"value":\[.*,"1"\]'; then
@@ -240,21 +197,19 @@ jobs:
           docker logs --tail=200 ono-prometheus-prod || true
         shell: bash
 
-      # 12. 오래된 Docker 이미지 정리
       - name: Clean up old Docker images
         run: |
           docker image prune -f --filter "until=24h"
         shell: bash
         continue-on-error: true
 
-      # 13. Discord 배포 알림
       - name: Send deployment notification
         if: always()
         run: |
           STATUS="${{ job.status }}"
-          COLOR="3066993"  # 파란색 (성공)
+          COLOR="3066993"
           if [ "$STATUS" != "success" ]; then
-            COLOR="15158332"  # 빨간색 (실패)
+            COLOR="15158332"
           fi
 
           curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
@@ -262,7 +217,7 @@ jobs:
             -d "{
               \"embeds\": [{
                 \"title\": \"🚀 Production Deployment $STATUS\",
-                \"description\": \"Environment: **PRODUCTION**\nURL: https://ono-prod.seungminki.shop\nBranch: \`${{ github.ref_name }}\`\nCommit: \`${{ github.sha }}\`\nAuthor: ${{ github.actor }}\",
+                \"description\": \"Environment: **PRODUCTION**\\nURL: https://ono-prod.seungminki.shop\\nBranch: \\`${DEPLOY_BRANCH}\\`\\nCommit: \\`${DEPLOY_SHA}\\`\\nAuthor: ${{ github.actor }}\",
                 \"color\": $COLOR,
                 \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\"
               }]

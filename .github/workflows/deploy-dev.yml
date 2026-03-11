@@ -1,76 +1,50 @@
 name: Deploy to Development Server (Mac Mini)
 
 on:
-  push:
-    branches: ["develop"]  # develop 브랜치에 푸시될 때 개발 배포
-  workflow_dispatch:  # 수동 실행 가능
+  workflow_run:
+    workflows: ["CI Build & Push Dev Image"]
+    types: [completed]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  build-and-deploy-dev:
-    runs-on: self-hosted  # Mac Mini의 Self-hosted Runner 사용
+  deploy-dev:
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'workflow_run' &&
+         github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.head_branch == 'develop')
+      }}
+    runs-on: self-hosted
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: false
 
     steps:
-      # 1. 코드 체크아웃
       - name: Checkout code
         uses: actions/checkout@v4
-
-      # 2. JDK 17 설정
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
-        env:
-          SEGMENT_DOWNLOAD_TIMEOUT_MINS: 1  # 캐시 다운로드 타임아웃 1분으로 단축
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
-      # 3. application-dev.yml 생성 (개발 환경 설정)
-      - name: Create application-dev.yml
+      - name: Resolve deployment metadata
         run: |
-          mkdir -p ./src/main/resources
-          echo "${{ secrets.APPLICATION_DEV }}" > ./src/main/resources/application-dev.yml
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "DEPLOY_SHA=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_ENV"
+            echo "DEPLOY_BRANCH=${{ github.event.workflow_run.head_branch }}" >> "$GITHUB_ENV"
+            echo "APP_TAG=dev-${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_ENV"
+          else
+            echo "DEPLOY_SHA=${{ github.sha }}" >> "$GITHUB_ENV"
+            echo "DEPLOY_BRANCH=${{ github.ref_name }}" >> "$GITHUB_ENV"
+            echo "APP_TAG=dev-latest" >> "$GITHUB_ENV"
+          fi
         shell: bash
 
-      # 4. Firebase Admin Key 생성
-      - name: Create FirebaseAdminKey.json
-        run: |
-          rm -rf ./FirebaseAdminKey.json
-          cat > ./FirebaseAdminKey.json << 'EOF'
-          ${{ secrets.FIREBASE_ADMIN_KEY }}
-          EOF
-        shell: bash
-
-      # 5. Gradle 빌드 권한 부여
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-        shell: bash
-
-      # 6. Gradle 빌드 (테스트 제외)
-      - name: Build with Gradle
-        run: ./gradlew clean build -x test
-        shell: bash
-
-      # 7. Docker 이미지 빌드 (DEVELOPMENT 태그)
-      - name: Build Docker image
-        run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/ono:dev-latest .
-          docker tag ${{ secrets.DOCKER_USERNAME }}/ono:dev-latest ${{ secrets.DOCKER_USERNAME }}/ono:dev-${{ github.sha }}
-        shell: bash
-
-      # 8. Docker Hub에 푸시
-      - name: Push to Docker Hub
-        run: |
-          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
-          docker push ${{ secrets.DOCKER_USERNAME }}/ono:dev-latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/ono:dev-${{ github.sha }}
-        shell: bash
-
-      # 9. .env 파일 생성 (DEVELOPMENT)
       - name: Create .env file
         run: |
-          cat > .env.dev << EOF
+          cat > .env.dev << EOFENV
           DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
           MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
           RABBITMQ_USER=${{ secrets.RABBITMQ_USER }}
@@ -96,28 +70,25 @@ jobs:
           GRAFANA_DEV_SERVE_FROM_SUB_PATH=true
           PROMETHEUS_DEV_EXTERNAL_URL=https://ono-dev.seungminki.shop/prometheus/
           PROMETHEUS_DEV_ROUTE_PREFIX=/prometheus
-          EOF
+          EOFENV
         shell: bash
 
-      # 10. Docker Compose로 배포 (DEVELOPMENT)
       - name: Deploy with Docker Compose
         run: |
-          # 최신 dev 이미지 강제 pull (tag 캐시로 구버전 실행되는 문제 방지)
-          docker pull ${{ secrets.DOCKER_USERNAME }}/ono:dev-latest
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
 
-          # MySQL과 Redis 시작 (개발 환경 전용)
+          docker pull ${{ secrets.DOCKER_USERNAME }}/ono:${APP_TAG}
+          docker tag ${{ secrets.DOCKER_USERNAME }}/ono:${APP_TAG} ${{ secrets.DOCKER_USERNAME }}/ono:dev-latest
+
           docker-compose -f docker-compose.dev.yml --env-file .env.dev up -d mysql-dev redis-dev
 
-          # Spring Boot 개발 앱만 재시작
           docker-compose -f docker-compose.dev.yml --env-file .env.dev stop app-dev || true
           docker-compose -f docker-compose.dev.yml --env-file .env.dev rm -f app-dev || true
           docker-compose -f docker-compose.dev.yml --env-file .env.dev up -d app-dev
 
-          # 실제 기동 이미지 확인
           docker inspect ono-app-dev --format='Running Image: {{.Config.Image}}'
           docker inspect ono-app-dev --format='Image ID: {{.Image}}'
 
-          # 헬스체크 대기 (최대 2분)
           echo "Waiting for development application to be healthy..."
           timeout=60
           elapsed=0
@@ -131,15 +102,11 @@ jobs:
             elapsed=$((elapsed + 5))
           done
 
-          # 컨테이너 상태 확인
           docker-compose -f docker-compose.dev.yml --env-file .env.dev ps
-
-          # 로그 출력 (마지막 50줄)
           echo "=== Development Application Logs ==="
           docker-compose -f docker-compose.dev.yml --env-file .env.dev logs --tail=50 app-dev
         shell: bash
 
-      # 11. Monitoring Stack 배포 (DEVELOPMENT)
       - name: Deploy Monitoring Stack
         run: |
           docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring stop prometheus-dev grafana-dev mysql-exporter-dev || true
@@ -150,10 +117,8 @@ jobs:
             mysql-exporter-dev prometheus-dev grafana-dev
         shell: bash
 
-      # 11-1. Monitoring 연동 검증 (DEVELOPMENT)
       - name: Verify Monitoring Integration
         run: |
-          # app-dev 내부 actuator 메트릭 엔드포인트가 200인지 확인
           echo "Checking app-dev actuator metrics endpoint..."
           if ! docker exec ono-app-dev sh -lc 'wget -qO- http://localhost:8081/actuator/prometheus | head -n 5' >/tmp/app_metrics_head.txt; then
             echo "ERROR: app-dev actuator/prometheus endpoint is not reachable"
@@ -161,7 +126,6 @@ jobs:
             exit 1
           fi
 
-          # prometheus 컨테이너 관점에서도 app-dev 메트릭 엔드포인트가 200인지 확인
           echo "Checking app-dev actuator metrics endpoint from prometheus-dev..."
           if ! docker exec ono-prometheus-dev sh -lc 'wget -qO- http://app-dev:8081/actuator/prometheus | head -n 5' >/tmp/prom_metrics_head.txt; then
             echo "ERROR: prometheus-dev cannot fetch app-dev actuator/prometheus"
@@ -170,7 +134,6 @@ jobs:
             exit 1
           fi
 
-          # Prometheus가 app-dev를 up=1로 스크랩하는지 확인 (최대 60초 대기)
           echo "Checking Prometheus scrape status for ono-backend-dev..."
           for i in $(seq 1 12); do
             result=$(docker exec ono-prometheus-dev sh -lc 'wget -qO- "http://localhost:9090/prometheus/api/v1/query?query=up{job=\"ono-backend-dev\"}"' || true)
@@ -189,21 +152,19 @@ jobs:
           exit 1
         shell: bash
 
-      # 12. 오래된 Docker 이미지 정리
       - name: Clean up old Docker images
         run: |
           docker image prune -f --filter "until=24h"
         shell: bash
         continue-on-error: true
 
-      # 13. Discord 배포 알림
       - name: Send deployment notification
         if: always()
         run: |
           STATUS="${{ job.status }}"
-          COLOR="3066993"  # 파란색 (성공)
+          COLOR="3066993"
           if [ "$STATUS" != "success" ]; then
-            COLOR="15158332"  # 빨간색 (실패)
+            COLOR="15158332"
           fi
 
           curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
@@ -211,7 +172,7 @@ jobs:
             -d "{
               \"embeds\": [{
                 \"title\": \"🔧 Development Deployment $STATUS\",
-                \"description\": \"Environment: **DEVELOPMENT**\nURL: https://ono-dev.seungminki.shop\nBranch: \`${{ github.ref_name }}\`\nCommit: \`${{ github.sha }}\`\nAuthor: ${{ github.actor }}\",
+                \"description\": \"Environment: **DEVELOPMENT**\\nURL: https://ono-dev.seungminki.shop\\nBranch: \\`${DEPLOY_BRANCH}\\`\\nCommit: \\`${DEPLOY_SHA}\\`\\nAuthor: ${{ github.actor }}\",
                 \"color\": $COLOR,
                 \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\"
               }]
