@@ -1,18 +1,72 @@
-name: Deploy to Production Server (Manual Fallback)
+name: CI Build & Deploy Prod
 
 on:
+  push:
+    branches: ["main"]
   workflow_dispatch:
-    inputs:
-      app_tag:
-        description: "Docker image tag (ex: prod-latest or prod-<sha>)"
-        required: true
-        default: "prod-latest"
 
 permissions:
   contents: read
 
 jobs:
+  build-and-push-prod:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Create application-prod.yml
+        run: |
+          mkdir -p ./src/main/resources
+          echo "${{ secrets.APPLICATION_PROD }}" > ./src/main/resources/application-prod.yml
+        shell: bash
+
+      - name: Create FirebaseAdminKey.json
+        run: |
+          rm -rf ./FirebaseAdminKey.json
+          cat > ./FirebaseAdminKey.json << 'EOKEY'
+          ${{ secrets.FIREBASE_ADMIN_KEY }}
+          EOKEY
+        shell: bash
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+        shell: bash
+
+      - name: Build with Gradle
+        run: ./gradlew clean build -x test
+        shell: bash
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/ono:prod-latest
+            ${{ secrets.DOCKER_USERNAME }}/ono:prod-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   deploy-prod:
+    needs: build-and-push-prod
     runs-on: self-hosted
     concurrency:
       group: deploy-prod
@@ -21,12 +75,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
 
       - name: Resolve deployment metadata
         run: |
           echo "DEPLOY_SHA=${{ github.sha }}" >> "$GITHUB_ENV"
           echo "DEPLOY_BRANCH=${{ github.ref_name }}" >> "$GITHUB_ENV"
-          echo "APP_TAG=${{ github.event.inputs.app_tag }}" >> "$GITHUB_ENV"
+          echo "APP_TAG=prod-${{ github.sha }}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Create .env file
@@ -154,6 +210,42 @@ jobs:
           docker-compose -f docker-compose.prod.yml logs --tail=50 app-prod-$TARGET
         shell: bash
 
+      - name: Deploy Monitoring Stack
+        run: |
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring stop prometheus-prod grafana-prod mysql-exporter-prod || true
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring rm -f prometheus-prod grafana-prod mysql-exporter-prod || true
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring up -d --force-recreate \
+            mysql-exporter-prod prometheus-prod grafana-prod
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod ps \
+            mysql-exporter-prod prometheus-prod grafana-prod
+        shell: bash
+
+      - name: Verify Monitoring Integration
+        continue-on-error: true
+        run: |
+          echo "Checking Prometheus scrape status for production jobs..."
+
+          for i in $(seq 1 12); do
+            result=$(docker exec ono-prometheus-prod sh -lc 'wget -qO- "http://localhost:9090/prometheus/api/v1/query?query=max(up{job=~\"ono-backend-prod-(blue|green)\"})"' || true)
+            if echo "$result" | grep -q '"value":\[.*,"1"\]'; then
+              echo "Prometheus scrape is UP for at least one production target"
+              exit 0
+            fi
+            echo "Waiting scrape up... ($i/12)"
+            sleep 5
+          done
+
+          echo "WARNING: Prometheus scrape for production targets is still down"
+          docker exec ono-prometheus-prod sh -lc 'wget -qO- "http://localhost:9090/prometheus/api/v1/targets"' || true
+          docker logs --tail=200 ono-prometheus-prod || true
+        shell: bash
+
+      - name: Clean up old Docker images
+        run: |
+          docker image prune -f --filter "until=24h"
+        shell: bash
+        continue-on-error: true
+
       - name: Send deployment notification
         if: always()
         run: |
@@ -167,8 +259,8 @@ jobs:
             -H "Content-Type: application/json" \
             -d "{
               \"embeds\": [{
-                \"title\": \"🚀 Production Deployment (Manual) $STATUS\",
-                \"description\": \"Environment: **PRODUCTION**\\nURL: https://ono-prod.seungminki.shop\\nBranch: \\`${DEPLOY_BRANCH}\\`\\nTag: \\`${APP_TAG}\\`\\nAuthor: ${{ github.actor }}\",
+                \"title\": \"🚀 Production Deployment $STATUS\",
+                \"description\": \"Environment: **PRODUCTION**\\nURL: https://ono-prod.seungminki.shop\\nBranch: \\`${DEPLOY_BRANCH}\\`\\nCommit: \\`${DEPLOY_SHA}\\`\\nAuthor: ${{ github.actor }}\",
                 \"color\": $COLOR,
                 \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\"
               }]
