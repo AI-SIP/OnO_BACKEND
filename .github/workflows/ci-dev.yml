@@ -2,7 +2,7 @@ name: CI Build & Push Dev Image
 
 on:
   push:
-    branches: ["develop"]
+    branches: ["feat/deploy"]
   workflow_dispatch:
 
 permissions:
