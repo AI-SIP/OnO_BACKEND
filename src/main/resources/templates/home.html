@@ -3,117 +3,344 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OnO, 나만의 진정한 오답노트</title>
+    <title>OnO | 손쉽게 작성하는 나만의 AI 오답노트, OnO</title>
+    <meta name="description" content="찰칵으로 시작하는 진짜 오답노트. AI 오답 분석, 복습 기록, 폴더 관리, 학습 리포트까지 OnO에서 한 번에.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
+
     <style>
+        :root {
+            --brand: #1cba1a;
+            --brand-strong: #159414;
+            --brand-soft: #e9f9e8;
+            --mint-soft: #f4fff4;
+            --ink: #102012;
+            --ink-soft: #355239;
+            --line: #cdeacc;
+            --surface: #ffffff;
+            --max: 1160px;
+            --radius-xl: 28px;
+            --radius-lg: 18px;
+            --radius-md: 12px;
+            --shadow: 0 18px 50px rgba(28, 186, 26, 0.15);
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
-        body, html {
+        html, body {
             width: 100%;
-            height: 100%;
-            font-family: Arial, sans-serif;
-            overflow-x: hidden;
-            background-color: #f3f3f3;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
+            min-height: 100%;
+            color: var(--ink);
+            background:
+                radial-gradient(1000px 500px at 100% -10%, #e0fadd 0, transparent 55%),
+                radial-gradient(900px 500px at -5% 30%, #edffe7 0, transparent 50%),
+                #f9fff8;
+            font-family: "Noto Sans KR", sans-serif;
         }
 
-        .container {
-            width: 90%;
-            max-width: 1200px;
-            text-align: center;
-            display: flex;
-            flex-direction: column;
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .page {
+            max-width: var(--max);
+            margin: 0 auto;
+            padding: 24px 20px 72px;
+        }
+
+        .brand {
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 1.7rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            margin-bottom: 18px;
+            color: var(--brand);
+        }
+
+        .brand span {
+            color: var(--brand);
+        }
+
+        .hero {
+            background: linear-gradient(145deg, #ffffff 0, #f6fff4 100%);
+            border: 1px solid #d8f0d6;
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow);
+            padding: 36px 24px;
+            display: grid;
+            gap: 24px;
             align-items: center;
-            gap: 20px;
-            padding: 50px 0; /* 상단과 하단에 여백 추가 */
         }
 
-        /* 모바일 레이아웃 */
-        .phone-layout {
+        .eyebrow {
+            display: inline-block;
+            background: var(--brand-soft);
+            border: 1px solid #bbe7b9;
+            color: #0f7a15;
+            border-radius: 999px;
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 14px;
+        }
+
+        h1 {
+            font-family: "Space Grotesk", "Noto Sans KR", sans-serif;
+            font-size: clamp(2.1rem, 6vw, 3.8rem);
+            line-height: 1.12;
+            letter-spacing: -0.03em;
+            margin-bottom: 14px;
+            color: #0d2a10;
+        }
+
+        .hero p {
+            color: #224126;
+            line-height: 1.85;
+            font-size: clamp(1.03rem, 2vw, 1.14rem);
+            max-width: 560px;
+            font-weight: 400;
+        }
+
+        .cta-wrap {
+            margin-top: 58px;
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .button-container {
-            display: flex;
-            flex-direction: row; /* 버튼을 가로로 나란히 배치 */
-            gap: 10px; /* 버튼 사이 간격 */
+            flex-wrap: wrap;
+            gap: 12px;
             align-items: center;
         }
 
-        .download-button {
-            background-size: contain;
-            background-repeat: no-repeat;
-            width: 150px;
+        .cta-label {
+            width: 100%;
+            color: #2d6f36;
+            font-size: 0.74rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            opacity: 1;
+        }
+
+        .store-btn {
+            width: 154px;
             height: 50px;
-            cursor: pointer;
-            margin-left: 10px; /* 오른쪽으로 10px 이동 */
+            display: inline-block;
+            border-radius: 10px;
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
-        .responsive-image {
+        .store-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 24px rgba(20, 140, 24, 0.2);
+        }
+
+        .cta-note {
+            color: #1f4c24;
+            font-size: 0.93rem;
+            font-weight: 500;
+        }
+
+        .hero-visual {
+            display: grid;
+            place-items: center;
+        }
+
+        .hero-visual {
+            width: min(100%, 340px);
+            margin: 0 auto;
+        }
+
+        .hero-copy {
+            margin-top: 12px;
+            max-width: 560px;
+            display: grid;
+            gap: 12px;
+        }
+
+        .lead {
+            color: #1f4024;
+            line-height: 1.78;
+            font-size: 0.96rem;
+            font-weight: 400;
+            text-wrap: pretty;
+            word-break: keep-all;
+        }
+
+        .hero-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid #c8e9c6;
+            background: #f6fff6;
+            color: #17571f;
+            border-radius: 999px;
+            padding: 7px 12px;
+            font-size: 0.88rem;
+            font-weight: 500;
+        }
+
+        .section {
+            margin-top: 60px;
+        }
+
+        .section h2 {
+            font-family: "Space Grotesk", "Noto Sans KR", sans-serif;
+            font-size: clamp(1.45rem, 3vw, 2.15rem);
+            letter-spacing: -0.02em;
+            margin-bottom: 8px;
+        }
+
+        .section .desc {
+            color: var(--ink-soft);
+            line-height: 1.75;
+            font-size: 1rem;
+        }
+
+        .value-grid {
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-lg);
+            padding: 18px;
+        }
+
+        .card h3 {
+            font-size: 1.08rem;
+            margin-bottom: 8px;
+            color: #0f7a15;
+        }
+
+        .card p {
+            color: #244529;
+            line-height: 1.7;
+            font-size: 0.97rem;
+        }
+
+        .poster-wrap {
+            margin-top: 0;
+            position: relative;
+            background: #ffffff;
+            border: 1px solid #1cba1a;
+            border-radius: var(--radius-lg);
+            padding: 8px;
+        }
+
+        .carousel {
+            overflow: hidden;
+            border-radius: var(--radius-md);
+        }
+
+        .track {
+            display: flex;
+            transition: transform 0.55s ease;
+            will-change: transform;
+        }
+
+        .slide {
+            min-width: 100%;
+            padding: 0;
+        }
+
+        .slide-card {
+            background: transparent;
+            border: 0;
+            border-radius: 0;
+            padding: 0;
+        }
+
+        .slide-card img {
             width: 100%;
-            height: auto;
+            aspect-ratio: 10 / 16;
+            object-fit: contain;
+            background: transparent;
+            border-radius: 10px;
+            border: 0;
+            max-height: 500px;
         }
 
-        /* 기본 설정: 태블릿 레이아웃 및 이미지 숨기기 */
-        .tablet-layout {
-            display: none;
+        .controls {
+            margin-top: 0;
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0;
+            padding: 0 2px;
+            pointer-events: none;
         }
-        .tablet-image {
-            display: none;
+
+        .control-btn {
+            border: 1px solid #bfe5bd;
+            background: rgba(255, 255, 255, 0.52);
+            color: #0f7a15;
+            border-radius: 999px;
+            font-weight: 600;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(17, 86, 24, 0.1);
+            pointer-events: auto;
         }
 
-        /* 태블릿 레이아웃 */
-        @media screen and (min-width: 768px) {
-            body, html {
-                height: 100vh;
-                overflow-y: hidden;
-                justify-content: center;
-                align-items: center;
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.72);
+        }
+
+        .footer {
+            margin-top: 56px;
+            padding-top: 20px;
+            border-top: 1px solid #d6ebd4;
+            color: #2b4f30;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            font-size: 0.93rem;
+        }
+
+        @media (min-width: 980px) {
+            .hero {
+                grid-template-columns: 1.1fr 0.9fr;
+                padding: 44px 34px;
             }
 
-            .container {
-                flex-direction: row;
-                justify-content: center;
-                align-items: center;
-                padding: 0;
+            h1 {
+                white-space: nowrap;
+                font-size: clamp(1.85rem, 3.4vw, 3rem);
+            }
+        }
+
+        @media (max-width: 979px) {
+            .value-grid {
+                grid-template-columns: 1fr;
             }
 
-            .phone-layout {
-                display: none;
-            }
-
-            .tablet-layout {
-                display: flex;
-                align-items: center;
-                gap: 20px;
-            }
-
-            .tablet-layout .text-and-buttons {
-                display: flex;
+            .footer {
                 flex-direction: column;
-                align-items: flex-start;
-                gap: 20px;
-                padding-left: 20px;
             }
 
-            .tablet-layout .button-container {
-                display: flex;
-                flex-direction: row;
-                gap: 15px;
-            }
-
-            .tablet-image {
-                display: block;
-                width: 100%;
-                max-width: 400px;
+            .slide-card img {
+                max-height: 380px;
             }
         }
     </style>
@@ -125,65 +352,147 @@
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-
     gtag('config', 'AW-16765111762');
 </script>
 
 <body>
-<div class="container">
-    <!-- 모바일 화면 레이아웃 -->
-    <div class="phone-layout">
-        <!-- 모바일 화면용 메인 텍스트 이미지 -->
-        <img src="/images/MainTextPhone.png" alt="메인 텍스트" class="responsive-image phone-image">
+<main class="page">
+    <div class="brand">On<span>O</span></div>
 
-        <!-- 모바일 화면용 버튼 -->
-        <div class="button-container">
-            <a href="https://apps.apple.com/kr/app/%EC%98%A4%EB%85%B8-ono-%EB%82%98%EB%A7%8C%EC%9D%98-%EC%A7%84%EC%A0%95%ED%95%9C-%EC%98%A4%EB%8B%B5%EB%85%B8%ED%8A%B8/id6602886624"
-               target="_blank" class="download-button"
-               style="background-image: url('/images/AppStoreDownloadButton.png'); background-size: 100% 100%;">
-            </a>
-            <a href="https://play.google.com/store/apps/details?id=com.aisip.OnO&pcampaignid=web_share&pli=1"
-               target="_blank" class="download-button"
-               style="background-image: url('/images/GooglePlayDownloadButton.png'); background-size: 100% 100%;">
-            </a>
-        </div>
+    <section class="hero">
+        <div>
+            <span class="eyebrow">손쉽게 작성하는 나만의 AI 오답노트, OnO</span>
+            <h1>이젠 OnO로 복습하세요</h1>
+            <br>
+            <div class="hero-copy">
+                <p class="lead">
+                    오답을 쌓아두는 데서 끝내지 않고, 다시 맞히는 루틴까지 이어지게 만듭니다.<br>
+                    빠른 기록부터 AI 분석, 복습 관리, 학습 리포트까지 한 번에 경험해보세요.
+                </p>
+            </div>
 
-        <!-- 모바일 화면용 메인 디바이스 이미지 -->
-        <img src="/images/MainDevicePhone.png" alt="메인 디바이스" class="responsive-image phone-image">
-    </div>
-
-    <!-- 태블릿 화면 레이아웃 -->
-    <div class="tablet-layout">
-        <div class="text-and-buttons">
-            <!-- 태블릿 화면용 메인 텍스트 이미지 -->
-            <img src="/images/MainTextTablet.png" alt="메인 텍스트 태블릿" class="responsive-image tablet-image">
-
-            <!-- 태블릿 화면용 버튼 -->
-            <div class="button-container">
+            <div class="cta-wrap">
                 <a href="https://apps.apple.com/kr/app/%EC%98%A4%EB%85%B8-ono-%EB%82%98%EB%A7%8C%EC%9D%98-%EC%A7%84%EC%A0%95%ED%95%9C-%EC%98%A4%EB%8B%B5%EB%85%B8%ED%8A%B8/id6602886624"
-                   target="_blank" class="download-button"
-                   style="background-image: url('/images/AppStoreDownloadButton.png'); background-size: 100% 100%;">
-                </a>
+                   target="_blank" rel="noopener noreferrer" class="store-btn"
+                   style="background-image: url('/images/AppStoreDownloadButton.png');"></a>
                 <a href="https://play.google.com/store/apps/details?id=com.ono.app&pcampaignid=web_share"
-                   target="_blank" class="download-button"
-                   style="background-image: url('/images/GooglePlayDownloadButton.png'); background-size: 100% 100%;">
-                </a>
+                   target="_blank" rel="noopener noreferrer" class="store-btn"
+                   style="background-image: url('/images/GooglePlayDownloadButton.png');"></a>
             </div>
         </div>
 
-        <!-- 태블릿 화면용 메인 디바이스 이미지 -->
-        <img src="/images/MainDeviceTablet.png" alt="메인 디바이스 태블릿" class="responsive-image tablet-image">
-    </div>
-</div>
+        <div class="hero-visual">
+            <div class="poster-wrap">
+                <div class="carousel" id="posterCarousel">
+                    <div class="track" id="posterTrack">
+                        <div class="slide"><div class="slide-card"><img src="/images/poster/HomeScreen.png" alt="OnO Home Screen"></div></div>
+                        <div class="slide"><div class="slide-card"><img src="/images/poster/ProblemRegister.png" alt="OnO Problem Register"></div></div>
+                        <div class="slide"><div class="slide-card"><img src="/images/poster/Directory.png" alt="OnO Directory"></div></div>
+                        <div class="slide"><div class="slide-card"><img src="/images/poster/ProblemDetail1.png" alt="OnO Problem Detail 1"></div></div>
+                        <div class="slide"><div class="slide-card"><img src="/images/poster/ProblemDetail2.png" alt="OnO Problem Detail 2"></div></div>
+                        <div class="slide"><div class="slide-card"><img src="/images/poster/ProblemDetail3.png" alt="OnO Problem Detail 3"></div></div>
+                        <div class="slide"><div class="slide-card"><img src="/images/poster/ProblemPractice.png" alt="OnO Problem Practice"></div></div>
+                        <div class="slide"><div class="slide-card"><img src="/images/poster/Report.png" alt="OnO Report"></div></div>
+                        <div class="slide"><div class="slide-card"><img src="/images/poster/MyPage.png" alt="OnO My Page"></div></div>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <button class="control-btn" id="prevBtn" aria-label="이전">‹</button>
+                    <button class="control-btn" id="nextBtn" aria-label="다음">›</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section">
+        <h2>오답 정리가 훨씬 쉬워집니다</h2>
+        <p class="desc">
+            번거롭고 오래 걸리던 오답 정리를, 매일 이어갈 수 있는 학습 루틴으로 바꿔보세요.
+        </p>
+
+        <div class="value-grid">
+            <article class="card">
+                <h3>빠르고 편리한 오답노트 작성</h3>
+                <p>문제를 길게 옮겨 적지 않아도 됩니다. 촬영 중심으로 필요한 정보만 빠르게 정리할 수 있어요.</p>
+            </article>
+            <article class="card">
+                <h3>AI 오답 분석</h3>
+                <p>단순 정답 확인을 넘어, 왜 틀렸는지와 어떤 개념이 부족한지까지 분석해 복습 방향을 잡아줍니다.</p>
+            </article>
+            <article class="card">
+                <h3>복습 기록 작성</h3>
+                <p>복습한 결과를 쌓아가며 성장하는 내 모습을 확인할 수 있어요.</p>
+            </article>
+            <article class="card">
+                <h3>복습 리스트 · 폴더</h3>
+                <p>시험 전 필요한 문제만 모아 보고, 폴더로 원하는 오답을 빠르게 찾아 복습할 수 있습니다.</p>
+            </article>
+            <article class="card">
+                <h3>태블릿과 스마트폰 연동</h3>
+                <p>집에서는 태블릿으로, 이동 중에는 스마트폰으로 같은 오답노트를 이어서 복습할 수 있습니다.</p>
+            </article>
+            <article class="card">
+                <h3>학습 리포트</h3>
+                <p>내 학습 추이와 약점 영역을 한눈에 확인하고, 다음에 무엇을 먼저 공부할지 더 명확하게 정할 수 있어요.</p>
+            </article>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <span>© OnO. All rights reserved.</span>
+        <span>Contact: aisip2024@gmail.com</span>
+    </footer>
+</main>
 
 <script>
-    // 스크롤 시 버튼 애니메이션 효과 (옵션)
-    window.addEventListener('scroll', () => {
-        const opacityValue = window.scrollY > 100 ? 1 : 0;
-        document.querySelectorAll('.download-button').forEach(button => {
-            button.style.opacity = opacityValue;
+    (function () {
+        const track = document.getElementById('posterTrack');
+        const slides = Array.from(track.children);
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+
+        let index = 0;
+        let timer = null;
+
+        function render() {
+            track.style.transform = `translateX(-${index * 100}%)`;
+        }
+
+        function goTo(nextIndex) {
+            index = (nextIndex + slides.length) % slides.length;
+            render();
+        }
+
+        function next() {
+            goTo(index + 1);
+        }
+
+        function prev() {
+            goTo(index - 1);
+        }
+
+        function startAuto() {
+            timer = setInterval(next, 3500);
+        }
+
+        function restartAuto() {
+            clearInterval(timer);
+            startAuto();
+        }
+
+        nextBtn.addEventListener('click', () => {
+            next();
+            restartAuto();
         });
-    });
+
+        prevBtn.addEventListener('click', () => {
+            prev();
+            restartAuto();
+        });
+
+        startAuto();
+    })();
 </script>
 </body>
 </html>

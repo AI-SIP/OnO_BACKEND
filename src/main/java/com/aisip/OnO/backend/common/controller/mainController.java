@@ -8,14 +8,6 @@ public class mainController {
 
     @GetMapping({"/", "/home"})
     public String mainPage() {
-        /*
-        String redirectUrl = "https://semnisem.notion.site/MVP-e104fd6af0064941acf464e6f77eabb3";
-        return ResponseEntity.status(HttpStatus.FOUND)
-                .header(HttpHeaders.LOCATION, redirectUrl)
-                .build();
-
-         */
-
         return "home";
     }
 
