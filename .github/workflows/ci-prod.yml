@@ -1,4 +1,4 @@
-name: CI Build & Push Prod Image
+name: CI Build & Deploy Prod
 
 on:
   push:
@@ -64,3 +64,206 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/ono:prod-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  deploy-prod:
+    needs: build-and-push-prod
+    runs-on: self-hosted
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Resolve deployment metadata
+        run: |
+          echo "DEPLOY_SHA=${{ github.sha }}" >> "$GITHUB_ENV"
+          echo "DEPLOY_BRANCH=${{ github.ref_name }}" >> "$GITHUB_ENV"
+          echo "APP_TAG=prod-${{ github.sha }}" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Create .env file
+        run: |
+          cat > .env.prod << EOFENV
+          DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+          MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+          RABBITMQ_USER=${{ secrets.RABBITMQ_USER }}
+          RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_PASSWORD }}
+          SPRING_CRYPTO_SECRET_KEY=${{ secrets.SPRING_CRYPTO_SECRET_KEY }}
+          JWT_ACCESS_TOKEN_SECRET=${{ secrets.JWT_ACCESS_TOKEN_SECRET }}
+          JWT_ACCESS_TOKEN_EXPIRATION=1800000
+          JWT_REFRESH_TOKEN_SECRET=${{ secrets.JWT_REFRESH_TOKEN_SECRET }}
+          JWT_REFRESH_TOKEN_EXPIRATION=604800000
+          CLOUD_AWS_S3_BUCKET=${{ secrets.CLOUD_AWS_S3_BUCKET }}
+          CLOUD_AWS_CREDENTIALS_ACCESS_KEY=${{ secrets.CLOUD_AWS_CREDENTIALS_ACCESS_KEY }}
+          CLOUD_AWS_CREDENTIALS_SECRET_KEY=${{ secrets.CLOUD_AWS_CREDENTIALS_SECRET_KEY }}
+          DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          SENTRY_DSN=${{ secrets.SENTRY_DSN }}
+          ADMIN_IDENTIFIER=${{ secrets.ADMIN_IDENTIFIER }}
+          ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+          GRAFANA_ADMIN_USER=${{ secrets.GRAFANA_ADMIN_USER }}
+          GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+          GRAFANA_PROD_ROOT_URL=https://ono-prod.seungminki.shop/grafana/
+          GRAFANA_PROD_SERVE_FROM_SUB_PATH=true
+          PROMETHEUS_PROD_EXTERNAL_URL=https://ono-prod.seungminki.shop/prometheus/
+          PROMETHEUS_PROD_ROUTE_PREFIX=/prometheus
+          EOFENV
+        shell: bash
+
+      - name: Blue-Green Deployment
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+
+          docker pull ${{ secrets.DOCKER_USERNAME }}/ono:${APP_TAG}
+          docker tag ${{ secrets.DOCKER_USERNAME }}/ono:${APP_TAG} ${{ secrets.DOCKER_USERNAME }}/ono:prod-latest
+
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d mysql-prod redis-prod
+
+          echo "Cleaning up orphan containers..."
+          docker stop ono-app-prod 2>/dev/null || true
+          docker rm ono-app-prod 2>/dev/null || true
+          docker stop ono-app 2>/dev/null || true
+          docker rm ono-app 2>/dev/null || true
+
+          BLUE_RUNNING=$(docker ps --filter "name=ono-app-prod-blue" --filter "status=running" -q)
+          GREEN_RUNNING=$(docker ps --filter "name=ono-app-prod-green" --filter "status=running" -q)
+
+          if [ -n "$BLUE_RUNNING" ]; then
+            CURRENT="blue"
+            TARGET="green"
+            CURRENT_PORT=8080
+            TARGET_PORT=8081
+          elif [ -n "$GREEN_RUNNING" ]; then
+            CURRENT="green"
+            TARGET="blue"
+            CURRENT_PORT=8081
+            TARGET_PORT=8080
+          else
+            CURRENT="none"
+            TARGET="blue"
+            CURRENT_PORT=0
+            TARGET_PORT=8080
+          fi
+
+          echo "Current active environment: $CURRENT (port $CURRENT_PORT)"
+          echo "Deploying to target environment: $TARGET (port $TARGET_PORT)"
+
+          if [ "$TARGET" = "green" ]; then
+            docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile green up -d app-prod-green
+          else
+            docker-compose -f docker-compose.prod.yml --env-file .env.prod up -d app-prod-blue
+          fi
+
+          echo "Waiting for $TARGET environment to be healthy..."
+          timeout=120
+          elapsed=0
+          healthy=false
+
+          while [ $elapsed -lt $timeout ]; do
+            if docker ps | grep "ono-app-prod-$TARGET" | grep -q "healthy"; then
+              echo "$TARGET environment is healthy!"
+              healthy=true
+              break
+            fi
+            echo "Waiting... ($elapsed seconds)"
+            sleep 5
+            elapsed=$((elapsed + 5))
+          done
+
+          if [ "$healthy" = false ]; then
+            echo "ERROR: $TARGET environment failed to become healthy within $timeout seconds"
+            docker-compose -f docker-compose.prod.yml logs --tail=100 app-prod-$TARGET
+            exit 1
+          fi
+
+          echo "Switching Nginx to $TARGET environment (port $TARGET_PORT)..."
+          sudo /opt/ono/scripts/switch-nginx.sh $TARGET_PORT
+
+          if sudo /opt/homebrew/bin/nginx -t; then
+            sudo /opt/homebrew/bin/nginx -s reload
+            echo "Nginx successfully switched to $TARGET environment"
+          else
+            echo "ERROR: Nginx configuration test failed"
+            sudo /opt/ono/scripts/switch-nginx.sh $CURRENT_PORT
+            exit 1
+          fi
+
+          echo "Waiting 10 seconds before stopping old environment..."
+          sleep 10
+
+          if [ "$CURRENT" != "none" ]; then
+            echo "Stopping old $CURRENT environment..."
+            docker-compose -f docker-compose.prod.yml stop app-prod-$CURRENT || true
+            docker-compose -f docker-compose.prod.yml rm -f app-prod-$CURRENT || true
+          else
+            echo "Initial deployment - no old environment to stop"
+          fi
+
+          echo "=== Current Container Status ==="
+          docker-compose -f docker-compose.prod.yml ps
+
+          echo "=== $TARGET Environment Logs ==="
+          docker-compose -f docker-compose.prod.yml logs --tail=50 app-prod-$TARGET
+        shell: bash
+
+      - name: Deploy Monitoring Stack
+        run: |
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring stop prometheus-prod grafana-prod mysql-exporter-prod || true
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring rm -f prometheus-prod grafana-prod mysql-exporter-prod || true
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring up -d --force-recreate \
+            mysql-exporter-prod prometheus-prod grafana-prod
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod ps \
+            mysql-exporter-prod prometheus-prod grafana-prod
+        shell: bash
+
+      - name: Verify Monitoring Integration
+        continue-on-error: true
+        run: |
+          echo "Checking Prometheus scrape status for production jobs..."
+
+          for i in $(seq 1 12); do
+            result=$(docker exec ono-prometheus-prod sh -lc 'wget -qO- "http://localhost:9090/prometheus/api/v1/query?query=max(up{job=~\"ono-backend-prod-(blue|green)\"})"' || true)
+            if echo "$result" | grep -q '"value":\[.*,"1"\]'; then
+              echo "Prometheus scrape is UP for at least one production target"
+              exit 0
+            fi
+            echo "Waiting scrape up... ($i/12)"
+            sleep 5
+          done
+
+          echo "WARNING: Prometheus scrape for production targets is still down"
+          docker exec ono-prometheus-prod sh -lc 'wget -qO- "http://localhost:9090/prometheus/api/v1/targets"' || true
+          docker logs --tail=200 ono-prometheus-prod || true
+        shell: bash
+
+      - name: Clean up old Docker images
+        run: |
+          docker image prune -f --filter "until=24h"
+        shell: bash
+        continue-on-error: true
+
+      - name: Send deployment notification
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          COLOR="3066993"
+          if [ "$STATUS" != "success" ]; then
+            COLOR="15158332"
+          fi
+
+          curl -X POST "${{ secrets.DISCORD_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"embeds\": [{
+                \"title\": \"🚀 Production Deployment $STATUS\",
+                \"description\": \"Environment: **PRODUCTION**\\nURL: https://ono-prod.seungminki.shop\\nBranch: \\`${DEPLOY_BRANCH}\\`\\nCommit: \\`${DEPLOY_SHA}\\`\\nAuthor: ${{ github.actor }}\",
+                \"color\": $COLOR,
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\"
+              }]
+            }"
+        shell: bash
+        continue-on-error: true
