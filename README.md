@@ -1,7 +1,8 @@
 <br>
 
 # 💫 손쉽게 작성하는 나만의 AI 오답노트, OnO를 소개합니다!
-![image](https://github.com/user-attachments/assets/440ba50d-7e49-44ba-ad80-53787d395d64)
+<img width="750" alt="image" src="https://github.com/user-attachments/assets/0adfc057-e86e-4388-98d9-ef649834f5f5" />
+
 
 #### 이전에 본 문제를 틀린 경험, 있으신가요?
 #### 무작정 진도만 달리는 것이 올바를까요?
@@ -72,6 +73,8 @@
 |복습노트 생성|<img width="220" alt="image" src="https://github.com/user-attachments/assets/7f20c547-c812-4524-b26e-55636c6f46ca" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/cc9f3985-d2cb-43be-96a5-d52ae73201c5" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/471dcfac-4df3-48fc-8702-da70d576f7e1" />|
 |복습노트 실행|<img width="220" alt="image" src="https://github.com/user-attachments/assets/1ac3827a-8b49-4836-8c39-26eb476f9bd9" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/4e0614dd-f5a8-4722-83dd-7bdd6438dac0" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/53434407-b1b0-4e32-bba8-374e6b98bcf9" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/4cb0c88e-01c8-437a-a85c-d6c57055b072" />|
 |오답 복습|<img width="220" alt="image" src="https://github.com/user-attachments/assets/b0038427-1e8f-461e-a1a8-ab0ed39d6ad2" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/2aea42ae-cac7-46ec-ad1f-bf5fad153437" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/8d9f244d-ceb9-4880-8966-4bce5ed07a08" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/4c8e7cff-3171-408b-a9a1-df32e508a64b" />|
+|학습 리포트|<img width="220" alt="image" src="https://github.com/user-attachments/assets/8b338b12-a68f-452d-8fb5-4bedb9e49333" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/fde9e21c-83a9-4264-b1b6-a84b03c7285d" />|
+
 <br>
 
 # 😮 기타 기능
