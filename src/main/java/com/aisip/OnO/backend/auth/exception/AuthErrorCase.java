@@ -16,7 +16,9 @@ public enum AuthErrorCase implements ErrorCase {
 
     REFRESH_TOKEN_NOT_EQUAL(400, 1004, "리프레시 토큰이 일치하지 않습니다."),
 
-    ACCESS_TOKEN_EXPIRED(400, 1005, "엑세스 토큰이 만료되었습니다.");
+    ACCESS_TOKEN_EXPIRED(400, 1005, "엑세스 토큰이 만료되었습니다."),
+
+    REFRESH_TOKEN_EXPIRED(401, 1006, "리프레시 토큰이 만료되었습니다.");
 
     private final Integer httpStatusCode;
     private final Integer errorCode;
