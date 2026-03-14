@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.auth.entity.Authority;
 import com.aisip.OnO.backend.auth.exception.AuthErrorCase;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -84,6 +85,9 @@ public class JwtTokenizer {
     public void validateRefreshToken(String token) {
         try {
             Jwts.parserBuilder().setSigningKey(refreshKey).build().parseClaimsJws(token);
+        } catch (ExpiredJwtException e) {
+            log.warn("리프레시 토큰 만료: {}", e.getMessage());
+            throw new ApplicationException(AuthErrorCase.REFRESH_TOKEN_EXPIRED);
         } catch (Exception e) {
             log.error("리프레시 토큰 검증 실패: {} / token={}", e.getMessage(), token);
             throw new ApplicationException(AuthErrorCase.INVALID_REFRESH_TOKEN);
