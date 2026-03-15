@@ -55,6 +55,7 @@ public class JwtTokenService {
 
     /**
      * ✅ 리프레시 토큰을 이용한 액세스 토큰 갱신
+     * - refresh 호출 시마다 refresh token도 재발급하여 만료시간 연장
      */
     public TokenResponseDto refreshAccessToken(String refreshToken) {
         jwtTokenizer.validateRefreshToken(refreshToken);
@@ -85,8 +86,18 @@ public class JwtTokenService {
             throw new ApplicationException(AuthErrorCase.REFRESH_TOKEN_NOT_EQUAL);
         }
 
-        log.info("userId: {} has : refresh access token", userId);
-        return generateTokens(userId, authority);
+        // 4. refresh token rotation
+        String newAccessToken = jwtTokenizer.createAccessToken(String.valueOf(userId), Map.of("authority", authority));
+        String newRefreshToken = jwtTokenizer.createRefreshToken(String.valueOf(userId), Map.of("authority", authority));
+
+        refreshTokenRepository.deleteByUserId(userId);
+        refreshTokenRepository.save(RefreshToken.from(userId, authority, newRefreshToken));
+
+        long expiration = jwtTokenizer.getRefreshTokenExpirationSeconds();
+        redisTokenService.saveRefreshToken(userId, newRefreshToken, expiration);
+
+        log.info("userId: {} has : refresh access token (refresh rotated)", userId);
+        return new TokenResponseDto(newAccessToken, newRefreshToken);
     }
 
     /**
