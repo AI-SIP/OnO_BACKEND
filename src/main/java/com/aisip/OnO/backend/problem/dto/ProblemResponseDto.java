@@ -1,6 +1,8 @@
 package com.aisip.OnO.backend.problem.dto;
 
 import com.aisip.OnO.backend.problem.entity.Problem;
+import com.aisip.OnO.backend.tag.dto.TagResponseDto;
+import com.aisip.OnO.backend.tag.entity.ProblemTagMapping;
 import lombok.AccessLevel;
 import lombok.Builder;
 import org.jetbrains.annotations.NotNull;
@@ -28,7 +30,11 @@ public record ProblemResponseDto (
 
     List<ProblemImageDataResponseDto> imageUrlList,
 
-    ProblemAnalysisResponseDto analysis
+    ProblemAnalysisResponseDto analysis,
+
+    List<Long> tagIdList,
+
+    List<TagResponseDto> tags
 ) {
     public static ProblemResponseDto from(@NotNull Problem problem) {
 
@@ -40,6 +46,20 @@ public record ProblemResponseDto (
                 .map(ProblemAnalysisResponseDto::from)
                 .orElse(null);
 
+        List<Long> tagIds = Optional.ofNullable(problem.getProblemTagMappingList())
+                .orElse(List.of())
+                .stream()
+                .map(ProblemTagMapping::getTag)
+                .map(tag -> tag.getId())
+                .toList();
+
+        List<TagResponseDto> tags = Optional.ofNullable(problem.getProblemTagMappingList())
+                .orElse(List.of())
+                .stream()
+                .map(ProblemTagMapping::getTag)
+                .map(TagResponseDto::from)
+                .toList();
+
         return ProblemResponseDto.builder()
                 .problemId(problem.getId())
                 .folderId(problem.getFolder().getId())
@@ -50,7 +70,8 @@ public record ProblemResponseDto (
                 .updatedAt(problem.getUpdatedAt())
                 .imageUrlList(problemImageDataList)
                 .analysis(analysisDto)
+                .tagIdList(tagIds)
+                .tags(tags)
                 .build();
     }
 }
-
