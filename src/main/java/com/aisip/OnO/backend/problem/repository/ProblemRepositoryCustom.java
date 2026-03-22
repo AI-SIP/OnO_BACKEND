@@ -25,4 +25,14 @@ public interface ProblemRepositoryCustom {
      * @return 문제 리스트 (size+1개 조회하여 hasNext 판단)
      */
     List<Problem> findProblemsByFolderWithCursor(Long folderId, Long cursor, int size);
+
+    /**
+     * 커서 기반 태그의 문제 조회
+     * @param tagId 태그 ID
+     * @param userId 유저 ID
+     * @param cursor 마지막으로 조회한 문제 ID (null이면 처음부터)
+     * @param size 조회할 개수
+     * @return 문제 리스트 (size+1개 조회하여 hasNext 판단)
+     */
+    List<Problem> findProblemsByTagWithCursor(Long tagId, Long userId, Long cursor, int size);
 }

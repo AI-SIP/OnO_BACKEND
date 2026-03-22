@@ -506,4 +506,36 @@ public class ProblemService {
         log.info("folderId: {} find problems with cursor: {}, size: {}, hasNext: {}", folderId, cursor, size, hasNext);
         return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
     }
+
+    /**
+     * V2 API: 커서 기반 태그의 문제 조회
+     * @param tagId 태그 ID
+     * @param userId 유저 ID
+     * @param cursor 마지막으로 조회한 문제 ID (null이면 처음부터)
+     * @param size 조회할 개수
+     * @return 커서 기반 페이징 응답
+     */
+    @Transactional(readOnly = true)
+    public CursorPageResponse<ProblemResponseDto> findProblemsByTagWithCursor(Long tagId, Long userId, Long cursor, int size) {
+        Tag tag = tagRepository.findById(tagId)
+                .orElseThrow(() -> new ApplicationException(TagErrorCase.TAG_NOT_FOUND));
+
+        if (!Objects.equals(tag.getUserId(), userId)) {
+            throw new ApplicationException(TagErrorCase.TAG_USER_UNMATCHED);
+        }
+
+        List<Problem> problems = problemRepository.findProblemsByTagWithCursor(tagId, userId, cursor, size);
+
+        boolean hasNext = problems.size() > size;
+        List<Problem> content = hasNext ? problems.subList(0, size) : problems;
+        Long nextCursor = hasNext ? content.get(content.size() - 1).getId() : null;
+
+        List<ProblemResponseDto> dtoList = content.stream()
+                .map(ProblemResponseDto::from)
+                .collect(Collectors.toList());
+
+        log.info("userId: {} find problems by tagId: {} with cursor: {}, size: {}, hasNext: {}",
+                userId, tagId, cursor, size, hasNext);
+        return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
+    }
 }

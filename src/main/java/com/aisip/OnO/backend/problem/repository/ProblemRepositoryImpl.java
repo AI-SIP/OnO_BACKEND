@@ -12,6 +12,7 @@ import static com.aisip.OnO.backend.practicenote.entity.QPracticeNote.practiceNo
 import static com.aisip.OnO.backend.practicenote.entity.QProblemPracticeNoteMapping.problemPracticeNoteMapping;
 import static com.aisip.OnO.backend.problem.entity.QProblem.problem;
 import static com.aisip.OnO.backend.problem.entity.QProblemImageData.problemImageData;
+import static com.aisip.OnO.backend.tag.entity.QProblemTagMapping.problemTagMapping;
 
 public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
 
@@ -93,6 +94,29 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
         return query
                 .orderBy(problem.id.asc())
                 .limit(size + 1)  // hasNext 판단을 위해 +1개 조회
+                .fetch();
+    }
+
+    @Override
+    public List<Problem> findProblemsByTagWithCursor(Long tagId, Long userId, Long cursor, int size) {
+        var query = queryFactory
+                .selectDistinct(problem)
+                .from(problem)
+                .join(problemTagMapping).on(problemTagMapping.problem.id.eq(problem.id))
+                .leftJoin(problem.folder).fetchJoin()
+                .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
+                .where(
+                        problemTagMapping.tag.id.eq(tagId),
+                        problem.userId.eq(userId)
+                );
+
+        if (cursor != null) {
+            query.where(problem.id.gt(cursor));
+        }
+
+        return query
+                .orderBy(problem.id.asc())
+                .limit(size + 1)
                 .fetch();
     }
 }

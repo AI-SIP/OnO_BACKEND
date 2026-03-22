@@ -71,6 +71,18 @@ public class ProblemController {
         return CommonResponse.success(problemService.findProblemsByFolderWithCursor(folderId, cursor, size));
     }
 
+    // ✅ V2 API: 커서 기반 태그의 문제 조회 (무한 스크롤)
+    @GetMapping("/tag/{tagId}/V2")
+    public CommonResponse<CursorPageResponse<ProblemResponseDto>> getProblemsWithCursorByTag(
+            @PathVariable("tagId") Long tagId,
+            @RequestParam(value = "cursor", required = false) Long cursor,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        log.info("userId: {} get problems for tagId: {} with cursor: {}, size: {}", userId, tagId, cursor, size);
+
+        return CommonResponse.success(problemService.findProblemsByTagWithCursor(tagId, userId, cursor, size));
+    }
+
     // ✅ 사용자의 문제 개수 조회
     @GetMapping("/problemCount")
     public CommonResponse<Long> getUserProblemCount() {
