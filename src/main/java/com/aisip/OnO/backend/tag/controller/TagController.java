@@ -32,4 +32,12 @@ public class TagController {
 
         return CommonResponse.success(tagService.getUserTags(userId));
     }
+
+    @DeleteMapping("/{tagId}")
+    public CommonResponse<String> deleteTag(@PathVariable("tagId") Long tagId) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        tagService.deleteTag(userId, tagId);
+
+        return CommonResponse.success("태그가 삭제되었습니다.");
+    }
 }

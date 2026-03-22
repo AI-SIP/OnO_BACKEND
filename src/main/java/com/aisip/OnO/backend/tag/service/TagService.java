@@ -3,8 +3,10 @@ package com.aisip.OnO.backend.tag.service;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.tag.dto.TagCreateRequestDto;
 import com.aisip.OnO.backend.tag.dto.TagResponseDto;
+import com.aisip.OnO.backend.tag.entity.ProblemTagMapping;
 import com.aisip.OnO.backend.tag.entity.Tag;
 import com.aisip.OnO.backend.tag.exception.TagErrorCase;
+import com.aisip.OnO.backend.tag.repository.ProblemTagMappingRepository;
 import com.aisip.OnO.backend.tag.repository.TagRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +25,7 @@ public class TagService {
     private static final int MAX_TAG_NAME_LENGTH = 30;
 
     private final TagRepository tagRepository;
+    private final ProblemTagMappingRepository problemTagMappingRepository;
 
     public TagResponseDto createTag(Long userId, TagCreateRequestDto requestDto) {
         String tagName = normalizeDisplayName(requestDto.name());
@@ -41,6 +44,23 @@ public class TagService {
                 .stream()
                 .map(TagResponseDto::from)
                 .toList();
+    }
+
+    public void deleteTag(Long userId, Long tagId) {
+        Tag tag = tagRepository.findById(tagId)
+                .orElseThrow(() -> new ApplicationException(TagErrorCase.TAG_NOT_FOUND));
+
+        if (!tag.getUserId().equals(userId)) {
+            throw new ApplicationException(TagErrorCase.TAG_USER_UNMATCHED);
+        }
+
+        List<ProblemTagMapping> mappings = problemTagMappingRepository.findAllByTagId(tagId);
+        if (!mappings.isEmpty()) {
+            problemTagMappingRepository.deleteAll(mappings);
+        }
+
+        tagRepository.delete(tag);
+        log.info("userId: {} deleted tagId: {}", userId, tagId);
     }
 
     private String normalizeDisplayName(String rawTagName) {

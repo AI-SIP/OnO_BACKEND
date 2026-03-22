@@ -8,4 +8,6 @@ import java.util.List;
 public interface ProblemTagMappingRepository extends JpaRepository<ProblemTagMapping, Long> {
 
     List<ProblemTagMapping> findAllByProblemId(Long problemId);
+
+    List<ProblemTagMapping> findAllByTagId(Long tagId);
 }
