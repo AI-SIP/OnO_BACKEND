@@ -148,6 +148,16 @@ public class JwtTokenizer {
     }
 
     /**
+     * RefreshToken의 남은 만료 시간을 초 단위로 반환
+     */
+    public long getRemainingRefreshExpirationTime(String token) {
+        Claims claims = getClaimsFromRefreshToken(token);
+        Date expiration = claims.getExpiration();
+        long now = System.currentTimeMillis();
+        return Math.max(0, (expiration.getTime() - now) / 1000);
+    }
+
+    /**
      * AccessToken 만료 시간을 초 단위로 반환
      */
     public long getAccessTokenExpirationSeconds() {
