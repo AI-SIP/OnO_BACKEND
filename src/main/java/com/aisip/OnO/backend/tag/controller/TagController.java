@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.tag.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.tag.dto.TagCreateRequestDto;
+import com.aisip.OnO.backend.tag.dto.TagDeleteRequestDto;
 import com.aisip.OnO.backend.tag.dto.TagResponseDto;
 import com.aisip.OnO.backend.tag.service.TagService;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,14 @@ public class TagController {
     public CommonResponse<String> deleteTag(@PathVariable("tagId") Long tagId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         tagService.deleteTag(userId, tagId);
+
+        return CommonResponse.success("태그가 삭제되었습니다.");
+    }
+
+    @DeleteMapping("")
+    public CommonResponse<String> deleteTags(@RequestBody TagDeleteRequestDto tagDeleteRequestDto) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        tagService.deleteTags(userId, tagDeleteRequestDto);
 
         return CommonResponse.success("태그가 삭제되었습니다.");
     }
