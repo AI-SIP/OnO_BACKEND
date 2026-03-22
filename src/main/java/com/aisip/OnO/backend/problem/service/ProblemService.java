@@ -141,6 +141,7 @@ public class ProblemService {
         Problem problem = Problem.from(problemRegisterDto, userId);
         problem.updateFolder(folder);
         problemRepository.save(problem);
+        syncProblemTags(problem, userId, problemRegisterDto.tagIds());
 
         analysisService.createSkippedAnalysis(problem.getId());
         missionLogService.registerProblemWriteMission(userId);
@@ -164,12 +165,14 @@ public class ProblemService {
                 problemRegisterV2Dto.memo(),
                 problemRegisterV2Dto.reference(),
                 problemRegisterV2Dto.folderId(),
-                problemRegisterV2Dto.solvedAt()
+                problemRegisterV2Dto.solvedAt(),
+                problemRegisterV2Dto.tagIds()
         );
 
         Problem problem = Problem.from(baseDto, userId);
         problem.updateFolder(folder);
         problemRepository.save(problem);
+        syncProblemTags(problem, userId, baseDto.tagIds());
 
         if (problemRegisterV2Dto.problemImageUrls() != null) {
             problemRegisterV2Dto.problemImageUrls().stream()
@@ -285,6 +288,7 @@ public class ProblemService {
         Problem problem = findProblemEntity(problemRegisterDto.problemId(), userId);
 
         problem.updateProblem(problemRegisterDto);
+        syncProblemTags(problem, userId, problemRegisterDto.tagIds());
 
         log.info("userId: {} update problemId: {}", userId, problem.getId());
     }
@@ -356,6 +360,50 @@ public class ProblemService {
         return ids.stream()
                 .filter(Objects::nonNull)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private void syncProblemTags(Problem problem, Long userId, List<Long> requestedTagIds) {
+        // null이면 기존 태그 유지, 빈 배열이면 전체 해제
+        if (requestedTagIds == null) {
+            return;
+        }
+
+        Set<Long> targetTagIds = toDistinctIds(requestedTagIds);
+        if (targetTagIds.size() > 5) {
+            throw new ApplicationException(TagErrorCase.TAG_LIMIT_EXCEEDED);
+        }
+
+        List<ProblemTagMapping> existingMappings = problemTagMappingRepository.findAllByProblemId(problem.getId());
+        Set<Long> existingTagIds = existingMappings.stream()
+                .map(mapping -> mapping.getTag().getId())
+                .collect(Collectors.toSet());
+
+        if (!targetTagIds.isEmpty()) {
+            List<Tag> targetTags = tagRepository.findAllByIdInAndUserId(new ArrayList<>(targetTagIds), userId);
+            if (targetTags.size() != targetTagIds.size()) {
+                throw new ApplicationException(TagErrorCase.TAG_NOT_FOUND);
+            }
+
+            Set<Long> targetTagIdSet = targetTags.stream().map(Tag::getId).collect(Collectors.toSet());
+
+            List<ProblemTagMapping> mappingsToDelete = existingMappings.stream()
+                    .filter(mapping -> !targetTagIdSet.contains(mapping.getTag().getId()))
+                    .toList();
+            if (!mappingsToDelete.isEmpty()) {
+                problemTagMappingRepository.deleteAll(mappingsToDelete);
+            }
+
+            for (Tag tag : targetTags) {
+                if (!existingTagIds.contains(tag.getId())) {
+                    problemTagMappingRepository.save(ProblemTagMapping.from(problem, tag));
+                }
+            }
+        } else {
+            // [] 전달 시 전체 해제
+            if (!existingMappings.isEmpty()) {
+                problemTagMappingRepository.deleteAll(existingMappings);
+            }
+        }
     }
 
     /**
