@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/tags")
@@ -22,5 +24,12 @@ public class TagController {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         return CommonResponse.success(tagService.createTag(userId, tagCreateRequestDto));
+    }
+
+    @GetMapping("")
+    public CommonResponse<List<TagResponseDto>> getUserTags() {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        return CommonResponse.success(tagService.getUserTags(userId));
     }
 }

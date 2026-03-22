@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Locale;
 
 @Slf4j
@@ -32,6 +33,14 @@ public class TagService {
 
         log.info("userId: {} create tag: {}", userId, tag.getName());
         return TagResponseDto.from(tag);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TagResponseDto> getUserTags(Long userId) {
+        return tagRepository.findAllByUserIdOrderByNameAsc(userId)
+                .stream()
+                .map(TagResponseDto::from)
+                .toList();
     }
 
     private String normalizeDisplayName(String rawTagName) {
