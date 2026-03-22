@@ -119,4 +119,26 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
                 .limit(size + 1)
                 .fetch();
     }
+
+    @Override
+    public List<Problem> findProblemsByTitleWithCursor(String titleQuery, Long userId, Long cursor, int size) {
+        var query = queryFactory
+                .selectDistinct(problem)
+                .from(problem)
+                .leftJoin(problem.folder).fetchJoin()
+                .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
+                .where(
+                        problem.userId.eq(userId),
+                        problem.reference.containsIgnoreCase(titleQuery)
+                );
+
+        if (cursor != null) {
+            query.where(problem.id.gt(cursor));
+        }
+
+        return query
+                .orderBy(problem.id.asc())
+                .limit(size + 1)
+                .fetch();
+    }
 }

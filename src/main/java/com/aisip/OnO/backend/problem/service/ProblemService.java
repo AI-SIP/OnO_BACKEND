@@ -538,4 +538,32 @@ public class ProblemService {
                 userId, tagId, cursor, size, hasNext);
         return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
     }
+
+    /**
+     * V2 API: 커서 기반 제목 contains 문제 조회
+     * - 제목은 현재 Problem.reference 필드를 사용
+     */
+    @Transactional(readOnly = true)
+    public CursorPageResponse<ProblemResponseDto> findProblemsByTitleWithCursor(
+            String titleQuery, Long userId, Long cursor, int size
+    ) {
+        String query = titleQuery == null ? "" : titleQuery.trim();
+        if (query.isEmpty()) {
+            return CursorPageResponse.of(List.of(), null, false, size);
+        }
+
+        List<Problem> problems = problemRepository.findProblemsByTitleWithCursor(query, userId, cursor, size);
+
+        boolean hasNext = problems.size() > size;
+        List<Problem> content = hasNext ? problems.subList(0, size) : problems;
+        Long nextCursor = hasNext ? content.get(content.size() - 1).getId() : null;
+
+        List<ProblemResponseDto> dtoList = content.stream()
+                .map(ProblemResponseDto::from)
+                .collect(Collectors.toList());
+
+        log.info("userId: {} find problems by title query: '{}' with cursor: {}, size: {}, hasNext: {}",
+                userId, query, cursor, size, hasNext);
+        return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
+    }
 }

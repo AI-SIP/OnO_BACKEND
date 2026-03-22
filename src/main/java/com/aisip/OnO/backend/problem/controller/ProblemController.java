@@ -83,6 +83,19 @@ public class ProblemController {
         return CommonResponse.success(problemService.findProblemsByTagWithCursor(tagId, userId, cursor, size));
     }
 
+    // ✅ V2 API: 제목(contains) 기반 문제 조회 (무한 스크롤)
+    @GetMapping("/title/V2")
+    public CommonResponse<CursorPageResponse<ProblemResponseDto>> getProblemsWithCursorByTitle(
+            @RequestParam("query") String query,
+            @RequestParam(value = "cursor", required = false) Long cursor,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        log.info("userId: {} search problems by title query: '{}' with cursor: {}, size: {}",
+                userId, query, cursor, size);
+
+        return CommonResponse.success(problemService.findProblemsByTitleWithCursor(query, userId, cursor, size));
+    }
+
     // ✅ 사용자의 문제 개수 조회
     @GetMapping("/problemCount")
     public CommonResponse<Long> getUserProblemCount() {
