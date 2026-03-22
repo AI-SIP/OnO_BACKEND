@@ -60,11 +60,12 @@
             font-weight: 700;
             letter-spacing: -0.03em;
             margin-bottom: 18px;
-            color: var(--brand);
+            color: #1CBA1A;
+            padding-left: 8px;
         }
 
         .brand span {
-            color: var(--brand);
+            color: #1CBA1A;
         }
 
         .hero {
@@ -97,6 +98,7 @@
             letter-spacing: -0.03em;
             margin-bottom: 14px;
             color: #0d2a10;
+            white-space: nowrap;
         }
 
         .hero p {
@@ -108,28 +110,39 @@
         }
 
         .cta-wrap {
-            margin-top: 58px;
             display: flex;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             gap: 12px;
             align-items: center;
         }
 
         .cta-label {
-            width: 100%;
-            color: #2d6f36;
-            font-size: 0.74rem;
-            font-weight: 600;
-            margin-bottom: 8px;
+            width: fit-content;
+            color: #1d5e27;
+            font-size: 0.64rem;
+            font-weight: 700;
+            margin-bottom: 4px;
             opacity: 1;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid #bfe4bf;
+            background: #f5fff4;
+        }
+
+        .cta-box {
+            margin-top: 58px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
         }
 
         .store-btn {
-            width: 154px;
-            height: 50px;
+            width: 168px;
+            height: 56px;
             display: inline-block;
             border-radius: 10px;
-            background-size: 100% 100%;
+            background-size: contain;
+            background-position: center;
             background-repeat: no-repeat;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
@@ -151,21 +164,21 @@
         }
 
         .hero-visual {
-            width: min(100%, 340px);
+            width: min(100%, 372px);
             margin: 0 auto;
         }
 
         .hero-copy {
-            margin-top: 12px;
+            margin-top: 20px;
             max-width: 560px;
             display: grid;
             gap: 12px;
         }
 
-        .lead {
+        .hero p.lead {
             color: #1f4024;
-            line-height: 1.78;
-            font-size: 0.96rem;
+            line-height: 1.62;
+            font-size: 0.88rem;
             font-weight: 400;
             text-wrap: pretty;
             word-break: keep-all;
@@ -202,8 +215,8 @@
 
         .section .desc {
             color: var(--ink-soft);
-            line-height: 1.75;
-            font-size: 1rem;
+            line-height: 1.6;
+            font-size: 0.8rem;
         }
 
         .value-grid {
@@ -221,7 +234,10 @@
         }
 
         .card h3 {
-            font-size: 1.08rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1.0rem;
             margin-bottom: 8px;
             color: #0f7a15;
         }
@@ -229,7 +245,7 @@
         .card p {
             color: #244529;
             line-height: 1.7;
-            font-size: 0.97rem;
+            font-size: 0.8rem;
         }
 
         .poster-wrap {
@@ -238,7 +254,7 @@
             background: #ffffff;
             border: 1px solid #1cba1a;
             border-radius: var(--radius-lg);
-            padding: 8px;
+            padding: 0;
         }
 
         .carousel {
@@ -278,39 +294,43 @@
             margin-top: 0;
             position: absolute;
             top: 50%;
-            left: 0;
-            right: 0;
+            left: 8px;
+            right: 8px;
             transform: translateY(-50%);
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 0;
-            padding: 0 2px;
             pointer-events: none;
         }
 
         .control-btn {
-            border: 1px solid #bfe5bd;
-            background: rgba(255, 255, 255, 0.52);
+            border: 0;
+            background: rgba(255, 255, 255, 0.28);
             color: #0f7a15;
-            border-radius: 999px;
-            font-weight: 600;
-            width: 36px;
-            height: 36px;
+            border-radius: 0;
+            font-weight: 700;
+            width: auto;
+            height: auto;
+            padding: 2px 6px;
+            font-size: 1.3rem;
+            line-height: 1;
             cursor: pointer;
-            box-shadow: 0 4px 12px rgba(17, 86, 24, 0.1);
+            box-shadow: none;
             pointer-events: auto;
         }
 
         .control-btn:hover {
-            background: rgba(255, 255, 255, 0.72);
+            background: rgba(255, 255, 255, 0.42);
         }
 
         .footer {
             margin-top: 56px;
             padding-top: 20px;
+            padding-left: 8px;
             border-top: 1px solid #d6ebd4;
-            color: #2b4f30;
+            color: #5f7f64;
+            opacity: 0.82;
             display: flex;
             justify-content: space-between;
             flex-wrap: wrap;
@@ -331,29 +351,62 @@
         }
 
         @media (max-width: 979px) {
+            .page {
+                padding-top: 20px;
+            }
+
+            .brand {
+                margin-bottom: 14px;
+            }
+
             .hero {
                 gap: 18px;
                 padding: 28px 18px;
+            }
+
+            h1 {
+                font-size: clamp(1.26rem, 6.6vw, 1.95rem);
+                letter-spacing: -0.02em;
             }
 
             .hero-copy {
                 gap: 8px;
             }
 
+            .cta-box {
+                margin-top: 52px;
+                align-items: center;
+            }
+
             .cta-wrap {
-                margin-top: 42px;
                 justify-content: center;
-                gap: 10px;
+                gap: 8px;
+                width: 100%;
             }
 
             .cta-label {
                 text-align: center;
-                margin-bottom: 4px;
+                margin-bottom: 2px;
+                font-size: 0.62rem;
+            }
+
+            .store-btn {
+                width: 146px;
+                height: 50px;
+            }
+
+            .hero-visual {
+                width: min(100%, 352px);
+            }
+
+            .hero p.lead {
+                font-size: 0.84rem;
+                line-height: 1.58;
             }
 
             .value-grid {
                 grid-template-columns: 1fr;
-                gap: 10px;
+                gap: 14px;
                 margin-top: 14px;
             }
 
@@ -384,22 +437,23 @@
     <section class="hero">
         <div>
             <span class="eyebrow">손쉽게 작성하는 나만의 AI 오답노트, OnO</span>
-            <h1>이젠 OnO로 복습하세요</h1>
-            <br>
+            <h1>이젠 OnO로 복습하세요!</h1>
             <div class="hero-copy">
                 <p class="lead">
-                    오답을 쌓아두는 데서 끝내지 않고, 다시 맞히는 루틴까지 이어지게 만듭니다.<br>
+                    오답을 쌓아두는 데서 끝내지 않고,<br>다시 맞히는 루틴까지 이어지게 만듭니다.<br> <br>
                     빠른 기록부터 AI 분석, 복습 관리, 학습 리포트까지 한 번에 경험해보세요.
                 </p>
             </div>
 
-            <div class="cta-wrap">
-                <a href="https://apps.apple.com/kr/app/%EC%98%A4%EB%85%B8-ono-%EB%82%98%EB%A7%8C%EC%9D%98-%EC%A7%84%EC%A0%95%ED%95%9C-%EC%98%A4%EB%8B%B5%EB%85%B8%ED%8A%B8/id6602886624"
-                   target="_blank" rel="noopener noreferrer" class="store-btn"
-                   style="background-image: url('/images/AppStoreDownloadButton.png');"></a>
-                <a href="https://play.google.com/store/apps/details?id=com.ono.app&pcampaignid=web_share"
-                   target="_blank" rel="noopener noreferrer" class="store-btn"
-                   style="background-image: url('/images/GooglePlayDownloadButton.png');"></a>
+            <div class="cta-box">
+                <div class="cta-wrap">
+                    <a href="https://apps.apple.com/kr/app/%EC%98%A4%EB%85%B8-ono-%EB%82%98%EB%A7%8C%EC%9D%98-%EC%A7%84%EC%A0%95%ED%95%9C-%EC%98%A4%EB%8B%B5%EB%85%B8%ED%8A%B8/id6602886624"
+                       target="_blank" rel="noopener noreferrer" class="store-btn"
+                       style="background-image: url('/images/AppStoreDownloadButton.png');"></a>
+                    <a href="https://play.google.com/store/apps/details?id=com.ono.app&pcampaignid=web_share"
+                       target="_blank" rel="noopener noreferrer" class="store-btn"
+                       style="background-image: url('/images/GooglePlayDownloadButton.png');"></a>
+                </div>
             </div>
         </div>
 
@@ -430,32 +484,32 @@
     <section class="section">
         <h2>오답 정리가 훨씬 쉬워집니다</h2>
         <p class="desc">
-            번거롭고 오래 걸리던 오답 정리를, 매일 이어갈 수 있는 학습 루틴으로 바꿔보세요.
+            번거롭고 오래 걸리던 오답 정리를, <br>매일 이어갈 수 있는 학습 루틴으로 바꿔보세요.
         </p>
 
         <div class="value-grid">
             <article class="card">
-                <h3>빠르고 편리한 오답노트 작성</h3>
+                <h3>📝 빠르고 편리한 오답노트 작성</h3>
                 <p>문제를 길게 옮겨 적지 않아도 됩니다. 촬영 중심으로 필요한 정보만 빠르게 정리할 수 있어요.</p>
             </article>
             <article class="card">
-                <h3>AI 오답 분석</h3>
+                <h3>🤖 AI 오답 분석</h3>
                 <p>단순 정답 확인을 넘어, 왜 틀렸는지와 어떤 개념이 부족한지까지 분석해 복습 방향을 잡아줍니다.</p>
             </article>
             <article class="card">
-                <h3>복습 기록 작성</h3>
+                <h3>📌 복습 기록 작성</h3>
                 <p>복습한 결과를 쌓아가며 성장하는 내 모습을 확인할 수 있어요.</p>
             </article>
             <article class="card">
-                <h3>복습 리스트 · 폴더</h3>
+                <h3>🗂 복습 리스트 · 폴더</h3>
                 <p>시험 전 필요한 문제만 모아 보고, 폴더로 원하는 오답을 빠르게 찾아 복습할 수 있습니다.</p>
             </article>
             <article class="card">
-                <h3>태블릿과 스마트폰 연동</h3>
+                <h3>📱 태블릿과 스마트폰 연동</h3>
                 <p>집에서는 태블릿으로, 이동 중에는 스마트폰으로 같은 오답노트를 이어서 복습할 수 있습니다.</p>
             </article>
             <article class="card">
-                <h3>학습 리포트</h3>
+                <h3>📊 학습 리포트</h3>
                 <p>내 학습 추이와 약점 영역을 한눈에 확인하고, 다음에 무엇을 먼저 공부할지 더 명확하게 정할 수 있어요.</p>
             </article>
         </div>

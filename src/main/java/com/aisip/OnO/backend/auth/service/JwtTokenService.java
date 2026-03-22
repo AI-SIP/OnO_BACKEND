@@ -6,7 +6,6 @@ import com.aisip.OnO.backend.auth.exception.AuthErrorCase;
 import com.aisip.OnO.backend.auth.repository.RefreshTokenRepository;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.auth.entity.Authority;
-import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.util.redis.RedisTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,16 +25,25 @@ public class JwtTokenService {
     private final RefreshTokenRepository refreshTokenRepository;
 
     /**
-     * ✅ 유저 정보를 기반으로 새로운 액세스/리프레시 토큰 생성 (Redis + DB)
+     * ✅ 유저 정보를 기반으로 액세스 토큰 생성
+     * - 기존 리프레시 토큰이 있으면 재사용
+     * - 없을 때만 신규 리프레시 토큰 발급/저장
      */
     public TokenResponseDto generateTokens(Long userId, Authority authority) {
         String accessToken = jwtTokenizer.createAccessToken(String.valueOf(userId), Map.of("authority", authority));
-        String refreshToken = jwtTokenizer.createRefreshToken(String.valueOf(userId), Map.of("authority", authority));
+        String refreshToken;
 
-        // DB에 RefreshToken 저장 (기존 토큰이 있으면 삭제 후 저장)
-        refreshTokenRepository.deleteByUserId(userId);
-        RefreshToken refreshTokenEntity = RefreshToken.from(userId, authority, refreshToken);
-        refreshTokenRepository.save(refreshTokenEntity);
+        // DB에 기존 RefreshToken이 있으면 재사용
+        RefreshToken existingRefreshToken = refreshTokenRepository.findByUserId(userId).orElse(null);
+        if (existingRefreshToken != null) {
+            refreshToken = existingRefreshToken.getRefreshToken();
+            log.info("Reusing existing refresh token for userId: {}", userId);
+        } else {
+            refreshToken = jwtTokenizer.createRefreshToken(String.valueOf(userId), Map.of("authority", authority));
+            RefreshToken refreshTokenEntity = RefreshToken.from(userId, authority, refreshToken);
+            refreshTokenRepository.save(refreshTokenEntity);
+            log.info("Created new refresh token for userId: {}", userId);
+        }
 
         // Redis에 RefreshToken 캐싱
         long expiration = jwtTokenizer.getRefreshTokenExpirationSeconds();
@@ -47,6 +55,7 @@ public class JwtTokenService {
 
     /**
      * ✅ 리프레시 토큰을 이용한 액세스 토큰 갱신
+     * - refresh 호출 시마다 refresh token도 재발급하여 만료시간 연장
      */
     public TokenResponseDto refreshAccessToken(String refreshToken) {
         jwtTokenizer.validateRefreshToken(refreshToken);
@@ -73,13 +82,22 @@ public class JwtTokenService {
 
         // 3. RefreshToken 일치 여부 확인
         if (!storedToken.equals(refreshToken)) {
-            redisTokenService.deleteRefreshToken(userId);
-            refreshTokenRepository.deleteByUserId(userId);
+            log.warn("RefreshToken mismatch for userId: {}", userId);
             throw new ApplicationException(AuthErrorCase.REFRESH_TOKEN_NOT_EQUAL);
         }
 
-        log.info("userId: {} has : refresh access token", userId);
-        return generateTokens(userId, authority);
+        // 4. refresh token rotation
+        String newAccessToken = jwtTokenizer.createAccessToken(String.valueOf(userId), Map.of("authority", authority));
+        String newRefreshToken = jwtTokenizer.createRefreshToken(String.valueOf(userId), Map.of("authority", authority));
+
+        refreshTokenRepository.deleteByUserId(userId);
+        refreshTokenRepository.save(RefreshToken.from(userId, authority, newRefreshToken));
+
+        long expiration = jwtTokenizer.getRefreshTokenExpirationSeconds();
+        redisTokenService.saveRefreshToken(userId, newRefreshToken, expiration);
+
+        log.info("userId: {} has : refresh access token (refresh rotated)", userId);
+        return new TokenResponseDto(newAccessToken, newRefreshToken);
     }
 
     /**

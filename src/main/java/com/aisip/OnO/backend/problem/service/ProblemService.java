@@ -5,6 +5,7 @@ import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import com.aisip.OnO.backend.config.rabbitmq.producer.ProblemAnalysisProducer;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
+import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
@@ -14,6 +15,7 @@ import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
+import com.aisip.OnO.backend.problem.repository.ProblemAnalysisRepository;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
@@ -38,6 +40,7 @@ public class ProblemService {
     private final ProblemRepository problemRepository;
 
     private final ProblemImageDataRepository problemImageDataRepository;
+    private final ProblemAnalysisRepository problemAnalysisRepository;
 
     private final FolderRepository folderRepository;
 
@@ -238,6 +241,14 @@ public class ProblemService {
      */
     @Transactional
     public void analysisProblem(Long problemId) {
+        // 이미 분석이 완료된 문제는 재요청하지 않음
+        if (problemAnalysisRepository.findByProblemId(problemId)
+                .map(analysis -> analysis.getStatus() == AnalysisStatus.COMPLETED)
+                .orElse(false)) {
+            log.info("분석이 이미 완료된 문제이므로 분석을 진행하지 않습니다 - problemId: {}", problemId);
+            return;
+        }
+
         // 1. 문제 이미지 개수 확인
         long problemImageCount = problemImageDataRepository.findAllByProblemId(problemId)
                 .stream()
