@@ -11,6 +11,7 @@ import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2Dto;
+import com.aisip.OnO.backend.problem.dto.ProblemTagUpdateDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
@@ -22,14 +23,22 @@ import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
+import com.aisip.OnO.backend.tag.entity.ProblemTagMapping;
+import com.aisip.OnO.backend.tag.entity.Tag;
+import com.aisip.OnO.backend.tag.exception.TagErrorCase;
+import com.aisip.OnO.backend.tag.repository.ProblemTagMappingRepository;
+import com.aisip.OnO.backend.tag.repository.TagRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -55,6 +64,8 @@ public class ProblemService {
     private final S3DeleteProducer s3DeleteProducer;
 
     private final ProblemAnalysisProducer analysisProducer;
+    private final TagRepository tagRepository;
+    private final ProblemTagMappingRepository problemTagMappingRepository;
 
     @Transactional(readOnly = true)
     public ProblemResponseDto findProblem(Long problemId) {
@@ -290,6 +301,61 @@ public class ProblemService {
 
             log.info("userId: {} update problem folder, problemId: {}, folderId: {}", userId, problem.getId(), folder.getId());
         }
+    }
+
+    @Transactional
+    public void updateProblemTags(Long problemId, Long userId, ProblemTagUpdateDto problemTagUpdateDto) {
+        Problem problem = findProblemEntity(problemId, userId);
+
+        Set<Long> addTagIds = toDistinctIds(problemTagUpdateDto.addTagIds());
+        Set<Long> removeTagIds = toDistinctIds(problemTagUpdateDto.removeTagIds());
+
+        List<ProblemTagMapping> existingMappings = problemTagMappingRepository.findAllByProblemId(problemId);
+        Set<Long> existingTagIds = existingMappings.stream()
+                .map(mapping -> mapping.getTag().getId())
+                .collect(Collectors.toSet());
+
+        List<ProblemTagMapping> mappingsToDelete = existingMappings.stream()
+                .filter(mapping -> removeTagIds.contains(mapping.getTag().getId()))
+                .toList();
+        if (!mappingsToDelete.isEmpty()) {
+            problemTagMappingRepository.deleteAll(mappingsToDelete);
+        }
+
+        Set<Long> currentTagIds = new LinkedHashSet<>(existingTagIds);
+        currentTagIds.removeAll(mappingsToDelete.stream()
+                .map(mapping -> mapping.getTag().getId())
+                .collect(Collectors.toSet()));
+
+        Set<Long> candidateAddTagIds = new LinkedHashSet<>(addTagIds);
+        candidateAddTagIds.removeAll(currentTagIds);
+
+        if (!candidateAddTagIds.isEmpty()) {
+            List<Tag> tagsToAdd = tagRepository.findAllByIdInAndUserId(new ArrayList<>(candidateAddTagIds), userId);
+            if (tagsToAdd.size() != candidateAddTagIds.size()) {
+                throw new ApplicationException(TagErrorCase.TAG_NOT_FOUND);
+            }
+
+            if (currentTagIds.size() + tagsToAdd.size() > 5) {
+                throw new ApplicationException(TagErrorCase.TAG_LIMIT_EXCEEDED);
+            }
+
+            for (Tag tag : tagsToAdd) {
+                problemTagMappingRepository.save(ProblemTagMapping.from(problem, tag));
+            }
+        }
+
+        log.info("userId: {} updated tags for problemId: {}, addCount: {}, removeCount: {}",
+                userId, problemId, addTagIds.size(), removeTagIds.size());
+    }
+
+    private Set<Long> toDistinctIds(List<Long> ids) {
+        if (ids == null) {
+            return Set.of();
+        }
+        return ids.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     /**

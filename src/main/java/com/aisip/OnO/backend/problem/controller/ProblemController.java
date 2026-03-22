@@ -7,6 +7,7 @@ import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2Dto;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
+import com.aisip.OnO.backend.problem.dto.ProblemTagUpdateDto;
 import com.aisip.OnO.backend.problem.service.ProblemAnalysisService;
 import com.aisip.OnO.backend.problem.service.ProblemService;
 import lombok.RequiredArgsConstructor;
@@ -155,6 +156,18 @@ public class ProblemController {
         problemService.updateProblemFolder(problemRegisterDto, userId);
 
         return CommonResponse.success("문제가 수정되었습니다.");
+    }
+
+    // ✅ 문제 태그 추가/해제
+    @PatchMapping("/{problemId}/tags")
+    public CommonResponse<String> updateProblemTags(
+            @PathVariable("problemId") Long problemId,
+            @RequestBody ProblemTagUpdateDto problemTagUpdateDto
+    ) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        problemService.updateProblemTags(problemId, userId, problemTagUpdateDto);
+
+        return CommonResponse.success("문제 태그가 수정되었습니다.");
     }
 
     // ✅ 문제 삭제
