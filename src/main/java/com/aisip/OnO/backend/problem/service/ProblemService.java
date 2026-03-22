@@ -416,19 +416,26 @@ public class ProblemService {
     public void deleteProblem(Long problemId) {
         // 1. 이미지 데이터 조회
         List<ProblemImageData> imageDataList = problemImageDataRepository.findAllByProblemId(problemId);
+        // 1-1. 태그 매핑 조회
+        List<ProblemTagMapping> problemTagMappings = problemTagMappingRepository.findAllByProblemId(problemId);
 
         // 2. DB에서 이미지 메타데이터 삭제 (동기 - 빠름)
         problemImageDataRepository.deleteAll(imageDataList);
 
-        // 3. PracticeNote 매핑 삭제 (동기 - 데이터 정합성 보장)
+        // 3. 태그 매핑 삭제 (동기 - 데이터 정합성 보장)
+        if (!problemTagMappings.isEmpty()) {
+            problemTagMappingRepository.deleteAll(problemTagMappings);
+        }
+
+        // 4. PracticeNote 매핑 삭제 (동기 - 데이터 정합성 보장)
         practiceNoteRepository.deleteProblemFromAllPractice(problemId);
 
-        // 4. 문제 삭제 (Soft Delete)
+        // 5. 문제 삭제 (Soft Delete)
         problemRepository.deleteById(problemId);
 
         log.info("problemId: {} DB 삭제 완료", problemId);
 
-        // 5. S3 파일 삭제는 비동기로 처리 (RabbitMQ Producer)
+        // 6. S3 파일 삭제는 비동기로 처리 (RabbitMQ Producer)
         imageDataList.forEach(imageData -> {
             try {
                 s3DeleteProducer.sendDeleteMessage(imageData.getImageUrl(), problemId);
