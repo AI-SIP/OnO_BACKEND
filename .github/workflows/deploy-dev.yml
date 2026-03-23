@@ -65,10 +65,11 @@ jobs:
           export DOCKER_CONFIG=/tmp/.docker-ci
           mkdir -p "$DOCKER_CONFIG"
           echo '{}' > "$DOCKER_CONFIG/config.json"
-          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+          DOCKER="docker --config $DOCKER_CONFIG"
+          echo "${{ secrets.DOCKER_PASSWORD }}" | $DOCKER login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
 
-          docker pull ${{ secrets.DOCKER_USERNAME }}/ono:${APP_TAG}
-          docker tag ${{ secrets.DOCKER_USERNAME }}/ono:${APP_TAG} ${{ secrets.DOCKER_USERNAME }}/ono:dev-latest
+          $DOCKER pull ${{ secrets.DOCKER_USERNAME }}/ono:${APP_TAG}
+          $DOCKER tag ${{ secrets.DOCKER_USERNAME }}/ono:${APP_TAG} ${{ secrets.DOCKER_USERNAME }}/ono:dev-latest
 
           docker-compose -f docker-compose.dev.yml --env-file .env.dev up -d mysql-dev redis-dev
 
@@ -76,8 +77,8 @@ jobs:
           docker-compose -f docker-compose.dev.yml --env-file .env.dev rm -f app-dev || true
           docker-compose -f docker-compose.dev.yml --env-file .env.dev up -d app-dev
 
-          docker inspect ono-app-dev --format='Running Image: {{.Config.Image}}'
-          docker inspect ono-app-dev --format='Image ID: {{.Image}}'
+          $DOCKER inspect ono-app-dev --format='Running Image: {{.Config.Image}}'
+          $DOCKER inspect ono-app-dev --format='Image ID: {{.Image}}'
 
           echo "Waiting for development application to be healthy..."
           timeout=60
