@@ -118,9 +118,11 @@ jobs:
         run: |
           export DOCKER_CONFIG=/tmp/.docker-ci
           mkdir -p "$DOCKER_CONFIG"
-          echo '{}' > "$DOCKER_CONFIG/config.json"
           DOCKER="docker --config $DOCKER_CONFIG"
-          echo "${{ secrets.DOCKER_PASSWORD }}" | $DOCKER login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+          AUTH_B64=$(printf '%s:%s' "${{ secrets.DOCKER_USERNAME }}" "${{ secrets.DOCKER_PASSWORD }}" | base64 | tr -d '\n')
+          cat > "$DOCKER_CONFIG/config.json" << EOF
+          {"auths":{"https://index.docker.io/v1/":{"auth":"$AUTH_B64"}}}
+          EOF
 
           $DOCKER pull ${{ secrets.DOCKER_USERNAME }}/ono:${APP_TAG}
           $DOCKER tag ${{ secrets.DOCKER_USERNAME }}/ono:${APP_TAG} ${{ secrets.DOCKER_USERNAME }}/ono:prod-latest
