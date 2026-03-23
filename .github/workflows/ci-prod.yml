@@ -218,6 +218,8 @@ jobs:
 
       - name: Deploy Monitoring Stack
         run: |
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring pull \
+            mysql-exporter-prod prometheus-prod grafana-prod
           docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring stop prometheus-prod grafana-prod mysql-exporter-prod || true
           docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring rm -f prometheus-prod grafana-prod mysql-exporter-prod || true
           docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring up -d --force-recreate \
