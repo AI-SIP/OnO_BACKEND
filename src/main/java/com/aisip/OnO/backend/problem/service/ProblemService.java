@@ -11,6 +11,7 @@ import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2Dto;
+import com.aisip.OnO.backend.problem.dto.ProblemTagUpdateDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
@@ -22,14 +23,22 @@ import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
+import com.aisip.OnO.backend.tag.entity.ProblemTagMapping;
+import com.aisip.OnO.backend.tag.entity.Tag;
+import com.aisip.OnO.backend.tag.exception.TagErrorCase;
+import com.aisip.OnO.backend.tag.repository.ProblemTagMappingRepository;
+import com.aisip.OnO.backend.tag.repository.TagRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -55,6 +64,8 @@ public class ProblemService {
     private final S3DeleteProducer s3DeleteProducer;
 
     private final ProblemAnalysisProducer analysisProducer;
+    private final TagRepository tagRepository;
+    private final ProblemTagMappingRepository problemTagMappingRepository;
 
     @Transactional(readOnly = true)
     public ProblemResponseDto findProblem(Long problemId) {
@@ -130,6 +141,7 @@ public class ProblemService {
         Problem problem = Problem.from(problemRegisterDto, userId);
         problem.updateFolder(folder);
         problemRepository.save(problem);
+        syncProblemTags(problem, userId, problemRegisterDto.tagIds());
 
         analysisService.createSkippedAnalysis(problem.getId());
         missionLogService.registerProblemWriteMission(userId);
@@ -153,12 +165,14 @@ public class ProblemService {
                 problemRegisterV2Dto.memo(),
                 problemRegisterV2Dto.reference(),
                 problemRegisterV2Dto.folderId(),
-                problemRegisterV2Dto.solvedAt()
+                problemRegisterV2Dto.solvedAt(),
+                problemRegisterV2Dto.tagIds()
         );
 
         Problem problem = Problem.from(baseDto, userId);
         problem.updateFolder(folder);
         problemRepository.save(problem);
+        syncProblemTags(problem, userId, baseDto.tagIds());
 
         if (problemRegisterV2Dto.problemImageUrls() != null) {
             problemRegisterV2Dto.problemImageUrls().stream()
@@ -274,6 +288,7 @@ public class ProblemService {
         Problem problem = findProblemEntity(problemRegisterDto.problemId(), userId);
 
         problem.updateProblem(problemRegisterDto);
+        syncProblemTags(problem, userId, problemRegisterDto.tagIds());
 
         log.info("userId: {} update problemId: {}", userId, problem.getId());
     }
@@ -292,6 +307,105 @@ public class ProblemService {
         }
     }
 
+    @Transactional
+    public void updateProblemTags(Long problemId, Long userId, ProblemTagUpdateDto problemTagUpdateDto) {
+        Problem problem = findProblemEntity(problemId, userId);
+
+        Set<Long> addTagIds = toDistinctIds(problemTagUpdateDto.addTagIds());
+        Set<Long> removeTagIds = toDistinctIds(problemTagUpdateDto.removeTagIds());
+
+        List<ProblemTagMapping> existingMappings = problemTagMappingRepository.findAllByProblemId(problemId);
+        Set<Long> existingTagIds = existingMappings.stream()
+                .map(mapping -> mapping.getTag().getId())
+                .collect(Collectors.toSet());
+
+        List<ProblemTagMapping> mappingsToDelete = existingMappings.stream()
+                .filter(mapping -> removeTagIds.contains(mapping.getTag().getId()))
+                .toList();
+        if (!mappingsToDelete.isEmpty()) {
+            problemTagMappingRepository.deleteAll(mappingsToDelete);
+        }
+
+        Set<Long> currentTagIds = new LinkedHashSet<>(existingTagIds);
+        currentTagIds.removeAll(mappingsToDelete.stream()
+                .map(mapping -> mapping.getTag().getId())
+                .collect(Collectors.toSet()));
+
+        Set<Long> candidateAddTagIds = new LinkedHashSet<>(addTagIds);
+        candidateAddTagIds.removeAll(currentTagIds);
+
+        if (!candidateAddTagIds.isEmpty()) {
+            List<Tag> tagsToAdd = tagRepository.findAllByIdInAndUserId(new ArrayList<>(candidateAddTagIds), userId);
+            if (tagsToAdd.size() != candidateAddTagIds.size()) {
+                throw new ApplicationException(TagErrorCase.TAG_NOT_FOUND);
+            }
+
+            if (currentTagIds.size() + tagsToAdd.size() > 5) {
+                throw new ApplicationException(TagErrorCase.TAG_LIMIT_EXCEEDED);
+            }
+
+            for (Tag tag : tagsToAdd) {
+                problemTagMappingRepository.save(ProblemTagMapping.from(problem, tag));
+            }
+        }
+
+        log.info("userId: {} updated tags for problemId: {}, addCount: {}, removeCount: {}",
+                userId, problemId, addTagIds.size(), removeTagIds.size());
+    }
+
+    private Set<Long> toDistinctIds(List<Long> ids) {
+        if (ids == null) {
+            return Set.of();
+        }
+        return ids.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private void syncProblemTags(Problem problem, Long userId, List<Long> requestedTagIds) {
+        // null이면 기존 태그 유지, 빈 배열이면 전체 해제
+        if (requestedTagIds == null) {
+            return;
+        }
+
+        Set<Long> targetTagIds = toDistinctIds(requestedTagIds);
+        if (targetTagIds.size() > 5) {
+            throw new ApplicationException(TagErrorCase.TAG_LIMIT_EXCEEDED);
+        }
+
+        List<ProblemTagMapping> existingMappings = problemTagMappingRepository.findAllByProblemId(problem.getId());
+        Set<Long> existingTagIds = existingMappings.stream()
+                .map(mapping -> mapping.getTag().getId())
+                .collect(Collectors.toSet());
+
+        if (!targetTagIds.isEmpty()) {
+            List<Tag> targetTags = tagRepository.findAllByIdInAndUserId(new ArrayList<>(targetTagIds), userId);
+            if (targetTags.size() != targetTagIds.size()) {
+                throw new ApplicationException(TagErrorCase.TAG_NOT_FOUND);
+            }
+
+            Set<Long> targetTagIdSet = targetTags.stream().map(Tag::getId).collect(Collectors.toSet());
+
+            List<ProblemTagMapping> mappingsToDelete = existingMappings.stream()
+                    .filter(mapping -> !targetTagIdSet.contains(mapping.getTag().getId()))
+                    .toList();
+            if (!mappingsToDelete.isEmpty()) {
+                problemTagMappingRepository.deleteAll(mappingsToDelete);
+            }
+
+            for (Tag tag : targetTags) {
+                if (!existingTagIds.contains(tag.getId())) {
+                    problemTagMappingRepository.save(ProblemTagMapping.from(problem, tag));
+                }
+            }
+        } else {
+            // [] 전달 시 전체 해제
+            if (!existingMappings.isEmpty()) {
+                problemTagMappingRepository.deleteAll(existingMappings);
+            }
+        }
+    }
+
     /**
      * 문제 삭제 (비동기 S3 파일 삭제 적용)
      * - DB 삭제: 동기 (즉시 완료)
@@ -302,19 +416,26 @@ public class ProblemService {
     public void deleteProblem(Long problemId) {
         // 1. 이미지 데이터 조회
         List<ProblemImageData> imageDataList = problemImageDataRepository.findAllByProblemId(problemId);
+        // 1-1. 태그 매핑 조회
+        List<ProblemTagMapping> problemTagMappings = problemTagMappingRepository.findAllByProblemId(problemId);
 
         // 2. DB에서 이미지 메타데이터 삭제 (동기 - 빠름)
         problemImageDataRepository.deleteAll(imageDataList);
 
-        // 3. PracticeNote 매핑 삭제 (동기 - 데이터 정합성 보장)
+        // 3. 태그 매핑 삭제 (동기 - 데이터 정합성 보장)
+        if (!problemTagMappings.isEmpty()) {
+            problemTagMappingRepository.deleteAll(problemTagMappings);
+        }
+
+        // 4. PracticeNote 매핑 삭제 (동기 - 데이터 정합성 보장)
         practiceNoteRepository.deleteProblemFromAllPractice(problemId);
 
-        // 4. 문제 삭제 (Soft Delete)
+        // 5. 문제 삭제 (Soft Delete)
         problemRepository.deleteById(problemId);
 
         log.info("problemId: {} DB 삭제 완료", problemId);
 
-        // 5. S3 파일 삭제는 비동기로 처리 (RabbitMQ Producer)
+        // 6. S3 파일 삭제는 비동기로 처리 (RabbitMQ Producer)
         imageDataList.forEach(imageData -> {
             try {
                 s3DeleteProducer.sendDeleteMessage(imageData.getImageUrl(), problemId);
@@ -383,6 +504,66 @@ public class ProblemService {
                 .collect(Collectors.toList());
 
         log.info("folderId: {} find problems with cursor: {}, size: {}, hasNext: {}", folderId, cursor, size, hasNext);
+        return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
+    }
+
+    /**
+     * V2 API: 커서 기반 태그의 문제 조회
+     * @param tagId 태그 ID
+     * @param userId 유저 ID
+     * @param cursor 마지막으로 조회한 문제 ID (null이면 처음부터)
+     * @param size 조회할 개수
+     * @return 커서 기반 페이징 응답
+     */
+    @Transactional(readOnly = true)
+    public CursorPageResponse<ProblemResponseDto> findProblemsByTagWithCursor(Long tagId, Long userId, Long cursor, int size) {
+        Tag tag = tagRepository.findById(tagId)
+                .orElseThrow(() -> new ApplicationException(TagErrorCase.TAG_NOT_FOUND));
+
+        if (!Objects.equals(tag.getUserId(), userId)) {
+            throw new ApplicationException(TagErrorCase.TAG_USER_UNMATCHED);
+        }
+
+        List<Problem> problems = problemRepository.findProblemsByTagWithCursor(tagId, userId, cursor, size);
+
+        boolean hasNext = problems.size() > size;
+        List<Problem> content = hasNext ? problems.subList(0, size) : problems;
+        Long nextCursor = hasNext ? content.get(content.size() - 1).getId() : null;
+
+        List<ProblemResponseDto> dtoList = content.stream()
+                .map(ProblemResponseDto::from)
+                .collect(Collectors.toList());
+
+        log.info("userId: {} find problems by tagId: {} with cursor: {}, size: {}, hasNext: {}",
+                userId, tagId, cursor, size, hasNext);
+        return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
+    }
+
+    /**
+     * V2 API: 커서 기반 제목 contains 문제 조회
+     * - 제목은 현재 Problem.reference 필드를 사용
+     */
+    @Transactional(readOnly = true)
+    public CursorPageResponse<ProblemResponseDto> findProblemsByTitleWithCursor(
+            String titleQuery, Long userId, Long cursor, int size
+    ) {
+        String query = titleQuery == null ? "" : titleQuery.trim();
+        if (query.isEmpty()) {
+            return CursorPageResponse.of(List.of(), null, false, size);
+        }
+
+        List<Problem> problems = problemRepository.findProblemsByTitleWithCursor(query, userId, cursor, size);
+
+        boolean hasNext = problems.size() > size;
+        List<Problem> content = hasNext ? problems.subList(0, size) : problems;
+        Long nextCursor = hasNext ? content.get(content.size() - 1).getId() : null;
+
+        List<ProblemResponseDto> dtoList = content.stream()
+                .map(ProblemResponseDto::from)
+                .collect(Collectors.toList());
+
+        log.info("userId: {} find problems by title query: '{}' with cursor: {}, size: {}, hasNext: {}",
+                userId, query, cursor, size, hasNext);
         return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
     }
 }

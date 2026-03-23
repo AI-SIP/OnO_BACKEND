@@ -12,6 +12,17 @@ public record ProblemRegisterDto (
 
     Long folderId,
 
-    LocalDateTime solvedAt
-) {}
+    LocalDateTime solvedAt,
 
+    List<Long> tagIds
+) {
+    public ProblemRegisterDto(
+            Long problemId,
+            String memo,
+            String reference,
+            Long folderId,
+            LocalDateTime solvedAt
+    ) {
+        this(problemId, memo, reference, folderId, solvedAt, null);
+    }
+}
