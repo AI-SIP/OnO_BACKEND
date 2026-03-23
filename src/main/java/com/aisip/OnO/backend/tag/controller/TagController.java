@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.tag.controller;
 import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.tag.dto.TagCreateRequestDto;
 import com.aisip.OnO.backend.tag.dto.TagDeleteRequestDto;
+import com.aisip.OnO.backend.tag.dto.TagRecommendRequestDto;
 import com.aisip.OnO.backend.tag.dto.TagResponseDto;
 import com.aisip.OnO.backend.tag.service.TagService;
 import lombok.RequiredArgsConstructor;
@@ -48,5 +49,17 @@ public class TagController {
         tagService.deleteTags(userId, tagDeleteRequestDto);
 
         return CommonResponse.success("태그가 삭제되었습니다.");
+    }
+
+    @PostMapping("/recommend")
+    public CommonResponse<List<TagResponseDto>> recommendTags(
+            @RequestBody(required = false) TagRecommendRequestDto tagRecommendRequestDto
+    ) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        TagRecommendRequestDto requestDto = tagRecommendRequestDto == null
+                ? new TagRecommendRequestDto(List.of())
+                : tagRecommendRequestDto;
+
+        return CommonResponse.success(tagService.recommendTags(userId, requestDto));
     }
 }

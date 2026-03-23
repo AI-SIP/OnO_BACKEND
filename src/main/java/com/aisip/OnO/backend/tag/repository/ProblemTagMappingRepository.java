@@ -14,4 +14,6 @@ public interface ProblemTagMappingRepository extends JpaRepository<ProblemTagMap
     List<ProblemTagMapping> findAllByTagIdIn(List<Long> tagIds);
 
     List<ProblemTagMapping> findAllByProblemIdAndTagIdIn(Long problemId, List<Long> tagIds);
+
+    List<ProblemTagMapping> findAllByTagUserIdOrderByCreatedAtDesc(Long userId);
 }
