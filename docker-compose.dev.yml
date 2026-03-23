@@ -146,11 +146,14 @@ services:
       - monitoring
 
   mysql-exporter-dev:
-    image: prom/mysqld-exporter:latest
+    image: prom/mysqld-exporter:v0.15.1
     container_name: ono-mysql-exporter-dev
     restart: unless-stopped
+    command:
+      - --mysqld.address=mysql-dev:3306
+      - --mysqld.username=root
     environment:
-      DATA_SOURCE_NAME: root:${MYSQL_ROOT_PASSWORD}@(mysql-dev:3306)/
+      MYSQLD_EXPORTER_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     depends_on:
       mysql-dev:
         condition: service_healthy
