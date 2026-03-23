@@ -146,7 +146,7 @@ services:
       - monitoring
 
   mysql-exporter-dev:
-    image: prom/mysqld-exporter:latest
+    image: prom/mysqld-exporter:v0.15.1
     container_name: ono-mysql-exporter-dev
     restart: unless-stopped
     environment:

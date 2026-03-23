@@ -200,7 +200,7 @@ services:
       - monitoring
 
   mysql-exporter-prod:
-    image: prom/mysqld-exporter:latest
+    image: prom/mysqld-exporter:v0.15.1
     container_name: ono-mysql-exporter-prod
     restart: unless-stopped
     environment:
