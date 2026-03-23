@@ -2,7 +2,7 @@ name: CI Build & Deploy Dev
 
 on:
   push:
-    branches: ["develop"]
+    branches: ["fix/cicd"]
   workflow_dispatch:
 
 permissions:
