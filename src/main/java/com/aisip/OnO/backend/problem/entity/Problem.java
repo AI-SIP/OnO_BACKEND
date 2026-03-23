@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.common.entity.BaseEntity;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
+import com.aisip.OnO.backend.tag.entity.ProblemTagMapping;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.SQLDelete;
@@ -48,6 +49,9 @@ public class Problem extends BaseEntity {
     @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL)
     private List<ProblemPracticeNoteMapping> problemPracticeNoteMappingList = new ArrayList<>();
 
+    @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProblemTagMapping> problemTagMappingList = new ArrayList<>();
+
     @OneToOne(mappedBy = "problem", cascade = CascadeType.ALL)
     private ProblemAnalysis problemAnalysis;
 
@@ -60,6 +64,7 @@ public class Problem extends BaseEntity {
                 .solvedAt(problemRegisterDto.solvedAt())
                 .problemImageDataList(new ArrayList<>())
                 .problemPracticeNoteMappingList(new ArrayList<>())
+                .problemTagMappingList(new ArrayList<>())
                 .build();
     }
 
@@ -105,6 +110,14 @@ public class Problem extends BaseEntity {
 
     public void removePracticeMappingFromProblem(ProblemPracticeNoteMapping problemPracticeNoteMapping) {
         problemPracticeNoteMappingList.remove(problemPracticeNoteMapping);
+    }
+
+    public void addTagMappingToProblem(ProblemTagMapping problemTagMapping) {
+        problemTagMappingList.add(problemTagMapping);
+    }
+
+    public void removeTagMappingFromProblem(ProblemTagMapping problemTagMapping) {
+        problemTagMappingList.remove(problemTagMapping);
     }
 
     public void updateProblemAnalysis(ProblemAnalysis analysis) {

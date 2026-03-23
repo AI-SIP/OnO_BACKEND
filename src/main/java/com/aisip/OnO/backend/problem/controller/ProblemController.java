@@ -7,6 +7,7 @@ import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2Dto;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
+import com.aisip.OnO.backend.problem.dto.ProblemTagUpdateDto;
 import com.aisip.OnO.backend.problem.service.ProblemAnalysisService;
 import com.aisip.OnO.backend.problem.service.ProblemService;
 import lombok.RequiredArgsConstructor;
@@ -68,6 +69,31 @@ public class ProblemController {
         log.info("userId: {} get problems for folderId: {} with cursor: {}, size: {}", userId, folderId, cursor, size);
 
         return CommonResponse.success(problemService.findProblemsByFolderWithCursor(folderId, cursor, size));
+    }
+
+    // ✅ V2 API: 커서 기반 태그의 문제 조회 (무한 스크롤)
+    @GetMapping("/tag/{tagId}/V2")
+    public CommonResponse<CursorPageResponse<ProblemResponseDto>> getProblemsWithCursorByTag(
+            @PathVariable("tagId") Long tagId,
+            @RequestParam(value = "cursor", required = false) Long cursor,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        log.info("userId: {} get problems for tagId: {} with cursor: {}, size: {}", userId, tagId, cursor, size);
+
+        return CommonResponse.success(problemService.findProblemsByTagWithCursor(tagId, userId, cursor, size));
+    }
+
+    // ✅ V2 API: 제목(contains) 기반 문제 조회 (무한 스크롤)
+    @GetMapping("/title/V2")
+    public CommonResponse<CursorPageResponse<ProblemResponseDto>> getProblemsWithCursorByTitle(
+            @RequestParam("query") String query,
+            @RequestParam(value = "cursor", required = false) Long cursor,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        log.info("userId: {} search problems by title query: '{}' with cursor: {}, size: {}",
+                userId, query, cursor, size);
+
+        return CommonResponse.success(problemService.findProblemsByTitleWithCursor(query, userId, cursor, size));
     }
 
     // ✅ 사용자의 문제 개수 조회
@@ -155,6 +181,18 @@ public class ProblemController {
         problemService.updateProblemFolder(problemRegisterDto, userId);
 
         return CommonResponse.success("문제가 수정되었습니다.");
+    }
+
+    // ✅ 문제 태그 추가/해제
+    @PatchMapping("/{problemId}/tags")
+    public CommonResponse<String> updateProblemTags(
+            @PathVariable("problemId") Long problemId,
+            @RequestBody ProblemTagUpdateDto problemTagUpdateDto
+    ) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        problemService.updateProblemTags(problemId, userId, problemTagUpdateDto);
+
+        return CommonResponse.success("문제 태그가 수정되었습니다.");
     }
 
     // ✅ 문제 삭제

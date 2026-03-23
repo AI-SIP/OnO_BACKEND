@@ -118,10 +118,16 @@ jobs:
 
       - name: Deploy with Docker Compose
         run: |
-          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+          export DOCKER_CONFIG=/tmp/.docker-ci
+          mkdir -p "$DOCKER_CONFIG"
+          DOCKER="docker --config $DOCKER_CONFIG"
+          AUTH_B64=$(printf '%s:%s' "${{ secrets.DOCKER_USERNAME }}" "${{ secrets.DOCKER_PASSWORD }}" | base64 | tr -d '\n')
+          cat > "$DOCKER_CONFIG/config.json" << EOF
+          {"auths":{"https://index.docker.io/v1/":{"auth":"$AUTH_B64"}}}
+          EOF
 
-          docker pull ${{ secrets.DOCKER_USERNAME }}/ono:${APP_TAG}
-          docker tag ${{ secrets.DOCKER_USERNAME }}/ono:${APP_TAG} ${{ secrets.DOCKER_USERNAME }}/ono:dev-latest
+          $DOCKER pull ${{ secrets.DOCKER_USERNAME }}/ono:${APP_TAG}
+          $DOCKER tag ${{ secrets.DOCKER_USERNAME }}/ono:${APP_TAG} ${{ secrets.DOCKER_USERNAME }}/ono:dev-latest
 
           docker-compose -f docker-compose.dev.yml --env-file .env.dev up -d mysql-dev redis-dev
 
@@ -129,8 +135,8 @@ jobs:
           docker-compose -f docker-compose.dev.yml --env-file .env.dev rm -f app-dev || true
           docker-compose -f docker-compose.dev.yml --env-file .env.dev up -d app-dev
 
-          docker inspect ono-app-dev --format='Running Image: {{.Config.Image}}'
-          docker inspect ono-app-dev --format='Image ID: {{.Image}}'
+          $DOCKER inspect ono-app-dev --format='Running Image: {{.Config.Image}}'
+          $DOCKER inspect ono-app-dev --format='Image ID: {{.Image}}'
 
           echo "Waiting for development application to be healthy..."
           timeout=60
@@ -152,6 +158,8 @@ jobs:
 
       - name: Deploy Monitoring Stack
         run: |
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring pull \
+            mysql-exporter-dev prometheus-dev grafana-dev
           docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring stop prometheus-dev grafana-dev mysql-exporter-dev || true
           docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring rm -f prometheus-dev grafana-dev mysql-exporter-dev || true
           docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring up -d --force-recreate \

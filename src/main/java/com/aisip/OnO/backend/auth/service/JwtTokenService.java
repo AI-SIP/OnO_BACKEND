@@ -33,11 +33,20 @@ public class JwtTokenService {
         String accessToken = jwtTokenizer.createAccessToken(String.valueOf(userId), Map.of("authority", authority));
         String refreshToken;
 
-        // DB에 기존 RefreshToken이 있으면 재사용
+        // DB에 기존 RefreshToken이 있으면 검증 후 재사용, 만료/무효면 재발급
         RefreshToken existingRefreshToken = refreshTokenRepository.findByUserId(userId).orElse(null);
         if (existingRefreshToken != null) {
-            refreshToken = existingRefreshToken.getRefreshToken();
-            log.info("Reusing existing refresh token for userId: {}", userId);
+            String existingTokenValue = existingRefreshToken.getRefreshToken();
+            try {
+                jwtTokenizer.validateRefreshToken(existingTokenValue);
+                refreshToken = existingTokenValue;
+                log.info("Reusing existing refresh token for userId: {}", userId);
+            } catch (ApplicationException e) {
+                refreshToken = jwtTokenizer.createRefreshToken(String.valueOf(userId), Map.of("authority", authority));
+                refreshTokenRepository.deleteByUserId(userId);
+                refreshTokenRepository.save(RefreshToken.from(userId, authority, refreshToken));
+                log.info("Existing refresh token was expired/invalid. Issued a new one for userId: {}", userId);
+            }
         } else {
             refreshToken = jwtTokenizer.createRefreshToken(String.valueOf(userId), Map.of("authority", authority));
             RefreshToken refreshTokenEntity = RefreshToken.from(userId, authority, refreshToken);
@@ -45,8 +54,8 @@ public class JwtTokenService {
             log.info("Created new refresh token for userId: {}", userId);
         }
 
-        // Redis에 RefreshToken 캐싱
-        long expiration = jwtTokenizer.getRefreshTokenExpirationSeconds();
+        // Redis에 RefreshToken 캐싱 (토큰 실제 남은 만료시간 기준)
+        long expiration = jwtTokenizer.getRemainingRefreshExpirationTime(refreshToken);
         redisTokenService.saveRefreshToken(userId, refreshToken, expiration);
 
         log.info("userId: {} has : generate token with authority: {}", userId, authority);
@@ -55,6 +64,7 @@ public class JwtTokenService {
 
     /**
      * ✅ 리프레시 토큰을 이용한 액세스 토큰 갱신
+     * - refresh token은 재사용하고 access token만 재발급
      */
     public TokenResponseDto refreshAccessToken(String refreshToken) {
         jwtTokenizer.validateRefreshToken(refreshToken);
@@ -71,9 +81,10 @@ public class JwtTokenService {
                     .orElseThrow(() -> new ApplicationException(AuthErrorCase.REFRESH_TOKEN_NOT_FOUND));
 
             storedToken = refreshTokenEntity.getRefreshToken();
+            jwtTokenizer.validateRefreshToken(storedToken);
 
             // DB에서 찾은 토큰을 Redis에 다시 캐싱
-            long expiration = jwtTokenizer.getRefreshTokenExpirationSeconds();
+            long expiration = jwtTokenizer.getRemainingRefreshExpirationTime(storedToken);
             redisTokenService.saveRefreshToken(userId, storedToken, expiration);
 
             log.info("RefreshToken cache miss - loaded from DB for userId: {}", userId);
@@ -85,8 +96,14 @@ public class JwtTokenService {
             throw new ApplicationException(AuthErrorCase.REFRESH_TOKEN_NOT_EQUAL);
         }
 
-        log.info("userId: {} has : refresh access token", userId);
-        return generateTokens(userId, authority);
+        // 4. access token만 재발급 (refresh token은 만료 연장/교체하지 않음)
+        String newAccessToken = jwtTokenizer.createAccessToken(String.valueOf(userId), Map.of("authority", authority));
+
+        long expiration = jwtTokenizer.getRemainingRefreshExpirationTime(refreshToken);
+        redisTokenService.saveRefreshToken(userId, refreshToken, expiration);
+
+        log.info("userId: {} has : refresh access token (refresh token reused)", userId);
+        return new TokenResponseDto(newAccessToken, refreshToken);
     }
 
     /**
