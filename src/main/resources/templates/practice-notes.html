@@ -101,13 +101,26 @@
         </table>
       </div>
 
-      <div th:if="${noteTotalPages > 1}" class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-2">
+      <div th:if="${noteTotalPages > 1}" class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-wrap justify-end gap-2">
         <a th:if="${notePage > 0}" th:href="@{/admin/practice-notes(notePage=${notePage - 1}, logPage=${logPage}, size=${size})}"
            class="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">이전</a>
         <span th:if="${notePage == 0}" class="px-4 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-400">이전</span>
-        <span class="px-4 py-2 text-sm text-gray-600">
-          <span th:text="${notePage + 1}">1</span> / <span th:text="${noteTotalPages}">1</span>
+
+        <a th:if="${hasPreviousNoteBlock}" th:href="@{/admin/practice-notes(notePage=${notePageBlockStart - 10}, logPage=${logPage}, size=${size})}"
+           class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">&lt;&lt;</a>
+        <span th:unless="${hasPreviousNoteBlock}" class="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-400">&lt;&lt;</span>
+
+        <span th:each="page : ${#numbers.sequence(notePageBlockStart, notePageBlockEnd)}">
+          <a th:if="${page == notePage}"
+             class="px-4 py-2 bg-indigo-600 border border-indigo-600 rounded-md text-sm font-medium text-white" th:text="${page + 1}">1</a>
+          <a th:if="${page != notePage}" th:href="@{/admin/practice-notes(notePage=${page}, logPage=${logPage}, size=${size})}"
+             class="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50" th:text="${page + 1}">1</a>
         </span>
+
+        <a th:if="${hasNextNoteBlock}" th:href="@{/admin/practice-notes(notePage=${notePageBlockStart + 10}, logPage=${logPage}, size=${size})}"
+           class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">&gt;&gt;</a>
+        <span th:unless="${hasNextNoteBlock}" class="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-400">&gt;&gt;</span>
+
         <a th:if="${notePage < noteTotalPages - 1}" th:href="@{/admin/practice-notes(notePage=${notePage + 1}, logPage=${logPage}, size=${size})}"
            class="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">다음</a>
         <span th:if="${notePage >= noteTotalPages - 1}" class="px-4 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-400">다음</span>
@@ -150,13 +163,26 @@
         </table>
       </div>
 
-      <div th:if="${logTotalPages > 1}" class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-2">
+      <div th:if="${logTotalPages > 1}" class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-wrap justify-end gap-2">
         <a th:if="${logPage > 0}" th:href="@{/admin/practice-notes(notePage=${notePage}, logPage=${logPage - 1}, size=${size})}"
            class="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">이전</a>
         <span th:if="${logPage == 0}" class="px-4 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-400">이전</span>
-        <span class="px-4 py-2 text-sm text-gray-600">
-          <span th:text="${logPage + 1}">1</span> / <span th:text="${logTotalPages}">1</span>
+
+        <a th:if="${hasPreviousLogBlock}" th:href="@{/admin/practice-notes(notePage=${notePage}, logPage=${logPageBlockStart - 10}, size=${size})}"
+           class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">&lt;&lt;</a>
+        <span th:unless="${hasPreviousLogBlock}" class="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-400">&lt;&lt;</span>
+
+        <span th:each="page : ${#numbers.sequence(logPageBlockStart, logPageBlockEnd)}">
+          <a th:if="${page == logPage}"
+             class="px-4 py-2 bg-indigo-600 border border-indigo-600 rounded-md text-sm font-medium text-white" th:text="${page + 1}">1</a>
+          <a th:if="${page != logPage}" th:href="@{/admin/practice-notes(notePage=${notePage}, logPage=${page}, size=${size})}"
+             class="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50" th:text="${page + 1}">1</a>
         </span>
+
+        <a th:if="${hasNextLogBlock}" th:href="@{/admin/practice-notes(notePage=${notePage}, logPage=${logPageBlockStart + 10}, size=${size})}"
+           class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">&gt;&gt;</a>
+        <span th:unless="${hasNextLogBlock}" class="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-400">&gt;&gt;</span>
+
         <a th:if="${logPage < logTotalPages - 1}" th:href="@{/admin/practice-notes(notePage=${notePage}, logPage=${logPage + 1}, size=${size})}"
            class="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">다음</a>
         <span th:if="${logPage >= logTotalPages - 1}" class="px-4 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-400">다음</span>

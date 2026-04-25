@@ -109,7 +109,7 @@
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr th:each="user, iterStat : ${users}" class="hover:bg-gray-50 transition-colors cursor-pointer"
+            <tr th:each="user : ${users}" class="hover:bg-gray-50 transition-colors cursor-pointer"
                 th:onclick="'location.href=\'/admin/user/' + ${user.userId} + '\''">
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" th:text="${user.userId}">1</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" th:text="${user.name}">유저 이름</td>
@@ -120,7 +120,7 @@
                   <span class="ml-2 text-xs text-gray-500" th:text="'(' + ${user.totalStudyCurrentPoint} + 'pt)'"> (0pt)</span>
                 </div>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" th:text="${problemCounts[iterStat.index]}">0</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" th:text="${user.problemCount}">0</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600" th:text="${#temporals.format(user.createdAt, 'yyyy-MM-dd HH:mm')}">2024-01-01 00:00</td>
             </tr>
             <tr th:if="${#lists.isEmpty(users)}">
@@ -136,12 +136,12 @@
     <!-- Pagination -->
     <div th:if="${totalPages > 1}" class="mt-6 flex items-center justify-between">
       <div class="text-sm text-gray-700">
-        <span class="font-medium" th:text="${currentPage * size + 1}">1</span>
-        부터 <span class="font-medium" th:text="${currentPage * size + #lists.size(users)}">20</span>
+        <span class="font-medium" th:text="${pageStartItem}">1</span>
+        부터 <span class="font-medium" th:text="${pageEndItem}">20</span>
         까지 (총 <span class="font-medium" th:text="${totalUsers}">100</span>개)
       </div>
 
-      <div class="flex space-x-2">
+      <div class="flex flex-wrap justify-end gap-2">
         <!-- Previous Button -->
         <a th:if="${currentPage > 0}"
            th:href="@{/admin/users(page=${currentPage - 1}, size=${size}, sortBy=${sortBy}, direction=${direction})}"
@@ -153,9 +153,20 @@
           이전
         </span>
 
+        <!-- Previous Page Block -->
+        <a th:if="${hasPreviousBlock}"
+           th:href="@{/admin/users(page=${pageBlockStart - 10}, size=${size}, sortBy=${sortBy}, direction=${direction})}"
+           class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+          &lt;&lt;
+        </a>
+        <span th:unless="${hasPreviousBlock}"
+              class="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-400 cursor-not-allowed">
+          &lt;&lt;
+        </span>
+
         <!-- Page Numbers -->
-        <div class="flex space-x-1">
-          <th:block th:each="page : ${#numbers.sequence(0, totalPages - 1)}">
+        <div class="flex flex-wrap gap-1">
+          <th:block th:each="page : ${#numbers.sequence(pageBlockStart, pageBlockEnd)}">
             <a th:if="${page == currentPage}"
                class="px-4 py-2 bg-indigo-600 border border-indigo-600 rounded-md text-sm font-medium text-white">
               <span th:text="${page + 1}">1</span>
@@ -167,6 +178,17 @@
             </a>
           </th:block>
         </div>
+
+        <!-- Next Page Block -->
+        <a th:if="${hasNextBlock}"
+           th:href="@{/admin/users(page=${pageBlockStart + 10}, size=${size}, sortBy=${sortBy}, direction=${direction})}"
+           class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+          &gt;&gt;
+        </a>
+        <span th:unless="${hasNextBlock}"
+              class="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-400 cursor-not-allowed">
+          &gt;&gt;
+        </span>
 
         <!-- Next Button -->
         <a th:if="${currentPage < totalPages - 1}"
