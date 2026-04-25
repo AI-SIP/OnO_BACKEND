@@ -9,6 +9,8 @@ import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
 
+import java.sql.Date;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -116,7 +118,7 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
 
         Map<LocalDate, Long> countByDate = new LinkedHashMap<>();
         for (Tuple row : dailyCounts) {
-            LocalDate date = row.get(createdDate);
+            LocalDate date = toLocalDate(row.get(createdDate));
             Long count = row.get(activeUserCount);
             if (date != null) {
                 countByDate.put(date, count != null ? count : 0L);
@@ -151,5 +153,21 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
 
     private LocalDateTime getEndOfToday() {
         return LocalDate.now().atTime(LocalTime.MAX);
+    }
+
+    private LocalDate toLocalDate(Object value) {
+        if (value instanceof LocalDate localDate) {
+            return localDate;
+        }
+        if (value instanceof LocalDateTime localDateTime) {
+            return localDateTime.toLocalDate();
+        }
+        if (value instanceof Date date) {
+            return date.toLocalDate();
+        }
+        if (value instanceof Timestamp timestamp) {
+            return timestamp.toLocalDateTime().toLocalDate();
+        }
+        return value != null ? LocalDate.parse(value.toString()) : null;
     }
 }

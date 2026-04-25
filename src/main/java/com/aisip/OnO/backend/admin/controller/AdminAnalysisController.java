@@ -91,6 +91,10 @@ public class AdminAnalysisController {
         model.addAttribute("averageDailyVisitors", averageDailyVisitors);
         model.addAttribute("startDate", selectedStartDate);
         model.addAttribute("endDate", selectedEndDate);
+        model.addAttribute("quickStart7Days", today.minusDays(6));
+        model.addAttribute("quickStart30Days", today.minusDays(29));
+        model.addAttribute("quickStart90Days", today.minusDays(89));
+        model.addAttribute("today", today);
 
         return "analysis";
     }
