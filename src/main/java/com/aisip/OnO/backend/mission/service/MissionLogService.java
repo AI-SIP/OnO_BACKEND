@@ -11,7 +11,12 @@ import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
+import java.sql.Date;
+import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -193,5 +198,44 @@ public class MissionLogService {
                 .toList();
 
         return new PageImpl<>(content, pageRequest, total);
+    }
+
+    @Transactional(readOnly = true)
+    public long countNotePracticeLogs() {
+        return missionLogRepository.countByMissionType(MissionType.NOTE_PRACTICE);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<LocalDate, Long> getDailyNotePracticeLogsCount(LocalDate startDate, LocalDate endDate) {
+        Map<LocalDate, Long> result = new LinkedHashMap<>();
+        missionLogRepository.countDailyByMissionType(
+                        MissionType.NOTE_PRACTICE,
+                        startDate.atStartOfDay(),
+                        endDate.atTime(LocalTime.MAX)
+                )
+                .forEach(row -> result.put(toLocalDate(row[0]), (Long) row[1]));
+
+        Map<LocalDate, Long> orderedResult = new LinkedHashMap<>();
+        for (LocalDate date = endDate; !date.isBefore(startDate); date = date.minusDays(1)) {
+            orderedResult.put(date, result.getOrDefault(date, 0L));
+        }
+
+        return orderedResult;
+    }
+
+    private LocalDate toLocalDate(Object value) {
+        if (value instanceof LocalDate localDate) {
+            return localDate;
+        }
+        if (value instanceof LocalDateTime localDateTime) {
+            return localDateTime.toLocalDate();
+        }
+        if (value instanceof Date date) {
+            return date.toLocalDate();
+        }
+        if (value instanceof Timestamp timestamp) {
+            return timestamp.toLocalDateTime().toLocalDate();
+        }
+        return LocalDate.parse(value.toString());
     }
 }

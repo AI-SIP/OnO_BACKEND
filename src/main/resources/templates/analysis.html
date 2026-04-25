@@ -151,20 +151,37 @@
       </div>
 
       <!-- System Health -->
-      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-indigo-500">
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-pink-500">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-gray-500 uppercase">시스템 상태</p>
-            <p class="mt-2 text-xl font-bold text-green-600">정상</p>
+            <p class="text-sm font-medium text-gray-500 uppercase">총 복습노트 수</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${allPracticeNoteCount}">0</p>
           </div>
-          <div class="p-3 bg-indigo-100 rounded-full">
-            <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          <div class="p-3 bg-pink-100 rounded-full">
+            <svg class="w-8 h-8 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2m4-2a8 8 0 11-16 0 8 8 0 0116 0z"></path>
             </svg>
           </div>
         </div>
         <div class="mt-4">
-          <p class="text-sm text-gray-500">모든 시스템 작동 중</p>
+          <a th:href="@{/admin/practice-notes}" class="text-sm text-pink-600 hover:text-pink-800 font-medium">복습 관리 보기 →</a>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-indigo-500">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-500 uppercase">총 복습 기록 수</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${allPracticeLogCount}">0</p>
+          </div>
+          <div class="p-3 bg-indigo-100 rounded-full">
+            <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2m-4 0V3m0 2v4m0-4h4m-4 0H7"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="mt-4">
+          <p class="text-xs text-gray-500">복습노트 사용 미션 기준</p>
         </div>
       </div>
     </div>
@@ -175,7 +192,7 @@
         <h3 class="text-lg font-semibold text-gray-900">상세 통계</h3>
       </div>
       <div class="p-6">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
           <!-- User Statistics -->
           <div>
             <h4 class="text-md font-semibold text-gray-800 mb-4 flex items-center">
@@ -207,6 +224,34 @@
               </div>
             </div>
           </div>
+
+          <!-- Practice Statistics -->
+          <div>
+            <h4 class="text-md font-semibold text-gray-800 mb-4 flex items-center">
+              <svg class="w-5 h-5 mr-2 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2m4-2a8 8 0 11-16 0 8 8 0 0116 0z"></path>
+              </svg>
+              복습 통계
+            </h4>
+            <div class="space-y-3">
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">총 복습노트 수</span>
+                <span class="text-sm font-bold text-gray-900" th:text="${allPracticeNoteCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">총 복습 기록 수</span>
+                <span class="text-sm font-bold text-gray-900" th:text="${allPracticeLogCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 복습노트 생성</span>
+                <span class="text-sm font-bold text-gray-900" th:text="${periodPracticeNoteCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 복습 수행</span>
+                <span class="text-sm font-bold text-gray-900" th:text="${periodPracticeLogCount}">0</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -224,6 +269,8 @@
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">날짜</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">출석 유저 수</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">신규 가입자 수</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">복습노트 생성 수</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">복습 수행 수</th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
@@ -253,9 +300,19 @@
                     <span class="ml-1 text-gray-500">명</span>
                   </span>
                 </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                  <span class="font-semibold" th:classappend="${dailyPracticeNotes[entry.key] > 0 ? 'text-pink-600' : 'text-gray-400'}"
+                        th:text="${dailyPracticeNotes[entry.key]}">0</span>
+                  <span class="ml-1 text-gray-500">개</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                  <span class="font-semibold" th:classappend="${dailyPracticeLogs[entry.key] > 0 ? 'text-indigo-600' : 'text-gray-400'}"
+                        th:text="${dailyPracticeLogs[entry.key]}">0</span>
+                  <span class="ml-1 text-gray-500">회</span>
+                </td>
               </tr>
               <tr th:if="${#maps.isEmpty(dailyActiveUsers)}">
-                <td colspan="3" class="px-4 py-8 text-center text-gray-500">
+                <td colspan="5" class="px-4 py-8 text-center text-gray-500">
                   데이터가 없습니다
                 </td>
               </tr>

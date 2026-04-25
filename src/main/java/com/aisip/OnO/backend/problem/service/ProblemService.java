@@ -127,6 +127,11 @@ public class ProblemService {
     }
 
     @Transactional(readOnly = true)
+    public long countAllProblems() {
+        return problemRepository.count();
+    }
+
+    @Transactional(readOnly = true)
     public Long findProblemCountByUser(Long userId) {
         log.info("userId: {} find problem count", userId);
         return problemRepository.countByUserId(userId);

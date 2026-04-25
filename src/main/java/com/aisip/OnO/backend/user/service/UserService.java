@@ -17,6 +17,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.sql.Date;
+import java.sql.Timestamp;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -103,6 +105,11 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public long countAllUsers() {
+        return userRepository.count();
+    }
+
     @Transactional
     public void updateUser(Long userId, UserRegisterDto userRegisterDto) {
 
@@ -163,26 +170,15 @@ public class UserService {
     @Transactional(readOnly = true)
     public Map<LocalDate, Long> getDailyNewUsersCount(LocalDate startDate, LocalDate endDate) {
         Map<LocalDate, Long> result = new LinkedHashMap<>();
-        List<User> allUsers = userRepository.findAll();
+        userRepository.countDailyNewUsers(startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX))
+                .forEach(row -> result.put(toLocalDate(row[0]), (Long) row[1]));
 
-        // 최근 날짜가 위로 오도록 역순으로 조회
+        Map<LocalDate, Long> orderedResult = new LinkedHashMap<>();
         for (LocalDate date = endDate; !date.isBefore(startDate); date = date.minusDays(1)) {
-            LocalDateTime startOfDay = date.atStartOfDay();
-            LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
-
-            long count = allUsers.stream()
-                    .filter(user -> {
-                        LocalDateTime createdAt = user.getCreatedAt();
-                        return createdAt != null &&
-                                !createdAt.isBefore(startOfDay) &&
-                                !createdAt.isAfter(endOfDay);
-                    })
-                    .count();
-
-            result.put(date, count);
+            orderedResult.put(date, result.getOrDefault(date, 0L));
         }
 
-        return result;
+        return orderedResult;
     }
 
     @Transactional(readOnly = true)
@@ -190,15 +186,24 @@ public class UserService {
         LocalDateTime startOfDay = date.atStartOfDay();
         LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
 
-        return userRepository.findAll().stream()
-                .filter(user -> {
-                    LocalDateTime createdAt = user.getCreatedAt();
-                    return createdAt != null &&
-                            !createdAt.isBefore(startOfDay) &&
-                            !createdAt.isAfter(endOfDay);
-                })
-                .sorted((u1, u2) -> u2.getCreatedAt().compareTo(u1.getCreatedAt()))
+        return userRepository.findAllByCreatedAtBetweenOrderByCreatedAtDesc(startOfDay, endOfDay).stream()
                 .map(UserResponseDto::from)
                 .collect(Collectors.toList());
+    }
+
+    private LocalDate toLocalDate(Object value) {
+        if (value instanceof LocalDate localDate) {
+            return localDate;
+        }
+        if (value instanceof LocalDateTime localDateTime) {
+            return localDateTime.toLocalDate();
+        }
+        if (value instanceof Date date) {
+            return date.toLocalDate();
+        }
+        if (value instanceof Timestamp timestamp) {
+            return timestamp.toLocalDateTime().toLocalDate();
+        }
+        return LocalDate.parse(value.toString());
     }
 }

@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.admin.controller;
 
 import com.aisip.OnO.backend.mission.service.MissionLogService;
+import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
 import com.aisip.OnO.backend.problem.service.ProblemService;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.entity.User;
@@ -28,6 +29,7 @@ public class AdminAnalysisController {
     private final UserService userService;
     private final ProblemService problemService;
     private final MissionLogService missionLogService;
+    private final PracticeNoteService practiceNoteService;
 
     @GetMapping("/analysis")
     public String getAllAnalysis(
@@ -37,8 +39,10 @@ public class AdminAnalysisController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             Model model
     ) {
-        int allUserCount = userService.findAllUsers().size();
-        int allProblemCount = problemService.findAllProblems().size();
+        long allUserCount = userService.countAllUsers();
+        long allProblemCount = problemService.countAllProblems();
+        long allPracticeNoteCount = practiceNoteService.countAllPracticeNotes();
+        long allPracticeLogCount = missionLogService.countNotePracticeLogs();
 
         LocalDate today = LocalDate.now();
         LocalDate selectedStartDate = startDate != null ? startDate : today.minusDays(29);
@@ -53,9 +57,17 @@ public class AdminAnalysisController {
         // 선택 기간 날짜별 출석 유저 수 및 신규 가입자 수
         Map<LocalDate, Long> dailyActiveUsers = missionLogService.getDailyActiveUsersCount(selectedStartDate, selectedEndDate);
         Map<LocalDate, Long> dailyNewUsers = userService.getDailyNewUsersCount(selectedStartDate, selectedEndDate);
+        Map<LocalDate, Long> dailyPracticeNotes = practiceNoteService.getDailyPracticeNotesCount(selectedStartDate, selectedEndDate);
+        Map<LocalDate, Long> dailyPracticeLogs = missionLogService.getDailyNotePracticeLogsCount(selectedStartDate, selectedEndDate);
 
         // 선택 기간 신규 가입자 총합
         long recentNewUsersCount = dailyNewUsers.values().stream()
+                .mapToLong(Long::longValue)
+                .sum();
+        long periodPracticeNoteCount = dailyPracticeNotes.values().stream()
+                .mapToLong(Long::longValue)
+                .sum();
+        long periodPracticeLogCount = dailyPracticeLogs.values().stream()
                 .mapToLong(Long::longValue)
                 .sum();
 
@@ -67,9 +79,15 @@ public class AdminAnalysisController {
 
         model.addAttribute("allUserCount", allUserCount);
         model.addAttribute("allProblemCount", allProblemCount);
+        model.addAttribute("allPracticeNoteCount", allPracticeNoteCount);
+        model.addAttribute("allPracticeLogCount", allPracticeLogCount);
         model.addAttribute("dailyActiveUsers", dailyActiveUsers);
         model.addAttribute("dailyNewUsers", dailyNewUsers);
+        model.addAttribute("dailyPracticeNotes", dailyPracticeNotes);
+        model.addAttribute("dailyPracticeLogs", dailyPracticeLogs);
         model.addAttribute("recentNewUsersCount", recentNewUsersCount);
+        model.addAttribute("periodPracticeNoteCount", periodPracticeNoteCount);
+        model.addAttribute("periodPracticeLogCount", periodPracticeLogCount);
         model.addAttribute("averageDailyVisitors", averageDailyVisitors);
         model.addAttribute("startDate", selectedStartDate);
         model.addAttribute("endDate", selectedEndDate);

@@ -2,6 +2,10 @@ package com.aisip.OnO.backend.mission.repository;
 
 import com.aisip.OnO.backend.mission.entity.MissionType;
 import com.aisip.OnO.backend.user.entity.User;
+import com.querydsl.core.Tuple;
+import com.querydsl.core.types.dsl.DateExpression;
+import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
 
@@ -94,21 +98,33 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
     @Override
     public Map<LocalDate, Long> getDailyActiveUsersCount(LocalDate startDate, LocalDate endDate) {
         Map<LocalDate, Long> result = new LinkedHashMap<>();
+        DateExpression<LocalDate> createdDate = Expressions.dateTemplate(
+                LocalDate.class,
+                "date({0})",
+                missionLog.createdAt
+        );
+        NumberExpression<Long> activeUserCount = missionLog.user.id.countDistinct();
 
-        // 최근 날짜가 위로 오도록 역순으로 조회
+        java.util.List<Tuple> dailyCounts = queryFactory
+                .select(createdDate, activeUserCount)
+                .from(missionLog)
+                .where(missionLog.missionType.eq(MissionType.USER_LOGIN)
+                        .and(missionLog.createdAt.between(startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX)))
+                )
+                .groupBy(createdDate)
+                .fetch();
+
+        Map<LocalDate, Long> countByDate = new LinkedHashMap<>();
+        for (Tuple row : dailyCounts) {
+            LocalDate date = row.get(createdDate);
+            Long count = row.get(activeUserCount);
+            if (date != null) {
+                countByDate.put(date, count != null ? count : 0L);
+            }
+        }
+
         for (LocalDate date = endDate; !date.isBefore(startDate); date = date.minusDays(1)) {
-            LocalDateTime startOfDay = date.atStartOfDay();
-            LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
-
-            Long count = queryFactory
-                    .select(missionLog.user.id.countDistinct())
-                    .from(missionLog)
-                    .where(missionLog.missionType.eq(MissionType.USER_LOGIN)
-                            .and(missionLog.createdAt.between(startOfDay, endOfDay))
-                    )
-                    .fetchOne();
-
-            result.put(date, count != null ? count : 0L);
+            result.put(date, countByDate.getOrDefault(date, 0L));
         }
 
         return result;
