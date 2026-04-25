@@ -18,7 +18,11 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -36,21 +40,39 @@ public class AdminUserController {
     public String getAllUsers(
             @RequestParam(defaultValue = "0", name = "page") int page,
             @RequestParam(defaultValue = "20", name = "size") int size,
+            @RequestParam(defaultValue = "createdAt", name = "sortBy") String sortBy,
+            @RequestParam(defaultValue = "desc", name = "direction") String direction,
             Model model
     ) {
         List<UserResponseDto> allUsers = userService.findAllUsers();
+        Map<Long, Long> problemCountByUserId = allUsers.stream()
+                .collect(Collectors.toMap(
+                        UserResponseDto::userId,
+                        user -> problemService.findProblemCountByUser(user.userId())
+                ));
+
+        Comparator<UserResponseDto> comparator = getUserComparator(sortBy, problemCountByUserId);
+        if ("desc".equalsIgnoreCase(direction)) {
+            comparator = comparator.reversed();
+        }
+
+        List<UserResponseDto> sortedUsers = allUsers.stream()
+                .sorted(comparator.thenComparing(UserResponseDto::userId, Comparator.reverseOrder()))
+                .toList();
 
         // 페이징 계산
-        int totalUsers = allUsers.size();
+        int totalUsers = sortedUsers.size();
         int totalPages = (int) Math.ceil((double) totalUsers / size);
         int startIndex = page * size;
         int endIndex = Math.min(startIndex + size, totalUsers);
 
-        List<UserResponseDto> pagedUsers = allUsers.subList(startIndex, endIndex);
+        List<UserResponseDto> pagedUsers = startIndex >= totalUsers
+                ? List.of()
+                : sortedUsers.subList(startIndex, endIndex);
 
         // 각 유저의 문제 개수 계산
         List<Long> problemCounts = pagedUsers.stream()
-                .map(user -> problemService.findProblemCountByUser(user.userId()))
+                .map(user -> problemCountByUserId.get(user.userId()))
                 .toList();
 
         model.addAttribute("users", pagedUsers);
@@ -59,8 +81,24 @@ public class AdminUserController {
         model.addAttribute("totalPages", totalPages);
         model.addAttribute("totalUsers", totalUsers);
         model.addAttribute("size", size);
+        model.addAttribute("sortBy", sortBy);
+        model.addAttribute("direction", direction);
 
         return "users";
+    }
+
+    private Comparator<UserResponseDto> getUserComparator(String sortBy, Map<Long, Long> problemCountByUserId) {
+        Function<UserResponseDto, Long> sortKey = switch (sortBy) {
+            case "level" -> UserResponseDto::totalStudyLevel;
+            case "problemCount" -> user -> problemCountByUserId.getOrDefault(user.userId(), 0L);
+            default -> null;
+        };
+
+        if (sortKey == null) {
+            return Comparator.comparing(UserResponseDto::createdAt);
+        }
+
+        return Comparator.comparing(sortKey);
     }
 
     @GetMapping("/user/{userId}")
