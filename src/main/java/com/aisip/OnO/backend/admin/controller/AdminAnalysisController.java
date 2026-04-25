@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -71,6 +72,7 @@ public class AdminAnalysisController {
         long periodActiveUserCount = dailyActiveUsers.values().stream()
                 .mapToLong(Long::longValue)
                 .sum();
+        long periodUniqueVisitorCount = missionLogService.countUniqueVisitors(selectedStartDate, selectedEndDate);
         long periodPracticeNoteCount = dailyPracticeNotes.values().stream()
                 .mapToLong(Long::longValue)
                 .sum();
@@ -78,11 +80,10 @@ public class AdminAnalysisController {
                 .mapToLong(Long::longValue)
                 .sum();
 
-        // 하루 평균 방문자 수 (선택 기간)
-        double averageDailyVisitors = dailyActiveUsers.values().stream()
-                .mapToLong(Long::longValue)
-                .average()
-                .orElse(0.0);
+        long selectedDays = ChronoUnit.DAYS.between(selectedStartDate, selectedEndDate) + 1;
+        double averageDailyVisitors = selectedDays > 0
+                ? (double) periodActiveUserCount / selectedDays
+                : 0.0;
 
         model.addAttribute("allUserCount", allUserCount);
         model.addAttribute("allProblemCount", allProblemCount);
@@ -96,6 +97,7 @@ public class AdminAnalysisController {
         model.addAttribute("recentNewUsersCount", recentNewUsersCount);
         model.addAttribute("periodVisitCount", periodVisitCount);
         model.addAttribute("periodActiveUserCount", periodActiveUserCount);
+        model.addAttribute("periodUniqueVisitorCount", periodUniqueVisitorCount);
         model.addAttribute("periodPracticeNoteCount", periodPracticeNoteCount);
         model.addAttribute("periodPracticeLogCount", periodPracticeLogCount);
         model.addAttribute("averageDailyVisitors", averageDailyVisitors);

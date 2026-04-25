@@ -185,6 +185,15 @@ public class MissionLogService {
     }
 
     @Transactional(readOnly = true)
+    public long countUniqueVisitors(LocalDate startDate, LocalDate endDate) {
+        return missionLogRepository.countDistinctUsersByMissionTypeAndCreatedAtBetween(
+                MissionType.USER_LOGIN,
+                startDate.atStartOfDay(),
+                endDate.atTime(LocalTime.MAX)
+        );
+    }
+
+    @Transactional(readOnly = true)
     public List<com.aisip.OnO.backend.user.entity.User> getActiveUsersByDate(LocalDate date) {
         return missionLogRepository.getActiveUsersByDate(date);
     }

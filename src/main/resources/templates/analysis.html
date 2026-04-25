@@ -130,10 +130,27 @@
       </div>
 
       <!-- Average Daily Visitors -->
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-cyan-500">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-500 uppercase">선택 기간 고유 방문 유저</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${periodUniqueVisitorCount}">0</p>
+          </div>
+          <div class="p-3 bg-cyan-100 rounded-full">
+            <svg class="w-8 h-8 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 18.72a9.094 9.094 0 003.75.78 9 9 0 00-9-9 9.094 9.094 0 00-3.75.78M18 18.72A8.966 8.966 0 0112.75 21a8.966 8.966 0 01-5.25-2.28M18 18.72A5.985 5.985 0 0012.75 15a5.985 5.985 0 00-5.25 3.72M15.75 6a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="mt-4">
+          <p class="text-xs text-gray-500">선택 기간 로그인한 서로 다른 유저</p>
+        </div>
+      </div>
+
       <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-gray-500 uppercase">하루 평균 방문자 수</p>
+            <p class="text-sm font-medium text-gray-500 uppercase">선택 기간 평균 DAU</p>
             <p class="mt-2 text-3xl font-bold text-gray-900"
                th:text="${#numbers.formatDecimal(averageDailyVisitors, 1, 1)}">0.0</p>
           </div>
@@ -144,7 +161,7 @@
           </div>
         </div>
         <div class="mt-4">
-          <p class="text-xs text-gray-500">선택 기간 기준</p>
+          <p class="text-xs text-gray-500">날짜별 출석 유저 수 평균</p>
         </div>
       </div>
 
@@ -225,6 +242,15 @@
               <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                 <span class="text-sm font-medium text-gray-600">선택 기간 방문 횟수</span>
                 <span class="text-sm font-bold text-gray-900" th:text="${periodVisitCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 고유 방문 유저</span>
+                <span class="text-sm font-bold text-gray-900" th:text="${periodUniqueVisitorCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 평균 DAU</span>
+                <span class="text-sm font-bold text-gray-900"
+                      th:text="${#numbers.formatDecimal(averageDailyVisitors, 1, 1)}">0.0</span>
               </div>
             </div>
           </div>

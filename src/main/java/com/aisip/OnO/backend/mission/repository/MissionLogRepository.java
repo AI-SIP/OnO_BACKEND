@@ -26,6 +26,18 @@ public interface MissionLogRepository extends JpaRepository<MissionLog, Long>, M
     );
 
     @Query("""
+            SELECT COUNT(DISTINCT m.user.id)
+            FROM MissionLog m
+            WHERE m.missionType = :missionType
+              AND m.createdAt BETWEEN :startDateTime AND :endDateTime
+            """)
+    long countDistinctUsersByMissionTypeAndCreatedAtBetween(
+            @Param("missionType") MissionType missionType,
+            @Param("startDateTime") LocalDateTime startDateTime,
+            @Param("endDateTime") LocalDateTime endDateTime
+    );
+
+    @Query("""
             SELECT FUNCTION('DATE', m.createdAt), COUNT(m)
             FROM MissionLog m
             WHERE m.missionType = :missionType
