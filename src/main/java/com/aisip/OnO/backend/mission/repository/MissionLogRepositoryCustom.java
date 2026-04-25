@@ -19,5 +19,7 @@ public interface MissionLogRepositoryCustom {
 
     Map<LocalDate, Long> getDailyActiveUsersCount(int days);
 
+    Map<LocalDate, Long> getDailyActiveUsersCount(LocalDate startDate, LocalDate endDate);
+
     List<User> getActiveUsersByDate(LocalDate date);
 }

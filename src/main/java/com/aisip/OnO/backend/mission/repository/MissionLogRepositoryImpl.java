@@ -87,12 +87,16 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
 
     @Override
     public Map<LocalDate, Long> getDailyActiveUsersCount(int days) {
-        Map<LocalDate, Long> result = new LinkedHashMap<>();
         LocalDate today = LocalDate.now();
+        return getDailyActiveUsersCount(today.minusDays(days - 1L), today);
+    }
+
+    @Override
+    public Map<LocalDate, Long> getDailyActiveUsersCount(LocalDate startDate, LocalDate endDate) {
+        Map<LocalDate, Long> result = new LinkedHashMap<>();
 
         // 최근 날짜가 위로 오도록 역순으로 조회
-        for (int i = 0; i < days; i++) {
-            LocalDate date = today.minusDays(i);
+        for (LocalDate date = endDate; !date.isBefore(startDate); date = date.minusDays(1)) {
             LocalDateTime startOfDay = date.atStartOfDay();
             LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
 

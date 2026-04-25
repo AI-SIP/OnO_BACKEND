@@ -30,20 +30,36 @@ public class AdminAnalysisController {
     private final MissionLogService missionLogService;
 
     @GetMapping("/analysis")
-    public String getAllAnalysis(Model model) {
+    public String getAllAnalysis(
+            @RequestParam(name = "startDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(name = "endDate", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            Model model
+    ) {
         int allUserCount = userService.findAllUsers().size();
         int allProblemCount = problemService.findAllProblems().size();
 
-        // 최근 30일간 날짜별 출석 유저 수 및 신규 가입자 수
-        Map<LocalDate, Long> dailyActiveUsers = missionLogService.getDailyActiveUsersCount(30);
-        Map<LocalDate, Long> dailyNewUsers = userService.getDailyNewUsersCount(30);
+        LocalDate today = LocalDate.now();
+        LocalDate selectedStartDate = startDate != null ? startDate : today.minusDays(29);
+        LocalDate selectedEndDate = endDate != null ? endDate : today;
 
-        // 최근 30일 신규 가입자 총합
+        if (selectedStartDate.isAfter(selectedEndDate)) {
+            LocalDate temp = selectedStartDate;
+            selectedStartDate = selectedEndDate;
+            selectedEndDate = temp;
+        }
+
+        // 선택 기간 날짜별 출석 유저 수 및 신규 가입자 수
+        Map<LocalDate, Long> dailyActiveUsers = missionLogService.getDailyActiveUsersCount(selectedStartDate, selectedEndDate);
+        Map<LocalDate, Long> dailyNewUsers = userService.getDailyNewUsersCount(selectedStartDate, selectedEndDate);
+
+        // 선택 기간 신규 가입자 총합
         long recentNewUsersCount = dailyNewUsers.values().stream()
                 .mapToLong(Long::longValue)
                 .sum();
 
-        // 하루 평균 방문자 수 (최근 30일)
+        // 하루 평균 방문자 수 (선택 기간)
         double averageDailyVisitors = dailyActiveUsers.values().stream()
                 .mapToLong(Long::longValue)
                 .average()
@@ -55,6 +71,8 @@ public class AdminAnalysisController {
         model.addAttribute("dailyNewUsers", dailyNewUsers);
         model.addAttribute("recentNewUsersCount", recentNewUsersCount);
         model.addAttribute("averageDailyVisitors", averageDailyVisitors);
+        model.addAttribute("startDate", selectedStartDate);
+        model.addAttribute("endDate", selectedEndDate);
 
         return "analysis";
     }

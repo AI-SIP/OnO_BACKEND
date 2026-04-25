@@ -47,6 +47,31 @@
       <p class="text-gray-600 mt-1">OnO 애플리케이션 통계 개요</p>
     </div>
 
+    <form th:action="@{/admin/analysis}" method="get" class="mb-8 bg-white rounded-lg shadow-md p-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <div>
+          <label for="startDate" class="block text-sm font-medium text-gray-700 mb-1">시작일</label>
+          <input id="startDate" name="startDate" type="date" th:value="${startDate}"
+                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+        </div>
+        <div>
+          <label for="endDate" class="block text-sm font-medium text-gray-700 mb-1">종료일</label>
+          <input id="endDate" name="endDate" type="date" th:value="${endDate}"
+                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+        </div>
+        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition">
+          기간 적용
+        </button>
+      </div>
+      <p class="mt-3 text-xs text-gray-500">
+        현재 기간:
+        <span th:text="${#temporals.format(startDate, 'yyyy-MM-dd')}">2024-01-01</span>
+        부터
+        <span th:text="${#temporals.format(endDate, 'yyyy-MM-dd')}">2024-01-30</span>
+        까지
+      </p>
+    </form>
+
     <!-- Key Metrics -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
       <!-- Total Users -->
@@ -100,15 +125,15 @@
           </div>
         </div>
         <div class="mt-4">
-          <p class="text-xs text-gray-500">최근 30일 기준</p>
+          <p class="text-xs text-gray-500">선택 기간 기준</p>
         </div>
       </div>
 
-      <!-- Recent 30 Days New Users -->
+      <!-- Selected Period New Users -->
       <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-orange-500">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-gray-500 uppercase">최근 30일 가입자 수</p>
+            <p class="text-sm font-medium text-gray-500 uppercase">선택 기간 가입자 수</p>
             <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${recentNewUsersCount}">0</p>
           </div>
           <div class="p-3 bg-orange-100 rounded-full">
@@ -118,7 +143,7 @@
           </div>
         </div>
         <div class="mt-4">
-          <p class="text-xs text-gray-500">지난 30일간 신규 가입</p>
+          <p class="text-xs text-gray-500">선택 기간 신규 가입</p>
         </div>
       </div>
 
@@ -186,7 +211,7 @@
     <!-- Daily Active Users -->
     <div class="bg-white rounded-lg shadow-md overflow-hidden mb-8">
       <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
-        <h3 class="text-lg font-semibold text-gray-900">날짜별 출석 유저 수 (최근 30일)</h3>
+        <h3 class="text-lg font-semibold text-gray-900">날짜별 출석 유저 수</h3>
       </div>
       <div class="p-6">
         <div class="overflow-x-auto">

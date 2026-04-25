@@ -159,6 +159,11 @@ public class MissionLogService {
     }
 
     @Transactional(readOnly = true)
+    public Map<LocalDate, Long> getDailyActiveUsersCount(LocalDate startDate, LocalDate endDate) {
+        return missionLogRepository.getDailyActiveUsersCount(startDate, endDate);
+    }
+
+    @Transactional(readOnly = true)
     public List<com.aisip.OnO.backend.user.entity.User> getActiveUsersByDate(LocalDate date) {
         return missionLogRepository.getActiveUsersByDate(date);
     }
