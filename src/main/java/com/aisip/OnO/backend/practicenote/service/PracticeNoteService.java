@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.practicenote.service;
 
+import com.aisip.OnO.backend.admin.dto.AdminPracticeNoteResponseDto;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
@@ -13,8 +14,14 @@ import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
+import com.aisip.OnO.backend.user.entity.User;
+import com.aisip.OnO.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +45,8 @@ public class PracticeNoteService {
     private final PracticeNotificationScheduler practiceNotificationScheduler;
 
     private final MissionLogService missionLogService;
+
+    private final UserRepository userRepository;
 
     private PracticeNote getPracticeEntity(Long practiceId){
 
@@ -225,5 +234,21 @@ public class PracticeNoteService {
 
         log.info("userId: {} find practice thumbnails with cursor: {}, size: {}, hasNext: {}", userId, cursor, size, hasNext);
         return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminPracticeNoteResponseDto> findAdminPracticeNotes(int page, int size) {
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<PracticeNote> practiceNotePage = practiceNoteRepository.findAll(pageRequest);
+
+        List<AdminPracticeNoteResponseDto> content = practiceNotePage.getContent().stream()
+                .map(practiceNote -> {
+                    User user = userRepository.findById(practiceNote.getUserId()).orElse(null);
+                    Long problemCount = (long) practiceNoteRepository.findProblemIdListByPracticeNoteId(practiceNote.getId()).size();
+                    return AdminPracticeNoteResponseDto.from(practiceNote, user, problemCount);
+                })
+                .toList();
+
+        return new PageImpl<>(content, pageRequest, practiceNotePage.getTotalElements());
     }
 }

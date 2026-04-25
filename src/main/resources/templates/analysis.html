@@ -26,6 +26,9 @@
           <a th:href="@{/admin/problems}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
             문제
           </a>
+          <a th:href="@{/admin/practice-notes}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
+            복습
+          </a>
           <a th:href="@{/admin/analysis}" class="text-indigo-600 px-3 py-2 rounded-md text-sm font-medium border-b-2 border-indigo-600">
             통계
           </a>
@@ -265,7 +268,7 @@
     <!-- Quick Actions -->
     <div class="bg-white rounded-lg shadow-md p-6">
       <h3 class="text-lg font-semibold text-gray-900 mb-4">빠른 이동</h3>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <a th:href="@{/admin/users}" class="flex items-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors group">
           <div class="p-2 bg-blue-200 rounded-lg group-hover:bg-blue-300 transition-colors">
             <svg class="w-6 h-6 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -287,6 +290,18 @@
           <div class="ml-4">
             <p class="text-sm font-medium text-gray-900">문제 관리</p>
             <p class="text-xs text-gray-500">모든 유저 문제 보기</p>
+          </div>
+        </a>
+
+        <a th:href="@{/admin/practice-notes}" class="flex items-center p-4 bg-pink-50 hover:bg-pink-100 rounded-lg transition-colors group">
+          <div class="p-2 bg-pink-200 rounded-lg group-hover:bg-pink-300 transition-colors">
+            <svg class="w-6 h-6 text-pink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2m4-2a8 8 0 11-16 0 8 8 0 0116 0z"></path>
+            </svg>
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-gray-900">복습 관리</p>
+            <p class="text-xs text-gray-500">복습노트 및 기록 보기</p>
           </div>
         </a>
 

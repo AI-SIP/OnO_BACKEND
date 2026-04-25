@@ -1,11 +1,14 @@
 package com.aisip.OnO.backend.mission.service;
 
+import com.aisip.OnO.backend.admin.dto.AdminPracticeLogResponseDto;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.mission.dto.MissionRegisterDto;
 import com.aisip.OnO.backend.mission.entity.MissionLog;
 import com.aisip.OnO.backend.mission.entity.MissionType;
 import com.aisip.OnO.backend.mission.exception.MissionErrorCase;
 import com.aisip.OnO.backend.mission.repository.MissionLogRepository;
+import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
+import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import java.time.LocalDate;
@@ -13,6 +16,10 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +31,8 @@ public class MissionLogService {
     private final MissionLogRepository missionLogRepository;
 
     private final UserRepository userRepository;
+
+    private final PracticeNoteRepository practiceNoteRepository;
 
     private static final Long DAILY_MISSION_POINT_LIMIT = 200L;
 
@@ -166,5 +175,23 @@ public class MissionLogService {
     @Transactional(readOnly = true)
     public List<com.aisip.OnO.backend.user.entity.User> getActiveUsersByDate(LocalDate date) {
         return missionLogRepository.getActiveUsersByDate(date);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminPracticeLogResponseDto> findAdminPracticeLogs(int page, int size) {
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        List<MissionLog> missionLogs = missionLogRepository.findAllByMissionType(MissionType.NOTE_PRACTICE, pageRequest);
+        long total = missionLogRepository.countByMissionType(MissionType.NOTE_PRACTICE);
+
+        List<AdminPracticeLogResponseDto> content = missionLogs.stream()
+                .map(missionLog -> {
+                    PracticeNote practiceNote = missionLog.getReferenceId() != null
+                            ? practiceNoteRepository.findById(missionLog.getReferenceId()).orElse(null)
+                            : null;
+                    return AdminPracticeLogResponseDto.from(missionLog, practiceNote);
+                })
+                .toList();
+
+        return new PageImpl<>(content, pageRequest, total);
     }
 }
