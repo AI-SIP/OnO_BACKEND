@@ -56,12 +56,19 @@ public class AdminAnalysisController {
 
         // 선택 기간 날짜별 출석 유저 수 및 신규 가입자 수
         Map<LocalDate, Long> dailyActiveUsers = missionLogService.getDailyActiveUsersCount(selectedStartDate, selectedEndDate);
+        Map<LocalDate, Long> dailyVisits = missionLogService.getDailyVisitCount(selectedStartDate, selectedEndDate);
         Map<LocalDate, Long> dailyNewUsers = userService.getDailyNewUsersCount(selectedStartDate, selectedEndDate);
         Map<LocalDate, Long> dailyPracticeNotes = practiceNoteService.getDailyPracticeNotesCount(selectedStartDate, selectedEndDate);
         Map<LocalDate, Long> dailyPracticeLogs = missionLogService.getDailyNotePracticeLogsCount(selectedStartDate, selectedEndDate);
 
         // 선택 기간 신규 가입자 총합
         long recentNewUsersCount = dailyNewUsers.values().stream()
+                .mapToLong(Long::longValue)
+                .sum();
+        long periodVisitCount = dailyVisits.values().stream()
+                .mapToLong(Long::longValue)
+                .sum();
+        long periodActiveUserCount = dailyActiveUsers.values().stream()
                 .mapToLong(Long::longValue)
                 .sum();
         long periodPracticeNoteCount = dailyPracticeNotes.values().stream()
@@ -82,10 +89,13 @@ public class AdminAnalysisController {
         model.addAttribute("allPracticeNoteCount", allPracticeNoteCount);
         model.addAttribute("allPracticeLogCount", allPracticeLogCount);
         model.addAttribute("dailyActiveUsers", dailyActiveUsers);
+        model.addAttribute("dailyVisits", dailyVisits);
         model.addAttribute("dailyNewUsers", dailyNewUsers);
         model.addAttribute("dailyPracticeNotes", dailyPracticeNotes);
         model.addAttribute("dailyPracticeLogs", dailyPracticeLogs);
         model.addAttribute("recentNewUsersCount", recentNewUsersCount);
+        model.addAttribute("periodVisitCount", periodVisitCount);
+        model.addAttribute("periodActiveUserCount", periodActiveUserCount);
         model.addAttribute("periodPracticeNoteCount", periodPracticeNoteCount);
         model.addAttribute("periodPracticeLogCount", periodPracticeLogCount);
         model.addAttribute("averageDailyVisitors", averageDailyVisitors);

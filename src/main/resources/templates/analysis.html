@@ -222,6 +222,10 @@
                 <span class="text-sm font-medium text-gray-600">총 유저 수</span>
                 <span class="text-sm font-bold text-gray-900" th:text="${allUserCount}">0</span>
               </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 방문 횟수</span>
+                <span class="text-sm font-bold text-gray-900" th:text="${periodVisitCount}">0</span>
+              </div>
             </div>
           </div>
 
@@ -283,6 +287,7 @@
             <thead class="bg-gray-50">
               <tr>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">날짜</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">방문 횟수</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">출석 유저 수</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">신규 가입자 수</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">복습노트 생성 수</th>
@@ -292,6 +297,11 @@
             <tbody class="bg-white divide-y divide-gray-200">
               <tr th:each="entry : ${dailyActiveUsers}" class="hover:bg-gray-50">
                 <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900" th:text="${#temporals.format(entry.key, 'yyyy-MM-dd (E)')}">2024-01-01</td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                  <span class="font-semibold" th:classappend="${dailyVisits[entry.key] > 0 ? 'text-cyan-600' : 'text-gray-400'}"
+                        th:text="${dailyVisits[entry.key]}">0</span>
+                  <span class="ml-1 text-gray-500">회</span>
+                </td>
                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                   <a th:if="${entry.value > 0}"
                      th:href="@{/admin/analysis/daily-active-users(date=${entry.key})}"
@@ -328,11 +338,36 @@
                 </td>
               </tr>
               <tr th:if="${#maps.isEmpty(dailyActiveUsers)}">
-                <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
                   데이터가 없습니다
                 </td>
               </tr>
             </tbody>
+            <tfoot class="bg-gray-50 border-t border-gray-200">
+              <tr>
+                <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">합계</td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                  <span class="font-bold text-cyan-700" th:text="${periodVisitCount}">0</span>
+                  <span class="ml-1 text-gray-500">회</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                  <span class="font-bold text-blue-700" th:text="${periodActiveUserCount}">0</span>
+                  <span class="ml-1 text-gray-500">명</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                  <span class="font-bold text-orange-700" th:text="${recentNewUsersCount}">0</span>
+                  <span class="ml-1 text-gray-500">명</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                  <span class="font-bold text-pink-700" th:text="${periodPracticeNoteCount}">0</span>
+                  <span class="ml-1 text-gray-500">개</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                  <span class="font-bold text-indigo-700" th:text="${periodPracticeLogCount}">0</span>
+                  <span class="ml-1 text-gray-500">회</span>
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>
@@ -373,8 +408,8 @@
             </svg>
           </div>
           <div class="ml-4">
-            <p class="text-sm font-medium text-gray-900">복습 관리</p>
-            <p class="text-xs text-gray-500">복습노트 및 기록 보기</p>
+            <p class="text-sm font-medium text-gray-900">복습노트 관리</p>
+            <p class="text-xs text-gray-500">복습노트 목록 보기</p>
           </div>
         </a>
 

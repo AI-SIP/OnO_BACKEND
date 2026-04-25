@@ -180,6 +180,11 @@ public class MissionLogService {
     }
 
     @Transactional(readOnly = true)
+    public Map<LocalDate, Long> getDailyVisitCount(LocalDate startDate, LocalDate endDate) {
+        return getDailyMissionCount(MissionType.USER_LOGIN, startDate, endDate);
+    }
+
+    @Transactional(readOnly = true)
     public List<com.aisip.OnO.backend.user.entity.User> getActiveUsersByDate(LocalDate date) {
         return missionLogRepository.getActiveUsersByDate(date);
     }
@@ -214,9 +219,13 @@ public class MissionLogService {
 
     @Transactional(readOnly = true)
     public Map<LocalDate, Long> getDailyNotePracticeLogsCount(LocalDate startDate, LocalDate endDate) {
+        return getDailyMissionCount(MissionType.NOTE_PRACTICE, startDate, endDate);
+    }
+
+    private Map<LocalDate, Long> getDailyMissionCount(MissionType missionType, LocalDate startDate, LocalDate endDate) {
         Map<LocalDate, Long> result = new LinkedHashMap<>();
         missionLogRepository.countDailyByMissionType(
-                        MissionType.NOTE_PRACTICE,
+                        missionType,
                         startDate.atStartOfDay(),
                         endDate.atTime(LocalTime.MAX)
                 )
