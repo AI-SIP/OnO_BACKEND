@@ -25,6 +25,14 @@ public interface PracticeNoteRepository extends JpaRepository<PracticeNote, Long
             @Param("endDateTime") LocalDateTime endDateTime
     );
 
+    @Query("""
+            SELECT m.practiceNote.id, COUNT(m.problem.id)
+            FROM ProblemPracticeNoteMapping m
+            WHERE m.practiceNote.id IN :practiceNoteIds
+            GROUP BY m.practiceNote.id
+            """)
+    List<Object[]> countProblemsByPracticeNoteIds(@Param("practiceNoteIds") List<Long> practiceNoteIds);
+
     @Query("SELECT p.id FROM PracticeNote p WHERE p.userId = :userId")
     List<Long> findAllPracticeIdsByUserId(@Param("userId") Long userId);
 }

@@ -19,6 +19,8 @@ import java.time.LocalTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
@@ -185,16 +187,21 @@ public class MissionLogService {
     @Transactional(readOnly = true)
     public Page<AdminPracticeLogResponseDto> findAdminPracticeLogs(int page, int size) {
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        List<MissionLog> missionLogs = missionLogRepository.findAllByMissionType(MissionType.NOTE_PRACTICE, pageRequest);
+        List<MissionLog> missionLogs = missionLogRepository.findAllByMissionTypeWithUser(MissionType.NOTE_PRACTICE, pageRequest);
         long total = missionLogRepository.countByMissionType(MissionType.NOTE_PRACTICE);
+        List<Long> practiceNoteIds = missionLogs.stream()
+                .map(MissionLog::getReferenceId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, PracticeNote> practiceNotesById = practiceNoteRepository.findAllById(practiceNoteIds).stream()
+                .collect(Collectors.toMap(PracticeNote::getId, Function.identity()));
 
         List<AdminPracticeLogResponseDto> content = missionLogs.stream()
-                .map(missionLog -> {
-                    PracticeNote practiceNote = missionLog.getReferenceId() != null
-                            ? practiceNoteRepository.findById(missionLog.getReferenceId()).orElse(null)
-                            : null;
-                    return AdminPracticeLogResponseDto.from(missionLog, practiceNote);
-                })
+                .map(missionLog -> AdminPracticeLogResponseDto.from(
+                        missionLog,
+                        practiceNotesById.get(missionLog.getReferenceId())
+                ))
                 .toList();
 
         return new PageImpl<>(content, pageRequest, total);

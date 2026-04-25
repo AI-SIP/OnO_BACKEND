@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.user.service;
 
+import com.aisip.OnO.backend.admin.dto.AdminUserResponseDto;
 import com.aisip.OnO.backend.folder.service.FolderService;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
 import com.aisip.OnO.backend.problem.service.ProblemService;
@@ -12,19 +13,21 @@ import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.util.webhook.DiscordWebhookNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Date;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.sql.Date;
-import java.sql.Timestamp;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -103,6 +106,13 @@ public class UserService {
                 .sorted((u1, u2) -> u2.getCreatedAt().compareTo(u1.getCreatedAt())) // 최신순 정렬
                 .map(UserResponseDto::from)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminUserResponseDto> findAdminUsers(int page, int size, String sortBy, String direction) {
+        PageRequest pageRequest = PageRequest.of(page, size);
+        return userRepository.findAdminUsers(pageRequest, sortBy, direction)
+                .map(row -> AdminUserResponseDto.from(row.user(), row.problemCount()));
     }
 
     @Transactional(readOnly = true)

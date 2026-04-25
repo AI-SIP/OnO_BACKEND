@@ -1,9 +1,14 @@
 package com.aisip.OnO.backend.problem.repository;
 
+import com.aisip.OnO.backend.admin.dto.AdminProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.QProblem;
+import com.querydsl.core.types.Projections;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
@@ -11,6 +16,7 @@ import java.util.Optional;
 import static com.aisip.OnO.backend.practicenote.entity.QPracticeNote.practiceNote;
 import static com.aisip.OnO.backend.practicenote.entity.QProblemPracticeNoteMapping.problemPracticeNoteMapping;
 import static com.aisip.OnO.backend.problem.entity.QProblem.problem;
+import static com.aisip.OnO.backend.problem.entity.QProblemAnalysis.problemAnalysis;
 import static com.aisip.OnO.backend.problem.entity.QProblemImageData.problemImageData;
 import static com.aisip.OnO.backend.tag.entity.QProblemTagMapping.problemTagMapping;
 
@@ -64,6 +70,35 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
                 .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
                 .orderBy(problem.id.asc())
                 .fetch();
+    }
+
+    @Override
+    public Page<AdminProblemResponseDto> findAdminProblems(Pageable pageable) {
+        List<AdminProblemResponseDto> content = queryFactory
+                .select(Projections.constructor(
+                        AdminProblemResponseDto.class,
+                        problem.id,
+                        problem.folder.id,
+                        problem.memo,
+                        problem.reference,
+                        problemAnalysis.status.stringValue(),
+                        problem.solvedAt,
+                        problem.createdAt
+                ))
+                .from(problem)
+                .leftJoin(problem.folder)
+                .leftJoin(problem.problemAnalysis, problemAnalysis)
+                .orderBy(problem.createdAt.desc(), problem.id.desc())
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+
+        Long total = queryFactory
+                .select(problem.count())
+                .from(problem)
+                .fetchOne();
+
+        return new PageImpl<>(content, pageable, total != null ? total : 0L);
     }
 
     @Override

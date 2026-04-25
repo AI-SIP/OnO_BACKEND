@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.admin.controller;
 
+import com.aisip.OnO.backend.admin.dto.AdminProblemResponseDto;
 import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.service.FolderService;
@@ -9,14 +10,13 @@ import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-
-import java.util.List;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -34,21 +34,24 @@ public class AdminProblemController {
             @RequestParam(defaultValue = "20", name = "size") int size,
             Model model
     ) {
-        List<ProblemResponseDto> allProblems = problemService.findAllProblems();
+        int selectedPage = Math.max(page, 0);
+        int selectedSize = Math.max(size, 1);
+        Page<AdminProblemResponseDto> problemPage = problemService.findAdminProblems(selectedPage, selectedSize);
+        int totalPages = problemPage.getTotalPages();
+        int pageBlockStart = (selectedPage / 10) * 10;
+        int pageBlockEnd = Math.min(pageBlockStart + 9, Math.max(totalPages - 1, 0));
 
-        // 페이징 계산
-        int totalProblems = allProblems.size();
-        int totalPages = (int) Math.ceil((double) totalProblems / size);
-        int startIndex = page * size;
-        int endIndex = Math.min(startIndex + size, totalProblems);
-
-        List<ProblemResponseDto> pagedProblems = allProblems.subList(startIndex, endIndex);
-
-        model.addAttribute("problems", pagedProblems);
-        model.addAttribute("currentPage", page);
+        model.addAttribute("problems", problemPage.getContent());
+        model.addAttribute("currentPage", selectedPage);
         model.addAttribute("totalPages", totalPages);
-        model.addAttribute("totalProblems", totalProblems);
-        model.addAttribute("size", size);
+        model.addAttribute("totalProblems", problemPage.getTotalElements());
+        model.addAttribute("size", selectedSize);
+        model.addAttribute("pageStartItem", problemPage.isEmpty() ? 0 : selectedPage * selectedSize + 1);
+        model.addAttribute("pageEndItem", selectedPage * selectedSize + problemPage.getNumberOfElements());
+        model.addAttribute("pageBlockStart", pageBlockStart);
+        model.addAttribute("pageBlockEnd", pageBlockEnd);
+        model.addAttribute("hasPreviousBlock", pageBlockStart > 0);
+        model.addAttribute("hasNextBlock", pageBlockEnd < totalPages - 1);
 
         return "problems";
     }

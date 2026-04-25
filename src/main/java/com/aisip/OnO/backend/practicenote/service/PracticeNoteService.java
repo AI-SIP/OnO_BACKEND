@@ -34,6 +34,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -247,11 +248,29 @@ public class PracticeNoteService {
     public Page<AdminPracticeNoteResponseDto> findAdminPracticeNotes(int page, int size) {
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<PracticeNote> practiceNotePage = practiceNoteRepository.findAll(pageRequest);
+        List<PracticeNote> practiceNotes = practiceNotePage.getContent();
+        List<Long> userIds = practiceNotes.stream()
+                .map(PracticeNote::getUserId)
+                .distinct()
+                .toList();
+        List<Long> practiceNoteIds = practiceNotes.stream()
+                .map(PracticeNote::getId)
+                .toList();
 
-        List<AdminPracticeNoteResponseDto> content = practiceNotePage.getContent().stream()
+        Map<Long, User> usersById = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+        Map<Long, Long> problemCountsByPracticeNoteId = practiceNoteIds.isEmpty()
+                ? Map.of()
+                : practiceNoteRepository.countProblemsByPracticeNoteIds(practiceNoteIds).stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]
+                ));
+
+        List<AdminPracticeNoteResponseDto> content = practiceNotes.stream()
                 .map(practiceNote -> {
-                    User user = userRepository.findById(practiceNote.getUserId()).orElse(null);
-                    Long problemCount = (long) practiceNoteRepository.findProblemIdListByPracticeNoteId(practiceNote.getId()).size();
+                    User user = usersById.get(practiceNote.getUserId());
+                    Long problemCount = problemCountsByPracticeNoteId.getOrDefault(practiceNote.getId(), 0L);
                     return AdminPracticeNoteResponseDto.from(practiceNote, user, problemCount);
                 })
                 .toList();

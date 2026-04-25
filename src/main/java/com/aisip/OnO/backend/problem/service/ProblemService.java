@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.problem.service;
 
+import com.aisip.OnO.backend.admin.dto.AdminProblemResponseDto;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
@@ -32,6 +33,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -129,6 +132,11 @@ public class ProblemService {
     @Transactional(readOnly = true)
     public long countAllProblems() {
         return problemRepository.count();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminProblemResponseDto> findAdminProblems(int page, int size) {
+        return problemRepository.findAdminProblems(PageRequest.of(page, size));
     }
 
     @Transactional(readOnly = true)

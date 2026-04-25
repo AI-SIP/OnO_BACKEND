@@ -14,6 +14,9 @@ public interface MissionLogRepository extends JpaRepository<MissionLog, Long>, M
 
     List<MissionLog> findAllByMissionType(MissionType missionType, Pageable pageable);
 
+    @Query("SELECT m FROM MissionLog m JOIN FETCH m.user WHERE m.missionType = :missionType")
+    List<MissionLog> findAllByMissionTypeWithUser(@Param("missionType") MissionType missionType, Pageable pageable);
+
     long countByMissionType(MissionType missionType);
 
     long countByMissionTypeAndCreatedAtBetween(
