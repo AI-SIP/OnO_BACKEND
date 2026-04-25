@@ -221,6 +221,57 @@
       </div>
     </div>
 
+    <!-- Problem Solve Records -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden mt-6">
+      <div class="px-6 py-5 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-900">문제 복습 기록</h3>
+        <span class="text-sm text-gray-500">
+          총 <span class="font-semibold text-indigo-600" th:text="${problemSolveCount}">0</span>개
+        </span>
+      </div>
+      <div class="px-6 py-5">
+        <div th:if="${!#lists.isEmpty(problemSolves)}" class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">기록 ID</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">유저 ID</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">복습일</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">정답 상태</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">소요 시간</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">회고</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">이미지</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <tr th:each="solve : ${problemSolves}" class="hover:bg-gray-50">
+                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900" th:text="${solve.problemSolveId}">1</td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                  <a th:href="@{/admin/user/{userId}(userId=${solve.userId})}" class="text-indigo-600 hover:text-indigo-800 font-medium" th:text="${solve.userId}">1</a>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600" th:text="${#temporals.format(solve.practicedAt, 'yyyy-MM-dd HH:mm')}">2024-01-01</td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600" th:text="${solve.answerStatus}">CORRECT</td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                  <span th:if="${solve.timeSpentSeconds != null}" th:text="${solve.timeSpentSeconds} + '초'">60초</span>
+                  <span th:unless="${solve.timeSpentSeconds != null}" class="text-gray-400">-</span>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-600">
+                  <span th:if="${solve.reflection != null and !solve.reflection.isEmpty()}" th:text="${#strings.abbreviate(solve.reflection, 60)}">회고</span>
+                  <span th:unless="${solve.reflection != null and !solve.reflection.isEmpty()}" class="text-gray-400">-</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                  <span th:text="${#lists.size(solve.imageUrls)} + '장'">0장</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div th:if="${#lists.isEmpty(problemSolves)}" class="text-center py-8 text-gray-500">
+          이 문제에 작성된 복습 기록이 없습니다
+        </div>
+      </div>
+    </div>
+
     <!-- Back Button -->
     <div class="mt-6 flex justify-end">
       <a th:href="@{/admin/problems}"

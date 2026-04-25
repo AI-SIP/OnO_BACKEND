@@ -68,6 +68,15 @@ public class ProblemSolveService {
     }
 
     @Transactional(readOnly = true)
+    public List<ProblemSolveResponseDto> getAdminProblemSolvesByProblemId(Long problemId) {
+        List<ProblemSolve> problemSolves = problemSolveRepository.findAllByProblemIdWithImages(problemId);
+
+        return problemSolves.stream()
+                .map(ProblemSolveResponseDto::from)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<ProblemSolveResponseDto> getUserProblemSolves(Long userId) {
         List<ProblemSolve> problemSolves = problemSolveRepository.findAllByUserId(userId);
 
