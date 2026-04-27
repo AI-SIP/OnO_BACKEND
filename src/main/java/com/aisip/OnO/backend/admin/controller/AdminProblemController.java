@@ -43,6 +43,13 @@ public class AdminProblemController {
         int selectedSize = Math.max(size, 1);
         Page<AdminProblemResponseDto> problemPage = problemService.findAdminProblems(selectedPage, selectedSize);
         int totalPages = problemPage.getTotalPages();
+
+        if (totalPages > 0 && selectedPage >= totalPages) {
+            selectedPage = totalPages - 1;
+            problemPage = problemService.findAdminProblems(selectedPage, selectedSize);
+            totalPages = problemPage.getTotalPages();
+        }
+
         int pageBlockStart = (selectedPage / 10) * 10;
         int pageBlockEnd = Math.min(pageBlockStart + 9, Math.max(totalPages - 1, 0));
 

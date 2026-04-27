@@ -19,6 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -75,7 +76,9 @@ class ProblemControllerTest {
                     LocalDateTime.now(),
                     LocalDateTime.now(),
                     imageUrlList,
-                    null
+                    null,
+                    List.of(),
+                    List.of()
             );
 
             problemResponseDtoList.add(problemResponseDto);
@@ -181,18 +184,20 @@ class ProblemControllerTest {
     @WithMockCustomUser()
     void registerProblemImageData() throws Exception {
         // When & Then
-        mockMvc.perform(post("/api/problems/imageData")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new ProblemImageDataRegisterDto(
-                                        1L,
-                                        "problemImage",
-                                        ProblemImageType.PROBLEM_IMAGE
-                                )
-                        )))
+        MockMultipartFile image = new MockMultipartFile(
+                "problemImages",
+                "problem.png",
+                MediaType.IMAGE_PNG_VALUE,
+                "problem-image".getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/problems/{problemId}/imageData", 1L)
+                        .file(image)
+                        .param("problemImageTypes", ProblemImageType.PROBLEM_IMAGE.name()))
                 .andExpect(status().isOk());
 
-        //verify(problemService, times(1)).registerProblemImageData(any(), eq(1L));  // userId가 1L인 것도 검증
+        verify(problemService, times(1)).uploadProblemImages(eq(1L), eq(1L), any(), any());
+        verify(problemService, times(1)).analysisProblem(eq(1L));
     }
 
     @Test
