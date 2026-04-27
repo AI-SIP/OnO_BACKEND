@@ -1,0 +1,52 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yml
+
+clients:
+  - url: http://loki-dev:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: ono-dev-docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values:
+              - ono-app-dev
+              - ono-mysql-dev
+              - ono-redis-dev
+              - ono-rabbitmq-dev
+              - ono-prometheus-dev
+              - ono-grafana-dev
+              - ono-loki-dev
+              - ono-promtail-dev
+              - ono-mysql-exporter-dev
+    relabel_configs:
+      - source_labels: [__meta_docker_container_name]
+        regex: '/(.*)'
+        target_label: container
+      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
+        target_label: compose_service
+      - source_labels: [__meta_docker_container_label_com_docker_compose_project]
+        target_label: compose_project
+      - source_labels: [__meta_docker_container_id]
+        target_label: __path__
+        replacement: /var/lib/docker/containers/$1/$1-json.log
+      - target_label: job
+        replacement: ono-service
+      - target_label: environment
+        replacement: dev
+      - target_label: source
+        replacement: docker-json
+    pipeline_stages:
+      - docker: {}
+      - drop:
+          older_than: 168h
+      - regex:
+          expression: '(^|[[:space:]])(?P<level>TRACE|DEBUG|INFO|WARN|ERROR|FATAL)([[:space:]]|$)'
+      - labels:
+          level:

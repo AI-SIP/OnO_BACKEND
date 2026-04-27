@@ -145,6 +145,46 @@ services:
     profiles:
       - monitoring
 
+  # Loki - DEVELOPMENT (Profile: monitoring)
+  loki-dev:
+    image: grafana/loki:2.9.8
+    container_name: ono-loki-dev
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/loki/loki.yml
+    ports:
+      - "127.0.0.1:3101:3100"
+    volumes:
+      - ./monitoring/loki.dev.yml:/etc/loki/loki.yml:ro
+      - loki_dev_data:/loki
+    mem_limit: 512m
+    cpus: "0.50"
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
+  # Promtail - DEVELOPMENT (Profile: monitoring)
+  promtail-dev:
+    image: grafana/promtail:2.9.8
+    container_name: ono-promtail-dev
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/promtail/promtail.yml
+    volumes:
+      - ./monitoring/promtail.dev.yml:/etc/promtail/promtail.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - promtail_dev_positions:/tmp
+    mem_limit: 256m
+    cpus: "0.25"
+    depends_on:
+      - loki-dev
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
   mysql-exporter-dev:
     image: prom/mysqld-exporter:v0.15.1
     container_name: ono-mysql-exporter-dev
@@ -180,6 +220,7 @@ services:
       - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
     depends_on:
       - prometheus-dev
+      - loki-dev
     networks:
       - ono-network
     profiles:
@@ -200,6 +241,10 @@ volumes:
   app_dev_logs:
     driver: local
   prometheus_dev_data:
+    driver: local
+  loki_dev_data:
+    driver: local
+  promtail_dev_positions:
     driver: local
   grafana_dev_data:
     driver: local
