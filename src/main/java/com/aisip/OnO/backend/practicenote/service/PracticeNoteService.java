@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.practicenote.service;
 
+import com.aisip.OnO.backend.admin.dto.AdminPracticeNoteResponseDto;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
@@ -13,13 +14,27 @@ import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
+import com.aisip.OnO.backend.user.entity.User;
+import com.aisip.OnO.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Date;
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -38,6 +53,8 @@ public class PracticeNoteService {
     private final PracticeNotificationScheduler practiceNotificationScheduler;
 
     private final MissionLogService missionLogService;
+
+    private final UserRepository userRepository;
 
     private PracticeNote getPracticeEntity(Long practiceId){
 
@@ -225,5 +242,74 @@ public class PracticeNoteService {
 
         log.info("userId: {} find practice thumbnails with cursor: {}, size: {}, hasNext: {}", userId, cursor, size, hasNext);
         return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminPracticeNoteResponseDto> findAdminPracticeNotes(int page, int size) {
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<PracticeNote> practiceNotePage = practiceNoteRepository.findAll(pageRequest);
+        List<PracticeNote> practiceNotes = practiceNotePage.getContent();
+        List<Long> userIds = practiceNotes.stream()
+                .map(PracticeNote::getUserId)
+                .distinct()
+                .toList();
+        List<Long> practiceNoteIds = practiceNotes.stream()
+                .map(PracticeNote::getId)
+                .toList();
+
+        Map<Long, User> usersById = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+        Map<Long, Long> problemCountsByPracticeNoteId = practiceNoteIds.isEmpty()
+                ? Map.of()
+                : practiceNoteRepository.countProblemsByPracticeNoteIds(practiceNoteIds).stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]
+                ));
+
+        List<AdminPracticeNoteResponseDto> content = practiceNotes.stream()
+                .map(practiceNote -> {
+                    User user = usersById.get(practiceNote.getUserId());
+                    Long problemCount = problemCountsByPracticeNoteId.getOrDefault(practiceNote.getId(), 0L);
+                    return AdminPracticeNoteResponseDto.from(practiceNote, user, problemCount);
+                })
+                .toList();
+
+        return new PageImpl<>(content, pageRequest, practiceNotePage.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    public long countAllPracticeNotes() {
+        return practiceNoteRepository.count();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<LocalDate, Long> getDailyPracticeNotesCount(LocalDate startDate, LocalDate endDate) {
+        Map<LocalDate, Long> result = new LinkedHashMap<>();
+        practiceNoteRepository.countDailyPracticeNotes(startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX))
+                .forEach(row -> result.put(toLocalDate(row[0]), (Long) row[1]));
+
+        Map<LocalDate, Long> orderedResult = new LinkedHashMap<>();
+        for (LocalDate date = endDate; !date.isBefore(startDate); date = date.minusDays(1)) {
+            orderedResult.put(date, result.getOrDefault(date, 0L));
+        }
+
+        return orderedResult;
+    }
+
+    private LocalDate toLocalDate(Object value) {
+        if (value instanceof LocalDate localDate) {
+            return localDate;
+        }
+        if (value instanceof LocalDateTime localDateTime) {
+            return localDateTime.toLocalDate();
+        }
+        if (value instanceof Date date) {
+            return date.toLocalDate();
+        }
+        if (value instanceof Timestamp timestamp) {
+            return timestamp.toLocalDateTime().toLocalDate();
+        }
+        return LocalDate.parse(value.toString());
     }
 }

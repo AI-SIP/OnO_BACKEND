@@ -26,6 +26,9 @@
           <a th:href="@{/admin/problems}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
             문제
           </a>
+          <a th:href="@{/admin/practice-notes}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
+            복습
+          </a>
           <a th:href="@{/admin/analysis}" class="text-indigo-600 px-3 py-2 rounded-md text-sm font-medium border-b-2 border-indigo-600">
             통계
           </a>
@@ -46,6 +49,47 @@
       <h2 class="text-2xl font-bold text-gray-900">시스템 통계</h2>
       <p class="text-gray-600 mt-1">OnO 애플리케이션 통계 개요</p>
     </div>
+
+    <form th:action="@{/admin/analysis}" method="get" class="mb-8 bg-white rounded-lg shadow-md border border-gray-100 overflow-hidden">
+      <div class="px-5 py-4 bg-gray-50 border-b border-gray-100 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p class="text-sm font-semibold text-gray-900">기간별 통계 조회</p>
+          <p class="mt-1 text-xs text-gray-500">
+            <span th:text="${#temporals.format(startDate, 'yyyy-MM-dd')}">2024-01-01</span>
+            부터
+            <span th:text="${#temporals.format(endDate, 'yyyy-MM-dd')}">2024-01-30</span>
+            까지
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <a th:href="@{/admin/analysis(startDate=${quickStart7Days}, endDate=${today})}"
+             class="px-3 py-2 bg-white border border-gray-200 rounded-md text-xs font-medium text-gray-700 hover:border-indigo-300 hover:text-indigo-700 transition">최근 7일</a>
+          <a th:href="@{/admin/analysis(startDate=${quickStart30Days}, endDate=${today})}"
+             class="px-3 py-2 bg-white border border-gray-200 rounded-md text-xs font-medium text-gray-700 hover:border-indigo-300 hover:text-indigo-700 transition">최근 30일</a>
+          <a th:href="@{/admin/analysis(startDate=${quickStart90Days}, endDate=${today})}"
+             class="px-3 py-2 bg-white border border-gray-200 rounded-md text-xs font-medium text-gray-700 hover:border-indigo-300 hover:text-indigo-700 transition">최근 90일</a>
+        </div>
+      </div>
+      <div class="p-5 grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 items-end">
+        <div>
+          <label for="startDate" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">시작일</label>
+          <div class="relative">
+            <input id="startDate" name="startDate" type="date" th:value="${startDate}"
+                   class="w-full h-11 rounded-lg border border-gray-200 bg-gray-50 px-4 text-sm text-gray-900 shadow-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100">
+          </div>
+        </div>
+        <div>
+          <label for="endDate" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">종료일</label>
+          <div class="relative">
+            <input id="endDate" name="endDate" type="date" th:value="${endDate}"
+                   class="w-full h-11 rounded-lg border border-gray-200 bg-gray-50 px-4 text-sm text-gray-900 shadow-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100">
+          </div>
+        </div>
+        <button type="submit" class="h-11 bg-indigo-600 hover:bg-indigo-700 text-white px-5 rounded-lg text-sm font-semibold shadow-sm transition">
+          적용
+        </button>
+      </div>
+    </form>
 
     <!-- Key Metrics -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -86,10 +130,62 @@
       </div>
 
       <!-- Average Daily Visitors -->
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-emerald-500">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-500 uppercase">선택 기간 문제 등록 수</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${periodProblemCount}">0</p>
+          </div>
+          <div class="p-3 bg-emerald-100 rounded-full">
+            <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="mt-4">
+          <p class="text-xs text-gray-500">선택 기간 작성된 문제</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-red-500">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-500 uppercase">선택 기간 분석 실패율</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900"
+               th:text="${#numbers.formatDecimal(periodAnalysisFailureRate, 1, 1)} + '%'">0.0%</p>
+          </div>
+          <div class="p-3 bg-red-100 rounded-full">
+            <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="mt-4">
+          <p class="text-xs text-gray-500">완료/실패 처리된 분석 기준</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-cyan-500">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-500 uppercase">선택 기간 고유 방문 유저</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${periodUniqueVisitorCount}">0</p>
+          </div>
+          <div class="p-3 bg-cyan-100 rounded-full">
+            <svg class="w-8 h-8 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 18.72a9.094 9.094 0 003.75.78 9 9 0 00-9-9 9.094 9.094 0 00-3.75.78M18 18.72A8.966 8.966 0 0112.75 21a8.966 8.966 0 01-5.25-2.28M18 18.72A5.985 5.985 0 0012.75 15a5.985 5.985 0 00-5.25 3.72M15.75 6a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="mt-4">
+          <p class="text-xs text-gray-500">선택 기간 로그인한 서로 다른 유저</p>
+        </div>
+      </div>
+
       <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-gray-500 uppercase">하루 평균 방문자 수</p>
+            <p class="text-sm font-medium text-gray-500 uppercase">선택 기간 평균 DAU</p>
             <p class="mt-2 text-3xl font-bold text-gray-900"
                th:text="${#numbers.formatDecimal(averageDailyVisitors, 1, 1)}">0.0</p>
           </div>
@@ -100,15 +196,15 @@
           </div>
         </div>
         <div class="mt-4">
-          <p class="text-xs text-gray-500">최근 30일 기준</p>
+          <p class="text-xs text-gray-500">날짜별 출석 유저 수 평균</p>
         </div>
       </div>
 
-      <!-- Recent 30 Days New Users -->
+      <!-- Selected Period New Users -->
       <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-orange-500">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-gray-500 uppercase">최근 30일 가입자 수</p>
+            <p class="text-sm font-medium text-gray-500 uppercase">선택 기간 가입자 수</p>
             <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${recentNewUsersCount}">0</p>
           </div>
           <div class="p-3 bg-orange-100 rounded-full">
@@ -118,25 +214,42 @@
           </div>
         </div>
         <div class="mt-4">
-          <p class="text-xs text-gray-500">지난 30일간 신규 가입</p>
+          <p class="text-xs text-gray-500">선택 기간 신규 가입</p>
         </div>
       </div>
 
       <!-- System Health -->
-      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-indigo-500">
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-pink-500">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-gray-500 uppercase">시스템 상태</p>
-            <p class="mt-2 text-xl font-bold text-green-600">정상</p>
+            <p class="text-sm font-medium text-gray-500 uppercase">총 복습노트 수</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${allPracticeNoteCount}">0</p>
           </div>
-          <div class="p-3 bg-indigo-100 rounded-full">
-            <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          <div class="p-3 bg-pink-100 rounded-full">
+            <svg class="w-8 h-8 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2m4-2a8 8 0 11-16 0 8 8 0 0116 0z"></path>
             </svg>
           </div>
         </div>
         <div class="mt-4">
-          <p class="text-sm text-gray-500">모든 시스템 작동 중</p>
+          <a th:href="@{/admin/practice-notes}" class="text-sm text-pink-600 hover:text-pink-800 font-medium">복습 관리 보기 →</a>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-indigo-500">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-500 uppercase">총 복습 기록 수</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${allPracticeLogCount}">0</p>
+          </div>
+          <div class="p-3 bg-indigo-100 rounded-full">
+            <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2m-4 0V3m0 2v4m0-4h4m-4 0H7"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="mt-4">
+          <p class="text-xs text-gray-500">복습노트 사용 미션 기준</p>
         </div>
       </div>
     </div>
@@ -147,7 +260,7 @@
         <h3 class="text-lg font-semibold text-gray-900">상세 통계</h3>
       </div>
       <div class="p-6">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
           <!-- User Statistics -->
           <div>
             <h4 class="text-md font-semibold text-gray-800 mb-4 flex items-center">
@@ -160,6 +273,19 @@
               <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                 <span class="text-sm font-medium text-gray-600">총 유저 수</span>
                 <span class="text-sm font-bold text-gray-900" th:text="${allUserCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 방문 횟수</span>
+                <span class="text-sm font-bold text-gray-900" th:text="${periodVisitCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 고유 방문 유저</span>
+                <span class="text-sm font-bold text-gray-900" th:text="${periodUniqueVisitorCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 평균 DAU</span>
+                <span class="text-sm font-bold text-gray-900"
+                      th:text="${#numbers.formatDecimal(averageDailyVisitors, 1, 1)}">0.0</span>
               </div>
             </div>
           </div>
@@ -177,6 +303,87 @@
                 <span class="text-sm font-medium text-gray-600">총 문제 수</span>
                 <span class="text-sm font-bold text-gray-900" th:text="${allProblemCount}">0</span>
               </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 문제 등록</span>
+                <span class="text-sm font-bold text-gray-900" th:text="${periodProblemCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">총 분석 데이터 수</span>
+                <span class="text-sm font-bold text-gray-900" th:text="${allProblemAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">전체 분석 완료</span>
+                <span class="text-sm font-bold text-green-700" th:text="${allCompletedAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">전체 분석 실패</span>
+                <span class="text-sm font-bold text-red-700" th:text="${allFailedAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">전체 분석 중</span>
+                <span class="text-sm font-bold text-yellow-700" th:text="${allProcessingAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">전체 분석 대기</span>
+                <span class="text-sm font-bold text-blue-700" th:text="${allNotStartedAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">전체 이미지 없음</span>
+                <span class="text-sm font-bold text-gray-700" th:text="${allNoImageAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 분석 완료</span>
+                <span class="text-sm font-bold text-green-700" th:text="${periodCompletedAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 분석 실패</span>
+                <span class="text-sm font-bold text-red-700" th:text="${periodFailedAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 분석 실패율</span>
+                <span class="text-sm font-bold text-red-700"
+                      th:text="${#numbers.formatDecimal(periodAnalysisFailureRate, 1, 1)} + '%'">0.0%</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 분석 중</span>
+                <span class="text-sm font-bold text-yellow-700" th:text="${periodProcessingAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 분석 대기</span>
+                <span class="text-sm font-bold text-blue-700" th:text="${periodNotStartedAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 이미지 없음</span>
+                <span class="text-sm font-bold text-gray-700" th:text="${periodNoImageAnalysisCount}">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Practice Statistics -->
+          <div>
+            <h4 class="text-md font-semibold text-gray-800 mb-4 flex items-center">
+              <svg class="w-5 h-5 mr-2 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2m4-2a8 8 0 11-16 0 8 8 0 0116 0z"></path>
+              </svg>
+              복습 통계
+            </h4>
+            <div class="space-y-3">
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">총 복습노트 수</span>
+                <span class="text-sm font-bold text-gray-900" th:text="${allPracticeNoteCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">총 복습 기록 수</span>
+                <span class="text-sm font-bold text-gray-900" th:text="${allPracticeLogCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 복습노트 생성</span>
+                <span class="text-sm font-bold text-gray-900" th:text="${periodPracticeNoteCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 복습 수행</span>
+                <span class="text-sm font-bold text-gray-900" th:text="${periodPracticeLogCount}">0</span>
+              </div>
             </div>
           </div>
         </div>
@@ -186,7 +393,7 @@
     <!-- Daily Active Users -->
     <div class="bg-white rounded-lg shadow-md overflow-hidden mb-8">
       <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
-        <h3 class="text-lg font-semibold text-gray-900">날짜별 출석 유저 수 (최근 30일)</h3>
+        <h3 class="text-lg font-semibold text-gray-900">날짜별 출석 유저 수</h3>
       </div>
       <div class="p-6">
         <div class="overflow-x-auto">
@@ -194,13 +401,22 @@
             <thead class="bg-gray-50">
               <tr>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">날짜</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">방문 횟수</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">출석 유저 수</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">신규 가입자 수</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">문제 등록 수</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">복습노트 생성 수</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">복습 수행 수</th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
               <tr th:each="entry : ${dailyActiveUsers}" class="hover:bg-gray-50">
                 <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900" th:text="${#temporals.format(entry.key, 'yyyy-MM-dd (E)')}">2024-01-01</td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                  <span class="font-semibold" th:classappend="${dailyVisits[entry.key] > 0 ? 'text-cyan-600' : 'text-gray-400'}"
+                        th:text="${dailyVisits[entry.key]}">0</span>
+                  <span class="ml-1 text-gray-500">회</span>
+                </td>
                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                   <a th:if="${entry.value > 0}"
                      th:href="@{/admin/analysis/daily-active-users(date=${entry.key})}"
@@ -225,13 +441,57 @@
                     <span class="ml-1 text-gray-500">명</span>
                   </span>
                 </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                  <span class="font-semibold" th:classappend="${dailyProblems[entry.key] > 0 ? 'text-emerald-600' : 'text-gray-400'}"
+                        th:text="${dailyProblems[entry.key]}">0</span>
+                  <span class="ml-1 text-gray-500">개</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                  <span class="font-semibold" th:classappend="${dailyPracticeNotes[entry.key] > 0 ? 'text-pink-600' : 'text-gray-400'}"
+                        th:text="${dailyPracticeNotes[entry.key]}">0</span>
+                  <span class="ml-1 text-gray-500">개</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                  <span class="font-semibold" th:classappend="${dailyPracticeLogs[entry.key] > 0 ? 'text-indigo-600' : 'text-gray-400'}"
+                        th:text="${dailyPracticeLogs[entry.key]}">0</span>
+                  <span class="ml-1 text-gray-500">회</span>
+                </td>
               </tr>
               <tr th:if="${#maps.isEmpty(dailyActiveUsers)}">
-                <td colspan="3" class="px-4 py-8 text-center text-gray-500">
+                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
                   데이터가 없습니다
                 </td>
               </tr>
             </tbody>
+            <tfoot class="bg-gray-50 border-t border-gray-200">
+              <tr>
+                <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">합계</td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                  <span class="font-bold text-cyan-700" th:text="${periodVisitCount}">0</span>
+                  <span class="ml-1 text-gray-500">회</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                  <span class="font-bold text-blue-700" th:text="${periodActiveUserCount}">0</span>
+                  <span class="ml-1 text-gray-500">명</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                  <span class="font-bold text-orange-700" th:text="${recentNewUsersCount}">0</span>
+                  <span class="ml-1 text-gray-500">명</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                  <span class="font-bold text-emerald-700" th:text="${periodProblemCount}">0</span>
+                  <span class="ml-1 text-gray-500">개</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                  <span class="font-bold text-pink-700" th:text="${periodPracticeNoteCount}">0</span>
+                  <span class="ml-1 text-gray-500">개</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                  <span class="font-bold text-indigo-700" th:text="${periodPracticeLogCount}">0</span>
+                  <span class="ml-1 text-gray-500">회</span>
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>
@@ -240,7 +500,7 @@
     <!-- Quick Actions -->
     <div class="bg-white rounded-lg shadow-md p-6">
       <h3 class="text-lg font-semibold text-gray-900 mb-4">빠른 이동</h3>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <a th:href="@{/admin/users}" class="flex items-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors group">
           <div class="p-2 bg-blue-200 rounded-lg group-hover:bg-blue-300 transition-colors">
             <svg class="w-6 h-6 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -262,6 +522,18 @@
           <div class="ml-4">
             <p class="text-sm font-medium text-gray-900">문제 관리</p>
             <p class="text-xs text-gray-500">모든 유저 문제 보기</p>
+          </div>
+        </a>
+
+        <a th:href="@{/admin/practice-notes}" class="flex items-center p-4 bg-pink-50 hover:bg-pink-100 rounded-lg transition-colors group">
+          <div class="p-2 bg-pink-200 rounded-lg group-hover:bg-pink-300 transition-colors">
+            <svg class="w-6 h-6 text-pink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2m4-2a8 8 0 11-16 0 8 8 0 0116 0z"></path>
+            </svg>
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-gray-900">복습노트 관리</p>
+            <p class="text-xs text-gray-500">복습노트 목록 보기</p>
           </div>
         </a>
 
