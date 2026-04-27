@@ -159,13 +159,13 @@ jobs:
       - name: Deploy Monitoring Stack
         run: |
           docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring pull \
-            mysql-exporter-dev prometheus-dev grafana-dev
-          docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring stop prometheus-dev grafana-dev mysql-exporter-dev || true
-          docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring rm -f prometheus-dev grafana-dev mysql-exporter-dev || true
+            mysql-exporter-dev prometheus-dev loki-dev promtail-dev grafana-dev
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring stop prometheus-dev grafana-dev loki-dev promtail-dev mysql-exporter-dev || true
+          docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring rm -f prometheus-dev grafana-dev loki-dev promtail-dev mysql-exporter-dev || true
           docker-compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring up -d --force-recreate \
-            mysql-exporter-dev prometheus-dev grafana-dev
+            mysql-exporter-dev prometheus-dev loki-dev promtail-dev grafana-dev
           docker-compose -f docker-compose.dev.yml --env-file .env.dev ps \
-            mysql-exporter-dev prometheus-dev grafana-dev
+            mysql-exporter-dev prometheus-dev loki-dev promtail-dev grafana-dev
         shell: bash
 
       - name: Verify Monitoring Integration
@@ -200,6 +200,43 @@ jobs:
           docker exec ono-prometheus-dev sh -lc 'wget -qO- "http://localhost:9090/prometheus/api/v1/targets"' || true
           docker logs --tail=200 ono-app-dev || true
           docker logs --tail=200 ono-prometheus-dev || true
+          exit 1
+        shell: bash
+
+      - name: Verify Loki Log Collection
+        run: |
+          echo "Checking Loki readiness..."
+          for i in $(seq 1 12); do
+            if curl -fsS http://localhost:3101/ready | grep -q ready; then
+              echo "Loki is ready"
+              break
+            fi
+            echo "Waiting Loki ready... ($i/12)"
+            sleep 5
+          done
+
+          if ! curl -fsS http://localhost:3101/ready | grep -q ready; then
+            echo "ERROR: Loki did not become ready"
+            docker logs --tail=200 ono-loki-dev || true
+            docker logs --tail=200 ono-promtail-dev || true
+            exit 1
+          fi
+
+          echo "Checking Loki received dev logs..."
+          for i in $(seq 1 12); do
+            result=$(curl -fsG "http://localhost:3101/loki/api/v1/label/container/values" || true)
+            if echo "$result" | grep -Eq '"ono-(app|mysql|redis|rabbitmq|prometheus|grafana|loki|promtail|mysql-exporter)-dev"'; then
+              echo "Loki received dev log labels"
+              exit 0
+            fi
+            echo "Waiting Loki log labels... ($i/12)"
+            sleep 5
+          done
+
+          echo "ERROR: Loki did not receive expected dev log labels"
+          curl -fsG "http://localhost:3101/loki/api/v1/labels" || true
+          docker logs --tail=200 ono-loki-dev || true
+          docker logs --tail=200 ono-promtail-dev || true
           exit 1
         shell: bash
 
