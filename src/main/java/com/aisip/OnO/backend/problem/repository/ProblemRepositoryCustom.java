@@ -1,11 +1,14 @@
 package com.aisip.OnO.backend.problem.repository;
 
 import com.aisip.OnO.backend.admin.dto.AdminProblemResponseDto;
+import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public interface ProblemRepositoryCustom {
@@ -19,6 +22,14 @@ public interface ProblemRepositoryCustom {
     List<Problem> findAll();
 
     Page<AdminProblemResponseDto> findAdminProblems(Pageable pageable);
+
+    Map<LocalDate, Long> countDailyProblems(LocalDate startDate, LocalDate endDate);
+
+    long countProblemAnalysesForActiveProblems();
+
+    Map<AnalysisStatus, Long> countProblemAnalysesByStatusForActiveProblems();
+
+    Map<AnalysisStatus, Long> countProblemAnalysesByStatusForActiveProblems(LocalDate startDate, LocalDate endDate);
 
     List<Problem> findAllProblemsByPracticeId(Long practiceId);
 

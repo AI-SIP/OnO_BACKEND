@@ -130,6 +130,41 @@
       </div>
 
       <!-- Average Daily Visitors -->
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-emerald-500">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-500 uppercase">선택 기간 문제 등록 수</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${periodProblemCount}">0</p>
+          </div>
+          <div class="p-3 bg-emerald-100 rounded-full">
+            <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="mt-4">
+          <p class="text-xs text-gray-500">선택 기간 작성된 문제</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-red-500">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-500 uppercase">선택 기간 분석 실패율</p>
+            <p class="mt-2 text-3xl font-bold text-gray-900"
+               th:text="${#numbers.formatDecimal(periodAnalysisFailureRate, 1, 1)} + '%'">0.0%</p>
+          </div>
+          <div class="p-3 bg-red-100 rounded-full">
+            <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="mt-4">
+          <p class="text-xs text-gray-500">완료/실패 처리된 분석 기준</p>
+        </div>
+      </div>
+
       <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-cyan-500">
         <div class="flex items-center justify-between">
           <div>
@@ -268,6 +303,59 @@
                 <span class="text-sm font-medium text-gray-600">총 문제 수</span>
                 <span class="text-sm font-bold text-gray-900" th:text="${allProblemCount}">0</span>
               </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 문제 등록</span>
+                <span class="text-sm font-bold text-gray-900" th:text="${periodProblemCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">총 분석 데이터 수</span>
+                <span class="text-sm font-bold text-gray-900" th:text="${allProblemAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">전체 분석 완료</span>
+                <span class="text-sm font-bold text-green-700" th:text="${allCompletedAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">전체 분석 실패</span>
+                <span class="text-sm font-bold text-red-700" th:text="${allFailedAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">전체 분석 중</span>
+                <span class="text-sm font-bold text-yellow-700" th:text="${allProcessingAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">전체 분석 대기</span>
+                <span class="text-sm font-bold text-blue-700" th:text="${allNotStartedAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">전체 이미지 없음</span>
+                <span class="text-sm font-bold text-gray-700" th:text="${allNoImageAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 분석 완료</span>
+                <span class="text-sm font-bold text-green-700" th:text="${periodCompletedAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 분석 실패</span>
+                <span class="text-sm font-bold text-red-700" th:text="${periodFailedAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 분석 실패율</span>
+                <span class="text-sm font-bold text-red-700"
+                      th:text="${#numbers.formatDecimal(periodAnalysisFailureRate, 1, 1)} + '%'">0.0%</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 분석 중</span>
+                <span class="text-sm font-bold text-yellow-700" th:text="${periodProcessingAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 분석 대기</span>
+                <span class="text-sm font-bold text-blue-700" th:text="${periodNotStartedAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 이미지 없음</span>
+                <span class="text-sm font-bold text-gray-700" th:text="${periodNoImageAnalysisCount}">0</span>
+              </div>
             </div>
           </div>
 
@@ -316,6 +404,7 @@
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">방문 횟수</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">출석 유저 수</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">신규 가입자 수</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">문제 등록 수</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">복습노트 생성 수</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">복습 수행 수</th>
               </tr>
@@ -353,6 +442,11 @@
                   </span>
                 </td>
                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                  <span class="font-semibold" th:classappend="${dailyProblems[entry.key] > 0 ? 'text-emerald-600' : 'text-gray-400'}"
+                        th:text="${dailyProblems[entry.key]}">0</span>
+                  <span class="ml-1 text-gray-500">개</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                   <span class="font-semibold" th:classappend="${dailyPracticeNotes[entry.key] > 0 ? 'text-pink-600' : 'text-gray-400'}"
                         th:text="${dailyPracticeNotes[entry.key]}">0</span>
                   <span class="ml-1 text-gray-500">개</span>
@@ -364,7 +458,7 @@
                 </td>
               </tr>
               <tr th:if="${#maps.isEmpty(dailyActiveUsers)}">
-                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
                   데이터가 없습니다
                 </td>
               </tr>
@@ -383,6 +477,10 @@
                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
                   <span class="font-bold text-orange-700" th:text="${recentNewUsersCount}">0</span>
                   <span class="ml-1 text-gray-500">명</span>
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                  <span class="font-bold text-emerald-700" th:text="${periodProblemCount}">0</span>
+                  <span class="ml-1 text-gray-500">개</span>
                 </td>
                 <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
                   <span class="font-bold text-pink-700" th:text="${periodPracticeNoteCount}">0</span>

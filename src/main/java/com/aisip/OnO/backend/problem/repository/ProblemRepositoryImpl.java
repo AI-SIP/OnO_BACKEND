@@ -1,18 +1,29 @@
 package com.aisip.OnO.backend.problem.repository;
 
 import com.aisip.OnO.backend.admin.dto.AdminProblemResponseDto;
+import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.QProblem;
+import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.DateExpression;
+import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
+import java.sql.Date;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
+import static com.aisip.OnO.backend.folder.entity.QFolder.folder;
 import static com.aisip.OnO.backend.practicenote.entity.QPracticeNote.practiceNote;
 import static com.aisip.OnO.backend.practicenote.entity.QProblemPracticeNoteMapping.problemPracticeNoteMapping;
 import static com.aisip.OnO.backend.problem.entity.QProblem.problem;
@@ -78,7 +89,7 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
                 .select(Projections.constructor(
                         AdminProblemResponseDto.class,
                         problem.id,
-                        problem.folder.id,
+                        folder.id,
                         problem.memo,
                         problem.reference,
                         problemAnalysis.status.stringValue(),
@@ -86,7 +97,7 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
                         problem.createdAt
                 ))
                 .from(problem)
-                .leftJoin(problem.folder)
+                .leftJoin(problem.folder, folder)
                 .leftJoin(problem.problemAnalysis, problemAnalysis)
                 .orderBy(problem.createdAt.desc(), problem.id.desc())
                 .offset(pageable.getOffset())
@@ -99,6 +110,76 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
                 .fetchOne();
 
         return new PageImpl<>(content, pageable, total != null ? total : 0L);
+    }
+
+    @Override
+    public Map<LocalDate, Long> countDailyProblems(LocalDate startDate, LocalDate endDate) {
+        DateExpression<Date> createdDate = Expressions.dateTemplate(
+                Date.class,
+                "date({0})",
+                problem.createdAt
+        );
+
+        List<Tuple> rows = queryFactory
+                .select(createdDate, problem.count())
+                .from(problem)
+                .where(problem.createdAt.between(startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX)))
+                .groupBy(createdDate)
+                .fetch();
+
+        Map<LocalDate, Long> countsByDate = new LinkedHashMap<>();
+        rows.forEach(row -> {
+            Date date = row.get(createdDate);
+            if (date != null) {
+                countsByDate.put(date.toLocalDate(), row.get(problem.count()));
+            }
+        });
+
+        Map<LocalDate, Long> result = new LinkedHashMap<>();
+        for (LocalDate date = endDate; !date.isBefore(startDate); date = date.minusDays(1)) {
+            result.put(date, countsByDate.getOrDefault(date, 0L));
+        }
+
+        return result;
+    }
+
+    @Override
+    public long countProblemAnalysesForActiveProblems() {
+        Long count = queryFactory
+                .select(problemAnalysis.count())
+                .from(problemAnalysis)
+                .join(problemAnalysis.problem, problem)
+                .where(problem.deletedAt.isNull())
+                .fetchOne();
+
+        return count != null ? count : 0L;
+    }
+
+    @Override
+    public Map<AnalysisStatus, Long> countProblemAnalysesByStatusForActiveProblems() {
+        return countProblemAnalysesByStatusForActiveProblems(null, null);
+    }
+
+    @Override
+    public Map<AnalysisStatus, Long> countProblemAnalysesByStatusForActiveProblems(LocalDate startDate, LocalDate endDate) {
+        var query = queryFactory
+                .select(problemAnalysis.status, problemAnalysis.count())
+                .from(problemAnalysis)
+                .join(problemAnalysis.problem, problem)
+                .where(problem.deletedAt.isNull());
+
+        if (startDate != null && endDate != null) {
+            query.where(problemAnalysis.updatedAt.between(startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX)));
+        }
+
+        List<Tuple> rows = query
+                .groupBy(problemAnalysis.status)
+                .fetch();
+
+        Map<AnalysisStatus, Long> result = new EnumMap<>(AnalysisStatus.class);
+        rows.forEach(row -> result.put(row.get(problemAnalysis.status), row.get(problemAnalysis.count())));
+
+        return result;
     }
 
     @Override
