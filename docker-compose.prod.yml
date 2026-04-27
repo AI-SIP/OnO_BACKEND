@@ -223,6 +223,8 @@ services:
     image: grafana/promtail:2.9.8
     container_name: ono-promtail-prod
     restart: unless-stopped
+    environment:
+      DOCKER_API_VERSION: "1.44"
     command:
       - -config.file=/etc/promtail/promtail.yml
     volumes:
