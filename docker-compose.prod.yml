@@ -220,7 +220,7 @@ services:
 
   # Promtail - PRODUCTION (Profile: monitoring)
   promtail-prod:
-    image: grafana/promtail:2.9.8
+    image: grafana/promtail:3.6.10
     container_name: ono-promtail-prod
     restart: unless-stopped
     environment:

@@ -166,7 +166,7 @@ services:
 
   # Promtail - DEVELOPMENT (Profile: monitoring)
   promtail-dev:
-    image: grafana/promtail:2.9.8
+    image: grafana/promtail:3.6.10
     container_name: ono-promtail-dev
     restart: unless-stopped
     environment:
