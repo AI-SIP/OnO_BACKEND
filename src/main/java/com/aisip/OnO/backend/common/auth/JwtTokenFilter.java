@@ -10,6 +10,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -84,6 +85,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                         new UsernamePasswordAuthenticationToken(userId, null, authorities);
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+                MDC.put("userId", String.valueOf(userId));
             } catch (ExpiredJwtException e) {
                 request.setAttribute("errorMessage", "토큰이 만료되었습니다.");
             } catch (Exception e) {

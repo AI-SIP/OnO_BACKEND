@@ -23,7 +23,7 @@ class LoggingAspect {
         String methodName = joinPoint.getSignature().getName();
         String className = joinPoint.getSignature().getDeclaringTypeName();
         String layer = getLayerName(className);
-        logger.error("[{}] [Exception] {}.{}(): {}", layer, className, methodName, ex.getMessage());
+        logger.error("[{}] [Exception] {}.{}(): {}", layer, className, methodName, ex.getMessage(), ex);
     }
 
     // 메서드 실행 이전 로깅

@@ -5,6 +5,7 @@ import com.aisip.OnO.backend.util.webhook.DiscordWebhookNotificationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.http.*;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -26,6 +27,8 @@ public class GlobalExceptionHandler {
         CommonResponse commonResponse = CommonResponse.error(e.getErrorCase());
 
         HttpStatus status = HttpStatus.valueOf(e.getErrorCase().getHttpStatusCode());
+        putErrorMdc(e.getErrorCase().getErrorCode(), e);
+        logByStatus(status, "Application exception handled: {}", e.getMessage(), e);
         sendToDiscord(e, request, status);
 
         return ResponseEntity
@@ -40,10 +43,25 @@ public class GlobalExceptionHandler {
         String message = bindingResult.getAllErrors().get(0).getDefaultMessage();
         CommonResponse commonResponse = CommonResponse.error(400, message);
 
+        putErrorMdc(400, ex);
+        log.warn("Validation exception handled: {}", message);
         sendToDiscord(ex, request, HttpStatus.BAD_REQUEST);
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
+                .body(commonResponse);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<CommonResponse> handleException(Exception ex, WebRequest request) {
+        CommonResponse commonResponse = CommonResponse.error(500, "서버 내부 오류가 발생했습니다.");
+
+        putErrorMdc(500, ex);
+        log.error("Unhandled exception occurred", ex);
+        sendToDiscord(ex, request, HttpStatus.INTERNAL_SERVER_ERROR);
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(commonResponse);
     }
 
@@ -59,5 +77,17 @@ public class GlobalExceptionHandler {
                 exceptionType
         );
     }
-}
 
+    private void putErrorMdc(Integer errorCode, Exception ex) {
+        MDC.put("errorCode", String.valueOf(errorCode));
+        MDC.put("exceptionType", ex.getClass().getSimpleName());
+    }
+
+    private void logByStatus(HttpStatus status, String message, String detail, Exception ex) {
+        if (status.is5xxServerError()) {
+            log.error(message, detail, ex);
+            return;
+        }
+        log.warn(message, detail);
+    }
+}
