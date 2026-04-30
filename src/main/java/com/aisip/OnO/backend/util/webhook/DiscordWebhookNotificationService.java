@@ -90,7 +90,7 @@ public class DiscordWebhookNotificationService {
             );
             log.info("Discord webhook 전송 완료: {}", payload.embeds().get(0).title());
         } catch (Exception e) {
-            log.error("Discord webhook 전송 실패: {}", e.getMessage());
+            log.error("Discord webhook 전송 실패: {}", e.getMessage(), e);
         }
     }
 }
