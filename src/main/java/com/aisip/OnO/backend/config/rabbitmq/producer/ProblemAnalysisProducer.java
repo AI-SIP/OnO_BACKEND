@@ -32,10 +32,13 @@ public class ProblemAnalysisProducer {
                     message
             );
 
-            log.info("[GPT Analysis Producer] 메시지 전송 성공 - problemId: {}", problemId);
+            log.info("RabbitMQ message sent - exchange: {}, routingKey: {}, operation: {}, problemId: {}",
+                    RabbitMQConfig.ANALYSIS_EXCHANGE, RabbitMQConfig.GPT_ANALYSIS_ROUTING_KEY,
+                    "problem_analysis", problemId);
         } catch (Exception e) {
-            log.error("[GPT Analysis Producer] 메시지 전송 실패 - problemId: {}, error: {}",
-                    problemId, e.getMessage(), e);
+            log.error("RabbitMQ message send failed - exchange: {}, routingKey: {}, operation: {}, problemId: {}, error: {}",
+                    RabbitMQConfig.ANALYSIS_EXCHANGE, RabbitMQConfig.GPT_ANALYSIS_ROUTING_KEY,
+                    "problem_analysis", problemId, e.getMessage(), e);
             // 메시지 전송 실패해도 예외를 던지지 않음 (분석은 선택적 기능)
         }
     }

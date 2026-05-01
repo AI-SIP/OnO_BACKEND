@@ -32,34 +32,39 @@ public class ProblemAnalysisConsumer {
      */
     @RabbitListener(queues = RabbitMQConfig.GPT_ANALYSIS_QUEUE, concurrency = "1-3")
     public void handleAnalysisMessage(ProblemAnalysisMessage message) {
-        log.info("[GPT Analysis Consumer] 메시지 수신 - problemId: {}, retryCount: {}",
-                message.getProblemId(), message.getRetryCount());
+        log.info("RabbitMQ message received - queue: {}, operation: {}, problemId: {}, messageRetryCount: {}",
+                RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", message.getProblemId(), message.getRetryCount());
 
         try {
             // 실제 GPT 분석 수행
             analysisService.analyzeProblemSync(message.getProblemId());
 
-            log.info("[GPT Analysis Consumer] 분석 성공 - problemId: {}", message.getProblemId());
+            log.info("RabbitMQ message processed - queue: {}, operation: {}, outcome: {}, problemId: {}",
+                    RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", "success", message.getProblemId());
 
         } catch (NonRetryableAnalysisException e) {
-            log.warn("[GPT Analysis Consumer] 비재시도 분석 실패 처리 - problemId: {}, error: {}",
-                    message.getProblemId(), e.getMessage());
+            log.warn("RabbitMQ message skipped - queue: {}, operation: {}, outcome: {}, problemId: {}, messageRetryCount: {}, reason: {}",
+                    RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", "non_retryable_failure",
+                    message.getProblemId(), message.getRetryCount(), e.getMessage());
             // 상태는 Service에서 FAILED로 업데이트됨. 재큐잉 없이 종료(ACK)
             return;
         } catch (ApplicationException e) {
             if (e.getErrorCase() == ProblemErrorCase.PROBLEM_NOT_FOUND) {
-                log.warn("[GPT Analysis Consumer] 문제가 이미 삭제/미존재하여 분석 스킵 - problemId: {}",
-                        message.getProblemId());
+                log.warn("RabbitMQ message skipped - queue: {}, operation: {}, outcome: {}, problemId: {}, messageRetryCount: {}",
+                        RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", "resource_not_found",
+                        message.getProblemId(), message.getRetryCount());
                 return;
             }
 
-            log.error("[GPT Analysis Consumer] 분석 실패 - problemId: {}, retryCount: {}, error: {}",
+            log.error("RabbitMQ message failed - queue: {}, operation: {}, outcome: {}, problemId: {}, messageRetryCount: {}, error: {}",
+                    RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", "failure",
                     message.getProblemId(), message.getRetryCount(), e.getMessage());
 
             // 예외를 던지면 RabbitMQ가 자동으로 재시도 or DLQ로 전송
             throw new RuntimeException("GPT 문제 분석 실패: " + message.getProblemId(), e);
         } catch (Exception e) {
-            log.error("[GPT Analysis Consumer] 분석 실패 - problemId: {}, retryCount: {}, error: {}",
+            log.error("RabbitMQ message failed - queue: {}, operation: {}, outcome: {}, problemId: {}, messageRetryCount: {}, error: {}",
+                    RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", "failure",
                     message.getProblemId(), message.getRetryCount(), e.getMessage());
 
             // 예외를 던지면 RabbitMQ가 자동으로 재시도 or DLQ로 전송
@@ -74,14 +79,17 @@ public class ProblemAnalysisConsumer {
      */
     @RabbitListener(queues = RabbitMQConfig.GPT_ANALYSIS_DLQ)
     public void handleAnalysisDLQ(ProblemAnalysisMessage message) {
-        log.error("[GPT Analysis DLQ] 최종 실패 메시지 - problemId: {}, retryCount: {}",
+        log.error("RabbitMQ message moved to DLQ - queue: {}, operation: {}, outcome: {}, problemId: {}, messageRetryCount: {}",
+                RabbitMQConfig.GPT_ANALYSIS_DLQ, "problem_analysis", "dlq",
                 message.getProblemId(), message.getRetryCount());
 
         // Discord 알림 전송
         String errorTitle = String.format("🚨 GPT 문제 분석 최종 실패 (DLQ)");
         String errorDetails = String.format(
-                "**Problem ID:** %d\n**Retry Count:** %d\n\n" +
+                "**Queue:** %s\n**Operation:** %s\n**Problem ID:** %d\n**Message Retry Count:** %d\n\n" +
                 "모든 재시도가 실패했습니다. 문제를 확인하고 수동으로 재분석을 요청해주세요.",
+                RabbitMQConfig.GPT_ANALYSIS_DLQ,
+                "problem_analysis",
                 message.getProblemId(),
                 message.getRetryCount()
         );
@@ -93,9 +101,11 @@ public class ProblemAnalysisConsumer {
                     "ERROR",
                     errorTitle
             );
-            log.info("[GPT Analysis DLQ] Discord 알림 전송 완료");
+            log.info("RabbitMQ DLQ notification sent - queue: {}, operation: {}, problemId: {}",
+                    RabbitMQConfig.GPT_ANALYSIS_DLQ, "problem_analysis", message.getProblemId());
         } catch (Exception e) {
-            log.error("[GPT Analysis DLQ] Discord 알림 전송 실패: {}", e.getMessage());
+            log.error("RabbitMQ DLQ notification failed - queue: {}, operation: {}, problemId: {}, error: {}",
+                    RabbitMQConfig.GPT_ANALYSIS_DLQ, "problem_analysis", message.getProblemId(), e.getMessage());
         }
     }
 }

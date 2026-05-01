@@ -33,10 +33,13 @@ public class S3DeleteProducer {
                     message
             );
 
-            log.info("[S3 Delete Producer] 메시지 전송 성공 - problemId: {}", problemId);
+            log.info("RabbitMQ message sent - exchange: {}, routingKey: {}, operation: {}, problemId: {}",
+                    RabbitMQConfig.FILE_EXCHANGE, RabbitMQConfig.S3_DELETE_ROUTING_KEY,
+                    "s3_delete", problemId);
         } catch (Exception e) {
-            log.error("[S3 Delete Producer] 메시지 전송 실패 - problemId: {}, error: {}",
-                    problemId, e.getMessage(), e);
+            log.error("RabbitMQ message send failed - exchange: {}, routingKey: {}, operation: {}, problemId: {}, error: {}",
+                    RabbitMQConfig.FILE_EXCHANGE, RabbitMQConfig.S3_DELETE_ROUTING_KEY,
+                    "s3_delete", problemId, e.getMessage(), e);
             // 메시지 전송 실패해도 DB 삭제는 완료되므로 예외를 던지지 않음
         }
     }
