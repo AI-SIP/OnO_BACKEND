@@ -38,7 +38,7 @@
 
     <springProfile name="local">
         <logger name="p6spy" level="INFO"/>
-        <logger name="org.hibernate.SQL" level="DEBUG"/>
+        <logger name="org.hibernate.SQL" level="WARN"/>
         <logger name="org.springframework.web.filter.CommonsRequestLoggingFilter" level="OFF"/>
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
