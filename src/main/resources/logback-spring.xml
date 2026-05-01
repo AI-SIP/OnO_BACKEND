@@ -29,6 +29,7 @@
             <includeMdcKeyName>userId</includeMdcKeyName>
             <includeMdcKeyName>method</includeMdcKeyName>
             <includeMdcKeyName>uri</includeMdcKeyName>
+            <includeMdcKeyName>clientIp</includeMdcKeyName>
             <includeMdcKeyName>status</includeMdcKeyName>
             <includeMdcKeyName>latencyMs</includeMdcKeyName>
             <includeMdcKeyName>errorCode</includeMdcKeyName>

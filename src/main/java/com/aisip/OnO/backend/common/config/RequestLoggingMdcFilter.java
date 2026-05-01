@@ -6,9 +6,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -20,6 +22,11 @@ import java.util.UUID;
 public class RequestLoggingMdcFilter extends OncePerRequestFilter {
 
     private static final String REQUEST_ID_HEADER = "X-Request-Id";
+    private static final String FORWARDED_FOR_HEADER = "X-Forwarded-For";
+    private static final String REAL_IP_HEADER = "X-Real-IP";
+
+    @Value("${logging.http.slow-request-threshold-ms:1000}")
+    private long slowRequestThresholdMs;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -43,6 +50,8 @@ public class RequestLoggingMdcFilter extends OncePerRequestFilter {
         MDC.put("traceId", traceId);
         MDC.put("method", request.getMethod());
         MDC.put("uri", request.getRequestURI());
+        MDC.put("clientIp", resolveClientIp(request));
+        response.setHeader(REQUEST_ID_HEADER, traceId);
 
         Exception failure = null;
         try {
@@ -57,8 +66,9 @@ public class RequestLoggingMdcFilter extends OncePerRequestFilter {
 
             MDC.put("status", String.valueOf(status));
             MDC.put("latencyMs", String.valueOf(latencyMs));
+            MDC.put("uri", resolveUriPattern(request));
 
-            log.info("HTTP request completed");
+            logRequestCompleted(status, latencyMs);
             clearMdc();
         }
     }
@@ -79,11 +89,53 @@ public class RequestLoggingMdcFilter extends OncePerRequestFilter {
         return status;
     }
 
+    private String resolveUriPattern(HttpServletRequest request) {
+        Object pattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+        if (pattern instanceof String matchedPattern && !matchedPattern.isBlank()) {
+            return matchedPattern;
+        }
+        return request.getRequestURI();
+    }
+
+    private String resolveClientIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader(FORWARDED_FOR_HEADER);
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",", 2)[0].trim();
+        }
+
+        String realIp = request.getHeader(REAL_IP_HEADER);
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp;
+        }
+
+        return request.getRemoteAddr();
+    }
+
+    private void logRequestCompleted(int status, long latencyMs) {
+        if (status >= HttpServletResponse.SC_INTERNAL_SERVER_ERROR) {
+            log.error("HTTP request completed");
+            return;
+        }
+
+        if (status >= HttpServletResponse.SC_BAD_REQUEST) {
+            log.warn("HTTP request completed");
+            return;
+        }
+
+        if (latencyMs >= slowRequestThresholdMs) {
+            log.info("HTTP slow request completed");
+            return;
+        }
+
+        log.debug("HTTP request completed");
+    }
+
     private void clearMdc() {
         MDC.remove("traceId");
         MDC.remove("userId");
         MDC.remove("method");
         MDC.remove("uri");
+        MDC.remove("clientIp");
         MDC.remove("status");
         MDC.remove("latencyMs");
         MDC.remove("errorCode");
