@@ -39,7 +39,7 @@
     <springProfile name="local">
         <logger name="p6spy" level="INFO"/>
         <logger name="org.hibernate.SQL" level="DEBUG"/>
-        <logger name="org.springframework.web.filter.CommonsRequestLoggingFilter" level="DEBUG"/>
+        <logger name="org.springframework.web.filter.CommonsRequestLoggingFilter" level="OFF"/>
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
         </root>
@@ -48,7 +48,7 @@
     <springProfile name="dev">
         <logger name="p6spy" level="INFO"/>
         <logger name="org.hibernate.SQL" level="INFO"/>
-        <logger name="org.springframework.web.filter.CommonsRequestLoggingFilter" level="INFO"/>
+        <logger name="org.springframework.web.filter.CommonsRequestLoggingFilter" level="OFF"/>
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
         </root>
@@ -57,7 +57,7 @@
     <springProfile name="prod">
         <logger name="p6spy" level="WARN"/>
         <logger name="org.hibernate.SQL" level="WARN"/>
-        <logger name="org.springframework.web.filter.CommonsRequestLoggingFilter" level="WARN"/>
+        <logger name="org.springframework.web.filter.CommonsRequestLoggingFilter" level="OFF"/>
         <logger name="org.springframework" level="INFO"/>
         <logger name="org.springframework.amqp" level="WARN"/>
         <logger name="com.zaxxer.hikari" level="WARN"/>
