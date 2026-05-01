@@ -190,7 +190,7 @@ public class ProblemAnalysisService {
     @Deprecated
     @Async
     public void analyzeProblemAsync(Long problemId) {
-        log.info("Starting async analysis for problemId: {}, imageUrls: {}", problemId);
+        log.info("Starting async analysis for problemId: {}", problemId);
 
         try {
             // Problem 조회
@@ -252,7 +252,7 @@ public class ProblemAnalysisService {
      */
     public ProblemAnalysisResponseDto testAnalyzeImage(String imageUrl) {
         try {
-            log.info("Testing image analysis for URL: {}", imageUrl);
+            log.info("Testing image analysis");
 
             // AI 분석 실행
             ProblemAnalysisResult result = openAIClient.analyzeImage(imageUrl);

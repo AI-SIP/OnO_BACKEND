@@ -45,7 +45,7 @@ public class FileUploadService {
         }
 
         recordExternalCall("s3", "upload", "success", sample);
-        log.info("file url : " + fileUrl + " has upload to S3");
+        log.info("S3 upload completed - fileSize: {}, contentType: {}", file.getSize(), file.getContentType());
         return fileUrl;
     }
 
@@ -54,7 +54,7 @@ public class FileUploadService {
         String splitStr = ".com/";
         String fileName = imageUrl.substring(imageUrl.lastIndexOf(splitStr) + splitStr.length());
 
-        log.info("file url : " + imageUrl + " has removed from S3");
+        log.info("S3 delete requested");
 
         try {
             amazonS3Client.deleteObject(new DeleteObjectRequest(bucket, fileName));

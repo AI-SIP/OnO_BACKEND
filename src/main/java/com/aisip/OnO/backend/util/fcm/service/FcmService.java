@@ -122,7 +122,7 @@ public class FcmService {
                         notificationRequestDto.data()
                 ));
             } catch (ApplicationException e) {
-                log.warn("FCM 전송 실패 (userId: {}, token: {}): {}", userId, fcmToken.getToken(), e.getMessage());
+                log.warn("FCM 전송 실패 (userId: {}): {}", userId, e.getMessage());
             }
         });
     }

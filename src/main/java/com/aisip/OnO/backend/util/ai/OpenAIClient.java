@@ -88,7 +88,7 @@ public class OpenAIClient {
                     .getMessage()
                     .getContent();
 
-            log.info("Received response from OpenAI: {}", content);
+            log.debug("Received response from OpenAI - contentLength: {}", content == null ? 0 : content.length());
 
             // 6. JSON 응답 파싱
             recordExternalCall("openai", "analyze_images", "success", sample);

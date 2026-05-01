@@ -33,10 +33,10 @@ public class S3DeleteProducer {
                     message
             );
 
-            log.info("[S3 Delete Producer] 메시지 전송 성공 - imageUrl: {}, problemId: {}", imageUrl, problemId);
+            log.info("[S3 Delete Producer] 메시지 전송 성공 - problemId: {}", problemId);
         } catch (Exception e) {
-            log.error("[S3 Delete Producer] 메시지 전송 실패 - imageUrl: {}, problemId: {}, error: {}",
-                    imageUrl, problemId, e.getMessage(), e);
+            log.error("[S3 Delete Producer] 메시지 전송 실패 - problemId: {}, error: {}",
+                    problemId, e.getMessage(), e);
             // 메시지 전송 실패해도 DB 삭제는 완료되므로 예외를 던지지 않음
         }
     }

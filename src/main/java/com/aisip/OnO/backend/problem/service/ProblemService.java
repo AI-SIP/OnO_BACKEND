@@ -291,7 +291,7 @@ public class ProblemService {
                 missionLogService.registerProblemPracticeMission(userId, problemId);
             }
 
-            log.info("Uploaded image to S3: {} for problemId: {}", imageUrl, problemId);
+            log.info("Uploaded image to S3 for problemId: {}, imageType: {}", problemId, imageType);
         }
     }
 
@@ -488,8 +488,8 @@ public class ProblemService {
             try {
                 s3DeleteProducer.sendDeleteMessage(imageData.getImageUrl(), problemId);
             } catch (Exception e) {
-                log.error("S3 삭제 메시지 전송 실패 - problemId: {}, imageUrl: {}, error: {}",
-                        problemId, imageData.getImageUrl(), e.getMessage());
+                log.error("S3 삭제 메시지 전송 실패 - problemId: {}, error: {}",
+                        problemId, e.getMessage());
             }
         });
 

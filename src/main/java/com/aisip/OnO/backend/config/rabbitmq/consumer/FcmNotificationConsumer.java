@@ -61,8 +61,8 @@ public class FcmNotificationConsumer {
                     sendToDevice(fcmToken.getToken(), message);
                     successCount++;
                 } catch (Exception e) {
-                    log.warn("[FCM Notification Consumer] 디바이스 전송 실패 - userId: {}, token: {}, error: {}",
-                            message.getUserId(), fcmToken.getToken(), e.getMessage());
+                    log.warn("[FCM Notification Consumer] 디바이스 전송 실패 - userId: {}, error: {}",
+                            message.getUserId(), e.getMessage());
                     failCount++;
                 }
             }

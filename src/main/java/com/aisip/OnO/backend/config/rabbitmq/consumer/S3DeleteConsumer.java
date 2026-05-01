@@ -29,22 +29,21 @@ public class S3DeleteConsumer {
      */
     @RabbitListener(queues = RabbitMQConfig.S3_DELETE_QUEUE, concurrency = "3-10")
     public void handleS3DeleteMessage(S3DeleteMessage message) {
-        log.info("[S3 Delete Consumer] 메시지 수신 - imageUrl: {}, problemId: {}, retryCount: {}",
-                message.getImageUrl(), message.getProblemId(), message.getRetryCount());
+        log.info("[S3 Delete Consumer] 메시지 수신 - problemId: {}, retryCount: {}",
+                message.getProblemId(), message.getRetryCount());
 
         try {
             // S3 파일 삭제 실행
             fileUploadService.deleteImageFileFromS3(message.getImageUrl());
 
-            log.info("[S3 Delete Consumer] 삭제 성공 - imageUrl: {}, problemId: {}",
-                    message.getImageUrl(), message.getProblemId());
+            log.info("[S3 Delete Consumer] 삭제 성공 - problemId: {}", message.getProblemId());
 
         } catch (Exception e) {
-            log.error("[S3 Delete Consumer] 삭제 실패 - imageUrl: {}, problemId: {}, retryCount: {}, error: {}",
-                    message.getImageUrl(), message.getProblemId(), message.getRetryCount(), e.getMessage());
+            log.error("[S3 Delete Consumer] 삭제 실패 - problemId: {}, retryCount: {}, error: {}",
+                    message.getProblemId(), message.getRetryCount(), e.getMessage());
 
             // 예외를 던지면 RabbitMQ가 자동으로 재시도 or DLQ로 전송
-            throw new RuntimeException("S3 파일 삭제 실패: " + message.getImageUrl(), e);
+            throw new RuntimeException("S3 파일 삭제 실패 - problemId: " + message.getProblemId(), e);
         }
     }
 
@@ -55,16 +54,18 @@ public class S3DeleteConsumer {
      */
     @RabbitListener(queues = RabbitMQConfig.S3_DELETE_DLQ)
     public void handleS3DeleteDLQ(S3DeleteMessage message) {
-        log.error("[S3 Delete DLQ] 최종 실패 메시지 - imageUrl: {}, problemId: {}, retryCount: {}",
-                message.getImageUrl(), message.getProblemId(), message.getRetryCount());
+        String maskedObjectKey = maskS3ObjectKey(message.getImageUrl());
+
+        log.error("[S3 Delete DLQ] 최종 실패 메시지 - problemId: {}, objectKey: {}, retryCount: {}",
+                message.getProblemId(), maskedObjectKey, message.getRetryCount());
 
         // Discord 알림 전송
         String errorTitle = String.format("🚨 S3 파일 삭제 최종 실패 (DLQ)");
         String errorDetails = String.format(
-                "**Problem ID:** %d\n**Image URL:** %s\n**Retry Count:** %d\n\n" +
+                "**Problem ID:** %d\n**Object Key:** %s\n**Retry Count:** %d\n\n" +
                 "모든 재시도가 실패했습니다. 수동으로 S3에서 파일을 삭제하거나 메시지를 재처리해주세요.",
                 message.getProblemId(),
-                message.getImageUrl(),
+                maskedObjectKey,
                 message.getRetryCount()
         );
 
@@ -79,5 +80,23 @@ public class S3DeleteConsumer {
         } catch (Exception e) {
             log.error("[S3 Delete DLQ] Discord 알림 전송 실패: {}", e.getMessage());
         }
+    }
+
+    private String maskS3ObjectKey(String imageUrl) {
+        if (imageUrl == null || imageUrl.isBlank()) {
+            return "unknown";
+        }
+
+        String splitStr = ".com/";
+        int keyStartIndex = imageUrl.lastIndexOf(splitStr);
+        String objectKey = keyStartIndex >= 0
+                ? imageUrl.substring(keyStartIndex + splitStr.length())
+                : imageUrl;
+
+        if (objectKey.length() <= 16) {
+            return "***";
+        }
+
+        return objectKey.substring(0, 8) + "***" + objectKey.substring(objectKey.length() - 8);
     }
 }
