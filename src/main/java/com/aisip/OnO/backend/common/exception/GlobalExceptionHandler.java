@@ -35,7 +35,7 @@ public class GlobalExceptionHandler {
 
         HttpStatusCode status = HttpStatusCode.valueOf(e.getErrorCase().getHttpStatusCode());
         putErrorMdc(e.getErrorCase().getErrorCode(), e);
-        logByStatus(status, "Application exception handled: {}", e.getMessage(), e);
+        logByStatus(status, "Application exception handled", e.getMessage(), e);
         notifyIfServerError(e, request, status);
 
         return ResponseEntity
@@ -51,7 +51,7 @@ public class GlobalExceptionHandler {
         CommonResponse commonResponse = CommonResponse.error(400, message);
 
         putErrorMdc(400, ex);
-        log.warn("Validation exception handled: {}", message);
+        logByStatus(HttpStatus.BAD_REQUEST, "Validation exception handled", message, ex);
 
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
@@ -89,7 +89,7 @@ public class GlobalExceptionHandler {
         CommonResponse commonResponse = CommonResponse.error(500, "서버 내부 오류가 발생했습니다.");
 
         putErrorMdc(500, ex);
-        log.error("Unhandled exception occurred", ex);
+        logByStatus(HttpStatus.INTERNAL_SERVER_ERROR, "Unhandled exception handled", ex.getMessage(), ex);
         notifyIfServerError(ex, request, HttpStatus.INTERNAL_SERVER_ERROR);
 
         return ResponseEntity
@@ -104,7 +104,7 @@ public class GlobalExceptionHandler {
         CommonResponse commonResponse = CommonResponse.error(status.value(), message);
 
         putErrorMdc(status.value(), ex);
-        logByStatus(status, "Spring MVC exception handled: {}", ex.getMessage(), ex);
+        logByStatus(status, "Spring MVC exception handled", ex.getMessage(), ex);
         notifyIfServerError(ex, request, status);
 
         return ResponseEntity
@@ -137,12 +137,22 @@ public class GlobalExceptionHandler {
         MDC.put("exceptionType", ex.getClass().getSimpleName());
     }
 
-    private void logByStatus(HttpStatusCode status, String message, String detail, Exception ex) {
+    private void logByStatus(HttpStatusCode status, String event, String detail, Exception ex) {
+        String exceptionType = ex.getClass().getSimpleName();
         if (status.is5xxServerError()) {
-            log.error(message, detail, ex);
+            log.error("{} - status: {}, exceptionType: {}, detail: {}",
+                    event,
+                    status.value(),
+                    exceptionType,
+                    detail,
+                    ex);
             return;
         }
-        log.warn(message, detail);
+        log.warn("{} - status: {}, exceptionType: {}, detail: {}",
+                event,
+                status.value(),
+                exceptionType,
+                detail);
     }
 
     private String resolveErrorMessage(ErrorResponseException ex) {
