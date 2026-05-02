@@ -37,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(SpringExtension.class)
 @SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles("local")  // 로컬 프로필 사용
+@ActiveProfiles("test")
 class ProblemControllerTest {
 
     @Autowired
