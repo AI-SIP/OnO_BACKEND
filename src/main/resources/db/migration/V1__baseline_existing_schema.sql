@@ -1,0 +1,3 @@
+-- Flyway adoption baseline.
+-- Existing dev/prod schemas are recorded at version 1 by baseline-on-migrate.
+-- Add new schema changes as V2__*.sql and later migrations.
