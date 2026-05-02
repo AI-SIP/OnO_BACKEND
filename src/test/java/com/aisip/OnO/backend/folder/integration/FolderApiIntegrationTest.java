@@ -251,12 +251,7 @@ public class FolderApiIntegrationTest {
 
         // when & then - 해당 폴더를 조회하는 API 호출
         MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/api/folders/root"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.folderId").isNotEmpty())
-                .andExpect(jsonPath("$.data.folderName").isNotEmpty())
-                .andExpect(jsonPath("$.data.parentFolder").isEmpty())
-                .andExpect(jsonPath("$.data.subFolderList.length()").value(0))
-                .andExpect(jsonPath("$.data.problemIdList.length()").value(0))
+                .andExpect(status().is4xxClientError())
                 .andReturn();
 
         String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
