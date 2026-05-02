@@ -12,9 +12,8 @@ public class LoggingFilterConfig {
         CommonsRequestLoggingFilter filter = new CommonsRequestLoggingFilter();
         filter.setIncludeClientInfo(true);
         filter.setIncludeQueryString(true);
-        filter.setIncludePayload(true);
+        filter.setIncludePayload(false);
         filter.setIncludeHeaders(false);
-        filter.setMaxPayloadLength(10000);
         return filter;
     }
 }

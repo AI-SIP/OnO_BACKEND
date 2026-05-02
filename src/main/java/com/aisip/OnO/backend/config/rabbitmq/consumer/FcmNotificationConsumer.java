@@ -40,15 +40,18 @@ public class FcmNotificationConsumer {
      */
     @RabbitListener(queues = RabbitMQConfig.FCM_NOTIFICATION_QUEUE, concurrency = "5-15")
     public void handleNotificationMessage(FcmNotificationMessage message) {
-        log.info("[FCM Notification Consumer] 메시지 수신 - userId: {}, title: {}, retryCount: {}",
-                message.getUserId(), message.getTitle(), message.getRetryCount());
+        log.info("RabbitMQ message received - queue: {}, operation: {}, userId: {}, messageRetryCount: {}",
+                RabbitMQConfig.FCM_NOTIFICATION_QUEUE, "fcm_notification",
+                message.getUserId(), message.getRetryCount());
 
         try {
             // 사용자의 모든 FCM 토큰 조회
             List<FcmToken> userFcmTokenList = fcmTokenRepository.findAllByUserId(message.getUserId());
 
             if (userFcmTokenList.isEmpty()) {
-                log.warn("[FCM Notification Consumer] FCM 토큰 없음 - userId: {}", message.getUserId());
+                log.warn("RabbitMQ message skipped - queue: {}, operation: {}, outcome: {}, userId: {}, messageRetryCount: {}",
+                        RabbitMQConfig.FCM_NOTIFICATION_QUEUE, "fcm_notification", "token_not_found",
+                        message.getUserId(), message.getRetryCount());
                 return; // 토큰 없으면 스킵 (정상 처리)
             }
 
@@ -61,22 +64,25 @@ public class FcmNotificationConsumer {
                     sendToDevice(fcmToken.getToken(), message);
                     successCount++;
                 } catch (Exception e) {
-                    log.warn("[FCM Notification Consumer] 디바이스 전송 실패 - userId: {}, token: {}, error: {}",
-                            message.getUserId(), fcmToken.getToken(), e.getMessage());
+                    log.warn("RabbitMQ device delivery failed - queue: {}, operation: {}, userId: {}, error: {}",
+                            RabbitMQConfig.FCM_NOTIFICATION_QUEUE, "fcm_notification", message.getUserId(), e.getMessage());
                     failCount++;
                 }
             }
-
-            log.info("[FCM Notification Consumer] 전송 완료 - userId: {}, 성공: {}, 실패: {}",
-                    message.getUserId(), successCount, failCount);
 
             // 모든 디바이스 전송 실패 시 예외 발생 (재시도)
             if (successCount == 0 && failCount > 0) {
                 throw new RuntimeException("모든 디바이스 FCM 전송 실패 - userId: " + message.getUserId());
             }
 
+            String outcome = failCount > 0 ? "partial_success" : "success";
+            log.info("RabbitMQ message processed - queue: {}, operation: {}, outcome: {}, userId: {}, successCount: {}, failCount: {}",
+                    RabbitMQConfig.FCM_NOTIFICATION_QUEUE, "fcm_notification", outcome,
+                    message.getUserId(), successCount, failCount);
+
         } catch (Exception e) {
-            log.error("[FCM Notification Consumer] 알림 전송 실패 - userId: {}, retryCount: {}, error: {}",
+            log.error("RabbitMQ message failed - queue: {}, operation: {}, outcome: {}, userId: {}, messageRetryCount: {}, error: {}",
+                    RabbitMQConfig.FCM_NOTIFICATION_QUEUE, "fcm_notification", "failure",
                     message.getUserId(), message.getRetryCount(), e.getMessage());
 
             // 예외를 던지면 RabbitMQ가 자동으로 재시도 or DLQ로 전송
@@ -101,7 +107,8 @@ public class FcmNotificationConsumer {
         try {
             String messageId = firebaseMessaging.send(fcmMessage);
             recordExternalCall("firebase", "send_notification_async", "success", sample);
-            log.debug("[FCM Notification Consumer] FCM 전송 성공 - messageId: {}", messageId);
+            log.debug("External delivery succeeded - dependency: {}, operation: {}, messageId: {}",
+                    "firebase", "send_notification_async", messageId);
         } catch (FirebaseMessagingException e) {
             recordExternalCall("firebase", "send_notification_async", "failure", sample);
             throw e;
@@ -115,17 +122,18 @@ public class FcmNotificationConsumer {
      */
     @RabbitListener(queues = RabbitMQConfig.FCM_NOTIFICATION_DLQ)
     public void handleNotificationDLQ(FcmNotificationMessage message) {
-        log.error("[FCM Notification DLQ] 최종 실패 메시지 - userId: {}, title: {}, retryCount: {}",
-                message.getUserId(), message.getTitle(), message.getRetryCount());
+        log.error("RabbitMQ message moved to DLQ - queue: {}, operation: {}, outcome: {}, userId: {}, messageRetryCount: {}",
+                RabbitMQConfig.FCM_NOTIFICATION_DLQ, "fcm_notification", "dlq",
+                message.getUserId(), message.getRetryCount());
 
         // Discord 알림 전송
         String errorTitle = String.format("🚨 FCM 푸시 알림 최종 실패 (DLQ)");
         String errorDetails = String.format(
-                "**User ID:** %d\n**Title:** %s\n**Body:** %s\n**Retry Count:** %d\n\n" +
+                "**Queue:** %s\n**Operation:** %s\n**User ID:** %d\n**Message Retry Count:** %d\n\n" +
                 "모든 재시도가 실패했습니다. FCM 토큰을 확인하거나 수동으로 알림을 재전송해주세요.",
+                RabbitMQConfig.FCM_NOTIFICATION_DLQ,
+                "fcm_notification",
                 message.getUserId(),
-                message.getTitle(),
-                message.getBody(),
                 message.getRetryCount()
         );
 
@@ -136,9 +144,11 @@ public class FcmNotificationConsumer {
                     "ERROR",
                     errorTitle
             );
-            log.info("[FCM Notification DLQ] Discord 알림 전송 완료");
+            log.info("RabbitMQ DLQ notification sent - queue: {}, operation: {}, userId: {}",
+                    RabbitMQConfig.FCM_NOTIFICATION_DLQ, "fcm_notification", message.getUserId());
         } catch (Exception e) {
-            log.error("[FCM Notification DLQ] Discord 알림 전송 실패: {}", e.getMessage());
+            log.error("RabbitMQ DLQ notification failed - queue: {}, operation: {}, userId: {}, error: {}",
+                    RabbitMQConfig.FCM_NOTIFICATION_DLQ, "fcm_notification", message.getUserId(), e.getMessage());
         }
     }
 

@@ -47,7 +47,18 @@ scrape_configs:
       - docker: {}
       - drop:
           older_than: 720h
-      - regex:
-          expression: '(^|[[:space:]])(?P<level>TRACE|DEBUG|INFO|WARN|ERROR|FATAL)([[:space:]]|$)'
+      - json:
+          expressions:
+            level: level
+            service: service
+            traceId: traceId
+            userId: userId
+            method: method
+            uri: uri
+            status: status
+            latencyMs: latencyMs
+            errorCode: errorCode
+            exceptionType: exceptionType
       - labels:
           level:
+          service:

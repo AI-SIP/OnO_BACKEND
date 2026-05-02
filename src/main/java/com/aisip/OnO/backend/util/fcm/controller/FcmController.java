@@ -25,7 +25,8 @@ public class FcmController {
     @PostMapping("/token")
     public CommonResponse<String> registerFcmToken(@RequestBody FcmTokenRequestDto fcmTokenRequestDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        log.info("fcm token: {}", fcmTokenRequestDto.token());
+        log.info("FCM token registration requested - userId: {}, tokenLength: {}",
+                userId, fcmTokenRequestDto.token() == null ? 0 : fcmTokenRequestDto.token().length());
 
         fcmService.registerToken(fcmTokenRequestDto, userId);
         return CommonResponse.success("문제가 등록되었습니다.");

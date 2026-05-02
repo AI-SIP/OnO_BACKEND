@@ -139,7 +139,7 @@ public class ProblemSolveService {
             problemSolve.addImage(problemSolveImageData);
             problemSolveImageDataRepository.save(problemSolveImageData);
 
-            log.info("Uploaded problem solve image to S3: {} for problemSolveId: {}", imageUrl, problemSolveId);
+            log.info("Uploaded problem solve image to S3 for problemSolveId: {}, imageOrder: {}", problemSolveId, i);
         }
     }
 
@@ -191,8 +191,8 @@ public class ProblemSolveService {
             try {
                 s3DeleteProducer.sendDeleteMessage(image.getImageUrl(), problemSolveId);
             } catch (Exception e) {
-                log.error("S3 삭제 메시지 전송 실패 - problemSolveId: {}, imageUrl: {}, error: {}",
-                        problemSolveId, image.getImageUrl(), e.getMessage());
+                log.error("S3 삭제 메시지 전송 실패 - problemSolveId: {}, error: {}",
+                        problemSolveId, e.getMessage());
             }
         });
 
@@ -210,8 +210,8 @@ public class ProblemSolveService {
                 try {
                     s3DeleteProducer.sendDeleteMessage(image.getImageUrl(), record.getId());
                 } catch (Exception e) {
-                    log.error("S3 삭제 메시지 전송 실패 - problemSolveId: {}, imageUrl: {}, error: {}",
-                            record.getId(), image.getImageUrl(), e.getMessage());
+                    log.error("S3 삭제 메시지 전송 실패 - problemSolveId: {}, error: {}",
+                            record.getId(), e.getMessage());
                 }
             });
         });
