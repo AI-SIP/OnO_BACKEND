@@ -26,33 +26,66 @@ public record UserResponseDto (
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {
+    private static final Long MAX_LEVEL = 15L;
+
     public static UserResponseDto from(@NotNull User user) {
+        var missionStatus = user.getUserMissionStatus();
+
         return UserResponseDto.builder()
                 .userId(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
-                .attendanceLevel(user.getUserMissionStatus().getAttendanceLevel())
-                .attendancePoint(user.getUserMissionStatus().getAttendancePoint())
-                .noteWriteLevel(user.getUserMissionStatus().getNoteWriteLevel())
-                .noteWritePoint(user.getUserMissionStatus().getNoteWritePoint())
-                .problemPracticeLevel(user.getUserMissionStatus().getProblemPracticeLevel())
-                .problemPracticePoint(user.getUserMissionStatus().getProblemPracticePoint())
-                .notePracticeLevel(user.getUserMissionStatus().getNotePracticeLevel())
-                .notePracticePoint(user.getUserMissionStatus().getNotePracticePoint())
+                .attendanceLevel(getResponseLevel(missionStatus.getAttendanceLevel()))
+                .attendancePoint(getResponsePoint(missionStatus.getAttendanceLevel(), missionStatus.getAttendancePoint()))
+                .noteWriteLevel(getResponseLevel(missionStatus.getNoteWriteLevel()))
+                .noteWritePoint(getResponsePoint(missionStatus.getNoteWriteLevel(), missionStatus.getNoteWritePoint()))
+                .problemPracticeLevel(getResponseLevel(missionStatus.getProblemPracticeLevel()))
+                .problemPracticePoint(getResponsePoint(missionStatus.getProblemPracticeLevel(), missionStatus.getProblemPracticePoint()))
+                .notePracticeLevel(getResponseLevel(missionStatus.getNotePracticeLevel()))
+                .notePracticePoint(getResponsePoint(missionStatus.getNotePracticeLevel(), missionStatus.getNotePracticePoint()))
                 // DB에 저장된 총 학습 레벨 정보 사용 (계산 불필요)
-                .totalStudyLevel(user.getUserMissionStatus().getTotalStudyLevel())
-                .totalStudyCurrentPoint(user.getUserMissionStatus().getTotalStudyPoint())
-                .totalStudyNextLevelThreshold(getTotalStudyNextLevelThreshold(user.getUserMissionStatus()))
+                .totalStudyLevel(getResponseLevel(missionStatus.getTotalStudyLevel()))
+                .totalStudyCurrentPoint(getTotalStudyResponsePoint(missionStatus.getTotalStudyLevel(), missionStatus.getTotalStudyPoint()))
+                .totalStudyNextLevelThreshold(getTotalStudyNextLevelThreshold(missionStatus))
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();
     }
 
+    private static Long getResponseLevel(Long level) {
+        if (level > MAX_LEVEL) {
+            return MAX_LEVEL;
+        }
+        return level;
+    }
+
+    private static Long getResponsePoint(Long level, Long point) {
+        if (level > MAX_LEVEL) {
+            return getThresholdForLevel(MAX_LEVEL);
+        }
+        return point;
+    }
+
+    private static Long getTotalStudyResponsePoint(Long level, Long point) {
+        if (level > MAX_LEVEL) {
+            return getTotalStudyThresholdForLevel(MAX_LEVEL);
+        }
+        return point;
+    }
+
     private static Long getTotalStudyNextLevelThreshold(com.aisip.OnO.backend.mission.entity.UserMissionStatus status) {
-        if (status.getTotalStudyLevel() >= 15) {
+        if (status.getTotalStudyLevel() >= MAX_LEVEL) {
             return 0L;
         }
         // 개별 능력치 필요 경험치 × 4
-        return (10 + (status.getTotalStudyLevel() - 1) * 10) * 4;
+        return getTotalStudyThresholdForLevel(status.getTotalStudyLevel());
+    }
+
+    private static Long getThresholdForLevel(Long level) {
+        return 10 + (level - 1) * 10;
+    }
+
+    private static Long getTotalStudyThresholdForLevel(Long level) {
+        return getThresholdForLevel(level) * 4;
     }
 }
