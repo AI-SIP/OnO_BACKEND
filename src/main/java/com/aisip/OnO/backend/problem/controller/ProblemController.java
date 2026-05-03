@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.common.ratelimit.RateLimit;
 import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.problem.dto.ProblemAnalysisResponseDto;
+import com.aisip.OnO.backend.problem.dto.ReviewDueResponseDto;
 import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2Dto;
@@ -223,6 +224,13 @@ public class ProblemController {
         problemService.deleteProblemImageData(imageUrl);
 
         return CommonResponse.success("문제 이미지 데이터 삭제가 완료되었습니다.");
+    }
+
+    // ✅ 오늘 복습 대상 문제 조회
+    @GetMapping("/review-due")
+    public CommonResponse<ReviewDueResponseDto> getReviewDueProblems() {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return CommonResponse.success(problemService.getReviewDueProblems(userId));
     }
 
 }

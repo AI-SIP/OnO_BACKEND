@@ -10,6 +10,7 @@ import lombok.*;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +43,16 @@ public class Problem extends BaseEntity {
     private String reference;
 
     private LocalDateTime solvedAt;
+
+    private LocalDate nextReviewAt;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private int reviewInterval = 1;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private int consecutiveCorrectCount = 0;
 
     @OneToMany(mappedBy = "problem", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProblemImageData> problemImageDataList = new ArrayList<>();
@@ -122,5 +133,11 @@ public class Problem extends BaseEntity {
 
     public void updateProblemAnalysis(ProblemAnalysis analysis) {
         this.problemAnalysis = analysis;
+    }
+
+    public void updateReviewSchedule(LocalDate nextReviewAt, int reviewInterval, int consecutiveCorrectCount) {
+        this.nextReviewAt = nextReviewAt;
+        this.reviewInterval = reviewInterval;
+        this.consecutiveCorrectCount = consecutiveCorrectCount;
     }
 }

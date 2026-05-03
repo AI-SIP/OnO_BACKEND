@@ -21,6 +21,7 @@ import com.aisip.OnO.backend.problem.repository.ProblemAnalysisRepository;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
+import com.aisip.OnO.backend.problem.dto.ReviewDueResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
@@ -191,6 +192,7 @@ public class ProblemService {
         problemRepository.save(problem);
         syncProblemTags(problem, userId, problemRegisterDto.tagIds());
 
+        problem.updateReviewSchedule(LocalDate.now(java.time.ZoneId.of("Asia/Seoul")), 1, 0);
         analysisService.createSkippedAnalysis(problem.getId());
         missionLogService.registerProblemWriteMission(userId);
 
@@ -247,6 +249,7 @@ public class ProblemService {
                         problemImageDataRepository.save(imageData);
                     });
         }
+        problem.updateReviewSchedule(LocalDate.now(java.time.ZoneId.of("Asia/Seoul")), 1, 0);
         analysisService.createSkippedAnalysis(problem.getId());
         missionLogService.registerProblemWriteMission(userId);
 
@@ -613,5 +616,25 @@ public class ProblemService {
         log.info("userId: {} find problems by title query: '{}' with cursor: {}, size: {}, hasNext: {}",
                 userId, query, cursor, size, hasNext);
         return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
+    }
+
+    @Transactional(readOnly = true)
+    public ReviewDueResponseDto getReviewDueProblems(Long userId) {
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        List<Problem> dueProblems = problemRepository.findReviewDueProblems(userId, today);
+
+        long overdueCount = dueProblems.stream()
+                .filter(p -> p.getNextReviewAt().isBefore(today))
+                .count();
+
+        List<ReviewDueResponseDto.ReviewDueProblemDto> problemDtos = dueProblems.stream()
+                .map(ReviewDueResponseDto.ReviewDueProblemDto::from)
+                .collect(Collectors.toList());
+
+        return ReviewDueResponseDto.builder()
+                .dueCount(dueProblems.size())
+                .overdueCount(overdueCount)
+                .problems(problemDtos)
+                .build();
     }
 }
