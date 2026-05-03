@@ -10,11 +10,15 @@ import com.aisip.OnO.backend.tag.entity.Tag;
 import com.aisip.OnO.backend.tag.exception.TagErrorCase;
 import com.aisip.OnO.backend.tag.repository.ProblemTagMappingRepository;
 import com.aisip.OnO.backend.tag.repository.TagRepository;
+import com.aisip.OnO.backend.util.redis.RedisSingleDataService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -31,9 +35,13 @@ public class TagService {
 
     private static final int MAX_TAG_NAME_LENGTH = 30;
     private static final int RECOMMEND_TAG_LIMIT = 5;
+    private static final String TAG_LIST_CACHE_PREFIX = "TAG_LIST:";
+    private static final Duration TAG_CACHE_TTL = Duration.ofHours(1);
 
     private final TagRepository tagRepository;
     private final ProblemTagMappingRepository problemTagMappingRepository;
+    private final RedisSingleDataService redisSingleDataService;
+    private final ObjectMapper objectMapper;
 
     public TagResponseDto createTag(Long userId, TagCreateRequestDto requestDto) {
         String tagName = normalizeDisplayName(requestDto.name());
@@ -42,16 +50,27 @@ public class TagService {
         Tag tag = tagRepository.findByUserIdAndNormalizedName(userId, normalizedName)
                 .orElseGet(() -> tagRepository.save(Tag.from(userId, tagName, normalizedName)));
 
+        evictTagCache(userId);
         log.info("userId: {} create tag: {}", userId, tag.getName());
         return TagResponseDto.from(tag);
     }
 
     @Transactional(readOnly = true)
     public List<TagResponseDto> getUserTags(Long userId) {
-        return tagRepository.findAllByUserIdOrderByNameAsc(userId)
+        String cacheKey = TAG_LIST_CACHE_PREFIX + userId;
+
+        List<TagResponseDto> cached = readTagCache(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
+        List<TagResponseDto> tags = tagRepository.findAllByUserIdOrderByNameAsc(userId)
                 .stream()
                 .map(TagResponseDto::from)
                 .toList();
+
+        writeTagCache(cacheKey, tags);
+        return tags;
     }
 
     public void deleteTag(Long userId, Long tagId) {
@@ -80,6 +99,7 @@ public class TagService {
         }
 
         tagRepository.deleteAll(tags);
+        evictTagCache(userId);
         log.info("userId: {} deleted tags count: {}", userId, tagIds.size());
     }
 
@@ -121,6 +141,32 @@ public class TagService {
         return ids.stream()
                 .filter(java.util.Objects::nonNull)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private List<TagResponseDto> readTagCache(String key) {
+        try {
+            String json = redisSingleDataService.getSingleData(key);
+            if (json == null || json.isBlank()) {
+                return null;
+            }
+            return objectMapper.readValue(json, new TypeReference<List<TagResponseDto>>() {});
+        } catch (Exception e) {
+            log.warn("Failed to read tag list cache. key={}, reason={}", key, e.getMessage());
+            return null;
+        }
+    }
+
+    private void writeTagCache(String key, List<TagResponseDto> tags) {
+        try {
+            String json = objectMapper.writeValueAsString(tags);
+            redisSingleDataService.setSingleData(key, json, TAG_CACHE_TTL);
+        } catch (Exception e) {
+            log.warn("Failed to write tag list cache. key={}, reason={}", key, e.getMessage());
+        }
+    }
+
+    private void evictTagCache(Long userId) {
+        redisSingleDataService.deleteSingleData(TAG_LIST_CACHE_PREFIX + userId);
     }
 
     private String normalizeDisplayName(String rawTagName) {
