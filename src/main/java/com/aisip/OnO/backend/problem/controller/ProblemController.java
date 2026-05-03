@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.problem.controller;
 
+import com.aisip.OnO.backend.common.ratelimit.RateLimit;
 import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.problem.dto.ProblemAnalysisResponseDto;
@@ -113,6 +114,7 @@ public class ProblemController {
     }
 
     // ✅ 문제 분석 요청 (비동기 트리거)
+    @RateLimit(key = "ai_analysis", limitPerDay = 20)
     @PostMapping("/{problemId}/analysis")
     public CommonResponse<String> requestProblemAnalysis(@PathVariable("problemId") Long problemId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -141,6 +143,7 @@ public class ProblemController {
     }
 
     // ✅ 문제 이미지 비동기 업로드
+    @RateLimit(key = "ai_analysis", limitPerDay = 20)
     @PostMapping("/{problemId}/imageData")
     public CommonResponse<String> uploadProblemImages(
             @PathVariable("problemId") Long problemId,
