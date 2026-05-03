@@ -10,6 +10,9 @@ import lombok.*;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,6 +43,10 @@ public class User extends BaseEntity {
 
     private String platform;
 
+    private LocalDateTime lastActiveAt;
+
+    private LocalDate lastNotifiedAt;
+
     @Embedded
     private UserMissionStatus userMissionStatus;
 
@@ -61,6 +68,19 @@ public class User extends BaseEntity {
                         1L, 0L   // 총 학습 레벨 (레벨 1, 포인트 0으로 시작)
                 ))
                 .build();
+    }
+
+    public void touchLastActiveAt() {
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        // 오늘 이미 갱신한 경우 DB write 생략
+        if (this.lastActiveAt != null && !this.lastActiveAt.toLocalDate().isBefore(today)) {
+            return;
+        }
+        this.lastActiveAt = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
+    }
+
+    public void updateLastNotifiedAt(LocalDate date) {
+        this.lastNotifiedAt = date;
     }
 
     public void updateUser(UserRegisterDto userRegisterDto) {

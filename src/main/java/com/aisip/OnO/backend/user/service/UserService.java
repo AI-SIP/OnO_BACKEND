@@ -121,6 +121,11 @@ public class UserService {
     }
 
     @Transactional
+    public void touchLastActiveAt(Long userId) {
+        findUserEntity(userId).touchLastActiveAt();
+    }
+
+    @Transactional
     public void updateUser(Long userId, UserRegisterDto userRegisterDto) {
 
         User user = findUserEntity(userId);
