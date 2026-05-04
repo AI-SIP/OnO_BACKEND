@@ -47,6 +47,10 @@ public class User extends BaseEntity {
 
     private LocalDate lastNotifiedAt;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean notificationEnabled = true;
+
     @Embedded
     private UserMissionStatus userMissionStatus;
 
@@ -81,6 +85,10 @@ public class User extends BaseEntity {
 
     public void updateLastNotifiedAt(LocalDate date) {
         this.lastNotifiedAt = date;
+    }
+
+    public void updateNotificationEnabled(boolean enabled) {
+        this.notificationEnabled = enabled;
     }
 
     public void updateUser(UserRegisterDto userRegisterDto) {

@@ -62,7 +62,10 @@ public class ReviewDueNotificationJob extends QuartzJobBean {
         List<Long> notifiedUserIds = new ArrayList<>();
 
         for (User user : users) {
-            // 3일 이상 미접속 유저는 재참여 흐름으로 처리
+            // 알림 수신 거부한 유저 스킵
+            if (!user.isNotificationEnabled()) continue;
+
+            // 7일 이상 미접속 유저는 재참여 흐름으로 처리
             if (user.getLastActiveAt() == null || user.getLastActiveAt().isBefore(reengagementCutoff)) {
                 continue;
             }
@@ -97,6 +100,7 @@ public class ReviewDueNotificationJob extends QuartzJobBean {
         List<Long> notifiedUserIds = new ArrayList<>();
 
         for (User user : inactiveUsers) {
+            if (!user.isNotificationEnabled()) continue;
             fcmService.sendNotificationToAllUserDevice(user.getId(),
                     new NotificationRequestDto("", "오랜만이에요!",
                             "오답노트를 펼칠 시간이에요. 복습하러 돌아와보세요!",
@@ -122,6 +126,7 @@ public class ReviewDueNotificationJob extends QuartzJobBean {
         List<Long> notifiedUserIds = new ArrayList<>();
 
         for (User user : longInactiveUsers) {
+            if (!user.isNotificationEnabled()) continue;
             fcmService.sendNotificationToAllUserDevice(user.getId(),
                     new NotificationRequestDto("", "오답노트가 기다리고 있어요",
                             "한동안 자리를 비우셨네요. 다시 시작하기 딱 좋은 날이에요!",

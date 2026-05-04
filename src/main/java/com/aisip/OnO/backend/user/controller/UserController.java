@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.user.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
+import com.aisip.OnO.backend.user.dto.NotificationSettingsUpdateDto;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.service.UserService;
@@ -34,6 +35,16 @@ public class UserController {
         userService.updateUser(userId, userRegisterDto);
 
         return CommonResponse.success("사용자 정보 수정이 완료되었습니다.");
+    }
+
+    // ✅ 알림 수신 설정
+    @PatchMapping("/notification-settings")
+    public CommonResponse<String> updateNotificationSettings(
+            @RequestBody NotificationSettingsUpdateDto dto) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        userService.updateNotificationSettings(userId, dto.notificationEnabled());
+
+        return CommonResponse.success("알림 설정이 변경되었습니다.");
     }
 
     // ✅ 사용자 계정 삭제
