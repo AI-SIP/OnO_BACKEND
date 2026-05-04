@@ -19,6 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -36,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(SpringExtension.class)
 @SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles("local")  // 로컬 프로필 사용
+@ActiveProfiles("test")
 class ProblemControllerTest {
 
     @Autowired
@@ -75,7 +76,11 @@ class ProblemControllerTest {
                     LocalDateTime.now(),
                     LocalDateTime.now(),
                     imageUrlList,
-                    null
+                    (long) i,
+                    LocalDateTime.now(),
+                    null,
+                    List.of(),
+                    List.of()
             );
 
             problemResponseDtoList.add(problemResponseDto);
@@ -99,6 +104,8 @@ class ProblemControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.problemId").value(1L))
+                .andExpect(jsonPath("$.data.solveCount").value(1L))
+                .andExpect(jsonPath("$.data.lastSolvedAt").exists())
                 .andExpect(jsonPath("$.data.memo").value("memo1"))
                 .andExpect(jsonPath("$.data.reference").value("reference1"))
                 .andExpect(jsonPath("$.data.imageUrlList.size()").value(3))
@@ -117,6 +124,8 @@ class ProblemControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.size()").value(5))
+                .andExpect(jsonPath("$.data[0].solveCount").value(1L))
+                .andExpect(jsonPath("$.data[0].lastSolvedAt").exists())
                 .andExpect(jsonPath("$.data[0].memo").value("memo1"))
                 .andExpect(jsonPath("$.data[0].reference").value("reference1"))
                 .andExpect(jsonPath("$.data[0].imageUrlList.size()").value(3))
@@ -181,18 +190,20 @@ class ProblemControllerTest {
     @WithMockCustomUser()
     void registerProblemImageData() throws Exception {
         // When & Then
-        mockMvc.perform(post("/api/problems/imageData")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new ProblemImageDataRegisterDto(
-                                        1L,
-                                        "problemImage",
-                                        ProblemImageType.PROBLEM_IMAGE
-                                )
-                        )))
+        MockMultipartFile image = new MockMultipartFile(
+                "problemImages",
+                "problem.png",
+                MediaType.IMAGE_PNG_VALUE,
+                "problem-image".getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/problems/{problemId}/imageData", 1L)
+                        .file(image)
+                        .param("problemImageTypes", ProblemImageType.PROBLEM_IMAGE.name()))
                 .andExpect(status().isOk());
 
-        //verify(problemService, times(1)).registerProblemImageData(any(), eq(1L));  // userId가 1L인 것도 검증
+        verify(problemService, times(1)).uploadProblemImages(eq(1L), eq(1L), any(), any());
+        verify(problemService, times(1)).analysisProblem(eq(1L));
     }
 
     @Test

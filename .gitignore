@@ -46,9 +46,13 @@ application-prod.properties
 application-local.yml
 application-dev.yml
 application-prod.yml
+application-test.yml
 FirebaseAdminKey.json
 
-**/db/migration/
+**/db/migration/*
+!**/db/migration/
+!**/db/migration/README.md
+!**/db/migration/V*.sql
 
 ### Environment variables
 .env
@@ -61,3 +65,7 @@ monitoring/README.md
 
 ### macOS
 .DS_Store
+
+### Local agent guidance
+/AGENTS.md
+.claude.md

@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.common.auth;
 
 import com.aisip.OnO.backend.auth.entity.Authority;
+import com.aisip.OnO.backend.auth.exception.AuthErrorCase;
 import com.aisip.OnO.backend.auth.service.JwtTokenizer;
 import com.aisip.OnO.backend.util.redis.RedisTokenService;
 import io.jsonwebtoken.Claims;
@@ -10,6 +11,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -27,6 +29,7 @@ import static com.aisip.OnO.backend.auth.service.JwtTokenizer.BEARER_PREFIX;
 public class JwtTokenFilter extends OncePerRequestFilter {
 
     public static final String AUTHORIZATION_HEADER = "Authorization";
+    public static final String AUTH_ERROR_CASE_ATTRIBUTE = "authErrorCase";
 
     private final JwtTokenizer jwtTokenizer;
     private final RedisTokenService redisTokenService;
@@ -68,7 +71,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
 
                 // 2. 블랙리스트 체크 (로그아웃된 토큰인지 확인)
                 if (redisTokenService.isBlacklisted(accessToken)) {
-                    request.setAttribute("errorMessage", "로그아웃된 토큰입니다.");
+                    request.setAttribute(AUTH_ERROR_CASE_ATTRIBUTE, AuthErrorCase.INVALID_ACCESS_TOKEN);
                     filterChain.doFilter(request, response);
                     return;
                 }
@@ -84,10 +87,11 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                         new UsernamePasswordAuthenticationToken(userId, null, authorities);
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+                MDC.put("userId", String.valueOf(userId));
             } catch (ExpiredJwtException e) {
-                request.setAttribute("errorMessage", "토큰이 만료되었습니다.");
+                request.setAttribute(AUTH_ERROR_CASE_ATTRIBUTE, AuthErrorCase.ACCESS_TOKEN_EXPIRED);
             } catch (Exception e) {
-                request.setAttribute("errorMessage", "인증이 실패했습니다.");
+                request.setAttribute(AUTH_ERROR_CASE_ATTRIBUTE, AuthErrorCase.AUTHENTICATION_FAILED);
             }
         }
 

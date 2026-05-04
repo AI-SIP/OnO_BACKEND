@@ -77,7 +77,7 @@ public class JwtTokenizer {
         try{
             Jwts.parserBuilder().setSigningKey(accessKey).build().parseClaimsJws(token);
         } catch (Exception e) {
-            log.error("엑세스 토큰 검증 실패: {} / token={}", e.getMessage(), token);
+            log.warn("엑세스 토큰 검증 실패: {}", e.getMessage());
             throw new ApplicationException(AuthErrorCase.ACCESS_TOKEN_EXPIRED);
         }
     }
@@ -89,7 +89,7 @@ public class JwtTokenizer {
             log.warn("리프레시 토큰 만료: {}", e.getMessage());
             throw new ApplicationException(AuthErrorCase.REFRESH_TOKEN_EXPIRED);
         } catch (Exception e) {
-            log.error("리프레시 토큰 검증 실패: {} / token={}", e.getMessage(), token);
+            log.warn("리프레시 토큰 검증 실패: {}", e.getMessage());
             throw new ApplicationException(AuthErrorCase.INVALID_REFRESH_TOKEN);
         }
     }

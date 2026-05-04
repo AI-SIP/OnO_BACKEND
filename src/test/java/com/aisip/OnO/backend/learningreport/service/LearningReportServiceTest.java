@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(properties = "learning-report.ai.enabled=false")
-@ActiveProfiles("local")
+@ActiveProfiles("test")
 @Transactional
 class LearningReportServiceTest {
 

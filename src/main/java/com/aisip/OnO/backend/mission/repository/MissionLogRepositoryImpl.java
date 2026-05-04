@@ -2,9 +2,15 @@ package com.aisip.OnO.backend.mission.repository;
 
 import com.aisip.OnO.backend.mission.entity.MissionType;
 import com.aisip.OnO.backend.user.entity.User;
+import com.querydsl.core.Tuple;
+import com.querydsl.core.types.dsl.DateExpression;
+import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
 
+import java.sql.Date;
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -87,24 +93,40 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
 
     @Override
     public Map<LocalDate, Long> getDailyActiveUsersCount(int days) {
-        Map<LocalDate, Long> result = new LinkedHashMap<>();
         LocalDate today = LocalDate.now();
+        return getDailyActiveUsersCount(today.minusDays(days - 1L), today);
+    }
 
-        // 최근 날짜가 위로 오도록 역순으로 조회
-        for (int i = 0; i < days; i++) {
-            LocalDate date = today.minusDays(i);
-            LocalDateTime startOfDay = date.atStartOfDay();
-            LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
+    @Override
+    public Map<LocalDate, Long> getDailyActiveUsersCount(LocalDate startDate, LocalDate endDate) {
+        Map<LocalDate, Long> result = new LinkedHashMap<>();
+        DateExpression<LocalDate> createdDate = Expressions.dateTemplate(
+                LocalDate.class,
+                "date({0})",
+                missionLog.createdAt
+        );
+        NumberExpression<Long> activeUserCount = missionLog.user.id.countDistinct();
 
-            Long count = queryFactory
-                    .select(missionLog.user.id.countDistinct())
-                    .from(missionLog)
-                    .where(missionLog.missionType.eq(MissionType.USER_LOGIN)
-                            .and(missionLog.createdAt.between(startOfDay, endOfDay))
-                    )
-                    .fetchOne();
+        java.util.List<Tuple> dailyCounts = queryFactory
+                .select(createdDate, activeUserCount)
+                .from(missionLog)
+                .where(missionLog.missionType.eq(MissionType.USER_LOGIN)
+                        .and(missionLog.createdAt.between(startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX)))
+                )
+                .groupBy(createdDate)
+                .fetch();
 
-            result.put(date, count != null ? count : 0L);
+        Map<LocalDate, Long> countByDate = new LinkedHashMap<>();
+        for (Tuple row : dailyCounts) {
+            LocalDate date = toLocalDate(row.get(createdDate));
+            Long count = row.get(activeUserCount);
+            if (date != null) {
+                countByDate.put(date, count != null ? count : 0L);
+            }
+        }
+
+        for (LocalDate date = endDate; !date.isBefore(startDate); date = date.minusDays(1)) {
+            result.put(date, countByDate.getOrDefault(date, 0L));
         }
 
         return result;
@@ -131,5 +153,21 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
 
     private LocalDateTime getEndOfToday() {
         return LocalDate.now().atTime(LocalTime.MAX);
+    }
+
+    private LocalDate toLocalDate(Object value) {
+        if (value instanceof LocalDate localDate) {
+            return localDate;
+        }
+        if (value instanceof LocalDateTime localDateTime) {
+            return localDateTime.toLocalDate();
+        }
+        if (value instanceof Date date) {
+            return date.toLocalDate();
+        }
+        if (value instanceof Timestamp timestamp) {
+            return timestamp.toLocalDateTime().toLocalDate();
+        }
+        return value != null ? LocalDate.parse(value.toString()) : null;
     }
 }

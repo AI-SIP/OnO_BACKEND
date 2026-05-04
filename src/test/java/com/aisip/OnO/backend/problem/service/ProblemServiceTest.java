@@ -14,6 +14,9 @@ import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
+import com.aisip.OnO.backend.problemsolve.entity.AnswerStatus;
+import com.aisip.OnO.backend.problemsolve.entity.ProblemSolve;
+import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -34,6 +38,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.util.ReflectionTestUtils.setField;
 
 @SpringBootTest
+@ActiveProfiles("test")
 class ProblemServiceTest {
 
     @Autowired
@@ -47,6 +52,9 @@ class ProblemServiceTest {
 
     @Autowired
     private FolderRepository folderRepository;
+
+    @Autowired
+    private ProblemSolveRepository problemSolveRepository;
 
     @MockBean
     private FileUploadService fileUploadService;
@@ -107,6 +115,7 @@ class ProblemServiceTest {
         problemList.clear();
         folderList.clear();
 
+        problemSolveRepository.deleteAll();
         problemImageDataRepository.deleteAll();
         problemRepository.deleteAll();
         folderRepository.deleteAll();
@@ -118,6 +127,10 @@ class ProblemServiceTest {
         // given
         Problem problem = problemList.get(0);
         Long problemId = problem.getId();
+        LocalDateTime firstSolvedAt = LocalDateTime.now().minusDays(1);
+        LocalDateTime lastSolvedAt = LocalDateTime.now();
+        problemSolveRepository.save(ProblemSolve.create(problem, userId, firstSolvedAt, AnswerStatus.CORRECT, null, null, null));
+        problemSolveRepository.save(ProblemSolve.create(problem, userId, lastSolvedAt, AnswerStatus.WRONG, null, null, null));
 
         // when
         ProblemResponseDto problemResponseDto = problemService.findProblem(problemId);
@@ -127,6 +140,8 @@ class ProblemServiceTest {
         assertThat(problemResponseDto.reference()).isEqualTo(problem.getReference());
         assertThat(problemResponseDto.imageUrlList().size()).isEqualTo(problemImageDataRepository.findAllByProblemId(problemId).size());
         assertThat(problemResponseDto.imageUrlList().size()).isEqualTo(2);
+        assertThat(problemResponseDto.solveCount()).isEqualTo(2L);
+        assertThat(problemResponseDto.lastSolvedAt()).isEqualTo(lastSolvedAt);
     }
 
     @Test
@@ -135,6 +150,9 @@ class ProblemServiceTest {
         //given
 
         //when
+        Problem firstProblem = problemList.get(0);
+        LocalDateTime lastSolvedAt = LocalDateTime.now();
+        problemSolveRepository.save(ProblemSolve.create(firstProblem, userId, lastSolvedAt, AnswerStatus.CORRECT, null, null, null));
         List<ProblemResponseDto> problemResponseDtoList = problemService.findUserProblems(userId);
 
         //then
@@ -147,6 +165,10 @@ class ProblemServiceTest {
             assertThat(problemResponseDtoList.get(i).memo()).isEqualTo(problem.getMemo());
             assertThat(problemResponseDtoList.get(i).reference()).isEqualTo(problem.getReference());
         }
+        assertThat(problemResponseDtoList.get(0).solveCount()).isEqualTo(1L);
+        assertThat(problemResponseDtoList.get(0).lastSolvedAt()).isEqualTo(lastSolvedAt);
+        assertThat(problemResponseDtoList.get(1).solveCount()).isEqualTo(0L);
+        assertThat(problemResponseDtoList.get(1).lastSolvedAt()).isNull();
     }
 
     @Test

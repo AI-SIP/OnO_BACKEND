@@ -1,8 +1,10 @@
 package com.aisip.OnO.backend.problem.controller;
 
+import com.aisip.OnO.backend.common.ratelimit.RateLimit;
 import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.problem.dto.ProblemAnalysisResponseDto;
+import com.aisip.OnO.backend.problem.dto.ReviewDueResponseDto;
 import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2Dto;
@@ -113,6 +115,7 @@ public class ProblemController {
     }
 
     // ✅ 문제 분석 요청 (비동기 트리거)
+    @RateLimit(key = "ai_analysis", limitPerDay = 20)
     @PostMapping("/{problemId}/analysis")
     public CommonResponse<String> requestProblemAnalysis(@PathVariable("problemId") Long problemId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -141,6 +144,7 @@ public class ProblemController {
     }
 
     // ✅ 문제 이미지 비동기 업로드
+    @RateLimit(key = "ai_analysis", limitPerDay = 20)
     @PostMapping("/{problemId}/imageData")
     public CommonResponse<String> uploadProblemImages(
             @PathVariable("problemId") Long problemId,
@@ -220,6 +224,13 @@ public class ProblemController {
         problemService.deleteProblemImageData(imageUrl);
 
         return CommonResponse.success("문제 이미지 데이터 삭제가 완료되었습니다.");
+    }
+
+    // ✅ 오늘 복습 대상 문제 조회
+    @GetMapping("/review-due")
+    public CommonResponse<ReviewDueResponseDto> getReviewDueProblems() {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return CommonResponse.success(problemService.getReviewDueProblems(userId));
     }
 
 }

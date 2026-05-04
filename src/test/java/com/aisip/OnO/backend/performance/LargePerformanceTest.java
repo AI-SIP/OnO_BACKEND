@@ -40,7 +40,7 @@ import java.util.Random;
  */
 @Slf4j
 @SpringBootTest
-@ActiveProfiles("local")
+@ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class LargePerformanceTest {
 

@@ -10,7 +10,7 @@ public enum MissionErrorCase implements ErrorCase {
 
     MISSION_TYPE_NOT_FOUND(400, 7001, "잘못된 미션 종류입니다."),
 
-    USER_NOT_FOUND(400, 7002, "해당하는 유저가 존재하지 않습니다.");
+    USER_NOT_FOUND(404, 7002, "해당하는 유저가 존재하지 않습니다.");
 
     private final Integer httpStatusCode;
     private final Integer errorCode;

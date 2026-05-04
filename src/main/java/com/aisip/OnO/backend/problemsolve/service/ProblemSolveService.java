@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.problemsolve.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
+import com.aisip.OnO.backend.problem.service.ReviewIntervalCalculator;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveRegisterDto;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveResponseDto;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveUpdateDto;
@@ -68,6 +69,15 @@ public class ProblemSolveService {
     }
 
     @Transactional(readOnly = true)
+    public List<ProblemSolveResponseDto> getAdminProblemSolvesByProblemId(Long problemId) {
+        List<ProblemSolve> problemSolves = problemSolveRepository.findAllByProblemIdWithImages(problemId);
+
+        return problemSolves.stream()
+                .map(ProblemSolveResponseDto::from)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<ProblemSolveResponseDto> getUserProblemSolves(Long userId) {
         List<ProblemSolve> problemSolves = problemSolveRepository.findAllByUserId(userId);
 
@@ -108,7 +118,16 @@ public class ProblemSolveService {
 
         problemSolveRepository.save(problemSolve);
         missionLogService.registerProblemPracticeMission(userId, problem.getId());
-        log.info("userId: {} created problem solve: {}", userId, problemSolve.getId());
+
+        ReviewIntervalCalculator.ReviewSchedule schedule = ReviewIntervalCalculator.calculate(
+                dto.answerStatus(),
+                problem.getReviewInterval(),
+                problem.getConsecutiveCorrectCount()
+        );
+        problem.updateReviewSchedule(schedule.nextReviewAt(), schedule.reviewInterval(), schedule.consecutiveCorrectCount());
+
+        log.info("userId: {} created problem solve: {}, nextReviewAt: {}, mastered: {}",
+                userId, problemSolve.getId(), schedule.nextReviewAt(), schedule.isMastered());
 
         return problemSolve.getId();
     }
@@ -130,7 +149,7 @@ public class ProblemSolveService {
             problemSolve.addImage(problemSolveImageData);
             problemSolveImageDataRepository.save(problemSolveImageData);
 
-            log.info("Uploaded problem solve image to S3: {} for problemSolveId: {}", imageUrl, problemSolveId);
+            log.info("Uploaded problem solve image to S3 for problemSolveId: {}, imageOrder: {}", problemSolveId, i);
         }
     }
 
@@ -182,8 +201,8 @@ public class ProblemSolveService {
             try {
                 s3DeleteProducer.sendDeleteMessage(image.getImageUrl(), problemSolveId);
             } catch (Exception e) {
-                log.error("S3 삭제 메시지 전송 실패 - problemSolveId: {}, imageUrl: {}, error: {}",
-                        problemSolveId, image.getImageUrl(), e.getMessage());
+                log.error("S3 삭제 메시지 전송 실패 - problemSolveId: {}, error: {}",
+                        problemSolveId, e.getMessage());
             }
         });
 
@@ -201,8 +220,8 @@ public class ProblemSolveService {
                 try {
                     s3DeleteProducer.sendDeleteMessage(image.getImageUrl(), record.getId());
                 } catch (Exception e) {
-                    log.error("S3 삭제 메시지 전송 실패 - problemSolveId: {}, imageUrl: {}, error: {}",
-                            record.getId(), image.getImageUrl(), e.getMessage());
+                    log.error("S3 삭제 메시지 전송 실패 - problemSolveId: {}, error: {}",
+                            record.getId(), e.getMessage());
                 }
             });
         });

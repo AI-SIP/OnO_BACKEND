@@ -219,13 +219,13 @@ jobs:
       - name: Deploy Monitoring Stack
         run: |
           docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring pull \
-            mysql-exporter-prod prometheus-prod grafana-prod
-          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring stop prometheus-prod grafana-prod mysql-exporter-prod || true
-          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring rm -f prometheus-prod grafana-prod mysql-exporter-prod || true
+            mysql-exporter-prod prometheus-prod loki-prod promtail-prod grafana-prod
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring stop prometheus-prod grafana-prod loki-prod promtail-prod mysql-exporter-prod || true
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring rm -f prometheus-prod grafana-prod loki-prod promtail-prod mysql-exporter-prod || true
           docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring up -d --force-recreate \
-            mysql-exporter-prod prometheus-prod grafana-prod
+            mysql-exporter-prod prometheus-prod loki-prod promtail-prod grafana-prod
           docker-compose -f docker-compose.prod.yml --env-file .env.prod ps \
-            mysql-exporter-prod prometheus-prod grafana-prod
+            mysql-exporter-prod prometheus-prod loki-prod promtail-prod grafana-prod
         shell: bash
 
       - name: Verify Monitoring Integration
@@ -246,6 +246,44 @@ jobs:
           echo "WARNING: Prometheus scrape for production targets is still down"
           docker exec ono-prometheus-prod sh -lc 'wget -qO- "http://localhost:9090/prometheus/api/v1/targets"' || true
           docker logs --tail=200 ono-prometheus-prod || true
+        shell: bash
+
+      - name: Verify Loki Log Collection
+        continue-on-error: true
+        run: |
+          echo "Checking Loki readiness..."
+          for i in $(seq 1 12); do
+            if curl -fsS http://localhost:3100/ready | grep -q ready; then
+              echo "Loki is ready"
+              break
+            fi
+            echo "Waiting Loki ready... ($i/12)"
+            sleep 5
+          done
+
+          if ! curl -fsS http://localhost:3100/ready | grep -q ready; then
+            echo "WARNING: Loki did not become ready"
+            docker logs --tail=200 ono-loki-prod || true
+            docker logs --tail=200 ono-promtail-prod || true
+            exit 1
+          fi
+
+          echo "Checking Loki received production logs..."
+          for i in $(seq 1 12); do
+            result=$(curl -fsG "http://localhost:3100/loki/api/v1/label/container/values" || true)
+            if echo "$result" | grep -Eq '"ono-(app-prod-blue|app-prod-green|mysql-prod|redis-prod|rabbitmq-prod|prometheus-prod|grafana-prod|loki-prod|promtail-prod|mysql-exporter-prod)"'; then
+              echo "Loki received production log labels"
+              exit 0
+            fi
+            echo "Waiting Loki production log labels... ($i/12)"
+            sleep 5
+          done
+
+          echo "WARNING: Loki did not receive expected production log labels"
+          curl -fsG "http://localhost:3100/loki/api/v1/labels" || true
+          docker logs --tail=200 ono-loki-prod || true
+          docker logs --tail=200 ono-promtail-prod || true
+          exit 1
         shell: bash
 
       - name: Clean up old Docker images

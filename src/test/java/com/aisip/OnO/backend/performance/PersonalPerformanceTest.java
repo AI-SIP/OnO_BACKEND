@@ -23,7 +23,7 @@ import jakarta.persistence.EntityManager;
  */
 @Slf4j
 @SpringBootTest
-@ActiveProfiles("local")
+@ActiveProfiles("test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class PersonalPerformanceTest {
 
