@@ -8,6 +8,7 @@ import com.aisip.OnO.backend.util.webhook.DiscordWebhookNotificationService;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
+import com.google.firebase.messaging.MessagingErrorCode;
 import com.google.firebase.messaging.Notification;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -63,6 +64,15 @@ public class FcmNotificationConsumer {
                 try {
                     sendToDevice(fcmToken.getToken(), message);
                     successCount++;
+                } catch (FirebaseMessagingException e) {
+                    if (isInvalidToken(e)) {
+                        fcmTokenRepository.deleteByToken(fcmToken.getToken());
+                        log.info("만료된 FCM 토큰 삭제 - userId: {}, errorCode: {}", message.getUserId(), e.getMessagingErrorCode());
+                    } else {
+                        log.warn("RabbitMQ device delivery failed - queue: {}, operation: {}, userId: {}, error: {}",
+                                RabbitMQConfig.FCM_NOTIFICATION_QUEUE, "fcm_notification", message.getUserId(), e.getMessage());
+                        failCount++;
+                    }
                 } catch (Exception e) {
                     log.warn("RabbitMQ device delivery failed - queue: {}, operation: {}, userId: {}, error: {}",
                             RabbitMQConfig.FCM_NOTIFICATION_QUEUE, "fcm_notification", message.getUserId(), e.getMessage());
@@ -150,6 +160,12 @@ public class FcmNotificationConsumer {
             log.error("RabbitMQ DLQ notification failed - queue: {}, operation: {}, userId: {}, error: {}",
                     RabbitMQConfig.FCM_NOTIFICATION_DLQ, "fcm_notification", message.getUserId(), e.getMessage());
         }
+    }
+
+    private boolean isInvalidToken(FirebaseMessagingException e) {
+        MessagingErrorCode code = e.getMessagingErrorCode();
+        return code == MessagingErrorCode.UNREGISTERED
+                || code == MessagingErrorCode.INVALID_ARGUMENT;
     }
 
     private void recordExternalCall(String dependency, String operation, String outcome, Timer.Sample sample) {

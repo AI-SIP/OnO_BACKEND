@@ -30,6 +30,10 @@ public record ProblemResponseDto (
 
     List<ProblemImageDataResponseDto> imageUrlList,
 
+    Long solveCount,
+
+    LocalDateTime lastSolvedAt,
+
     ProblemAnalysisResponseDto analysis,
 
     List<Long> tagIdList,
@@ -37,6 +41,10 @@ public record ProblemResponseDto (
     List<TagResponseDto> tags
 ) {
     public static ProblemResponseDto from(@NotNull Problem problem) {
+        return from(problem, 0L, null);
+    }
+
+    public static ProblemResponseDto from(@NotNull Problem problem, Long solveCount, LocalDateTime lastSolvedAt) {
 
         List<ProblemImageDataResponseDto> problemImageDataList = Optional.ofNullable(problem.getProblemImageDataList())
                 .orElse(List.of())
@@ -69,6 +77,8 @@ public record ProblemResponseDto (
                 .createdAt(problem.getCreatedAt())
                 .updatedAt(problem.getUpdatedAt())
                 .imageUrlList(problemImageDataList)
+                .solveCount(solveCount)
+                .lastSolvedAt(lastSolvedAt)
                 .analysis(analysisDto)
                 .tagIdList(tagIds)
                 .tags(tags)

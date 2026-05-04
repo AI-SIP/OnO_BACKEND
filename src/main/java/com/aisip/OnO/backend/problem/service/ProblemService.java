@@ -21,9 +21,12 @@ import com.aisip.OnO.backend.problem.repository.ProblemAnalysisRepository;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
+import com.aisip.OnO.backend.problem.dto.ReviewDueResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
+import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveRepository;
+import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveSummary;
 import com.aisip.OnO.backend.tag.entity.ProblemTagMapping;
 import com.aisip.OnO.backend.tag.entity.Tag;
 import com.aisip.OnO.backend.tag.exception.TagErrorCase;
@@ -69,6 +72,8 @@ public class ProblemService {
 
     private final PracticeNoteRepository practiceNoteRepository;
 
+    private final ProblemSolveRepository problemSolveRepository;
+
     private final S3DeleteProducer s3DeleteProducer;
 
     private final ProblemAnalysisProducer analysisProducer;
@@ -80,7 +85,7 @@ public class ProblemService {
         Problem problem = problemRepository.findProblemWithImageData(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
-        return ProblemResponseDto.from(problem);
+        return toProblemResponseDto(problem);
     }
 
     @Transactional(readOnly = true)
@@ -111,27 +116,22 @@ public class ProblemService {
     public List<ProblemResponseDto> findUserProblems(Long userId) {
         log.info("userId: {} find all user problems", userId);
 
-        return problemRepository.findAllByUserId(userId)
-                .stream()
-                .map(ProblemResponseDto::from)
-                .collect(Collectors.toList());
+        return toProblemResponseDtos(problemRepository.findAllByUserId(userId));
     }
 
     @Transactional(readOnly = true)
     public List<ProblemResponseDto> findFolderProblemList(Long folderId) {
-        return problemRepository.findAllByFolderId(folderId)
-                .stream()
-                .map(ProblemResponseDto::from)
-                .collect(Collectors.toList());
+        return toProblemResponseDtos(problemRepository.findAllByFolderId(folderId));
     }
 
     @Transactional(readOnly = true)
     public List<ProblemResponseDto> findAllProblems() {
-        return problemRepository.findAll()
+        List<Problem> problems = problemRepository.findAll()
                 .stream()
                 .sorted((p1, p2) -> p2.getCreatedAt().compareTo(p1.getCreatedAt())) // 최신순 정렬
-                .map(ProblemResponseDto::from)
-                .collect(Collectors.toList());
+                .toList();
+
+        return toProblemResponseDtos(problems);
     }
 
     @Transactional(readOnly = true)
@@ -191,6 +191,7 @@ public class ProblemService {
         problemRepository.save(problem);
         syncProblemTags(problem, userId, problemRegisterDto.tagIds());
 
+        problem.updateReviewSchedule(LocalDate.now(java.time.ZoneId.of("Asia/Seoul")), 1, 0);
         analysisService.createSkippedAnalysis(problem.getId());
         missionLogService.registerProblemWriteMission(userId);
 
@@ -247,6 +248,7 @@ public class ProblemService {
                         problemImageDataRepository.save(imageData);
                     });
         }
+        problem.updateReviewSchedule(LocalDate.now(java.time.ZoneId.of("Asia/Seoul")), 1, 0);
         analysisService.createSkippedAnalysis(problem.getId());
         missionLogService.registerProblemWriteMission(userId);
 
@@ -547,9 +549,7 @@ public class ProblemService {
         List<Problem> content = hasNext ? problems.subList(0, size) : problems;
         Long nextCursor = hasNext ? content.get(content.size() - 1).getId() : null;
 
-        List<ProblemResponseDto> dtoList = content.stream()
-                .map(ProblemResponseDto::from)
-                .collect(Collectors.toList());
+        List<ProblemResponseDto> dtoList = toProblemResponseDtos(content);
 
         log.info("folderId: {} find problems with cursor: {}, size: {}, hasNext: {}", folderId, cursor, size, hasNext);
         return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
@@ -578,9 +578,7 @@ public class ProblemService {
         List<Problem> content = hasNext ? problems.subList(0, size) : problems;
         Long nextCursor = hasNext ? content.get(content.size() - 1).getId() : null;
 
-        List<ProblemResponseDto> dtoList = content.stream()
-                .map(ProblemResponseDto::from)
-                .collect(Collectors.toList());
+        List<ProblemResponseDto> dtoList = toProblemResponseDtos(content);
 
         log.info("userId: {} find problems by tagId: {} with cursor: {}, size: {}, hasNext: {}",
                 userId, tagId, cursor, size, hasNext);
@@ -606,12 +604,67 @@ public class ProblemService {
         List<Problem> content = hasNext ? problems.subList(0, size) : problems;
         Long nextCursor = hasNext ? content.get(content.size() - 1).getId() : null;
 
-        List<ProblemResponseDto> dtoList = content.stream()
-                .map(ProblemResponseDto::from)
-                .collect(Collectors.toList());
+        List<ProblemResponseDto> dtoList = toProblemResponseDtos(content);
 
         log.info("userId: {} find problems by title query: '{}' with cursor: {}, size: {}, hasNext: {}",
                 userId, query, cursor, size, hasNext);
         return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
+    }
+
+    private ProblemResponseDto toProblemResponseDto(Problem problem) {
+        Long solveCount = problemSolveRepository.countByProblemId(problem.getId());
+        return ProblemResponseDto.from(
+                problem,
+                solveCount != null ? solveCount : 0L,
+                problemSolveRepository.findLastSolvedAtByProblemId(problem.getId())
+        );
+    }
+
+    private List<ProblemResponseDto> toProblemResponseDtos(List<Problem> problems) {
+        if (problems.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> problemIds = problems.stream()
+                .map(Problem::getId)
+                .toList();
+
+        Map<Long, ProblemSolveSummary> solveSummariesByProblemId = problemSolveRepository.findSolveSummariesByProblemIds(problemIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        ProblemSolveSummary::getProblemId,
+                        solveSummary -> solveSummary
+                ));
+
+        return problems.stream()
+                .map(problem -> {
+                    ProblemSolveSummary solveSummary = solveSummariesByProblemId.get(problem.getId());
+                    return ProblemResponseDto.from(
+                            problem,
+                            solveSummary != null ? solveSummary.getSolveCount() : 0L,
+                            solveSummary != null ? solveSummary.getLastSolvedAt() : null
+                    );
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public ReviewDueResponseDto getReviewDueProblems(Long userId) {
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        List<Problem> dueProblems = problemRepository.findReviewDueProblems(userId, today);
+
+        long overdueCount = dueProblems.stream()
+                .filter(p -> p.getNextReviewAt().isBefore(today))
+                .count();
+
+        List<ReviewDueResponseDto.ReviewDueProblemDto> problemDtos = dueProblems.stream()
+                .map(ReviewDueResponseDto.ReviewDueProblemDto::from)
+                .collect(Collectors.toList());
+
+        return ReviewDueResponseDto.builder()
+                .dueCount(dueProblems.size())
+                .overdueCount(overdueCount)
+                .problems(problemDtos)
+                .build();
     }
 }

@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.problemsolve.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
+import com.aisip.OnO.backend.problem.service.ReviewIntervalCalculator;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveRegisterDto;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveResponseDto;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveUpdateDto;
@@ -117,7 +118,16 @@ public class ProblemSolveService {
 
         problemSolveRepository.save(problemSolve);
         missionLogService.registerProblemPracticeMission(userId, problem.getId());
-        log.info("userId: {} created problem solve: {}", userId, problemSolve.getId());
+
+        ReviewIntervalCalculator.ReviewSchedule schedule = ReviewIntervalCalculator.calculate(
+                dto.answerStatus(),
+                problem.getReviewInterval(),
+                problem.getConsecutiveCorrectCount()
+        );
+        problem.updateReviewSchedule(schedule.nextReviewAt(), schedule.reviewInterval(), schedule.consecutiveCorrectCount());
+
+        log.info("userId: {} created problem solve: {}, nextReviewAt: {}, mastered: {}",
+                userId, problemSolve.getId(), schedule.nextReviewAt(), schedule.isMastered());
 
         return problemSolve.getId();
     }
