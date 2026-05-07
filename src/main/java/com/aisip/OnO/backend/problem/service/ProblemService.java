@@ -206,8 +206,7 @@ public class ProblemService {
      */
     @Transactional
     public Long registerProblemV2(ProblemRegisterV2Dto problemRegisterV2Dto, Long userId) {
-        Folder folder = folderRepository.findById(problemRegisterV2Dto.folderId())
-                .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
+        Folder folder = resolveRegisterFolder(problemRegisterV2Dto.folderId(), userId);
 
         ProblemRegisterDto baseDto = new ProblemRegisterDto(
                 problemRegisterV2Dto.problemId(),
@@ -254,6 +253,16 @@ public class ProblemService {
 
         log.info("userId: {} register problem(v2) problemId: {}", userId, problem.getId());
         return problem.getId();
+    }
+
+    private Folder resolveRegisterFolder(Long folderId, Long userId) {
+        if (folderId == null) {
+            return folderRepository.findByUserIdAndParentFolderIsNull(userId)
+                    .orElseThrow(() -> new ApplicationException(FolderErrorCase.ROOT_FOLDER_NOT_EXIST));
+        }
+
+        return folderRepository.findById(folderId)
+                .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
     }
 
     /**

@@ -8,6 +8,7 @@ import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
+import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2Dto;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
@@ -17,6 +18,9 @@ import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.problemsolve.entity.AnswerStatus;
 import com.aisip.OnO.backend.problemsolve.entity.ProblemSolve;
 import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveRepository;
+import com.aisip.OnO.backend.user.dto.UserRegisterDto;
+import com.aisip.OnO.backend.user.entity.User;
+import com.aisip.OnO.backend.user.repository.UserRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -55,6 +59,9 @@ class ProblemServiceTest {
 
     @Autowired
     private ProblemSolveRepository problemSolveRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @MockBean
     private FileUploadService fileUploadService;
@@ -262,6 +269,41 @@ class ProblemServiceTest {
         assertThatThrownBy(() -> problemService.registerProblem(dto, userId))
                 .isInstanceOf(ApplicationException.class)
                 .hasMessageContaining(FolderErrorCase.FOLDER_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    @DisplayName("문제 등록 v2 - folderId가 없으면 루트 폴더에 등록")
+    void registerProblemV2_nullFolderIdUsesRootFolder() {
+        // Given
+        User user = userRepository.save(User.from(new UserRegisterDto(
+                "root-user@example.com",
+                "root-user",
+                "root-user-" + System.nanoTime(),
+                "MEMBER",
+                null
+        )));
+        Long rootUserId = user.getId();
+        Folder rootFolder = folderRepository.save(Folder.from(
+                new FolderRegisterDto("root", null, null),
+                rootUserId
+        ));
+        ProblemRegisterV2Dto dto = new ProblemRegisterV2Dto(
+                null,
+                "memo",
+                "reference",
+                null,
+                LocalDateTime.now(),
+                List.of("https://example.com/problem.png"),
+                List.of("https://example.com/answer.png"),
+                null
+        );
+
+        // When
+        Long problemId = problemService.registerProblemV2(dto, rootUserId);
+
+        // Then
+        Problem problem = problemRepository.findById(problemId).orElseThrow();
+        assertThat(problem.getFolder().getId()).isEqualTo(rootFolder.getId());
     }
 
     @Test
