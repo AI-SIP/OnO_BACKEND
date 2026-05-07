@@ -35,7 +35,7 @@ public class FolderController {
     public CommonResponse<FolderResponseDto> getFolder(@PathVariable("folderId") Long folderId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        return CommonResponse.success(folderService.findFolder(folderId));
+        return CommonResponse.success(folderService.findFolder(folderId, userId));
     }
 
     // ✅ V2 API: 커서 기반 하위 폴더 조회 (무한 스크롤)
@@ -47,7 +47,7 @@ public class FolderController {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} get subfolders for folderId: {} with cursor: {}, size: {}", userId, folderId, cursor, size);
 
-        return CommonResponse.success(folderService.findSubFoldersWithCursor(folderId, cursor, size));
+        return CommonResponse.success(folderService.findSubFoldersWithCursor(folderId, userId, cursor, size));
     }
 
     // ✅ 모든 폴더 조회
@@ -98,7 +98,8 @@ public class FolderController {
     // ✅ 폴더 삭제 기능
     @DeleteMapping("")
     public CommonResponse<String> deleteFoldersWithProblems(@RequestBody FolderDeleteRequestDto folderDeleteRequestDto) {
-        folderService.deleteFoldersWithProblems(folderDeleteRequestDto.deleteFolderIdList());
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        folderService.deleteFoldersWithProblems(userId, folderDeleteRequestDto.deleteFolderIdList());
         return CommonResponse.success("폴더가 성공적으로 삭제되었습니다.");
     }
 

@@ -26,7 +26,7 @@ public class PracticeNoteController {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} get problem practice for practice id: {}", userId, practiceId);
 
-        return CommonResponse.success(practiceNoteService.findPracticeNoteDetail(practiceId));
+        return CommonResponse.success(practiceNoteService.findPracticeNoteDetail(practiceId, userId));
     }
 
     // ✅ 사용자의 모든 복습 리스트 썸네일 조회
@@ -94,7 +94,7 @@ public class PracticeNoteController {
     @DeleteMapping("")
     public CommonResponse<String> deletePractices(@RequestBody PracticeNoteDeleteRequestDto practiceNoteDeleteRequestDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        practiceNoteService.deletePractices(practiceNoteDeleteRequestDto.deletePracticeIdList());
+        practiceNoteService.deletePractices(userId, practiceNoteDeleteRequestDto.deletePracticeIdList());
 
         return CommonResponse.success("선택한 복습 노트가 삭제되었습니다.");
     }
