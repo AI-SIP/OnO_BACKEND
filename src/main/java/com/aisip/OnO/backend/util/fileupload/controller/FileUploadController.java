@@ -4,7 +4,7 @@ import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -42,7 +42,8 @@ public class FileUploadController {
     public CommonResponse<String> deleteImageFile(
             @RequestParam("imageUrl") String imageUrl
     ) {
-        fileUploadService.deleteImageFileFromS3(imageUrl);
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        fileUploadService.deleteUserImageFile(imageUrl, userId);
 
         return CommonResponse.success("이미지 삭제가 완료되었습니다.");
     }

@@ -70,11 +70,11 @@ public class AdminProblemController {
 
     @GetMapping("/problem/{problemId}")
     public String getProblemDetail(@PathVariable(name = "problemId") Long problemId, Model model) {
-        ProblemResponseDto problem = problemService.findProblem(problemId);
+        ProblemResponseDto problem = problemService.findProblemForAdmin(problemId);
         model.addAttribute("problem", problem);
 
         // 폴더 및 작성자 정보 조회
-        FolderResponseDto folder = folderService.findFolder(problem.folderId());
+        FolderResponseDto folder = folderService.findFolderForAdmin(problem.folderId());
         UserResponseDto user = userService.findUser(folder.userId());
         List<ProblemSolveResponseDto> problemSolves = problemSolveService.getAdminProblemSolvesByProblemId(problemId);
         model.addAttribute("folder", folder);

@@ -33,6 +33,7 @@ import java.time.LocalTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -56,10 +57,13 @@ public class PracticeNoteService {
 
     private final UserRepository userRepository;
 
-    private PracticeNote getPracticeEntity(Long practiceId){
+    private PracticeNote getPracticeEntity(Long practiceId, Long userId){
 
-        return practiceNoteRepository.findById(practiceId)
+        PracticeNote practiceNote = practiceNoteRepository.findById(practiceId)
                 .orElseThrow(() -> new ApplicationException(PracticeNoteErrorCase.PRACTICE_NOTE_NOT_FOUND));
+
+        validatePracticeOwner(practiceNote, userId);
+        return practiceNote;
     }
 
     public Long registerPractice(PracticeNoteRegisterDto practiceNoteRegisterDto, Long userId) {
@@ -69,7 +73,7 @@ public class PracticeNoteService {
 
         if (practiceNoteRegisterDto.problemIdList() != null) {
             practiceNoteRegisterDto.problemIdList().forEach(problemId ->
-                    addProblemToPractice(practiceNote, problemId));
+                    addProblemToPractice(practiceNote, problemId, userId));
         }
 
         if(practiceNoteRegisterDto.practiceNotification() != null) {
@@ -94,10 +98,11 @@ public class PracticeNoteService {
     }
 
     @Transactional(readOnly = true)
-    public PracticeNoteDetailResponseDto findPracticeNoteDetail(Long practiceId){
+    public PracticeNoteDetailResponseDto findPracticeNoteDetail(Long practiceId, Long userId){
         log.info("find practiceId: {}", practiceId);
         PracticeNote practiceNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceId)
                 .orElseThrow(() -> new ApplicationException(PracticeNoteErrorCase.PRACTICE_NOTE_NOT_FOUND));
+        validatePracticeOwner(practiceNote, userId);
 
         List<Long> problemIdList = practiceNoteRepository.findProblemIdListByPracticeNoteId(practiceId);
 
@@ -132,7 +137,7 @@ public class PracticeNoteService {
     }
 
     public void addPracticeNoteCount(Long userId, Long practiceId) {
-        PracticeNote practiceNote = getPracticeEntity(practiceId);
+        PracticeNote practiceNote = getPracticeEntity(practiceId, userId);
         practiceNote.updatePracticeNoteCount();
 
         // 복습노트 사용 미션 등록
@@ -143,7 +148,7 @@ public class PracticeNoteService {
 
     public void updatePracticeInfo(Long userId, PracticeNoteUpdateDto practiceNoteUpdateDto) {
         Long practiceId = practiceNoteUpdateDto.practiceNoteId();
-        PracticeNote practiceNote = getPracticeEntity(practiceId);
+        PracticeNote practiceNote = getPracticeEntity(practiceId, userId);
 
         practiceNote.updateTitle(practiceNoteUpdateDto.practiceTitle());
 
@@ -151,7 +156,7 @@ public class PracticeNoteService {
 
         if (!practiceNoteUpdateDto.addProblemIdList().isEmpty()) {
             practiceNoteUpdateDto.addProblemIdList().forEach(problemId -> {
-                addProblemToPractice(practiceNote, problemId);
+                addProblemToPractice(practiceNote, problemId, userId);
             });
         }
 
@@ -176,7 +181,12 @@ public class PracticeNoteService {
 
     }
 
-    public void deletePractice(Long practiceId) {
+    public void deletePractice(Long practiceId, Long userId) {
+        getPracticeEntity(practiceId, userId);
+        deletePracticeWithoutOwnerCheck(practiceId);
+    }
+
+    private void deletePracticeWithoutOwnerCheck(Long practiceId) {
         List<ProblemPracticeNoteMapping> problemPracticeNoteMappingList = problemPracticeNoteMappingRepository.findAllByPracticeNoteId(practiceId);
         problemPracticeNoteMappingList.forEach(ProblemPracticeNoteMapping::removeMappingFromProblemAndPractice);
 
@@ -184,24 +194,27 @@ public class PracticeNoteService {
         log.info("practiceId: {} has deleted", practiceId);
     }
 
-    public void deletePractices(List<Long> practiceIdList) {
-        practiceIdList.forEach(this::deletePractice);
+    public void deletePractices(Long userId, List<Long> practiceIdList) {
+        practiceIdList.forEach(practiceId -> deletePractice(practiceId, userId));
     }
 
     public void deleteAllPracticesByUser(Long userId) {
         List<Long> practiceIdList = practiceNoteRepository.findAllPracticeIdsByUserId(userId);
 
-        deletePractices(practiceIdList);
+        practiceIdList.forEach(this::deletePracticeWithoutOwnerCheck);
         log.info("userId: {} has delete all practices", userId);
     }
 
-    private void addProblemToPractice(PracticeNote practiceNote, Long problemId) {
+    private void addProblemToPractice(PracticeNote practiceNote, Long problemId, Long userId) {
 
         boolean exists = practiceNoteRepository.checkProblemAlreadyMatchingWithPractice(practiceNote.getId(), problemId);
 
         if (!exists) {
             Problem problem = problemRepository.findById(problemId)
                     .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
+            if (!Objects.equals(problem.getUserId(), userId)) {
+                throw new ApplicationException(ProblemErrorCase.PROBLEM_USER_UNMATCHED);
+            }
 
             ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from();
             problemPracticeNoteMapping.addMappingToProblemAndPractice(problem, practiceNote);
@@ -219,6 +232,12 @@ public class PracticeNoteService {
 
     public void deleteProblemsFromAllPractice(List<Long> deleteProblemIdList) {
         practiceNoteRepository.deleteProblemsFromAllPractice(deleteProblemIdList);
+    }
+
+    private void validatePracticeOwner(PracticeNote practiceNote, Long userId) {
+        if (!Objects.equals(practiceNote.getUserId(), userId)) {
+            throw new ApplicationException(PracticeNoteErrorCase.PRACTICE_NOTE_USER_UNMATCHED);
+        }
     }
 
     /**

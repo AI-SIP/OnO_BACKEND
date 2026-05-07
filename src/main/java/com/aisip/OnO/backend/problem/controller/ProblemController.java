@@ -40,7 +40,7 @@ public class ProblemController {
     @GetMapping("/{problemId}")
     public CommonResponse<ProblemResponseDto> getProblem(@PathVariable("problemId") Long problemId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        ProblemResponseDto problemResponseDto = problemService.findProblem(problemId);
+        ProblemResponseDto problemResponseDto = problemService.findProblem(problemId, userId);
 
         return CommonResponse.success(problemResponseDto);
     }
@@ -58,7 +58,7 @@ public class ProblemController {
     public CommonResponse<List<ProblemResponseDto>> getProblemsByUserId(@PathVariable("folderId") Long folderId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-        return CommonResponse.success(problemService.findFolderProblemList(folderId));
+        return CommonResponse.success(problemService.findFolderProblemList(folderId, userId));
     }
 
     // ✅ V2 API: 커서 기반 폴더의 문제 조회 (무한 스크롤)
@@ -70,7 +70,7 @@ public class ProblemController {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} get problems for folderId: {} with cursor: {}, size: {}", userId, folderId, cursor, size);
 
-        return CommonResponse.success(problemService.findProblemsByFolderWithCursor(folderId, cursor, size));
+        return CommonResponse.success(problemService.findProblemsByFolderWithCursor(folderId, userId, cursor, size));
     }
 
     // ✅ V2 API: 커서 기반 태그의 문제 조회 (무한 스크롤)
@@ -119,7 +119,7 @@ public class ProblemController {
     @PostMapping("/{problemId}/analysis")
     public CommonResponse<String> requestProblemAnalysis(@PathVariable("problemId") Long problemId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        problemService.analysisProblem(problemId);
+        problemService.analysisProblem(problemId, userId);
 
         return CommonResponse.success("문제 분석 요청이 접수되었습니다.");
     }
@@ -153,7 +153,7 @@ public class ProblemController {
     ) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         problemService.uploadProblemImages(problemId, userId, problemImages, problemImageTypes);
-        problemService.analysisProblem(problemId);
+        problemService.analysisProblem(problemId, userId);
 
         return CommonResponse.success("이미지 업로드가 시작되었습니다.");
     }
@@ -164,7 +164,7 @@ public class ProblemController {
             @PathVariable("problemId") Long problemId
     ) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        analysisService.updateToNoImage(problemId);
+        problemService.updateProblemAnalysisToNoImage(problemId, userId);
 
         return CommonResponse.success("이미지 업로드가 시작되었습니다.");
     }
@@ -204,7 +204,8 @@ public class ProblemController {
     public CommonResponse<String> deleteProblems(
             @RequestBody ProblemDeleteRequestDto problemDeleteRequestDto
             ) {
-        problemService.deleteProblemList(problemDeleteRequestDto.deleteProblemIdList());
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        problemService.deleteProblemList(userId, problemDeleteRequestDto.deleteProblemIdList());
         return CommonResponse.success("문제 삭제가 완료되었습니다.");
     }
 
@@ -221,7 +222,7 @@ public class ProblemController {
     @DeleteMapping("/imageData")
     public CommonResponse<String> deleteProblemImageData(@RequestParam("imageUrl") String imageUrl) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        problemService.deleteProblemImageData(imageUrl);
+        problemService.deleteProblemImageData(imageUrl, userId);
 
         return CommonResponse.success("문제 이미지 데이터 삭제가 완료되었습니다.");
     }

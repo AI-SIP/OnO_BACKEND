@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.practicenote.service;
 
+import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
@@ -10,6 +11,7 @@ import com.aisip.OnO.backend.practicenote.dto.PracticeNoteUpdateDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNotificationRegisterDto;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
+import com.aisip.OnO.backend.practicenote.exception.PracticeNoteErrorCase;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
 import com.aisip.OnO.backend.practicenote.repository.ProblemPracticeNoteMappingRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
@@ -17,6 +19,7 @@ import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
+import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -33,6 +36,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -187,7 +191,7 @@ class PracticeNoteServiceTest {
         Long practiceNoteId = practiceNote.getId();
 
         //when
-        PracticeNoteDetailResponseDto practiceNoteDetailResponseDto = practiceNoteService.findPracticeNoteDetail(practiceNoteId);
+        PracticeNoteDetailResponseDto practiceNoteDetailResponseDto = practiceNoteService.findPracticeNoteDetail(practiceNoteId, userId);
 
         //then
         assertThat(practiceNote.getId()).isEqualTo(practiceNoteDetailResponseDto.practiceNoteId());
@@ -196,6 +200,19 @@ class PracticeNoteServiceTest {
             //System.out.println("===== imageDataSize: " + practiceNoteDetailResponseDto.problemResponseDtoList().get(i).imageUrlList().size() + "=====");
             assertThat(problemList.get(i).getId()).isEqualTo(practiceNoteDetailResponseDto.problemIdList().get(i));
         }
+    }
+
+    @Test
+    @DisplayName("다른 유저의 복습 노트 상세 조회 시 예외")
+    void findPracticeNoteDetail_OtherUserPractice() {
+        PracticeNote otherUserPractice = practiceNoteRepository.save(PracticeNote.from(
+                new PracticeNoteRegisterDto(null, "other practice", List.of(), null),
+                2L
+        ));
+
+        assertThatThrownBy(() -> practiceNoteService.findPracticeNoteDetail(otherUserPractice.getId(), userId))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessageContaining(PracticeNoteErrorCase.PRACTICE_NOTE_USER_UNMATCHED.getMessage());
     }
 
     @Test
@@ -227,6 +244,28 @@ class PracticeNoteServiceTest {
         practiceNoteService.registerPractice(practiceNoteRegisterDto, userId);
 
         assertThat(practiceNoteRepository.findAll().size()).isEqualTo(practiceNoteList.size() + 1);
+    }
+
+    @Test
+    @DisplayName("다른 유저의 문제를 복습 노트에 추가하면 예외")
+    void registerPractice_OtherUserProblem() {
+        Problem otherUserProblem = Problem.from(
+                new ProblemRegisterDto(null, "memo", "reference", null, LocalDateTime.now()),
+                2L
+        );
+        otherUserProblem.updateFolder(problemList.get(0).getFolder());
+        problemRepository.save(otherUserProblem);
+
+        PracticeNoteRegisterDto practiceNoteRegisterDto = new PracticeNoteRegisterDto(
+                null,
+                "new practice",
+                List.of(otherUserProblem.getId()),
+                null
+        );
+
+        assertThatThrownBy(() -> practiceNoteService.registerPractice(practiceNoteRegisterDto, userId))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessageContaining(ProblemErrorCase.PROBLEM_USER_UNMATCHED.getMessage());
     }
 
     @Test
@@ -279,7 +318,7 @@ class PracticeNoteServiceTest {
         Long practiceNoteId = practiceNoteList.get(0).getId();
 
         // when
-        practiceNoteService.deletePractice(practiceNoteId);
+        practiceNoteService.deletePractice(practiceNoteId, userId);
 
         // then
         Optional<PracticeNote> optionalPracticeNote = practiceNoteRepository.findById(practiceNoteId);
@@ -296,7 +335,7 @@ class PracticeNoteServiceTest {
         List<Long> practiceIdList = List.of(practiceNoteList.get(0).getId(), practiceNoteList.get(1).getId());
 
         // when
-        practiceNoteService.deletePractices(practiceIdList);
+        practiceNoteService.deletePractices(userId, practiceIdList);
 
         // then
         for (int i = 0; i < 2; i++) {

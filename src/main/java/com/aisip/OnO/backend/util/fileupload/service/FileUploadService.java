@@ -1,6 +1,12 @@
 package com.aisip.OnO.backend.util.fileupload.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.problem.entity.ProblemImageData;
+import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
+import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
+import com.aisip.OnO.backend.problemsolve.entity.ProblemSolveImageData;
+import com.aisip.OnO.backend.problemsolve.exception.ProblemSolveErrorCase;
+import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveImageDataRepository;
 import com.aisip.OnO.backend.util.fileupload.exception.FileUploadErrorCase;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.DeleteObjectRequest;
@@ -8,10 +14,12 @@ import com.amazonaws.services.s3.model.ObjectMetadata;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.io.IOException;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
@@ -24,6 +32,9 @@ import java.util.UUID;
 public class FileUploadService {
     private final AmazonS3Client amazonS3Client;
     private final MeterRegistry meterRegistry;
+    private final ProblemImageDataRepository problemImageDataRepository;
+    private final ProblemSolveImageDataRepository problemSolveImageDataRepository;
+
     @Value("${cloud.aws.s3.bucket}")
     private String bucket;
 
@@ -63,6 +74,36 @@ public class FileUploadService {
             recordExternalCall("s3", "delete", "failure", sample);
             throw e;
         }
+    }
+
+    @Transactional
+    public void deleteUserImageFile(String imageUrl, Long userId) {
+        problemImageDataRepository.findByImageUrl(imageUrl)
+                .ifPresentOrElse(
+                        imageData -> deleteProblemImageData(imageData, imageUrl, userId),
+                        () -> deleteProblemSolveImageData(imageUrl, userId)
+                );
+    }
+
+    private void deleteProblemImageData(ProblemImageData imageData, String imageUrl, Long userId) {
+        if (!Objects.equals(imageData.getProblem().getUserId(), userId)) {
+            throw new ApplicationException(ProblemErrorCase.PROBLEM_USER_UNMATCHED);
+        }
+
+        deleteImageFileFromS3(imageUrl);
+        problemImageDataRepository.deleteByImageUrl(imageUrl);
+    }
+
+    private void deleteProblemSolveImageData(String imageUrl, Long userId) {
+        ProblemSolveImageData imageData = problemSolveImageDataRepository.findByImageUrl(imageUrl)
+                .orElseThrow(() -> new ApplicationException(FileUploadErrorCase.FILE_NOT_FOUND));
+
+        if (!Objects.equals(imageData.getProblemSolve().getUserId(), userId)) {
+            throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_USER_UNMATCHED);
+        }
+
+        deleteImageFileFromS3(imageUrl);
+        problemSolveImageDataRepository.deleteByImageUrl(imageUrl);
     }
 
     private String createFileName(MultipartFile file) {
