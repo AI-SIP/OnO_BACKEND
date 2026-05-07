@@ -170,7 +170,7 @@ class FolderServiceTest {
         Long folderId = folderList.get(1).getId();
 
         //when
-        FolderResponseDto folderResponseDto = folderService.findFolder(folderId);
+        FolderResponseDto folderResponseDto = folderService.findFolder(folderId, userId);
 
         //then
         assertThat(folderResponseDto.folderId()).isEqualTo(folderList.get(1).getId());
@@ -183,13 +183,26 @@ class FolderServiceTest {
     }
 
     @Test
+    @DisplayName("다른 유저의 폴더 조회 시 예외")
+    void findFolder_OtherUserFolder() {
+        Folder otherUserFolder = folderRepository.save(Folder.from(
+                new FolderRegisterDto("other folder", null, null),
+                2L
+        ));
+
+        assertThatThrownBy(() -> folderService.findFolder(otherUserFolder.getId(), userId))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessageContaining(FolderErrorCase.FOLDER_USER_UNMATCHED.getMessage());
+    }
+
+    @Test
     @DisplayName("folderId를 사용해 특정 폴더 엔티티 조회하기 테스트")
     void findFolderEntity() {
         //given
         Long folderId = folderList.get(0).getId();
 
         //when
-        Folder folder = folderService.findFolderEntity(folderId);
+        Folder folder = folderService.findFolderEntity(folderId, userId);
 
         //then
         assertThat(folder.getId()).isEqualTo(folderList.get(0).getId());
@@ -317,6 +330,24 @@ class FolderServiceTest {
     }
 
     @Test
+    @DisplayName("다른 유저의 부모 폴더에 폴더 생성 시 예외")
+    void createFolder_OtherUserParentFolder() {
+        Folder otherUserParentFolder = folderRepository.save(Folder.from(
+                new FolderRegisterDto("other parent", null, null),
+                2L
+        ));
+        FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
+                "new folder",
+                null,
+                otherUserParentFolder.getId()
+        );
+
+        assertThatThrownBy(() -> folderService.createFolder(folderRegisterDto, userId))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessageContaining(FolderErrorCase.FOLDER_USER_UNMATCHED.getMessage());
+    }
+
+    @Test
     @DisplayName("폴더 수정 테스트 - 폴더 이름 수정")
     void updateFolder_FolderName() {
         //given
@@ -396,7 +427,7 @@ class FolderServiceTest {
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when & then
-        assertThatThrownBy(() -> folderService.deleteFoldersWithProblems(folderIdList))
+        assertThatThrownBy(() -> folderService.deleteFoldersWithProblems(userId, folderIdList))
                 .isInstanceOf(ApplicationException.class)
                 .hasMessageContaining(FolderErrorCase.ROOT_FOLDER_CANNOT_REMOVE.getMessage());
 
@@ -411,7 +442,7 @@ class FolderServiceTest {
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when
-        folderService.deleteFoldersWithProblems(folderIdList);
+        folderService.deleteFoldersWithProblems(userId, folderIdList);
 
         // then
         assertThat(folderRepository.findAllByUserId(userId).size()).isEqualTo(1);
@@ -425,7 +456,7 @@ class FolderServiceTest {
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
 
         // when
-        folderService.deleteFoldersWithProblems(folderIdList);
+        folderService.deleteFoldersWithProblems(userId, folderIdList);
 
         // then
         assertThat(folderRepository.findAllByUserId(userId).size()).isEqualTo(3);

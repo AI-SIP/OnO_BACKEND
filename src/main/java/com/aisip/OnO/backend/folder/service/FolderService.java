@@ -59,7 +59,7 @@ public class FolderService {
     }
 
     @Transactional(readOnly = true)
-    public FolderResponseDto findFolder(Long folderId) {
+    public FolderResponseDto findFolderForAdmin(Long folderId) {
         Folder folder = folderRepository.findFolderWithDetailsByFolderId(folderId)
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
 
@@ -68,9 +68,24 @@ public class FolderService {
     }
 
     @Transactional(readOnly = true)
-    public Folder findFolderEntity(Long folderId) {
+    public FolderResponseDto findFolder(Long folderId, Long userId) {
+        Folder folder = findFolderWithDetailsOwnedByUser(folderId, userId);
+
+        List<Long> problemIdList = folderRepository.findProblemIdsByFolder(folder.getId());
+        return FolderResponseDto.from(folder, problemIdList);
+    }
+
+    @Transactional(readOnly = true)
+    private Folder findFolderEntity(Long folderId) {
         return folderRepository.findById(folderId)
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
+    }
+
+    @Transactional(readOnly = true)
+    public Folder findFolderEntity(Long folderId, Long userId) {
+        Folder folder = findFolderEntity(folderId);
+        validateFolderOwner(folder, userId);
+        return folder;
     }
 
     @Transactional(readOnly = true)
@@ -104,7 +119,7 @@ public class FolderService {
 
     public Long createFolder(FolderRegisterDto folderRegisterDto, Long userId) {
         Folder folder = Folder.from(folderRegisterDto, userId);
-        Folder parentFolder = findFolderEntity(folderRegisterDto.parentFolderId());
+        Folder parentFolder = findFolderEntity(folderRegisterDto.parentFolderId(), userId);
 
         folder.updateParentFolder(parentFolder);
         folderRepository.save(folder);
@@ -114,11 +129,11 @@ public class FolderService {
     }
 
     public void updateFolder(FolderRegisterDto folderRegisterDto, Long userId) {
-        Folder folder = findFolderEntity(folderRegisterDto.folderId());
+        Folder folder = findFolderEntity(folderRegisterDto.folderId(), userId);
         folder.updateFolderInfo(folderRegisterDto);
 
         if (folderRegisterDto.parentFolderId() != null && folder.getParentFolder() != null) {
-            Folder newParentFolder = findFolderEntity(folderRegisterDto.parentFolderId());
+            Folder newParentFolder = findFolderEntity(folderRegisterDto.parentFolderId(), userId);
 
             folder.updateParentFolder(newParentFolder);
         }
@@ -126,11 +141,11 @@ public class FolderService {
         log.info("userId : {} update folder id: {}", userId, folder.getId());
     }
 
-    public void deleteFoldersWithProblems(List<Long> folderIds) {
+    public void deleteFoldersWithProblems(Long userId, List<Long> folderIds) {
         // 삭제할 모든 폴더의 ID 조회 (하위 폴더 포함)
-        Set<Long> allFolderIds = getAllFolderIdsIncludingSubFolders(folderIds);
+        Set<Long> allFolderIds = getAllFolderIdsIncludingSubFolders(userId, folderIds);
 
-        problemService.deleteAllByFolderIds(allFolderIds);
+        problemService.deleteAllByFolderIds(userId, allFolderIds);
 
         deleteAllByFolderIds(allFolderIds);
     }
@@ -142,12 +157,11 @@ public class FolderService {
         deleteAllUserFolders(userId);
     }
 
-    public Set<Long> getAllFolderIdsIncludingSubFolders(List<Long> folderIds) {
+    public Set<Long> getAllFolderIdsIncludingSubFolders(Long userId, List<Long> folderIds) {
         Set<Long> allFolderIds = new HashSet<>();
 
         for (Long folderId : folderIds) {
-            Folder folder = folderRepository.findById(folderId)
-                    .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
+            Folder folder = findFolderEntity(folderId, userId);
 
             if (folder.getParentFolder() == null) {
                 throw new ApplicationException(FolderErrorCase.ROOT_FOLDER_CANNOT_REMOVE);
@@ -170,7 +184,7 @@ public class FolderService {
         return subFolderIds;
     }
 
-    public void deleteAllByFolderIds(Collection<Long> folderIds) {
+    private void deleteAllByFolderIds(Collection<Long> folderIds) {
         List<Folder> foldersToDelete = folderRepository.findAllById(folderIds);
         folderRepository.deleteAll(foldersToDelete);
     }
@@ -190,7 +204,8 @@ public class FolderService {
      * @return 커서 기반 페이징 응답
      */
     @Transactional(readOnly = true)
-    public CursorPageResponse<FolderThumbnailResponseDto> findSubFoldersWithCursor(Long folderId, Long cursor, int size) {
+    public CursorPageResponse<FolderThumbnailResponseDto> findSubFoldersWithCursor(Long folderId, Long userId, Long cursor, int size) {
+        findFolderEntity(folderId, userId);
         List<Folder> folders = folderRepository.findSubFoldersWithCursor(folderId, cursor, size);
 
         boolean hasNext = folders.size() > size;
@@ -203,6 +218,19 @@ public class FolderService {
 
         log.info("folderId: {} find subfolders with cursor: {}, size: {}, hasNext: {}", folderId, cursor, size, hasNext);
         return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
+    }
+
+    private Folder findFolderWithDetailsOwnedByUser(Long folderId, Long userId) {
+        Folder folder = folderRepository.findFolderWithDetailsByFolderId(folderId)
+                .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
+        validateFolderOwner(folder, userId);
+        return folder;
+    }
+
+    private void validateFolderOwner(Folder folder, Long userId) {
+        if (!Objects.equals(folder.getUserId(), userId)) {
+            throw new ApplicationException(FolderErrorCase.FOLDER_USER_UNMATCHED);
+        }
     }
 
     /**

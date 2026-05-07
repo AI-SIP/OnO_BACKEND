@@ -97,7 +97,7 @@ class ProblemControllerTest {
     void getProblem() throws Exception {
         //given
         Long problemId = 1L;
-        given(problemService.findProblem(problemId)).willReturn(problemResponseDtoList.get(0));
+        given(problemService.findProblem(problemId, 1L)).willReturn(problemResponseDtoList.get(0));
 
         // When & Then
         mockMvc.perform(get("/api/problems/" + problemId)
@@ -152,7 +152,7 @@ class ProblemControllerTest {
     @WithMockCustomUser()
     void getFolderProblems() throws Exception {
         //given
-        given(problemService.findFolderProblemList(1L)).willReturn(problemResponseDtoList);
+        given(problemService.findFolderProblemList(1L, 1L)).willReturn(problemResponseDtoList);
 
         // When & Then
         mockMvc.perform(get("/api/problems/folder/1")
@@ -203,7 +203,7 @@ class ProblemControllerTest {
                 .andExpect(status().isOk());
 
         verify(problemService, times(1)).uploadProblemImages(eq(1L), eq(1L), any(), any());
-        verify(problemService, times(1)).analysisProblem(eq(1L));
+        verify(problemService, times(1)).analysisProblem(eq(1L), eq(1L));
     }
 
     @Test
@@ -264,6 +264,6 @@ class ProblemControllerTest {
                         .param("imageUrl", imageUrl))
                 .andExpect(status().isOk());
 
-        Mockito.verify(problemService, Mockito.times(1)).deleteProblemImageData(imageUrl);
+        Mockito.verify(problemService, Mockito.times(1)).deleteProblemImageData(imageUrl, 1L);
     }
 }

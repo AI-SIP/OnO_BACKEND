@@ -13,6 +13,7 @@ import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
+import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.problemsolve.entity.AnswerStatus;
@@ -140,7 +141,7 @@ class ProblemServiceTest {
         problemSolveRepository.save(ProblemSolve.create(problem, userId, lastSolvedAt, AnswerStatus.WRONG, null, null, null));
 
         // when
-        ProblemResponseDto problemResponseDto = problemService.findProblem(problemId);
+        ProblemResponseDto problemResponseDto = problemService.findProblem(problemId, userId);
 
         // then
         assertThat(problemResponseDto.memo()).isEqualTo(problem.getMemo());
@@ -149,6 +150,16 @@ class ProblemServiceTest {
         assertThat(problemResponseDto.imageUrlList().size()).isEqualTo(2);
         assertThat(problemResponseDto.solveCount()).isEqualTo(2L);
         assertThat(problemResponseDto.lastSolvedAt()).isEqualTo(lastSolvedAt);
+    }
+
+    @Test
+    @DisplayName("다른 유저의 문제 조회 시 예외")
+    void findProblem_OtherUserProblem() {
+        Problem otherUserProblem = createOtherUserProblem();
+
+        assertThatThrownBy(() -> problemService.findProblem(otherUserProblem.getId(), userId))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessageContaining(ProblemErrorCase.PROBLEM_USER_UNMATCHED.getMessage());
     }
 
     @Test
@@ -186,7 +197,7 @@ class ProblemServiceTest {
         Long folderId = folder.getId();
 
         //when
-        List<ProblemResponseDto> problemResponseDtoList = problemService.findFolderProblemList(folderId);
+        List<ProblemResponseDto> problemResponseDtoList = problemService.findFolderProblemList(folderId, userId);
 
         //then
         assertThat(problemResponseDtoList.size()).isEqualTo(problemRepository.findAllByFolderId(folderId).size());
@@ -202,6 +213,19 @@ class ProblemServiceTest {
         assertThat(problemResponseDtoList.get(0)).isNotNull();
         assertThat(problemResponseDtoList.size()).isEqualTo(3);
         assertThat(problemResponseDtoList.get(0).imageUrlList().size()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("다른 유저의 폴더 문제 목록 조회 시 예외")
+    void findFolderProblemList_OtherUserFolder() {
+        Folder otherUserFolder = folderRepository.save(Folder.from(
+                new FolderRegisterDto("other folder", null, null),
+                2L
+        ));
+
+        assertThatThrownBy(() -> problemService.findFolderProblemList(otherUserFolder.getId(), userId))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessageContaining(FolderErrorCase.FOLDER_USER_UNMATCHED.getMessage());
     }
 
     @Test
@@ -269,6 +293,22 @@ class ProblemServiceTest {
         assertThatThrownBy(() -> problemService.registerProblem(dto, userId))
                 .isInstanceOf(ApplicationException.class)
                 .hasMessageContaining(FolderErrorCase.FOLDER_NOT_FOUND.getMessage());
+    }
+
+    @Test
+    @DisplayName("문제 등록하기 - 다른 유저 폴더 예외")
+    void registerProblem_otherUserFolder() {
+        Folder otherUserFolder = folderRepository.save(Folder.from(
+                new FolderRegisterDto("other folder", null, null),
+                2L
+        ));
+        ProblemRegisterDto dto = new ProblemRegisterDto(
+                null, "memo", "reference", otherUserFolder.getId(), LocalDateTime.now()
+        );
+
+        assertThatThrownBy(() -> problemService.registerProblem(dto, userId))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessageContaining(FolderErrorCase.FOLDER_USER_UNMATCHED.getMessage());
     }
 
     @Test
@@ -428,7 +468,7 @@ class ProblemServiceTest {
 
         // When
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
-        problemService.deleteProblem(problemId);
+        problemService.deleteProblem(problemId, userId);
 
         // Then
         verify(fileUploadService, times(2)).deleteImageFileFromS3(anyString());
@@ -462,7 +502,7 @@ class ProblemServiceTest {
 
         // when
         doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
-        problemService.deleteProblemList(problemIdList);
+        problemService.deleteProblemList(userId, problemIdList);
 
         // then
         verify(fileUploadService, times(2 * problemIdList.size())).deleteImageFileFromS3(anyString());
@@ -477,7 +517,7 @@ class ProblemServiceTest {
 
         // when
         int problemCount = problemRepository.findAllByFolderId(folderIdList.get(0)).size();
-        problemService.deleteAllByFolderIds(folderIdList);
+        problemService.deleteAllByFolderIds(userId, folderIdList);
 
         // then
         verify(fileUploadService, times(2 * problemCount)).deleteImageFileFromS3(anyString());
@@ -495,7 +535,7 @@ class ProblemServiceTest {
             String imageUrl = problem.getProblemImageDataList().get(0).getImageUrl();
 
             // when
-            problemService.deleteProblemImageData(imageUrl);
+            problemService.deleteProblemImageData(imageUrl, userId);
 
             // then
             verify(fileUploadService, times(1)).deleteImageFileFromS3(anyString());
@@ -507,5 +547,35 @@ class ProblemServiceTest {
                 assertThat(problem.getProblemImageDataList().size()).isEqualTo(1);
             }
         }
+    }
+
+    @Test
+    @DisplayName("다른 유저의 문제 이미지 삭제 시 예외")
+    void deleteProblemImageData_OtherUserProblem() {
+        Problem otherUserProblem = createOtherUserProblem();
+        ProblemImageData imageData = ProblemImageData.from(new ProblemImageDataRegisterDto(
+                otherUserProblem.getId(),
+                "other-user-url",
+                ProblemImageType.PROBLEM_IMAGE
+        ));
+        imageData.updateProblem(otherUserProblem);
+        problemImageDataRepository.save(imageData);
+
+        assertThatThrownBy(() -> problemService.deleteProblemImageData("other-user-url", userId))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessageContaining(ProblemErrorCase.PROBLEM_USER_UNMATCHED.getMessage());
+    }
+
+    private Problem createOtherUserProblem() {
+        Folder otherUserFolder = folderRepository.save(Folder.from(
+                new FolderRegisterDto("other folder", null, null),
+                2L
+        ));
+        Problem otherUserProblem = Problem.from(
+                new ProblemRegisterDto(null, "memo", "reference", otherUserFolder.getId(), LocalDateTime.now()),
+                2L
+        );
+        otherUserProblem.updateFolder(otherUserFolder);
+        return problemRepository.save(otherUserProblem);
     }
 }

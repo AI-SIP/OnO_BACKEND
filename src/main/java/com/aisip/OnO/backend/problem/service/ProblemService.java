@@ -81,9 +81,16 @@ public class ProblemService {
     private final ProblemTagMappingRepository problemTagMappingRepository;
 
     @Transactional(readOnly = true)
-    public ProblemResponseDto findProblem(Long problemId) {
+    public ProblemResponseDto findProblemForAdmin(Long problemId) {
         Problem problem = problemRepository.findProblemWithImageData(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
+
+        return toProblemResponseDto(problem);
+    }
+
+    @Transactional(readOnly = true)
+    public ProblemResponseDto findProblem(Long problemId, Long userId) {
+        Problem problem = findProblemEntityWithImageData(problemId, userId);
 
         return toProblemResponseDto(problem);
     }
@@ -120,7 +127,9 @@ public class ProblemService {
     }
 
     @Transactional(readOnly = true)
-    public List<ProblemResponseDto> findFolderProblemList(Long folderId) {
+    public List<ProblemResponseDto> findFolderProblemList(Long folderId, Long userId) {
+        validateFolderOwner(folderId, userId);
+
         return toProblemResponseDtos(problemRepository.findAllByFolderId(folderId));
     }
 
@@ -185,6 +194,7 @@ public class ProblemService {
 
         Folder folder = folderRepository.findById(problemRegisterDto.folderId())
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
+        validateFolderOwner(folder, userId);
 
         Problem problem = Problem.from(problemRegisterDto, userId);
         problem.updateFolder(folder);
@@ -262,6 +272,10 @@ public class ProblemService {
         }
 
         return folderRepository.findById(folderId)
+                .map(folder -> {
+                    validateFolderOwner(folder, userId);
+                    return folder;
+                })
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
     }
 
@@ -313,7 +327,14 @@ public class ProblemService {
      * - 이미지 없음: NOT_STARTED → NO_IMAGE
      */
     @Transactional
-    public void analysisProblem(Long problemId) {
+    public void analysisProblem(Long problemId, Long userId) {
+        findProblemEntity(problemId, userId);
+
+        analysisProblemWithoutOwnerCheck(problemId);
+    }
+
+    @Transactional
+    private void analysisProblemWithoutOwnerCheck(Long problemId) {
         // 이미 분석이 완료된 문제는 재요청하지 않음
         if (problemAnalysisRepository.findByProblemId(problemId)
                 .map(analysis -> analysis.getStatus() == AnalysisStatus.COMPLETED)
@@ -342,6 +363,12 @@ public class ProblemService {
     }
 
     @Transactional
+    public void updateProblemAnalysisToNoImage(Long problemId, Long userId) {
+        findProblemEntity(problemId, userId);
+        analysisService.updateToNoImage(problemId);
+    }
+
+    @Transactional
     public void updateProblemInfo(ProblemRegisterDto problemRegisterDto, Long userId) {
 
         Problem problem = findProblemEntity(problemRegisterDto.problemId(), userId);
@@ -359,6 +386,7 @@ public class ProblemService {
         if (problemRegisterDto.folderId() != null) {
             Folder folder = folderRepository.findById(problemRegisterDto.folderId())
                     .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
+            validateFolderOwner(folder, userId);
 
             problem.updateFolder(folder);
 
@@ -472,7 +500,7 @@ public class ProblemService {
      * - PracticeNote 매핑 삭제: 동기 (데이터 정합성)
      */
     @Transactional
-    public void deleteProblem(Long problemId) {
+    private void deleteProblemWithoutOwnerCheck(Long problemId) {
         // 1. 이미지 데이터 조회
         List<ProblemImageData> imageDataList = problemImageDataRepository.findAllByProblemId(problemId);
         // 1-1. 태그 매핑 조회
@@ -508,36 +536,51 @@ public class ProblemService {
     }
 
     @Transactional
-    public void deleteProblemImageData(String imageUrl) {
+    public void deleteProblem(Long problemId, Long userId) {
+        findProblemEntity(problemId, userId);
+        deleteProblemWithoutOwnerCheck(problemId);
+    }
+
+    @Transactional
+    public void deleteProblemImageData(String imageUrl, Long userId) {
+        ProblemImageData imageData = problemImageDataRepository.findByImageUrl(imageUrl)
+                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
+        if (!Objects.equals(imageData.getProblem().getUserId(), userId)) {
+            throw new ApplicationException(ProblemErrorCase.PROBLEM_USER_UNMATCHED);
+        }
+
         fileUploadService.deleteImageFileFromS3(imageUrl);
         problemImageDataRepository.deleteByImageUrl(imageUrl);
     }
 
     @Transactional
-    public void deleteProblemList(List<Long> problemIdList) {
-        problemIdList.forEach(this::deleteProblem);
+    public void deleteProblemList(Long userId, List<Long> problemIdList) {
+        problemIdList.forEach(problemId -> deleteProblem(problemId, userId));
     }
 
     @Transactional
-    public void deleteFolderProblems(Long folderId) {
+    private void deleteFolderProblems(Long folderId) {
         problemRepository.findAllByFolderId(folderId)
                 .forEach(problem -> {
-                    deleteProblem(problem.getId());
+                    deleteProblemWithoutOwnerCheck(problem.getId());
                 });
 
         log.info("problem in folderId: {} has deleted", folderId);
     }
 
     @Transactional
-    public void deleteAllByFolderIds(Collection<Long> folderIds) {
-        folderIds.forEach(this::deleteFolderProblems);
+    public void deleteAllByFolderIds(Long userId, Collection<Long> folderIds) {
+        folderIds.forEach(folderId -> {
+            validateFolderOwner(folderId, userId);
+            deleteFolderProblems(folderId);
+        });
     }
 
     @Transactional
     public void deleteAllUserProblems(Long userId) {
         problemRepository.findAllByUserId(userId)
                 .forEach(problem -> {
-                    deleteProblem(problem.getId());
+                    deleteProblemWithoutOwnerCheck(problem.getId());
                 });
 
         log.info("userId: {} delete all user problems", userId);
@@ -551,7 +594,8 @@ public class ProblemService {
      * @return 커서 기반 페이징 응답
      */
     @Transactional(readOnly = true)
-    public CursorPageResponse<ProblemResponseDto> findProblemsByFolderWithCursor(Long folderId, Long cursor, int size) {
+    public CursorPageResponse<ProblemResponseDto> findProblemsByFolderWithCursor(Long folderId, Long userId, Long cursor, int size) {
+        validateFolderOwner(folderId, userId);
         List<Problem> problems = problemRepository.findProblemsByFolderWithCursor(folderId, cursor, size);
 
         boolean hasNext = problems.size() > size;
@@ -655,6 +699,18 @@ public class ProblemService {
                     );
                 })
                 .collect(Collectors.toList());
+    }
+
+    private void validateFolderOwner(Long folderId, Long userId) {
+        Folder folder = folderRepository.findById(folderId)
+                .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
+        validateFolderOwner(folder, userId);
+    }
+
+    private void validateFolderOwner(Folder folder, Long userId) {
+        if (!Objects.equals(folder.getUserId(), userId)) {
+            throw new ApplicationException(FolderErrorCase.FOLDER_USER_UNMATCHED);
+        }
     }
 
     @Transactional(readOnly = true)
