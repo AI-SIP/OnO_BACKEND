@@ -6,6 +6,7 @@ import com.aisip.OnO.backend.problem.dto.ProblemAnalysisResponseDto;
 import com.aisip.OnO.backend.problem.dto.ReviewDueResponseDto;
 import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
+import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2BatchDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2Dto;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.dto.ProblemTagUpdateDto;
@@ -139,6 +140,15 @@ public class ProblemController {
 
         Long problemId = problemService.registerProblemV2(problemRegisterV2Dto, userId);
         return CommonResponse.success(problemId);
+    }
+
+    // ✅ 문제 배치 등록 v2 (이미지 URL 동시 저장)
+    @PostMapping("/v2/batch")
+    public CommonResponse<List<Long>> registerProblemsV2(@RequestBody ProblemRegisterV2BatchDto problemRegisterV2BatchDto) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        List<Long> problemIds = problemService.registerProblemsV2(problemRegisterV2BatchDto, userId);
+        return CommonResponse.success(problemIds);
     }
 
     // ✅ 문제 이미지 비동기 업로드

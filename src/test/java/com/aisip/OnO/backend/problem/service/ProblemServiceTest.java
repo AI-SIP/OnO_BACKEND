@@ -10,6 +10,7 @@ import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
+import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2BatchDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2Dto;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
@@ -361,6 +362,80 @@ class ProblemServiceTest {
         // Then
         Problem problem = problemRepository.findById(problemId).orElseThrow();
         assertThat(problem.getFolder().getId()).isEqualTo(rootFolder.getId());
+    }
+
+    @Test
+    @DisplayName("문제 배치 등록 v2 - 정상 케이스")
+    void registerProblemsV2_success() {
+        Long folderId = folderList.get(0).getId();
+        ProblemRegisterV2BatchDto dto = new ProblemRegisterV2BatchDto(List.of(
+                new ProblemRegisterV2Dto(
+                        null,
+                        "memo1",
+                        "reference1",
+                        folderId,
+                        LocalDateTime.now(),
+                        List.of("https://example.com/problem1.png"),
+                        List.of("https://example.com/answer1.png"),
+                        null
+                ),
+                new ProblemRegisterV2Dto(
+                        null,
+                        "memo2",
+                        "reference2",
+                        folderId,
+                        LocalDateTime.now(),
+                        List.of("https://example.com/problem2.png"),
+                        List.of(),
+                        null
+                )
+        ));
+
+        List<Long> problemIds = problemService.registerProblemsV2(dto, userId);
+
+        assertThat(problemIds).hasSize(2);
+        assertThat(problemRepository.findAllByUserId(userId)).hasSize(problemList.size() + 2);
+        assertThat(problemImageDataRepository.findAllByProblemId(problemIds.get(0))).hasSize(2);
+        assertThat(problemImageDataRepository.findAllByProblemId(problemIds.get(1))).hasSize(1);
+        assertThat(problemAnalysisRepository.existsByProblemId(problemIds.get(0))).isTrue();
+        assertThat(problemAnalysisRepository.existsByProblemId(problemIds.get(1))).isTrue();
+    }
+
+    @Test
+    @DisplayName("문제 배치 등록 v2 - 중간 실패 시 전체 롤백")
+    void registerProblemsV2_rollbackWhenFolderNotFound() {
+        long problemCount = problemRepository.countByUserId(userId);
+        long imageCount = problemImageDataRepository.count();
+
+        ProblemRegisterV2BatchDto dto = new ProblemRegisterV2BatchDto(List.of(
+                new ProblemRegisterV2Dto(
+                        null,
+                        "memo1",
+                        "reference1",
+                        folderList.get(0).getId(),
+                        LocalDateTime.now(),
+                        List.of("https://example.com/problem1.png"),
+                        List.of(),
+                        null
+                ),
+                new ProblemRegisterV2Dto(
+                        null,
+                        "memo2",
+                        "reference2",
+                        999999L,
+                        LocalDateTime.now(),
+                        List.of("https://example.com/problem2.png"),
+                        List.of(),
+                        null
+                )
+        ));
+
+        assertThatThrownBy(() -> problemService.registerProblemsV2(dto, userId))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessageContaining(FolderErrorCase.FOLDER_NOT_FOUND.getMessage());
+
+        assertThat(problemRepository.countByUserId(userId)).isEqualTo(problemCount);
+        assertThat(problemImageDataRepository.count()).isEqualTo(imageCount);
     }
 
     @Test
