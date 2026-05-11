@@ -332,6 +332,10 @@
                 <span class="text-sm font-bold text-gray-700" th:text="${allNoImageAnalysisCount}">0</span>
               </div>
               <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">전체 요청 제한 초과</span>
+                <span class="text-sm font-bold text-orange-700" th:text="${allRateLimitExceededAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                 <span class="text-sm font-medium text-gray-600">선택 기간 분석 완료</span>
                 <span class="text-sm font-bold text-green-700" th:text="${periodCompletedAnalysisCount}">0</span>
               </div>
@@ -355,6 +359,10 @@
               <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                 <span class="text-sm font-medium text-gray-600">선택 기간 이미지 없음</span>
                 <span class="text-sm font-bold text-gray-700" th:text="${periodNoImageAnalysisCount}">0</span>
+              </div>
+              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <span class="text-sm font-medium text-gray-600">선택 기간 요청 제한 초과</span>
+                <span class="text-sm font-bold text-orange-700" th:text="${periodRateLimitExceededAnalysisCount}">0</span>
               </div>
             </div>
           </div>
