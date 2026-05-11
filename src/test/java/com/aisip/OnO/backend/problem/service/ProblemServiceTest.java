@@ -1,6 +1,8 @@
 package com.aisip.OnO.backend.problem.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.common.ratelimit.RateLimitService;
+import com.aisip.OnO.backend.config.rabbitmq.producer.ProblemAnalysisProducer;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
@@ -10,10 +12,13 @@ import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2Dto;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
+import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.Problem;
+import com.aisip.OnO.backend.problem.entity.ProblemAnalysis;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
+import com.aisip.OnO.backend.problem.repository.ProblemAnalysisRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.problemsolve.entity.AnswerStatus;
@@ -38,6 +43,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.util.ReflectionTestUtils.setField;
@@ -56,6 +62,9 @@ class ProblemServiceTest {
     private ProblemImageDataRepository problemImageDataRepository;
 
     @Autowired
+    private ProblemAnalysisRepository problemAnalysisRepository;
+
+    @Autowired
     private FolderRepository folderRepository;
 
     @Autowired
@@ -67,6 +76,12 @@ class ProblemServiceTest {
     @MockBean
     private FileUploadService fileUploadService;
 
+    @MockBean
+    private RateLimitService rateLimitService;
+
+    @MockBean
+    private ProblemAnalysisProducer analysisProducer;
+
     private final Long userId = 1L;
     private List<Problem> problemList;
 
@@ -77,6 +92,7 @@ class ProblemServiceTest {
 
         problemList = new ArrayList<>();
         folderList = new ArrayList<>();
+        lenient().when(rateLimitService.tryConsume(anyString(), anyLong(), anyInt())).thenReturn(true);
 
         // 폴더 2개 생성
         for (int f = 1; f <= 2; f++) {
@@ -125,6 +141,7 @@ class ProblemServiceTest {
 
         problemSolveRepository.deleteAll();
         problemImageDataRepository.deleteAll();
+        problemAnalysisRepository.deleteAll();
         problemRepository.deleteAll();
         folderRepository.deleteAll();
     }
@@ -371,6 +388,26 @@ class ProblemServiceTest {
         assertThat(imageDataSize).isEqualTo(problemList.get(0).getProblemImageDataList().size() + 1);
         assertThat(problem.getProblemImageDataList().get(imageDataSize - 1).getImageUrl()).isEqualTo(imageUrl);
         assertThat(problem.getProblemImageDataList().get(imageDataSize - 1).getProblemImageType()).isEqualTo(ProblemImageType.SOLVE_IMAGE);
+    }
+
+    @Test
+    @DisplayName("AI 분석 요청 제한 초과 시 예외 없이 상태 저장")
+    void analysisProblem_rateLimitExceeded() {
+        // given
+        Problem problem = problemList.get(0);
+        ProblemAnalysis analysis = ProblemAnalysis.createSkipped(problem);
+        problem.updateProblemAnalysis(analysis);
+        problemAnalysisRepository.save(analysis);
+        given(rateLimitService.tryConsume(eq("ai_analysis"), eq(userId), anyInt())).willReturn(false);
+
+        // when
+        problemService.analysisProblem(problem.getId(), userId);
+
+        // then
+        ProblemAnalysis savedAnalysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
+        assertThat(savedAnalysis.getStatus()).isEqualTo(AnalysisStatus.RATE_LIMIT_EXCEEDED);
+        assertThat(savedAnalysis.getErrorMessage()).contains("일일 요청 횟수");
+        verify(analysisProducer, never()).sendAnalysisMessage(any());
     }
 
     @Test

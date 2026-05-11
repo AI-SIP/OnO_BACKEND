@@ -37,6 +37,7 @@ public class ProblemAnalysis extends BaseEntity {
     private String studyTips;         // 학습 팁
 
     @Enumerated(EnumType.STRING)
+    @Column(columnDefinition = "VARCHAR(32)")
     private AnalysisStatus status;    // 분석 상태
 
     @Column(columnDefinition = "TEXT")
@@ -82,5 +83,10 @@ public class ProblemAnalysis extends BaseEntity {
     public void updateToNoImage() {
         this.status = AnalysisStatus.NO_IMAGE;
         this.errorMessage = "이미지가 없어 분석을 진행할 수 없습니다.";
+    }
+
+    public void updateToRateLimitExceeded() {
+        this.status = AnalysisStatus.RATE_LIMIT_EXCEEDED;
+        this.errorMessage = "AI 분석 일일 요청 횟수를 초과해 분석을 진행하지 않았습니다.";
     }
 }
