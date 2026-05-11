@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.problem.service;
 
 import com.aisip.OnO.backend.admin.dto.AdminProblemResponseDto;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.common.ratelimit.RateLimitService;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import com.aisip.OnO.backend.config.rabbitmq.producer.ProblemAnalysisProducer;
@@ -57,6 +58,9 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 @RequiredArgsConstructor
 public class ProblemService {
+    private static final String AI_ANALYSIS_RATE_LIMIT_KEY = "ai_analysis";
+    private static final int AI_ANALYSIS_LIMIT_PER_DAY = 20;
+
     private final ProblemRepository problemRepository;
 
     private final ProblemImageDataRepository problemImageDataRepository;
@@ -79,6 +83,7 @@ public class ProblemService {
     private final ProblemAnalysisProducer analysisProducer;
     private final TagRepository tagRepository;
     private final ProblemTagMappingRepository problemTagMappingRepository;
+    private final RateLimitService rateLimitService;
 
     @Transactional(readOnly = true)
     public ProblemResponseDto findProblemForAdmin(Long problemId) {
@@ -330,11 +335,11 @@ public class ProblemService {
     public void analysisProblem(Long problemId, Long userId) {
         findProblemEntity(problemId, userId);
 
-        analysisProblemWithoutOwnerCheck(problemId);
+        analysisProblemWithoutOwnerCheck(problemId, userId);
     }
 
     @Transactional
-    private void analysisProblemWithoutOwnerCheck(Long problemId) {
+    private void analysisProblemWithoutOwnerCheck(Long problemId, Long userId) {
         // 이미 분석이 완료된 문제는 재요청하지 않음
         if (problemAnalysisRepository.findByProblemId(problemId)
                 .map(analysis -> analysis.getStatus() == AnalysisStatus.COMPLETED)
@@ -355,6 +360,12 @@ public class ProblemService {
             analysisService.updateToNoImage(problemId);
             log.info("분석 불가 (이미지 없음) - problemId: {}", problemId);
         } else {
+            if (!rateLimitService.tryConsume(AI_ANALYSIS_RATE_LIMIT_KEY, userId, AI_ANALYSIS_LIMIT_PER_DAY)) {
+                analysisService.updateToRateLimitExceeded(problemId);
+                log.info("AI 분석 일일 요청 제한 초과 - userId: {}, problemId: {}", userId, problemId);
+                return;
+            }
+
             // 이미지 있음 → PROCESSING 상태로 업데이트 후 RabbitMQ 전송
             analysisService.updateToProcessing(problemId);
             analysisProducer.sendAnalysisMessage(problemId);
