@@ -5,5 +5,6 @@ public enum AnalysisStatus {
     COMPLETED,    // 완료
     FAILED,        // 실패
     NOT_STARTED,
-    NO_IMAGE
+    NO_IMAGE,
+    RATE_LIMIT_EXCEEDED
 }

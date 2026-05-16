@@ -92,6 +92,7 @@ public class AdminAnalysisController {
         long periodProcessingAnalysisCount = periodAnalysisStatusCounts.getOrDefault(AnalysisStatus.PROCESSING, 0L);
         long periodNotStartedAnalysisCount = periodAnalysisStatusCounts.getOrDefault(AnalysisStatus.NOT_STARTED, 0L);
         long periodNoImageAnalysisCount = periodAnalysisStatusCounts.getOrDefault(AnalysisStatus.NO_IMAGE, 0L);
+        long periodRateLimitExceededAnalysisCount = periodAnalysisStatusCounts.getOrDefault(AnalysisStatus.RATE_LIMIT_EXCEEDED, 0L);
         long periodFinishedAnalysisCount = periodCompletedAnalysisCount + periodFailedAnalysisCount;
         double periodAnalysisFailureRate = periodFinishedAnalysisCount == 0
                 ? 0.0
@@ -112,6 +113,7 @@ public class AdminAnalysisController {
         model.addAttribute("allProcessingAnalysisCount", allAnalysisStatusCounts.getOrDefault(AnalysisStatus.PROCESSING, 0L));
         model.addAttribute("allNotStartedAnalysisCount", allAnalysisStatusCounts.getOrDefault(AnalysisStatus.NOT_STARTED, 0L));
         model.addAttribute("allNoImageAnalysisCount", allAnalysisStatusCounts.getOrDefault(AnalysisStatus.NO_IMAGE, 0L));
+        model.addAttribute("allRateLimitExceededAnalysisCount", allAnalysisStatusCounts.getOrDefault(AnalysisStatus.RATE_LIMIT_EXCEEDED, 0L));
         model.addAttribute("dailyActiveUsers", dailyActiveUsers);
         model.addAttribute("dailyVisits", dailyVisits);
         model.addAttribute("dailyNewUsers", dailyNewUsers);
@@ -130,6 +132,7 @@ public class AdminAnalysisController {
         model.addAttribute("periodProcessingAnalysisCount", periodProcessingAnalysisCount);
         model.addAttribute("periodNotStartedAnalysisCount", periodNotStartedAnalysisCount);
         model.addAttribute("periodNoImageAnalysisCount", periodNoImageAnalysisCount);
+        model.addAttribute("periodRateLimitExceededAnalysisCount", periodRateLimitExceededAnalysisCount);
         model.addAttribute("periodAnalysisFailureRate", periodAnalysisFailureRate);
         model.addAttribute("averageDailyVisitors", averageDailyVisitors);
         model.addAttribute("startDate", selectedStartDate);

@@ -1,6 +1,8 @@
 package com.aisip.OnO.backend.problem.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.common.ratelimit.RateLimitService;
+import com.aisip.OnO.backend.config.rabbitmq.producer.ProblemAnalysisProducer;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
@@ -8,12 +10,16 @@ import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
+import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2BatchDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2Dto;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
+import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.Problem;
+import com.aisip.OnO.backend.problem.entity.ProblemAnalysis;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
+import com.aisip.OnO.backend.problem.repository.ProblemAnalysisRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.problemsolve.entity.AnswerStatus;
@@ -38,6 +44,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.util.ReflectionTestUtils.setField;
@@ -56,6 +63,9 @@ class ProblemServiceTest {
     private ProblemImageDataRepository problemImageDataRepository;
 
     @Autowired
+    private ProblemAnalysisRepository problemAnalysisRepository;
+
+    @Autowired
     private FolderRepository folderRepository;
 
     @Autowired
@@ -67,6 +77,12 @@ class ProblemServiceTest {
     @MockBean
     private FileUploadService fileUploadService;
 
+    @MockBean
+    private RateLimitService rateLimitService;
+
+    @MockBean
+    private ProblemAnalysisProducer analysisProducer;
+
     private final Long userId = 1L;
     private List<Problem> problemList;
 
@@ -77,6 +93,7 @@ class ProblemServiceTest {
 
         problemList = new ArrayList<>();
         folderList = new ArrayList<>();
+        lenient().when(rateLimitService.tryConsume(anyString(), anyLong(), anyInt())).thenReturn(true);
 
         // 폴더 2개 생성
         for (int f = 1; f <= 2; f++) {
@@ -125,6 +142,7 @@ class ProblemServiceTest {
 
         problemSolveRepository.deleteAll();
         problemImageDataRepository.deleteAll();
+        problemAnalysisRepository.deleteAll();
         problemRepository.deleteAll();
         folderRepository.deleteAll();
     }
@@ -347,6 +365,80 @@ class ProblemServiceTest {
     }
 
     @Test
+    @DisplayName("문제 배치 등록 v2 - 정상 케이스")
+    void registerProblemsV2_success() {
+        Long folderId = folderList.get(0).getId();
+        ProblemRegisterV2BatchDto dto = new ProblemRegisterV2BatchDto(List.of(
+                new ProblemRegisterV2Dto(
+                        null,
+                        "memo1",
+                        "reference1",
+                        folderId,
+                        LocalDateTime.now(),
+                        List.of("https://example.com/problem1.png"),
+                        List.of("https://example.com/answer1.png"),
+                        null
+                ),
+                new ProblemRegisterV2Dto(
+                        null,
+                        "memo2",
+                        "reference2",
+                        folderId,
+                        LocalDateTime.now(),
+                        List.of("https://example.com/problem2.png"),
+                        List.of(),
+                        null
+                )
+        ));
+
+        List<Long> problemIds = problemService.registerProblemsV2(dto, userId);
+
+        assertThat(problemIds).hasSize(2);
+        assertThat(problemRepository.findAllByUserId(userId)).hasSize(problemList.size() + 2);
+        assertThat(problemImageDataRepository.findAllByProblemId(problemIds.get(0))).hasSize(2);
+        assertThat(problemImageDataRepository.findAllByProblemId(problemIds.get(1))).hasSize(1);
+        assertThat(problemAnalysisRepository.existsByProblemId(problemIds.get(0))).isTrue();
+        assertThat(problemAnalysisRepository.existsByProblemId(problemIds.get(1))).isTrue();
+    }
+
+    @Test
+    @DisplayName("문제 배치 등록 v2 - 중간 실패 시 전체 롤백")
+    void registerProblemsV2_rollbackWhenFolderNotFound() {
+        long problemCount = problemRepository.countByUserId(userId);
+        long imageCount = problemImageDataRepository.count();
+
+        ProblemRegisterV2BatchDto dto = new ProblemRegisterV2BatchDto(List.of(
+                new ProblemRegisterV2Dto(
+                        null,
+                        "memo1",
+                        "reference1",
+                        folderList.get(0).getId(),
+                        LocalDateTime.now(),
+                        List.of("https://example.com/problem1.png"),
+                        List.of(),
+                        null
+                ),
+                new ProblemRegisterV2Dto(
+                        null,
+                        "memo2",
+                        "reference2",
+                        999999L,
+                        LocalDateTime.now(),
+                        List.of("https://example.com/problem2.png"),
+                        List.of(),
+                        null
+                )
+        ));
+
+        assertThatThrownBy(() -> problemService.registerProblemsV2(dto, userId))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessageContaining(FolderErrorCase.FOLDER_NOT_FOUND.getMessage());
+
+        assertThat(problemRepository.countByUserId(userId)).isEqualTo(problemCount);
+        assertThat(problemImageDataRepository.count()).isEqualTo(imageCount);
+    }
+
+    @Test
     @DisplayName("문제 이미지 등록하기")
     void registerProblemImageData() {
         // given
@@ -371,6 +463,26 @@ class ProblemServiceTest {
         assertThat(imageDataSize).isEqualTo(problemList.get(0).getProblemImageDataList().size() + 1);
         assertThat(problem.getProblemImageDataList().get(imageDataSize - 1).getImageUrl()).isEqualTo(imageUrl);
         assertThat(problem.getProblemImageDataList().get(imageDataSize - 1).getProblemImageType()).isEqualTo(ProblemImageType.SOLVE_IMAGE);
+    }
+
+    @Test
+    @DisplayName("AI 분석 요청 제한 초과 시 예외 없이 상태 저장")
+    void analysisProblem_rateLimitExceeded() {
+        // given
+        Problem problem = problemList.get(0);
+        ProblemAnalysis analysis = ProblemAnalysis.createSkipped(problem);
+        problem.updateProblemAnalysis(analysis);
+        problemAnalysisRepository.save(analysis);
+        given(rateLimitService.tryConsume(eq("ai_analysis"), eq(userId), anyInt())).willReturn(false);
+
+        // when
+        problemService.analysisProblem(problem.getId(), userId);
+
+        // then
+        ProblemAnalysis savedAnalysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
+        assertThat(savedAnalysis.getStatus()).isEqualTo(AnalysisStatus.RATE_LIMIT_EXCEEDED);
+        assertThat(savedAnalysis.getErrorMessage()).contains("일일 요청 횟수");
+        verify(analysisProducer, never()).sendAnalysisMessage(any());
     }
 
     @Test

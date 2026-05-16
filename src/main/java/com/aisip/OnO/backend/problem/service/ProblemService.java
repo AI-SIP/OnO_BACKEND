@@ -2,15 +2,18 @@ package com.aisip.OnO.backend.problem.service;
 
 import com.aisip.OnO.backend.admin.dto.AdminProblemResponseDto;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.common.ratelimit.RateLimitService;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import com.aisip.OnO.backend.config.rabbitmq.producer.ProblemAnalysisProducer;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
+import com.aisip.OnO.backend.problem.entity.ProblemAnalysis;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
+import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2BatchDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2Dto;
 import com.aisip.OnO.backend.problem.dto.ProblemTagUpdateDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
@@ -57,6 +60,9 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 @RequiredArgsConstructor
 public class ProblemService {
+    private static final String AI_ANALYSIS_RATE_LIMIT_KEY = "ai_analysis";
+    private static final int AI_ANALYSIS_LIMIT_PER_DAY = 20;
+
     private final ProblemRepository problemRepository;
 
     private final ProblemImageDataRepository problemImageDataRepository;
@@ -79,6 +85,7 @@ public class ProblemService {
     private final ProblemAnalysisProducer analysisProducer;
     private final TagRepository tagRepository;
     private final ProblemTagMappingRepository problemTagMappingRepository;
+    private final RateLimitService rateLimitService;
 
     @Transactional(readOnly = true)
     public ProblemResponseDto findProblemForAdmin(Long problemId) {
@@ -265,10 +272,73 @@ public class ProblemService {
         return problem.getId();
     }
 
+    /**
+     * 문제 배치 등록 v2
+     * - 요청 전체를 하나의 트랜잭션으로 처리
+     * - 폴더/태그 검증을 저장 전에 수행해 중간 실패 시 전체 롤백
+     */
+    @Transactional
+    public List<Long> registerProblemsV2(ProblemRegisterV2BatchDto problemRegisterV2BatchDto, Long userId) {
+        List<ProblemRegisterV2Dto> registerDtos = problemRegisterV2BatchDto.problems();
+        if (registerDtos == null || registerDtos.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, Folder> foldersById = resolveRegisterFolders(registerDtos, userId);
+        Folder rootFolder = registerDtos.stream().anyMatch(dto -> dto.folderId() == null)
+                ? resolveRootFolder(userId)
+                : null;
+        Map<Long, Tag> tagsById = findRegisterTagsById(registerDtos, userId);
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+
+        List<Problem> problems = registerDtos.stream()
+                .map(dto -> {
+                    ProblemRegisterDto baseDto = toProblemRegisterDto(dto);
+                    Problem problem = Problem.from(baseDto, userId);
+                    Folder folder = dto.folderId() == null ? rootFolder : foldersById.get(dto.folderId());
+                    problem.updateFolder(folder);
+                    problem.updateReviewSchedule(today, 1, 0);
+                    return problem;
+                })
+                .toList();
+        problemRepository.saveAll(problems);
+
+        List<ProblemImageData> imageDataList = new ArrayList<>();
+        List<ProblemTagMapping> tagMappings = new ArrayList<>();
+        List<ProblemAnalysis> analyses = new ArrayList<>();
+
+        for (int i = 0; i < registerDtos.size(); i++) {
+            ProblemRegisterV2Dto dto = registerDtos.get(i);
+            Problem problem = problems.get(i);
+
+            addImageData(imageDataList, problem, dto.problemImageUrls(), ProblemImageType.PROBLEM_IMAGE);
+            addImageData(imageDataList, problem, dto.answerImageUrls(), ProblemImageType.ANSWER_IMAGE);
+
+            for (Long tagId : toDistinctIds(dto.tagIds())) {
+                tagMappings.add(ProblemTagMapping.from(problem, tagsById.get(tagId)));
+            }
+
+            ProblemAnalysis analysis = ProblemAnalysis.createSkipped(problem);
+            problem.updateProblemAnalysis(analysis);
+            analyses.add(analysis);
+        }
+
+        problemImageDataRepository.saveAll(imageDataList);
+        problemTagMappingRepository.saveAll(tagMappings);
+        problemAnalysisRepository.saveAll(analyses);
+
+        problems.forEach(problem -> missionLogService.registerProblemWriteMission(userId));
+
+        List<Long> problemIds = problems.stream()
+                .map(Problem::getId)
+                .toList();
+        log.info("userId: {} register problems(v2 batch) problemIds: {}", userId, problemIds);
+        return problemIds;
+    }
+
     private Folder resolveRegisterFolder(Long folderId, Long userId) {
         if (folderId == null) {
-            return folderRepository.findByUserIdAndParentFolderIsNull(userId)
-                    .orElseThrow(() -> new ApplicationException(FolderErrorCase.ROOT_FOLDER_NOT_EXIST));
+            return resolveRootFolder(userId);
         }
 
         return folderRepository.findById(folderId)
@@ -277,6 +347,83 @@ public class ProblemService {
                     return folder;
                 })
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
+    }
+
+    private Folder resolveRootFolder(Long userId) {
+        return folderRepository.findByUserIdAndParentFolderIsNull(userId)
+                .orElseThrow(() -> new ApplicationException(FolderErrorCase.ROOT_FOLDER_NOT_EXIST));
+    }
+
+    private Map<Long, Folder> resolveRegisterFolders(List<ProblemRegisterV2Dto> registerDtos, Long userId) {
+        Set<Long> folderIds = registerDtos.stream()
+                .map(ProblemRegisterV2Dto::folderId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        if (folderIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, Folder> foldersById = folderRepository.findAllById(folderIds).stream()
+                .collect(Collectors.toMap(Folder::getId, folder -> folder));
+        if (foldersById.size() != folderIds.size()) {
+            throw new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND);
+        }
+
+        foldersById.values().forEach(folder -> validateFolderOwner(folder, userId));
+        return foldersById;
+    }
+
+    private Map<Long, Tag> findRegisterTagsById(List<ProblemRegisterV2Dto> registerDtos, Long userId) {
+        boolean hasTooManyTags = registerDtos.stream()
+                .map(dto -> toDistinctIds(dto.tagIds()).size())
+                .anyMatch(size -> size > 5);
+        if (hasTooManyTags) {
+            throw new ApplicationException(TagErrorCase.TAG_LIMIT_EXCEEDED);
+        }
+
+        Set<Long> tagIds = registerDtos.stream()
+                .flatMap(dto -> toDistinctIds(dto.tagIds()).stream())
+                .collect(Collectors.toSet());
+
+        if (tagIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Tag> tags = tagRepository.findAllByIdInAndUserId(new ArrayList<>(tagIds), userId);
+        if (tags.size() != tagIds.size()) {
+            throw new ApplicationException(TagErrorCase.TAG_NOT_FOUND);
+        }
+
+        return tags.stream().collect(Collectors.toMap(Tag::getId, tag -> tag));
+    }
+
+    private ProblemRegisterDto toProblemRegisterDto(ProblemRegisterV2Dto dto) {
+        return new ProblemRegisterDto(
+                dto.problemId(),
+                dto.memo(),
+                dto.reference(),
+                dto.folderId(),
+                dto.solvedAt(),
+                dto.tagIds()
+        );
+    }
+
+    private void addImageData(List<ProblemImageData> imageDataList, Problem problem, List<String> imageUrls, ProblemImageType imageType) {
+        if (imageUrls == null) {
+            return;
+        }
+
+        imageUrls.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(url -> !url.isEmpty())
+                .forEach(url -> {
+                    ProblemImageData imageData = ProblemImageData.from(
+                            new ProblemImageDataRegisterDto(problem.getId(), url, imageType));
+                    imageData.updateProblem(problem);
+                    imageDataList.add(imageData);
+                });
     }
 
     /**
@@ -330,11 +477,11 @@ public class ProblemService {
     public void analysisProblem(Long problemId, Long userId) {
         findProblemEntity(problemId, userId);
 
-        analysisProblemWithoutOwnerCheck(problemId);
+        analysisProblemWithoutOwnerCheck(problemId, userId);
     }
 
     @Transactional
-    private void analysisProblemWithoutOwnerCheck(Long problemId) {
+    private void analysisProblemWithoutOwnerCheck(Long problemId, Long userId) {
         // 이미 분석이 완료된 문제는 재요청하지 않음
         if (problemAnalysisRepository.findByProblemId(problemId)
                 .map(analysis -> analysis.getStatus() == AnalysisStatus.COMPLETED)
@@ -355,6 +502,12 @@ public class ProblemService {
             analysisService.updateToNoImage(problemId);
             log.info("분석 불가 (이미지 없음) - problemId: {}", problemId);
         } else {
+            if (!rateLimitService.tryConsume(AI_ANALYSIS_RATE_LIMIT_KEY, userId, AI_ANALYSIS_LIMIT_PER_DAY)) {
+                analysisService.updateToRateLimitExceeded(problemId);
+                log.info("AI 분석 일일 요청 제한 초과 - userId: {}, problemId: {}", userId, problemId);
+                return;
+            }
+
             // 이미지 있음 → PROCESSING 상태로 업데이트 후 RabbitMQ 전송
             analysisService.updateToProcessing(problemId);
             analysisProducer.sendAnalysisMessage(problemId);

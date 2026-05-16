@@ -186,6 +186,46 @@ class ProblemControllerTest {
     }
 
     @Test
+    @DisplayName("문제 배치 등록 v2 기능")
+    @WithMockCustomUser()
+    void registerProblemsV2() throws Exception {
+        given(problemService.registerProblemsV2(any(), eq(1L))).willReturn(List.of(1L, 2L));
+
+        ProblemRegisterV2BatchDto dto = new ProblemRegisterV2BatchDto(List.of(
+                new ProblemRegisterV2Dto(
+                        null,
+                        "memo1",
+                        "reference1",
+                        1L,
+                        LocalDateTime.now(),
+                        List.of("https://example.com/problem1.png"),
+                        List.of("https://example.com/answer1.png"),
+                        null
+                ),
+                new ProblemRegisterV2Dto(
+                        null,
+                        "memo2",
+                        "reference2",
+                        1L,
+                        LocalDateTime.now(),
+                        List.of("https://example.com/problem2.png"),
+                        List.of(),
+                        null
+                )
+        ));
+
+        mockMvc.perform(post("/api/problems/v2/batch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.size()").value(2))
+                .andExpect(jsonPath("$.data[0]").value(1))
+                .andExpect(jsonPath("$.data[1]").value(2));
+
+        verify(problemService, times(1)).registerProblemsV2(any(), eq(1L));
+    }
+
+    @Test
     @DisplayName("문제 이미지 등록")
     @WithMockCustomUser()
     void registerProblemImageData() throws Exception {
