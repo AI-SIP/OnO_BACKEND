@@ -551,7 +551,7 @@ public class LearningReportService {
     }
 
     private Duration ttlUntilNextMidnight() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(KST);
         LocalDateTime nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay();
         Duration ttl = Duration.between(now, nextMidnight);
         return ttl.isNegative() || ttl.isZero() ? Duration.ofSeconds(1) : ttl;
