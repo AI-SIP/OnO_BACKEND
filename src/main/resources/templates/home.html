@@ -1,574 +1,764 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OnO | 손쉽게 작성하는 나만의 AI 오답노트, OnO</title>
-    <meta name="description" content="찰칵으로 시작하는 진짜 오답노트. AI 오답 분석, 복습 기록, 폴더 관리, 학습 리포트까지 OnO에서 한 번에.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OnO | 나만의 진정한 AI 오답노트</title>
+  <meta name="description" content="사진 한 장으로 시작하는 AI 오답노트. AI 오답 분석, 복습 관리, 학습 리포트까지 OnO에서 한 번에.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
 
-    <style>
-        :root {
-            --brand: #1cba1a;
-            --brand-strong: #159414;
-            --brand-soft: #e9f9e8;
-            --mint-soft: #f4fff4;
-            --ink: #102012;
-            --ink-soft: #355239;
-            --line: #cdeacc;
-            --surface: #ffffff;
-            --max: 1160px;
-            --radius-xl: 28px;
-            --radius-lg: 18px;
-            --radius-md: 12px;
-            --shadow: 0 18px 50px rgba(28, 186, 26, 0.15);
-        }
+  <style>
+    :root {
+      --brand:   #1cba1a;
+      --brand-dk:#0f9a0d;
+      --t1: #1d1d1f;
+      --t2: #6e6e73;
+      --t3: #86868b;
+      --bg:  #ffffff;
+      --bg2: #f5f5f7;
+      --line: #d2d2d7;
+      --max: 1140px;
+    }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--t1);
+      font-family: "Noto Sans KR", -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    a { color: inherit; text-decoration: none; }
 
-        html, body {
-            width: 100%;
-            min-height: 100%;
-            color: var(--ink);
-            background:
-                radial-gradient(1000px 500px at 100% -10%, #e0fadd 0, transparent 55%),
-                radial-gradient(900px 500px at -5% 30%, #edffe7 0, transparent 50%),
-                #f9fff8;
-            font-family: "Noto Sans KR", sans-serif;
-        }
+    /* ── SCROLL REVEAL ── */
+    .rv {
+      opacity: 0;
+      transform: translateY(28px);
+      transition:
+        opacity .82s cubic-bezier(.16,1,.3,1),
+        transform .82s cubic-bezier(.16,1,.3,1);
+    }
+    .rv.in { opacity: 1; transform: none; }
+    .d1 { transition-delay: .1s; }
+    .d2 { transition-delay: .22s; }
+    .d3 { transition-delay: .34s; }
+    .d4 { transition-delay: .46s; }
 
-        a {
-            color: inherit;
-            text-decoration: none;
-        }
+    /* ── NAV ── */
+    .nav {
+      position: sticky; top: 0; z-index: 100;
+      height: 52px;
+      background: rgba(255,255,255,.9);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid var(--line);
+    }
+    .nav-inner {
+      max-width: var(--max); margin: 0 auto;
+      padding: 0 24px; height: 100%;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo {
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 1.45rem; font-weight: 700;
+      letter-spacing: -.04em; color: var(--brand);
+    }
+    .nav-btn {
+      background: var(--brand); color: #fff;
+      font-size: .82rem; font-weight: 600;
+      padding: 7px 18px; border-radius: 980px;
+      transition: background .2s;
+    }
+    .nav-btn:hover { background: var(--brand-dk); }
 
-        .page {
-            max-width: var(--max);
-            margin: 0 auto;
-            padding: 24px 20px 72px;
-        }
+    /* ── PHONE IMAGE (already has device frame) ── */
+    .phone-img {
+      display: block;
+      width: 100%;
+      height: auto;
+      filter:
+        drop-shadow(0 2px 4px rgba(0,0,0,.06))
+        drop-shadow(0 16px 40px rgba(0,0,0,.13))
+        drop-shadow(0 40px 80px rgba(0,0,0,.08));
+    }
 
-        .brand {
-            font-family: "Space Grotesk", sans-serif;
-            font-size: 1.7rem;
-            font-weight: 700;
-            letter-spacing: -0.03em;
-            margin-bottom: 18px;
-            color: #1CBA1A;
-            padding-left: 8px;
-        }
+    /* ── HERO ── */
+    .hero {
+      background: var(--bg);
+      padding: 96px 24px 0;
+      text-align: center;
+    }
+    .hero-tag {
+      display: inline-block;
+      font-size: .75rem; font-weight: 700;
+      color: var(--brand); letter-spacing: .1em; text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-family: "Space Grotesk", "Noto Sans KR", sans-serif;
+      font-size: clamp(2.6rem, 7vw, 5rem);
+      font-weight: 700; letter-spacing: -.04em; line-height: 1.07;
+      color: var(--t1); margin-bottom: 22px;
+    }
+    .hero h1 em { font-style: normal; color: var(--brand); }
+    .hero-lead {
+      font-size: clamp(.97rem, 1.8vw, 1.15rem);
+      line-height: 1.68; color: var(--t2);
+      max-width: 500px; margin: 0 auto 40px;
+      word-break: keep-all;
+    }
+    .btn-row {
+      display: flex; gap: 12px;
+      justify-content: center; flex-wrap: wrap;
+      margin-bottom: 64px;
+    }
+    .store-btn {
+      display: inline-block;
+      width: 152px; height: 50px;
+      background-size: contain;
+      background-position: center;
+      background-repeat: no-repeat;
+      border-radius: 10px;
+      transition: transform .2s, opacity .2s;
+    }
+    .store-btn:hover { transform: translateY(-2px); opacity: .84; }
 
-        .brand span {
-            color: #1CBA1A;
-        }
+    /* ── HERO GALLERY ── */
+    .gallery-section {
+      position: relative;
+      margin-top: 0;
+    }
 
-        .hero {
-            background: linear-gradient(145deg, #ffffff 0, #f6fff4 100%);
-            border: 1px solid #d8f0d6;
-            border-radius: var(--radius-xl);
-            box-shadow: var(--shadow);
-            padding: 36px 24px;
-            display: grid;
-            gap: 24px;
-            align-items: center;
-        }
+    /* fade edges */
+    .gallery-section::before,
+    .gallery-section::after {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 80px;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .gallery-section::before {
+      left: 0;
+      background: linear-gradient(to right, var(--bg), transparent);
+    }
+    .gallery-section::after {
+      right: 0;
+      background: linear-gradient(to left, var(--bg), transparent);
+    }
 
-        .eyebrow {
-            display: inline-block;
-            background: var(--brand-soft);
-            border: 1px solid #bbe7b9;
-            color: #0f7a15;
-            border-radius: 999px;
-            padding: 8px 12px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-bottom: 14px;
-        }
+    .gallery-track {
+      display: flex;
+      gap: 18px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      scroll-behavior: smooth;
+      padding: 32px 80px 56px;
+      scrollbar-width: none;
+      cursor: grab;
+      align-items: flex-end;
+    }
+    .gallery-track::-webkit-scrollbar { display: none; }
+    .gallery-track.grabbing { cursor: grabbing; user-select: none; }
 
-        h1 {
-            font-family: "Space Grotesk", "Noto Sans KR", sans-serif;
-            font-size: clamp(2.1rem, 6vw, 3.8rem);
-            line-height: 1.12;
-            letter-spacing: -0.03em;
-            margin-bottom: 14px;
-            color: #0d2a10;
-            white-space: nowrap;
-        }
+    .gal-item {
+      flex-shrink: 0;
+      width: 195px;
+      scroll-snap-align: center;
+      transition: transform .45s cubic-bezier(.16,1,.3,1), filter .45s;
+      will-change: transform;
+    }
+    .gal-item img {
+      width: 100%; display: block;
+      filter:
+        drop-shadow(0 4px 8px rgba(0,0,0,.08))
+        drop-shadow(0 16px 36px rgba(0,0,0,.12));
+      transition: filter .45s;
+    }
 
-        .hero p {
-            color: #224126;
-            line-height: 1.85;
-            font-size: clamp(1.03rem, 2vw, 1.14rem);
-            max-width: 560px;
-            font-weight: 400;
-        }
+    /* hover: hovered item pops, siblings shrink */
+    .gallery-track:has(.gal-item:hover) .gal-item {
+      transform: scale(.91) translateY(12px);
+      filter: opacity(.65);
+    }
+    .gallery-track .gal-item:hover {
+      transform: scale(1.07) translateY(-10px) !important;
+      filter: none !important;
+      z-index: 5;
+    }
+    .gallery-track .gal-item:hover img {
+      filter:
+        drop-shadow(0 8px 16px rgba(0,0,0,.12))
+        drop-shadow(0 28px 60px rgba(0,0,0,.2));
+    }
 
-        .cta-wrap {
-            display: flex;
-            flex-wrap: nowrap;
-            gap: 12px;
-            align-items: center;
-        }
+    /* 첫/마지막 아이템 hover 비활성화 */
+    .gallery-track .gal-item:first-child,
+    .gallery-track .gal-item:last-child {
+      pointer-events: none;
+    }
 
-        .cta-label {
-            width: fit-content;
-            color: #1d5e27;
-            font-size: 0.64rem;
-            font-weight: 700;
-            margin-bottom: 4px;
-            opacity: 1;
-            padding: 4px 10px;
-            border-radius: 999px;
-            border: 1px solid #bfe4bf;
-            background: #f5fff4;
-        }
+    /* arrow buttons */
+    .gal-btn {
+      position: absolute;
+      top: 50%; transform: translateY(-50%);
+      z-index: 10;
+      background: rgba(255,255,255,.92);
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      width: 42px; height: 42px;
+      font-size: 1.2rem; line-height: 1;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0,0,0,.1);
+      backdrop-filter: blur(12px);
+      display: flex; align-items: center; justify-content: center;
+      transition: transform .2s, background .2s;
+      color: var(--t1);
+    }
+    .gal-btn:hover {
+      background: #fff;
+      transform: translateY(-50%) scale(1.1);
+    }
+    .gal-prev { left: 16px; }
+    .gal-next { right: 16px; }
 
-        .cta-box {
-            margin-top: 58px;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-        }
+    /* ── SHARED BAND TYPOGRAPHY ── */
+    .band-tag {
+      display: block;
+      font-size: .73rem; font-weight: 700;
+      color: var(--brand); letter-spacing: .1em; text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    .band-h2 {
+      font-family: "Space Grotesk", "Noto Sans KR", sans-serif;
+      font-size: clamp(1.75rem, 3.8vw, 2.9rem);
+      font-weight: 700; letter-spacing: -.03em; line-height: 1.16;
+      color: var(--t1); word-break: keep-all;
+    }
+    .band-p {
+      font-size: 1.02rem; line-height: 1.85; color: var(--t2);
+      word-break: keep-all;
+    }
 
-        .store-btn {
-            width: 168px;
-            height: 56px;
-            display: inline-block;
-            border-radius: 10px;
-            background-size: contain;
-            background-position: center;
-            background-repeat: no-repeat;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
+    /* ── TAGLINE BAND ── */
+    .tagline {
+      background: var(--bg2);
+      padding: 96px 24px;
+      text-align: center;
+    }
+    .tagline .band-h2 { max-width: 660px; margin: 0 auto 18px; }
+    .tagline .band-p  { max-width: 440px; margin: 0 auto; }
 
-        .store-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 24px rgba(20, 140, 24, 0.2);
-        }
+    /* ── FEATURE BANDS ── */
+    .feat { padding: 0; }
 
-        .cta-note {
-            color: #1f4c24;
-            font-size: 0.93rem;
-            font-weight: 500;
-        }
+    .feat-inner {
+      max-width: var(--max); margin: 0 auto;
+      padding: 96px 40px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+    }
 
-        .hero-visual {
-            display: grid;
-            place-items: center;
-        }
+    /* flip: image goes left */
+    .feat-inner--flip .feat-img-wrap { order: -1; }
 
-        .hero-visual {
-            width: min(100%, 372px);
-            margin: 0 auto;
-        }
+    .feat-copy { }
+    .feat-copy .band-p { max-width: 400px; margin-top: 18px; }
 
-        .hero-copy {
-            margin-top: 20px;
-            max-width: 560px;
-            display: grid;
-            gap: 12px;
-        }
+    .feat-img-wrap {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .feat-img-wrap .phone-img { max-width: 280px; }
 
-        .hero p.lead {
-            color: #1f4024;
-            line-height: 1.62;
-            font-size: 0.88rem;
-            font-weight: 400;
-            text-wrap: pretty;
-            word-break: keep-all;
-        }
+    /* two-phone side-by-side */
+    .phone-duo {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 12px;
+    }
+    .phone-duo .phone-img { max-width: 188px; }
+    .phone-duo .phone-img:last-child {
+      transform: translateY(24px);
+    }
 
-        .hero-badges {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
+    /* ── STATS CALLOUT (within feature copy) ── */
+    .stat-row {
+      display: flex;
+      gap: 32px;
+      margin-top: 28px;
+    }
+    .stat-item { display: flex; flex-direction: column; gap: 4px; }
+    .stat-num {
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 2rem; font-weight: 700;
+      color: var(--brand); letter-spacing: -.03em; line-height: 1;
+    }
+    .stat-label { font-size: .8rem; color: var(--t3); font-weight: 500; }
 
-        .hero-badge {
-            display: inline-flex;
-            align-items: center;
-            border: 1px solid #c8e9c6;
-            background: #f6fff6;
-            color: #17571f;
-            border-radius: 999px;
-            padding: 7px 12px;
-            font-size: 0.88rem;
-            font-weight: 500;
-        }
+    /* ── THEME SECTION ── */
+    .theme-section {
+      background: var(--bg);
+      padding: 96px 24px;
+      overflow: hidden;
+    }
+    .theme-inner {
+      max-width: var(--max); margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+    }
+    .theme-copy .band-tag { color: var(--brand); }
+    .theme-copy .band-h2 { color: var(--t1); }
+    .theme-copy .band-p  { color: var(--t2); margin-top: 18px; max-width: 400px; }
+    .theme-img-wrap {
+      display: flex; justify-content: center; align-items: center;
+    }
+    .theme-img-wrap img {
+      width: 100%; max-width: 460px; display: block;
+    }
 
-        .section {
-            margin-top: 60px;
-        }
+    /* ── ACHIEVEMENT SECTION ── */
+    .achieve-section {
+      background: var(--bg);
+      padding: 96px 24px;
+    }
+    .achieve-inner {
+      max-width: var(--max); margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+    }
+    .achieve-inner .band-p { max-width: 400px; margin-top: 18px; }
+    .achieve-img-wrap {
+      display: flex; justify-content: center; align-items: center;
+    }
+    .achieve-img-wrap .phone-img { max-width: 300px; }
 
-        .section h2 {
-            font-family: "Space Grotesk", "Noto Sans KR", sans-serif;
-            font-size: clamp(1.45rem, 3vw, 2.15rem);
-            letter-spacing: -0.02em;
-            margin-bottom: 8px;
-        }
+    /* ── DOWNLOAD CTA ── */
+    .dl-section {
+      background: var(--bg2);
+      padding: 96px 24px;
+      text-align: center;
+    }
+    .dl-section .band-h2 { margin-bottom: 14px; }
+    .dl-section .band-p  { margin-bottom: 40px; }
 
-        .section .desc {
-            color: var(--ink-soft);
-            line-height: 1.6;
-            font-size: 0.8rem;
-        }
+    /* ── FOOTER ── */
+    .footer {
+      background: var(--bg);
+      border-top: 1px solid var(--line);
+      padding: 28px 24px;
+    }
+    .footer-inner {
+      max-width: var(--max); margin: 0 auto;
+      display: flex; justify-content: space-between;
+      flex-wrap: wrap; gap: 8px;
+      font-size: .83rem; color: var(--t3);
+    }
 
-        .value-grid {
-            margin-top: 20px;
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 14px;
-        }
+    /* ── RESPONSIVE ── */
+    @media (max-width: 860px) {
+      .feat-inner {
+        grid-template-columns: 1fr;
+        gap: 40px; padding: 72px 24px;
+        text-align: center;
+      }
+      .feat-inner--flip .feat-img-wrap { order: 0; }
+      .feat-copy .band-p { max-width: none; }
+      .feat-img-wrap .phone-img { max-width: 240px; }
+      .phone-duo .phone-img { max-width: 155px; }
+      .stat-row { justify-content: center; }
 
-        .card {
-            background: var(--surface);
-            border: 1px solid var(--line);
-            border-radius: var(--radius-lg);
-            padding: 18px;
-        }
+      .achieve-inner {
+        grid-template-columns: 1fr;
+        gap: 40px; text-align: center;
+      }
+      .achieve-inner .band-p { max-width: none; }
 
-        .card h3 {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 1.0rem;
-            margin-bottom: 8px;
-            color: #0f7a15;
-        }
+      .theme-inner {
+        grid-template-columns: 1fr;
+        gap: 40px; text-align: center;
+      }
+      .theme-copy .band-p { max-width: none; }
 
-        .card p {
-            color: #244529;
-            line-height: 1.7;
-            font-size: 0.8rem;
-        }
+      .hero-phones .ph-side { display: none; }
+    }
 
-        .poster-wrap {
-            margin-top: 0;
-            position: relative;
-            background: #ffffff;
-            border: 1px solid #1cba1a;
-            border-radius: var(--radius-lg);
-            padding: 0;
-        }
-
-        .carousel {
-            overflow: hidden;
-            border-radius: var(--radius-md);
-        }
-
-        .track {
-            display: flex;
-            transition: transform 0.55s ease;
-            will-change: transform;
-        }
-
-        .slide {
-            min-width: 100%;
-            padding: 0;
-        }
-
-        .slide-card {
-            background: transparent;
-            border: 0;
-            border-radius: 0;
-            padding: 0;
-        }
-
-        .slide-card img {
-            width: 100%;
-            aspect-ratio: 10 / 16;
-            object-fit: contain;
-            background: transparent;
-            border-radius: 10px;
-            border: 0;
-            max-height: 500px;
-        }
-
-        .controls {
-            margin-top: 0;
-            position: absolute;
-            top: 50%;
-            left: 8px;
-            right: 8px;
-            transform: translateY(-50%);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0;
-            pointer-events: none;
-        }
-
-        .control-btn {
-            border: 0;
-            background: rgba(255, 255, 255, 0.28);
-            color: #0f7a15;
-            border-radius: 0;
-            font-weight: 700;
-            width: auto;
-            height: auto;
-            padding: 2px 6px;
-            font-size: 1.3rem;
-            line-height: 1;
-            cursor: pointer;
-            box-shadow: none;
-            pointer-events: auto;
-        }
-
-        .control-btn:hover {
-            background: rgba(255, 255, 255, 0.42);
-        }
-
-        .footer {
-            margin-top: 56px;
-            padding-top: 20px;
-            padding-left: 8px;
-            border-top: 1px solid #d6ebd4;
-            color: #5f7f64;
-            opacity: 0.82;
-            display: flex;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 10px;
-            font-size: 0.93rem;
-        }
-
-        @media (min-width: 980px) {
-            .hero {
-                grid-template-columns: 1.1fr 0.9fr;
-                padding: 44px 34px;
-            }
-
-            h1 {
-                white-space: nowrap;
-                font-size: clamp(1.85rem, 3.4vw, 3rem);
-            }
-        }
-
-        @media (max-width: 979px) {
-            .page {
-                padding-top: 20px;
-            }
-
-            .brand {
-                margin-bottom: 14px;
-            }
-
-            .hero {
-                gap: 18px;
-                padding: 28px 18px;
-            }
-
-            h1 {
-                font-size: clamp(1.26rem, 6.6vw, 1.95rem);
-                letter-spacing: -0.02em;
-            }
-
-            .hero-copy {
-                gap: 8px;
-            }
-
-            .cta-box {
-                margin-top: 52px;
-                align-items: center;
-            }
-
-            .cta-wrap {
-                justify-content: center;
-                gap: 8px;
-                width: 100%;
-            }
-
-            .cta-label {
-                text-align: center;
-                margin-bottom: 2px;
-                font-size: 0.62rem;
-            }
-
-            .store-btn {
-                width: 146px;
-                height: 50px;
-            }
-
-            .hero-visual {
-                width: min(100%, 352px);
-            }
-
-            .hero p.lead {
-                font-size: 0.84rem;
-                line-height: 1.58;
-            }
-
-            .value-grid {
-                grid-template-columns: 1fr;
-                gap: 14px;
-                margin-top: 14px;
-            }
-
-            .footer {
-                flex-direction: column;
-            }
-
-            .slide-card img {
-                max-height: 380px;
-            }
-        }
-    </style>
+    @media (max-width: 560px) {
+      .hero { padding-top: 64px; }
+      .hero-phones .ph-center { width: 200px; }
+    }
+  </style>
 </head>
 
-<!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=AW-16765111762"></script>
 <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'AW-16765111762');
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'AW-16765111762');
 </script>
 
 <body>
-<main class="page">
-    <div class="brand">On<span>O</span></div>
 
-    <section class="hero">
-        <div>
-            <span class="eyebrow">손쉽게 작성하는 나만의 AI 오답노트, OnO</span>
-            <h1>이젠 OnO로 복습하세요!</h1>
-            <div class="hero-copy">
-                <p class="lead">
-                    오답을 쌓아두는 데서 끝내지 않고,<br>다시 맞히는 루틴까지 이어지게 만듭니다.<br> <br>
-                    빠른 기록부터 AI 분석, 복습 관리, 학습 리포트까지 한 번에 경험해보세요.
-                </p>
-            </div>
+<!-- ── NAV ── -->
+<nav class="nav">
+  <div class="nav-inner">
+    <span class="logo">OnO</span>
+    <a href="https://apps.apple.com/kr/app/%EC%98%A4%EB%85%B8-ono-%EB%82%98%EB%A7%8C%EC%9D%98-%EC%A7%84%EC%A0%95%ED%95%9C-%EC%98%A4%EB%8B%B5%EB%85%B8%ED%8A%B8/id6602886624"
+       target="_blank" rel="noopener noreferrer" class="nav-btn">무료 다운로드</a>
+  </div>
+</nav>
 
-            <div class="cta-box">
-                <div class="cta-wrap">
-                    <a href="https://apps.apple.com/kr/app/%EC%98%A4%EB%85%B8-ono-%EB%82%98%EB%A7%8C%EC%9D%98-%EC%A7%84%EC%A0%95%ED%95%9C-%EC%98%A4%EB%8B%B5%EB%85%B8%ED%8A%B8/id6602886624"
-                       target="_blank" rel="noopener noreferrer" class="store-btn"
-                       style="background-image: url('/images/AppStoreDownloadButton.png');"></a>
-                    <a href="https://play.google.com/store/apps/details?id=com.ono.app&pcampaignid=web_share"
-                       target="_blank" rel="noopener noreferrer" class="store-btn"
-                       style="background-image: url('/images/GooglePlayDownloadButton.png');"></a>
-                </div>
-            </div>
+<!-- ── HERO ── -->
+<section class="hero">
+  <span class="hero-tag rv">나만의 AI 오답노트</span>
+  <h1 class="rv d1">틀린 문제, 이제<br><em>OnO</em>로 끝내세요</h1>
+  <p class="hero-lead rv d2">
+    오답을 쌓아두는 데서 끝내지 않고,<br>
+    다시 맞히는 루틴까지 이어지게 만듭니다.
+  </p>
+  <div class="btn-row rv d3">
+    <a href="https://apps.apple.com/kr/app/%EC%98%A4%EB%85%B8-ono-%EB%82%98%EB%A7%8C%EC%9D%98-%EC%A7%84%EC%A0%95%ED%95%9C-%EC%98%A4%EB%8B%B5%EB%85%B8%ED%8A%B8/id6602886624"
+       target="_blank" rel="noopener noreferrer" class="store-btn"
+       style="background-image:url('/images/AppStoreDownloadButton.png')"></a>
+    <a href="https://play.google.com/store/apps/details?id=com.ono.app&pcampaignid=web_share"
+       target="_blank" rel="noopener noreferrer" class="store-btn"
+       style="background-image:url('/images/GooglePlayDownloadButton.png')"></a>
+  </div>
+
+</section>
+
+<!-- ── HERO GALLERY ── -->
+<div class="gallery-section rv">
+  <button class="gal-btn gal-prev" id="galPrev" aria-label="이전">&#8249;</button>
+  <div class="gallery-track" id="galleryTrack">
+    <div class="gal-item">
+      <img src="/images/ScreenShot/SocialLogin.png" alt="OnO 로그인" loading="eager">
+    </div>
+    <div class="gal-item">
+      <img src="/images/ScreenShot/DirectoryScreen.png" alt="책장 관리" loading="eager">
+    </div>
+    <div class="gal-item">
+      <img src="/images/ScreenShot/ProblemRegister.png" alt="오답노트 작성" loading="lazy">
+    </div>
+    <div class="gal-item">
+      <img src="/images/ScreenShot/ProblemDetail1.png" alt="문제 상세" loading="lazy">
+    </div>
+    <div class="gal-item">
+      <img src="/images/ScreenShot/ProblemDetail3.png" alt="AI 오답 분석" loading="lazy">
+    </div>
+    <div class="gal-item">
+      <img src="/images/ScreenShot/PracticeNote.png" alt="복습 세트" loading="lazy">
+    </div>
+    <div class="gal-item">
+      <img src="/images/ScreenShot/ProblemSolve1.png" alt="복습 완료" loading="lazy">
+    </div>
+    <div class="gal-item">
+      <img src="/images/ScreenShot/LearningReport2.png" alt="학습 리포트" loading="lazy">
+    </div>
+    <div class="gal-item">
+      <img src="/images/ScreenShot/UserLevel.png" alt="학습 레벨" loading="lazy">
+    </div>
+    <div class="gal-item">
+      <img src="/images/ScreenShot/LearningCalendar2.png" alt="학습 달력" loading="lazy">
+    </div>
+    <div class="gal-item">
+      <img src="/images/ScreenShot/AchievementCard.png" alt="성취 카드" loading="lazy">
+    </div>
+  </div>
+  <button class="gal-btn gal-next" id="galNext" aria-label="다음">&#8250;</button>
+</div>
+
+<!-- ── TAGLINE ── -->
+<section class="tagline">
+  <span class="band-tag rv">OnO</span>
+  <h2 class="band-h2 rv d1">빠른 기록, AI 분석, 복습 관리,<br>학습 리포트까지 한 앱에서</h2>
+  <p class="band-p rv d2">공부의 모든 흐름을 OnO 하나로 연결하세요.</p>
+</section>
+
+<!-- ── FEATURE 1 : 빠른 등록 ── -->
+<div style="background:var(--bg)">
+  <div class="feat-inner">
+    <div class="feat-copy rv">
+      <span class="band-tag">빠른 등록</span>
+      <h3 class="band-h2">사진 한 장으로<br>바로 시작하세요</h3>
+      <p class="band-p">
+        틀린 문제를 카메라로 찍고 공책을 선택하면 끝. 제목, 메모, 태그까지 한 화면에서 바로 작성할 수 있어요.
+        여러 장의 사진도 한 번에 등록할 수 있습니다.
+      </p>
+    </div>
+    <div class="feat-img-wrap rv d1">
+      <div class="phone-duo">
+        <img src="/images/ScreenShot/ProblemRegister.png" alt="오답노트 작성 화면" class="phone-img" loading="lazy">
+        <img src="/images/ScreenShot/ProblemMultiRegister2.png" alt="여러장 등록 화면" class="phone-img" loading="lazy">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── FEATURE 2 : 체계적인 관리 ── -->
+<div style="background:var(--bg2)">
+  <div class="feat-inner feat-inner--flip">
+    <div class="feat-copy rv">
+      <span class="band-tag">공책별 관리</span>
+      <h3 class="band-h2">과목별로 정리된<br>나만의 책장</h3>
+      <p class="band-p">
+        국어, 수학, 영어… 과목마다 공책을 만들어 오답을 깔끔하게 분류하세요.
+        AI가 추천하는 복습 문제도 한눈에 확인할 수 있어요.
+      </p>
+    </div>
+    <div class="feat-img-wrap rv d1">
+      <img src="/images/ScreenShot/DirectoryScreen.png" alt="책장 관리 화면" class="phone-img" loading="lazy">
+    </div>
+  </div>
+</div>
+
+<!-- ── FEATURE 3 : AI 분석 ── -->
+<div style="background:var(--bg)">
+  <div class="feat-inner">
+    <div class="feat-copy rv">
+      <span class="band-tag">AI 오답 분석</span>
+      <h3 class="band-h2">왜 틀렸는지<br>AI가 찾아줍니다</h3>
+      <p class="band-p">
+        문제를 등록하면 AI가 과목, 문제 유형, 핵심 포인트를 분석하고
+        상세한 풀이까지 제공해요. 정답을 아는 것을 넘어, 개념을 완전히 이해할 수 있습니다.
+      </p>
+      <div class="stat-row">
+        <div class="stat-item">
+          <span class="stat-num">3가지</span>
+          <span class="stat-label">분석 항목</span>
         </div>
-
-        <div class="hero-visual">
-            <div class="poster-wrap">
-                <div class="carousel" id="posterCarousel">
-                    <div class="track" id="posterTrack">
-                        <div class="slide"><div class="slide-card"><img src="/images/poster/HomeScreen.png" alt="OnO Home Screen"></div></div>
-                        <div class="slide"><div class="slide-card"><img src="/images/poster/ProblemRegister.png" alt="OnO Problem Register"></div></div>
-                        <div class="slide"><div class="slide-card"><img src="/images/poster/Directory.png" alt="OnO Directory"></div></div>
-                        <div class="slide"><div class="slide-card"><img src="/images/poster/ProblemDetail1.png" alt="OnO Problem Detail 1"></div></div>
-                        <div class="slide"><div class="slide-card"><img src="/images/poster/ProblemDetail2.png" alt="OnO Problem Detail 2"></div></div>
-                        <div class="slide"><div class="slide-card"><img src="/images/poster/ProblemDetail3.png" alt="OnO Problem Detail 3"></div></div>
-                        <div class="slide"><div class="slide-card"><img src="/images/poster/ProblemPractice.png" alt="OnO Problem Practice"></div></div>
-                        <div class="slide"><div class="slide-card"><img src="/images/poster/Report.png" alt="OnO Report"></div></div>
-                        <div class="slide"><div class="slide-card"><img src="/images/poster/MyPage.png" alt="OnO My Page"></div></div>
-                    </div>
-                </div>
-
-                <div class="controls">
-                    <button class="control-btn" id="prevBtn" aria-label="이전">‹</button>
-                    <button class="control-btn" id="nextBtn" aria-label="다음">›</button>
-                </div>
-            </div>
+        <div class="stat-item">
+          <span class="stat-num">AI</span>
+          <span class="stat-label">자동 풀이 제공</span>
         </div>
-    </section>
+      </div>
+    </div>
+    <div class="feat-img-wrap rv d1">
+      <div class="phone-duo">
+        <img src="/images/ScreenShot/ProblemDetail1.png" alt="문제 화면" class="phone-img" loading="lazy">
+        <img src="/images/ScreenShot/ProblemDetail3.png" alt="AI 분석 결과 화면" class="phone-img" loading="lazy">
+      </div>
+    </div>
+  </div>
+</div>
 
-    <section class="section">
-        <h2>오답 정리가 훨씬 쉬워집니다</h2>
-        <p class="desc">
-            번거롭고 오래 걸리던 오답 정리를, <br>매일 이어갈 수 있는 학습 루틴으로 바꿔보세요.
-        </p>
+<!-- ── FEATURE 4 : 복습 세트 ── -->
+<div style="background:var(--bg2)">
+  <div class="feat-inner feat-inner--flip">
+    <div class="feat-copy rv">
+      <span class="band-tag">복습 세트</span>
+      <h3 class="band-h2">다시 풀어야 할 문제를<br>놓치지 않아요</h3>
+      <p class="band-p">
+        틀린 문제를 복습 세트에 담아두고 시험 전에 꺼내 직접 다시 풀 수 있어요.
+        정답·부분정답·오답을 기록하며 내 실력 변화를 추적합니다.
+      </p>
+    </div>
+    <div class="feat-img-wrap rv d1">
+      <div class="phone-duo">
+        <img src="/images/ScreenShot/PracticeNote.png" alt="복습 세트 목록" class="phone-img" loading="lazy">
+        <img src="/images/ScreenShot/ProblemSolve1.png" alt="복습 결과 입력" class="phone-img" loading="lazy">
+      </div>
+    </div>
+  </div>
+</div>
 
-        <div class="value-grid">
-            <article class="card">
-                <h3>📝 빠르고 편리한 오답노트 작성</h3>
-                <p>문제를 길게 옮겨 적지 않아도 됩니다. 촬영 중심으로 필요한 정보만 빠르게 정리할 수 있어요.</p>
-            </article>
-            <article class="card">
-                <h3>🤖 AI 오답 분석</h3>
-                <p>단순 정답 확인을 넘어, 왜 틀렸는지와 어떤 개념이 부족한지까지 분석해 복습 방향을 잡아줍니다.</p>
-            </article>
-            <article class="card">
-                <h3>📌 복습 기록 작성</h3>
-                <p>복습한 결과를 쌓아가며 성장하는 내 모습을 확인할 수 있어요.</p>
-            </article>
-            <article class="card">
-                <h3>🗂 복습 리스트 · 폴더</h3>
-                <p>시험 전 필요한 문제만 모아 보고, 폴더로 원하는 오답을 빠르게 찾아 복습할 수 있습니다.</p>
-            </article>
-            <article class="card">
-                <h3>📱 태블릿과 스마트폰 연동</h3>
-                <p>집에서는 태블릿으로, 이동 중에는 스마트폰으로 같은 오답노트를 이어서 복습할 수 있습니다.</p>
-            </article>
-            <article class="card">
-                <h3>📊 학습 리포트</h3>
-                <p>내 학습 추이와 약점 영역을 한눈에 확인하고, 다음에 무엇을 먼저 공부할지 더 명확하게 정할 수 있어요.</p>
-            </article>
+<!-- ── FEATURE 5 : 학습 리포트 ── -->
+<div style="background:var(--bg)">
+  <div class="feat-inner">
+    <div class="feat-copy rv">
+      <span class="band-tag">학습 리포트</span>
+      <h3 class="band-h2">내 약점이 어디인지<br>데이터로 보여줍니다</h3>
+      <p class="band-p">
+        주간·월간·누적 리포트로 복습 횟수, 평균 정답률, 연속 학습일을 한눈에 확인하세요.
+        집중 복습이 필요한 태그도 자동으로 추천해드려요.
+      </p>
+      <div class="stat-row">
+        <div class="stat-item">
+          <span class="stat-num">83%</span>
+          <span class="stat-label">평균 정답률</span>
         </div>
-    </section>
+        <div class="stat-item">
+          <span class="stat-num">주·월·누적</span>
+          <span class="stat-label">리포트 제공</span>
+        </div>
+      </div>
+    </div>
+    <div class="feat-img-wrap rv d1">
+      <div class="phone-duo">
+        <img src="/images/ScreenShot/LearningReport1.png" alt="주간 리포트" class="phone-img" loading="lazy">
+        <img src="/images/ScreenShot/LearningReport2.png" alt="상세 리포트" class="phone-img" loading="lazy">
+      </div>
+    </div>
+  </div>
+</div>
 
-    <footer class="footer">
-        <span>© OnO. All rights reserved.</span>
-        <span>Contact: aisip2024@gmail.com</span>
-    </footer>
-</main>
+<!-- ── FEATURE 6 : 학습 기록 & 스트릭 ── -->
+<div style="background:var(--bg2)">
+  <div class="feat-inner feat-inner--flip">
+    <div class="feat-copy rv">
+      <span class="band-tag">학습 기록</span>
+      <h3 class="band-h2">꾸준함이<br>실력이 됩니다</h3>
+      <p class="band-p">
+        매일 학습하면 스트릭이 쌓이고, 출석·노트 작성·문제 복습으로
+        학습 레벨이 올라가요. 달력으로 한 달 학습 기록을 한눈에 확인하세요.
+      </p>
+    </div>
+    <div class="feat-img-wrap rv d1">
+      <div class="phone-duo">
+        <img src="/images/ScreenShot/UserLevel.png" alt="학습 레벨" class="phone-img" loading="lazy">
+        <img src="/images/ScreenShot/LearningCalendar2.png" alt="학습 달력" class="phone-img" loading="lazy">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── THEME SECTION ── -->
+<section class="theme-section">
+  <div class="theme-inner">
+    <div class="theme-copy rv">
+      <span class="band-tag">테마</span>
+      <h2 class="band-h2">나만의 컬러로<br>오답노트를 꾸며보세요</h2>
+      <p class="band-p">
+        핑크, 블루, 퍼플, 민트, 오렌지까지 — 다양한 테마 컬러를 지원해요.
+        매일 펼치는 오답노트가 내 취향에 맞게 달라집니다.
+      </p>
+    </div>
+    <div class="theme-img-wrap rv d1">
+      <img src="/images/ScreenShot/MultiTheme.png" alt="다양한 테마 컬러" loading="lazy">
+    </div>
+  </div>
+</section>
+
+<!-- ── ACHIEVEMENT CARD ── -->
+<section class="achieve-section">
+  <div class="achieve-inner">
+    <div class="rv">
+      <span class="band-tag">성취 카드</span>
+      <h2 class="band-h2">이번 주 공부 기록,<br>공유하고 동기를 얻으세요</h2>
+      <p class="band-p">
+        한 주간의 복습 횟수, 정답률, 학습 시간이 담긴 성취 카드를 친구에게 공유하세요.
+        나의 꾸준함이 한눈에 보입니다.
+      </p>
+    </div>
+    <div class="achieve-img-wrap rv d1">
+      <img src="/images/ScreenShot/AchievementCard.png" alt="학습 성취 카드" class="phone-img" loading="lazy">
+    </div>
+  </div>
+</section>
+
+<!-- ── DOWNLOAD CTA ── -->
+<section class="dl-section">
+  <span class="band-tag rv">무료 다운로드</span>
+  <h2 class="band-h2 rv d1">오늘 틀린 문제,<br>오늘 바로 정리하세요</h2>
+  <p class="band-p rv d2">지금 다운로드하고 AI 오답 분석을 무료로 경험해보세요.</p>
+  <div class="btn-row rv d3">
+    <a href="https://apps.apple.com/kr/app/%EC%98%A4%EB%85%B8-ono-%EB%82%98%EB%A7%8C%EC%9D%98-%EC%A7%84%EC%A0%95%ED%95%9C-%EC%98%A4%EB%8B%B5%EB%85%B8%ED%8A%B8/id6602886624"
+       target="_blank" rel="noopener noreferrer" class="store-btn"
+       style="background-image:url('/images/AppStoreDownloadButton.png')"></a>
+    <a href="https://play.google.com/store/apps/details?id=com.ono.app&pcampaignid=web_share"
+       target="_blank" rel="noopener noreferrer" class="store-btn"
+       style="background-image:url('/images/GooglePlayDownloadButton.png')"></a>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <span>© OnO. All rights reserved.</span>
+    <span>Contact: aisip2024@gmail.com</span>
+  </div>
+</footer>
 
 <script>
-    (function () {
-        const track = document.getElementById('posterTrack');
-        const slides = Array.from(track.children);
-        const prevBtn = document.getElementById('prevBtn');
-        const nextBtn = document.getElementById('nextBtn');
+  // ── 스크롤 리빌 ──
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.08 });
 
-        let index = 0;
-        let timer = null;
+  document.querySelectorAll('.rv').forEach(el => io.observe(el));
 
-        function render() {
-            track.style.transform = `translateX(-${index * 100}%)`;
-        }
+  // 히어로 + 갤러리는 즉시 순차 등장
+  [...document.querySelectorAll('.hero .rv'), document.querySelector('.gallery-section')].forEach((el, i) => {
+    if (el) setTimeout(() => el.classList.add('in'), 60 + i * 90);
+  });
 
-        function goTo(nextIndex) {
-            index = (nextIndex + slides.length) % slides.length;
-            render();
-        }
+  // ── 갤러리 ──
+  const track = document.getElementById('galleryTrack');
+  const SCROLL_AMOUNT = 220;
+  const AUTO_INTERVAL = 3200;
+  let autoDir = 1;
+  let autoTimer = null;
 
-        function next() {
-            goTo(index + 1);
-        }
+  function scrollAuto() {
+    const maxScroll = track.scrollWidth - track.clientWidth;
+    if (autoDir === 1 && track.scrollLeft >= maxScroll - SCROLL_AMOUNT) {
+      autoDir = -1;
+    } else if (autoDir === -1 && track.scrollLeft <= SCROLL_AMOUNT) {
+      autoDir = 1;
+    }
+    track.scrollBy({ left: SCROLL_AMOUNT * autoDir, behavior: 'smooth' });
+  }
 
-        function prev() {
-            goTo(index - 1);
-        }
+  function startAuto() {
+    stopAuto();
+    autoTimer = setInterval(scrollAuto, AUTO_INTERVAL);
+  }
+  function stopAuto() {
+    clearInterval(autoTimer);
+  }
 
-        function startAuto() {
-            timer = setInterval(next, 3500);
-        }
+  // 마우스 올리면 멈추고, 나가면 재시작
+  track.addEventListener('mouseenter', stopAuto);
+  track.addEventListener('mouseleave', startAuto);
 
-        function restartAuto() {
-            clearInterval(timer);
-            startAuto();
-        }
+  document.getElementById('galPrev').addEventListener('click', () => {
+    track.scrollBy({ left: -SCROLL_AMOUNT, behavior: 'smooth' });
+    startAuto();
+  });
+  document.getElementById('galNext').addEventListener('click', () => {
+    track.scrollBy({ left: SCROLL_AMOUNT, behavior: 'smooth' });
+    startAuto();
+  });
 
-        nextBtn.addEventListener('click', () => {
-            next();
-            restartAuto();
-        });
+  // 드래그 스크롤
+  let isDragging = false, startX = 0, scrollLeft = 0;
+  track.addEventListener('mousedown', e => {
+    isDragging = true;
+    stopAuto();
+    track.classList.add('grabbing');
+    startX = e.pageX - track.offsetLeft;
+    scrollLeft = track.scrollLeft;
+  });
+  track.addEventListener('mouseleave', () => {
+    if (isDragging) { isDragging = false; track.classList.remove('grabbing'); }
+  });
+  track.addEventListener('mouseup', () => {
+    isDragging = false;
+    track.classList.remove('grabbing');
+    startAuto();
+  });
+  track.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const x = e.pageX - track.offsetLeft;
+    track.scrollLeft = scrollLeft - (x - startX) * 1.4;
+  });
 
-        prevBtn.addEventListener('click', () => {
-            prev();
-            restartAuto();
-        });
-
-        startAuto();
-    })();
+  startAuto();
 </script>
 </body>
 </html>
