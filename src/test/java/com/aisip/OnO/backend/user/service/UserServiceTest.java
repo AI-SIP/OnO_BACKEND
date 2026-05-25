@@ -238,16 +238,20 @@ class UserServiceTest {
     void deleteUserById() {
         // Given
         Long userId = 1L;
+        User user = User.from(userRegisterDto);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         doNothing().when(userRepository).deleteById(userId);
 
         // When
         userService.deleteUserById(userId);
 
         // Then
+        assertThat(user.getIdentifier()).startsWith("deleted:" + userId + ":");
         verify(practiceNoteService, times(1)).deleteAllPracticesByUser(userId);
         verify(problemService, times(1)).deleteAllUserProblems(userId);
         verify(folderService, times(1)).deleteAllUserFolders(userId);
+        verify(userRepository, times(1)).findById(userId);
         verify(userRepository, times(1)).deleteById(userId);
-        verify(userRepository, times(1)).flush();
+        verify(userRepository, times(2)).flush();
     }
 }

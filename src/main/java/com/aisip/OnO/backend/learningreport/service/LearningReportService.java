@@ -1,9 +1,10 @@
 package com.aisip.OnO.backend.learningreport.service;
 
-import com.aisip.OnO.backend.learningreport.dto.LearningReportResponseDto;
 import com.aisip.OnO.backend.learningreport.dto.LearningComparison;
 import com.aisip.OnO.backend.learningreport.dto.LearningPeriodReport;
 import com.aisip.OnO.backend.learningreport.dto.LearningRecommendations;
+import com.aisip.OnO.backend.learningreport.dto.LearningReportResponseDto;
+import com.aisip.OnO.backend.learningreport.dto.LearningReportSummaryResponseDto;
 import com.aisip.OnO.backend.learningreport.dto.LearningTrendPoint;
 import com.aisip.OnO.backend.learningreport.dto.LearningWeakArea;
 import com.aisip.OnO.backend.learningreport.repository.LearningReportQueryRepository;
@@ -18,7 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,6 +35,9 @@ public class LearningReportService {
 
     private static final int TOP_WEAK_AREAS_LIMIT = 3;
     private static final String CACHE_KEY_PREFIX = "LEARNING_REPORT";
+    private static final String SUMMARY_CACHE_KEY_PREFIX = "LEARNING_REPORT_SUMMARY";
+    private static final int MONTHLY_REVIEW_GOAL = 30;
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final LearningReportQueryRepository reportRepository;
     private final OpenAIClient openAIClient;
@@ -74,6 +80,98 @@ public class LearningReportService {
 
         writeCache(cacheKey, report);
         return report;
+    }
+
+    public LearningReportSummaryResponseDto getLearningReportSummary(Long userId) {
+        LocalDate today = LocalDate.now(KST);
+        String cacheKey = SUMMARY_CACHE_KEY_PREFIX + ":" + today + ":" + userId;
+
+        LearningReportSummaryResponseDto cached = readSummaryCache(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
+        YearMonth currentMonth = YearMonth.from(today);
+        YearMonth previousMonth = currentMonth.minusMonths(1);
+
+        LocalDateTime currentStart = currentMonth.atDay(1).atStartOfDay();
+        LocalDateTime currentEnd = currentMonth.atEndOfMonth().atTime(23, 59, 59);
+        LocalDateTime previousStart = previousMonth.atDay(1).atStartOfDay();
+        LocalDateTime previousEnd = previousMonth.atEndOfMonth().atTime(23, 59, 59);
+
+        long monthlyReviewCount = defaultLong(reportRepository.countReviewsInPeriod(userId, currentStart, currentEnd));
+        long previousMonthlyReviewCount = defaultLong(reportRepository.countReviewsInPeriod(userId, previousStart, previousEnd));
+        long reviewCountDiff = monthlyReviewCount - previousMonthlyReviewCount;
+        double reviewCountChangeRate = summaryChangeRate(monthlyReviewCount, previousMonthlyReviewCount);
+
+        String monthLabel = currentMonth.getYear() + "년 " + currentMonth.getMonthValue() + "월";
+        String generatedAt = OffsetDateTime.now(KST).truncatedTo(ChronoUnit.SECONDS).toString();
+
+        boolean goalAchieved = monthlyReviewCount >= MONTHLY_REVIEW_GOAL;
+        long remaining = Math.max(0L, MONTHLY_REVIEW_GOAL - monthlyReviewCount);
+        String summaryMessage = buildSummaryMessage(monthlyReviewCount, previousMonthlyReviewCount, reviewCountDiff);
+
+        LearningReportSummaryResponseDto summary = LearningReportSummaryResponseDto.builder()
+                .monthLabel(monthLabel)
+                .monthlyReviewCount(monthlyReviewCount)
+                .monthlyReviewGoal(MONTHLY_REVIEW_GOAL)
+                .previousMonthlyReviewCount(previousMonthlyReviewCount)
+                .reviewCountDiff(reviewCountDiff)
+                .reviewCountChangeRate(reviewCountChangeRate)
+                .generatedAt(generatedAt)
+                .monthlyReviewGoalAchieved(goalAchieved)
+                .remainingReviewCountToGoal(remaining)
+                .summaryMessage(summaryMessage)
+                .build();
+
+        writeSummaryCache(cacheKey, summary);
+        return summary;
+    }
+
+    private double summaryChangeRate(long current, long previous) {
+        if (previous == 0) {
+            return current == 0 ? 0.0 : 100.0;
+        }
+        double rate = ((double) (current - previous) / previous) * 100.0;
+        return Math.round(rate * 10.0) / 10.0;
+    }
+
+    private String buildSummaryMessage(long current, long previous, long diff) {
+        if (current == 0) {
+            return "이번 달 복습 기록을 만들어보세요";
+        }
+        if (previous == 0) {
+            return "이번 달 복습을 시작했어요";
+        }
+        if (diff > 0) {
+            return "지난달보다 " + diff + "문제 더 복습했어요";
+        }
+        if (diff == 0) {
+            return "지난달과 같은 페이스예요";
+        }
+        return "지난달보다 " + Math.abs(diff) + "문제 적게 복습했어요";
+    }
+
+    private LearningReportSummaryResponseDto readSummaryCache(String cacheKey) {
+        try {
+            String cachedJson = redisSingleDataService.getSingleData(cacheKey);
+            if (cachedJson == null || cachedJson.isBlank()) {
+                return null;
+            }
+            return objectMapper.readValue(cachedJson, LearningReportSummaryResponseDto.class);
+        } catch (Exception e) {
+            log.warn("Failed to read learning report summary cache. key={}, reason={}", cacheKey, e.getMessage());
+            return null;
+        }
+    }
+
+    private void writeSummaryCache(String cacheKey, LearningReportSummaryResponseDto summary) {
+        try {
+            String json = objectMapper.writeValueAsString(summary);
+            redisSingleDataService.setSingleData(cacheKey, json, ttlUntilNextMidnight());
+        } catch (Exception e) {
+            log.warn("Failed to write learning report summary cache. key={}, reason={}", cacheKey, e.getMessage());
+        }
     }
 
     private LearningPeriodReport buildPeriodReport(
@@ -453,7 +551,7 @@ public class LearningReportService {
     }
 
     private Duration ttlUntilNextMidnight() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(KST);
         LocalDateTime nextMidnight = now.toLocalDate().plusDays(1).atStartOfDay();
         Duration ttl = Duration.between(now, nextMidnight);
         return ttl.isNegative() || ttl.isZero() ? Duration.ofSeconds(1) : ttl;

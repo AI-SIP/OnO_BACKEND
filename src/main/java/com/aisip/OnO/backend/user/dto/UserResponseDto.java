@@ -75,7 +75,7 @@ public record UserResponseDto (
 
     private static Long getTotalStudyNextLevelThreshold(com.aisip.OnO.backend.mission.entity.UserMissionStatus status) {
         if (status.getTotalStudyLevel() >= MAX_LEVEL) {
-            return 0L;
+            return getTotalStudyThresholdForLevel(MAX_LEVEL);
         }
         // 개별 능력치 필요 경험치 × 4
         return getTotalStudyThresholdForLevel(status.getTotalStudyLevel());

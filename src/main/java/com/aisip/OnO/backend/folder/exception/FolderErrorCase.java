@@ -14,7 +14,9 @@ public enum FolderErrorCase implements ErrorCase {
 
     ROOT_FOLDER_NOT_EXIST(404, 5003, "루트 폴더가 존재하지 않습니다."),
 
-    ROOT_FOLDER_CANNOT_REMOVE(400, 5004, "루트 폴더는 삭제할 수 없습니다.");
+    ROOT_FOLDER_CANNOT_REMOVE(400, 5004, "루트 폴더는 삭제할 수 없습니다."),
+
+    ROOT_FOLDER_CANNOT_UPDATE(400, 5005, "루트 폴더는 수정할 수 없습니다.");
 
     private final Integer httpStatusCode;
     private final Integer errorCode;

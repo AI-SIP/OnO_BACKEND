@@ -1,12 +1,12 @@
 package com.aisip.OnO.backend.problem.controller;
 
-import com.aisip.OnO.backend.common.ratelimit.RateLimit;
 import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.problem.dto.ProblemAnalysisResponseDto;
 import com.aisip.OnO.backend.problem.dto.ReviewDueResponseDto;
 import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
+import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2BatchDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2Dto;
 import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.dto.ProblemTagUpdateDto;
@@ -115,7 +115,6 @@ public class ProblemController {
     }
 
     // ✅ 문제 분석 요청 (비동기 트리거)
-    @RateLimit(key = "ai_analysis", limitPerDay = 20)
     @PostMapping("/{problemId}/analysis")
     public CommonResponse<String> requestProblemAnalysis(@PathVariable("problemId") Long problemId) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -143,8 +142,16 @@ public class ProblemController {
         return CommonResponse.success(problemId);
     }
 
+    // ✅ 문제 배치 등록 v2 (이미지 URL 동시 저장)
+    @PostMapping("/v2/batch")
+    public CommonResponse<List<Long>> registerProblemsV2(@RequestBody ProblemRegisterV2BatchDto problemRegisterV2BatchDto) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        List<Long> problemIds = problemService.registerProblemsV2(problemRegisterV2BatchDto, userId);
+        return CommonResponse.success(problemIds);
+    }
+
     // ✅ 문제 이미지 비동기 업로드
-    @RateLimit(key = "ai_analysis", limitPerDay = 20)
     @PostMapping("/{problemId}/imageData")
     public CommonResponse<String> uploadProblemImages(
             @PathVariable("problemId") Long problemId,

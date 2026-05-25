@@ -108,6 +108,24 @@ public class ProblemAnalysisService {
     }
 
     /**
+     * 분석 상태를 RATE_LIMIT_EXCEEDED로 업데이트 (일일 요청 제한 초과)
+     */
+    public void updateToRateLimitExceeded(Long problemId) {
+        ProblemAnalysis analysis = analysisRepository.findByProblemId(problemId)
+                .orElseGet(() -> {
+                    Problem problem = problemRepository.findById(problemId)
+                            .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
+                    ProblemAnalysis newAnalysis = ProblemAnalysis.createSkipped(problem);
+                    problem.updateProblemAnalysis(newAnalysis);
+                    return newAnalysis;
+                });
+
+        analysis.updateToRateLimitExceeded();
+        analysisRepository.save(analysis);
+        log.info("Updated analysis to RATE_LIMIT_EXCEEDED for problemId: {}", problemId);
+    }
+
+    /**
      * 동기적으로 문제 이미지를 분석합니다 (RabbitMQ Consumer에서 호출)
      * - 동시성 문제 해결: 이미 생성된 PROCESSING 엔티티만 조회하여 업데이트
      */

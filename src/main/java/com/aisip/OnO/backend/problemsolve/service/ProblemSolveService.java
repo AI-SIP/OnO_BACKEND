@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.problemsolve.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
+import com.aisip.OnO.backend.util.redis.StreakCacheService;
 import com.aisip.OnO.backend.problem.service.ReviewIntervalCalculator;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveRegisterDto;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveResponseDto;
@@ -39,6 +40,7 @@ public class ProblemSolveService {
     private final FileUploadService fileUploadService;
     private final S3DeleteProducer s3DeleteProducer;
     private final ObjectMapper objectMapper;
+    private final StreakCacheService streakCacheService;
 
     @Transactional(readOnly = true)
     public ProblemSolveResponseDto getProblemSolve(Long problemSolveId, Long userId) {
@@ -117,6 +119,7 @@ public class ProblemSolveService {
         );
 
         problemSolveRepository.save(problemSolve);
+        streakCacheService.evict(userId);
         missionLogService.registerProblemPracticeMission(userId, problem.getId());
 
         ReviewIntervalCalculator.ReviewSchedule schedule = ReviewIntervalCalculator.calculate(
@@ -195,6 +198,7 @@ public class ProblemSolveService {
         List<ProblemSolveImageData> images = problemSolve.getImages();
 
         problemSolveRepository.delete(problemSolve);
+        streakCacheService.evict(userId);
         log.info("userId: {} deleted problem solve: {}", userId, problemSolveId);
 
         images.forEach(image -> {

@@ -142,14 +142,22 @@ public class UserService {
 
     @Transactional
     public void deleteUserById(Long userId) {
+        User user = findUserEntity(userId);
         practiceNoteService.deleteAllPracticesByUser(userId);
         problemService.deleteAllUserProblems(userId);
         folderService.deleteAllUserFolders(userId);
+
+        user.maskIdentifierForDeletion(makeDeletedIdentifier(userId));
+        userRepository.flush();
 
         userRepository.deleteById(userId);
         userRepository.flush();
 
         log.info("userId: {} has deleted", userId);
+    }
+
+    private String makeDeletedIdentifier(Long userId) {
+        return "deleted:" + userId + ":" + UUID.randomUUID();
     }
 
     private String makeGuestName() {

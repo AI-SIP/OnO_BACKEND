@@ -112,5 +112,8 @@ public class User extends BaseEntity {
             this.password = userRegisterDto.password();
         }
     }
-}
 
+    public void maskIdentifierForDeletion(String maskedIdentifier) {
+        this.identifier = maskedIdentifier;
+    }
+}
