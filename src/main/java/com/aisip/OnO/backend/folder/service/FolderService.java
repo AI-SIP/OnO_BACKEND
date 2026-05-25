@@ -130,6 +130,11 @@ public class FolderService {
 
     public void updateFolder(FolderRegisterDto folderRegisterDto, Long userId) {
         Folder folder = findFolderEntity(folderRegisterDto.folderId(), userId);
+
+        if (folder.getParentFolder() == null) {
+            throw new ApplicationException(FolderErrorCase.ROOT_FOLDER_CANNOT_UPDATE);
+        }
+
         folder.updateFolderInfo(folderRegisterDto);
 
         if (folderRegisterDto.parentFolderId() != null && folder.getParentFolder() != null) {
