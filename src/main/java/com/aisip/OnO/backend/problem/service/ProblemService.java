@@ -35,6 +35,7 @@ import com.aisip.OnO.backend.tag.entity.Tag;
 import com.aisip.OnO.backend.tag.exception.TagErrorCase;
 import com.aisip.OnO.backend.tag.repository.ProblemTagMappingRepository;
 import com.aisip.OnO.backend.tag.repository.TagRepository;
+import com.aisip.OnO.backend.util.redis.StreakCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -86,6 +87,7 @@ public class ProblemService {
     private final TagRepository tagRepository;
     private final ProblemTagMappingRepository problemTagMappingRepository;
     private final RateLimitService rateLimitService;
+    private final StreakCacheService streakCacheService;
 
     @Transactional(readOnly = true)
     public ProblemResponseDto findProblemForAdmin(Long problemId) {
@@ -210,6 +212,7 @@ public class ProblemService {
 
         problem.updateReviewSchedule(LocalDate.now(java.time.ZoneId.of("Asia/Seoul")), 1, 0);
         analysisService.createSkippedAnalysis(problem.getId());
+        streakCacheService.evict(userId);
         missionLogService.registerProblemWriteMission(userId);
 
         log.info("userId: {} register problemId: {}", userId, problem.getId());
@@ -266,6 +269,7 @@ public class ProblemService {
         }
         problem.updateReviewSchedule(LocalDate.now(java.time.ZoneId.of("Asia/Seoul")), 1, 0);
         analysisService.createSkippedAnalysis(problem.getId());
+        streakCacheService.evict(userId);
         missionLogService.registerProblemWriteMission(userId);
 
         log.info("userId: {} register problem(v2) problemId: {}", userId, problem.getId());
@@ -327,6 +331,7 @@ public class ProblemService {
         problemTagMappingRepository.saveAll(tagMappings);
         problemAnalysisRepository.saveAll(analyses);
 
+        streakCacheService.evict(userId);
         problems.forEach(problem -> missionLogService.registerProblemWriteMission(userId));
 
         List<Long> problemIds = problems.stream()
@@ -692,6 +697,7 @@ public class ProblemService {
     public void deleteProblem(Long problemId, Long userId) {
         findProblemEntity(problemId, userId);
         deleteProblemWithoutOwnerCheck(problemId);
+        streakCacheService.evict(userId);
     }
 
     @Transactional
@@ -736,6 +742,7 @@ public class ProblemService {
                     deleteProblemWithoutOwnerCheck(problem.getId());
                 });
 
+        streakCacheService.evict(userId);
         log.info("userId: {} delete all user problems", userId);
     }
 

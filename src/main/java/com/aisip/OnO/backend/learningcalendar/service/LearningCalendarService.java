@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.learningcalendar.service;
 
 import com.aisip.OnO.backend.learningcalendar.dto.LearningCalendarResponseDto;
 import com.aisip.OnO.backend.learningcalendar.repository.LearningCalendarQueryRepository;
+import com.aisip.OnO.backend.util.redis.StreakCacheService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 public class LearningCalendarService {
 
     private final LearningCalendarQueryRepository calendarRepository;
+    private final StreakCacheService streakCacheService;
 
     public LearningCalendarResponseDto getLearningCalendar(Long userId, int year, int month) {
         return getLearningCalendar(userId, year, month, LocalDate.now());
@@ -90,10 +92,13 @@ public class LearningCalendarService {
     }
 
     private TreeSet<LocalDate> findStudyDates(Long userId) {
-        TreeSet<LocalDate> studyDates = new TreeSet<>();
-        studyDates.addAll(calendarRepository.findDistinctReviewDatesTotal(userId));
-        studyDates.addAll(calendarRepository.findDistinctNoteWriteDatesTotal(userId));
-        return studyDates;
+        return streakCacheService.get(userId).orElseGet(() -> {
+            TreeSet<LocalDate> studyDates = new TreeSet<>();
+            studyDates.addAll(calendarRepository.findDistinctReviewDatesTotal(userId));
+            studyDates.addAll(calendarRepository.findDistinctNoteWriteDatesTotal(userId));
+            streakCacheService.put(userId, studyDates);
+            return studyDates;
+        });
     }
 
     private int calculateCurrentStreak(TreeSet<LocalDate> studyDates, LocalDate today) {
