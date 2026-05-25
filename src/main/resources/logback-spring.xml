@@ -48,7 +48,7 @@
 
     <springProfile name="dev">
         <logger name="p6spy" level="INFO"/>
-        <logger name="org.hibernate.SQL" level="INFO"/>
+        <logger name="org.hibernate.SQL" level="WARN"/>
         <logger name="org.springframework.web.filter.CommonsRequestLoggingFilter" level="OFF"/>
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
@@ -56,7 +56,7 @@
     </springProfile>
 
     <springProfile name="prod">
-        <logger name="p6spy" level="WARN"/>
+        <logger name="p6spy" level="OFF"/>
         <logger name="org.hibernate.SQL" level="WARN"/>
         <logger name="org.springframework.web.filter.CommonsRequestLoggingFilter" level="OFF"/>
         <logger name="org.springframework" level="INFO"/>
