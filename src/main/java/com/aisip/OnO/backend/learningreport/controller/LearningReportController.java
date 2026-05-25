@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.learningreport.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.learningreport.dto.LearningReportResponseDto;
+import com.aisip.OnO.backend.learningreport.dto.LearningReportSummaryResponseDto;
 import com.aisip.OnO.backend.learningreport.service.LearningReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -19,6 +20,14 @@ import java.time.LocalDate;
 public class LearningReportController {
 
     private final LearningReportService learningReportService;
+
+
+    @GetMapping("/summary")
+    public CommonResponse<LearningReportSummaryResponseDto> getLearningReportSummary() {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        LearningReportSummaryResponseDto summary = learningReportService.getLearningReportSummary(userId);
+        return CommonResponse.success(summary);
+    }
 
     @GetMapping("")
     public CommonResponse<LearningReportResponseDto> getLearningReport(
