@@ -88,6 +88,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
                 MDC.put("userId", String.valueOf(userId));
+                MDC.put("authority", authority.name());
             } catch (ExpiredJwtException e) {
                 request.setAttribute(AUTH_ERROR_CASE_ATTRIBUTE, AuthErrorCase.ACCESS_TOKEN_EXPIRED);
             } catch (Exception e) {
