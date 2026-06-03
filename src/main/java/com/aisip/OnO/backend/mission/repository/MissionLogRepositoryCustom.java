@@ -9,6 +9,8 @@ import java.util.Map;
 public interface MissionLogRepositoryCustom {
     boolean alreadyWriteProblemsTodayMoreThan3(Long userId);
 
+    long countProblemWritesToday(Long userId);
+
     boolean alreadyPracticeProblem(Long problemId);
 
     boolean alreadyPracticeNote(Long practiceNoteId);
