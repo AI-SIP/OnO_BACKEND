@@ -1,8 +1,6 @@
 name: CI Build & Deploy Dev
 
 on:
-  push:
-    branches: ["develop"]
   workflow_dispatch:
 
 permissions:
@@ -10,6 +8,7 @@ permissions:
 
 jobs:
   build-and-push-dev:
+    if: github.ref_name == 'develop'
     runs-on: ubuntu-latest
 
     steps:
