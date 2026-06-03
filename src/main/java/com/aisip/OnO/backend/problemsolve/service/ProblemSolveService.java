@@ -24,9 +24,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 @Slf4j
 @Service
@@ -41,6 +46,8 @@ public class ProblemSolveService {
     private final S3DeleteProducer s3DeleteProducer;
     private final ObjectMapper objectMapper;
     private final StreakCacheService streakCacheService;
+    @Qualifier("s3UploadExecutor")
+    private final Executor s3UploadExecutor;
 
     @Transactional(readOnly = true)
     public ProblemSolveResponseDto getProblemSolve(Long problemSolveId, Long userId) {
@@ -144,16 +151,27 @@ public class ProblemSolveService {
             throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_USER_UNMATCHED);
         }
 
-        for (int i = 0; i < images.size(); i++) {
-            MultipartFile imageFile = images.get(i);
-            String imageUrl = fileUploadService.uploadFileToS3(imageFile);
+        // S3 업로드를 병렬로 실행 (트랜잭션과 무관한 네트워크 I/O)
+        List<CompletableFuture<String>> uploadFutures = IntStream.range(0, images.size())
+                .mapToObj(i -> CompletableFuture.supplyAsync(
+                        () -> fileUploadService.uploadFileToS3(images.get(i)),
+                        s3UploadExecutor
+                ))
+                .toList();
 
-            ProblemSolveImageData problemSolveImageData = ProblemSolveImageData.create(imageUrl, i);
-            problemSolve.addImage(problemSolveImageData);
-            problemSolveImageDataRepository.save(problemSolveImageData);
+        List<String> imageUrls = uploadFutures.stream()
+                .map(CompletableFuture::join)
+                .collect(Collectors.toList());
 
-            log.info("Uploaded problem solve image to S3 for problemSolveId: {}, imageOrder: {}", problemSolveId, i);
-        }
+        // DB 저장은 메인 스레드에서 배치로 처리 (트랜잭션 컨텍스트 유지)
+        List<ProblemSolveImageData> imageDataList = IntStream.range(0, imageUrls.size())
+                .mapToObj(i -> ProblemSolveImageData.create(imageUrls.get(i), i))
+                .collect(Collectors.toList());
+
+        imageDataList.forEach(problemSolve::addImage);
+        problemSolveImageDataRepository.saveAll(imageDataList);
+
+        log.info("Uploaded {} images in parallel for problemSolveId: {}", images.size(), problemSolveId);
     }
 
     @Transactional
