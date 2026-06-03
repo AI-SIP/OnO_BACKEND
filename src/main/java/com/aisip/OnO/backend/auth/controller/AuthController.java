@@ -36,9 +36,13 @@ public class AuthController {
 
     // ✅ 로그아웃
     @PostMapping("/logout")
-    public CommonResponse<String> logout(@RequestHeader("Authorization") String accessToken) {
+    public CommonResponse<String> logout(
+            @RequestHeader("Authorization") String accessToken,
+            @RequestBody(required = false) TokenRequestDto tokenRequestDto
+    ) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        userAuthService.logout(accessToken, userId);
+        String refreshToken = tokenRequestDto == null ? null : tokenRequestDto.getRefreshToken();
+        userAuthService.logout(accessToken, userId, refreshToken);
 
         return CommonResponse.success("로그아웃 되었습니다.");
     }

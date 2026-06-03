@@ -36,4 +36,9 @@ public class RefreshToken {
                 .refreshToken(refreshToken)
                 .build();
     }
+
+    public void updateToken(Authority authority, String refreshToken) {
+        this.authority = authority;
+        this.refreshToken = refreshToken;
+    }
 }
