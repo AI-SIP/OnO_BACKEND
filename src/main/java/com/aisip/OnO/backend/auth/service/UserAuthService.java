@@ -41,8 +41,8 @@ public class UserAuthService {
         return jwtTokenService.refreshAccessToken(tokenRequestDto.getRefreshToken());
     }
 
-    public void logout(String accessToken, Long userId) {
-        jwtTokenService.logout(accessToken, userId);
+    public void logout(String accessToken, Long userId, String refreshToken) {
+        jwtTokenService.logout(accessToken, userId, refreshToken);
         log.info("userId: {} has logged out", userId);
     }
 }
