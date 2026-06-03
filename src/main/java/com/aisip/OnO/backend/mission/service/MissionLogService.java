@@ -103,6 +103,26 @@ public class MissionLogService {
         }
     }
 
+    public void registerProblemWriteMissionBatch(Long userId, int count) {
+        long todayCount = missionLogRepository.countProblemWritesToday(userId);
+        int toCreate = (int) Math.min(count, Math.max(0, 3 - todayCount));
+        if (toCreate == 0) return;
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ApplicationException(MissionErrorCase.USER_NOT_FOUND));
+
+        MissionRegisterDto dto = MissionRegisterDto.builder()
+                .userId(userId)
+                .missionType(MissionType.PROBLEM_WRITE)
+                .build();
+
+        for (int i = 0; i < toCreate; i++) {
+            MissionLog log = MissionLog.from(dto, user);
+            missionLogRepository.save(log);
+            addPointToUser(user, log);
+        }
+    }
+
     public void registerProblemPracticeMission(Long userId, Long problemId) {
         boolean alreadyPracticeProblem = missionLogRepository.alreadyPracticeProblem(problemId);
 

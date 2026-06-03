@@ -332,7 +332,7 @@ public class ProblemService {
         problemAnalysisRepository.saveAll(analyses);
 
         streakCacheService.evict(userId);
-        problems.forEach(problem -> missionLogService.registerProblemWriteMission(userId));
+        missionLogService.registerProblemWriteMissionBatch(userId, problems.size());
 
         List<Long> problemIds = problems.stream()
                 .map(Problem::getId)
