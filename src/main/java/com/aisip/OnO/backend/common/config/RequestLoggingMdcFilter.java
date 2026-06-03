@@ -133,6 +133,7 @@ public class RequestLoggingMdcFilter extends OncePerRequestFilter {
     private void clearMdc() {
         MDC.remove("traceId");
         MDC.remove("userId");
+        MDC.remove("authority");
         MDC.remove("method");
         MDC.remove("uri");
         MDC.remove("clientIp");

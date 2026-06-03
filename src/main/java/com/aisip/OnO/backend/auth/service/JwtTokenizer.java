@@ -17,6 +17,7 @@ import java.security.Key;
 import java.util.Base64;
 import java.util.Date;
 import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -68,6 +69,7 @@ public class JwtTokenizer {
                 .setClaims(claims)
                 .setSubject(subject)
                 .setIssuedAt(now)
+                .setId(UUID.randomUUID().toString())
                 .setExpiration(new Date(now.getTime() + refreshTokenExpiration))
                 .signWith(refreshKey, SignatureAlgorithm.HS256)
                 .compact();
