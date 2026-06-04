@@ -70,3 +70,6 @@ monitoring/README.md
 ### Local agent guidance
 /AGENTS.md
 .claude.md
+
+### Claude Code local settings (machine-specific, not team-shared)
+.claude/settings.local.json
