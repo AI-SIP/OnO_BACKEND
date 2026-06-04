@@ -1,0 +1,7 @@
+interface:
+  display_name: "OnO Migrate"
+  short_description: "OnO DB 마이그레이션 안전 워크플로우"
+  default_prompt: "Use $migrate to design and review this OnO database migration."
+
+policy:
+  allow_implicit_invocation: true
