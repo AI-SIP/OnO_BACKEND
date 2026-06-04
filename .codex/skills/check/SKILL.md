@@ -1,6 +1,6 @@
 ---
 name: check
-description: OnO 변경사항을 읽기 전용으로 다관점 검증할 때 사용. 사용자가 "check", "check <커밋>", 위험 검토, 배포 전 검토를 요청하면 diff와 영향 흐름을 2중으로 검토한다. 인자가 없으면 현재 git 변경사항을 대상으로 한다.
+description: Use for read-only OnO change review. Trigger on "check", "check <commit>", risk review, or pre-deploy review. If no argument is provided, review current git changes.
 ---
 
 # OnO Check
@@ -17,8 +17,8 @@ description: OnO 변경사항을 읽기 전용으로 다관점 검증할 때 사
 2. 변경된 파일과 영향받는 사용자 흐름 기준으로 검토한다.
 3. 1차 검토:
    - 사용자 데이터 격리, 인증/인가 누락
-   - N+1, 풀스캔, pagination/index, 커넥션 풀 위험
-   - null/empty, 예외 처리, 롤백, 동시성, 비즈니스 정합성
+   - N+1, 풀스캔, pagination/index, connection pool 위험
+   - null/empty, 예외 처리, rollback, 동시성, 비즈니스 정합성
    - FCM/메일 실발송, 잘못된 DB write, schema 안전성
 4. 2차 반증:
    - 발견한 문제가 실제로 도달 가능한지 확인한다.
@@ -40,5 +40,4 @@ description: OnO 변경사항을 읽기 전용으로 다관점 검증할 때 사
 - 🟢 이상 없음
 
 각 항목은 `파일:라인`, 사용자 영향, 수정 방향을 포함한다.
-
 마지막에 자가 반증 결과를 짧게 포함한다.

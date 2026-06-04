@@ -14,7 +14,9 @@
     ├── check/
     ├── commit/
     ├── feat/
+    ├── migrate/
     ├── plan/
+    ├── pr/
     ├── report/
     ├── test/
     ├── test-writer/
@@ -32,7 +34,9 @@
 ~/.codex/skills/check
 ~/.codex/skills/commit
 ~/.codex/skills/feat
+~/.codex/skills/migrate
 ~/.codex/skills/plan
+~/.codex/skills/pr
 ~/.codex/skills/report
 ~/.codex/skills/test
 ~/.codex/skills/test-writer
@@ -115,7 +119,7 @@ feat docs/...의 구현 명세서를 기준으로 기능 구현해줘
 현재 `.claude/commands`와 맞춰 제공하는 주요 명령어 이름:
 
 ```text
-analysis check commit explain feat perf plan report test
+analysis check commit explain feat migrate perf plan pr report test
 ```
 
 보조 스킬:
@@ -245,6 +249,35 @@ plan 학습 기록 검색 API 필터 기능
 - 관련 코드와 문서를 먼저 확인한다.
 - API 계약, 데이터 흐름, 에러 처리, 테스트 방법, 배포 리스크를 정리한다.
 - `/Users/ksm/programing/sw_maestro/OnO_BACKEND/backend/docs` 아래 기능별 폴더에 markdown을 작성한다.
+
+### migrate
+
+DB schema 변경과 Flyway migration이 필요할 때 사용한다.
+
+```text
+$migrate review_schedule에 알림 실패 사유 컬럼 추가
+```
+
+수행 방식:
+
+- 기존 migration 버전과 관련 entity/repository/query/API 영향을 먼저 확인한다.
+- H2 인메모리가 아닌 환경에 `ddl-auto=create` 또는 `create-drop`을 추가하지 않는다.
+- 안전한 migration 순서, backfill, rollback/대응 방법, dev/prod 적용 리스크를 정리한다.
+- 운영 영향이 있는 SQL 파일은 저장 전 확인한다.
+
+### pr
+
+기준 커밋부터 현재까지의 변경사항으로 PR 제목과 본문 초안을 작성할 때 사용한다.
+
+```text
+$pr abc1234
+```
+
+수행 방식:
+
+- `git log`, `git diff`, `git status`로 커밋된 변경과 미커밋 변경을 분리한다.
+- `.github/PULL_REQUEST_TEMPLATE.md`를 읽고 같은 구조로 작성한다.
+- 사용자 영향, API 호환성, DB migration, 인증/권한, 검증 결과, 배포 리스크, 롤백 방법을 포함한다.
 
 ### test-writer
 
