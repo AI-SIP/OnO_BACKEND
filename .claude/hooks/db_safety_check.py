@@ -18,6 +18,12 @@ DANGEROUS = [
     (r"TRUNCATE\s+(TABLE\s+)?[`\w][`\w.]*",        "TRUNCATE"),
     (r"ALTER\s+TABLE\s+[`\w][`\w.]*\s+DROP",       "DROP COLUMN/INDEX"),
     (r"DROP\s+DATABASE",                            "DROP DATABASE"),
+    (r"flyway\s+clean\b",                           "Flyway clean"),
+    (r"ddl-auto\s*[:=]\s*create-drop\b",            "ddl-auto=create-drop"),
+    (r"ddl-auto\s*[:=]\s*create\b",                 "ddl-auto=create"),
+    (r"docker\s+compose\s+down\b.*\s-v\b",          "docker compose down -v"),
+    (r"docker-compose\b.*\sdown\b.*\s-v\b",         "docker-compose down -v"),
+    (r"\bmysql\b.*\b(prod|production)\b",           "production mysql command"),
 ]
 
 found = [label for pattern, label in DANGEROUS if re.search(pattern, cmd, re.IGNORECASE)]
@@ -26,6 +32,11 @@ found = [label for pattern, label in DANGEROUS if re.search(pattern, cmd, re.IGN
 if (re.search(r"DELETE\s+FROM", cmd, re.IGNORECASE)
         and not re.search(r"\bWHERE\b", cmd, re.IGNORECASE)):
     found.append("WHERE 없는 DELETE")
+
+# WHERE 없는 UPDATE는 운영 데이터 대량 변경으로 이어질 수 있다.
+if (re.search(r"\bUPDATE\s+[`.\w]+\s+SET\b", cmd, re.IGNORECASE)
+        and not re.search(r"\bWHERE\b", cmd, re.IGNORECASE)):
+    found.append("WHERE 없는 UPDATE")
 
 if found:
     print(f"🚨 위험한 DB 작업 감지: {', '.join(found)}")
