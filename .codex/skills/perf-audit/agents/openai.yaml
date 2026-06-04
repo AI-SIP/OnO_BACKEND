@@ -1,0 +1,7 @@
+interface:
+  display_name: "OnO Perf Audit"
+  short_description: "OnO 성능 리스크 점검"
+  default_prompt: "Use $perf-audit to inspect this OnO performance concern."
+
+policy:
+  allow_implicit_invocation: true

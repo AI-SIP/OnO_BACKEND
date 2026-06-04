@@ -1,0 +1,7 @@
+interface:
+  display_name: "OnO Explain"
+  short_description: "OnO 코드 흐름 학습 설명"
+  default_prompt: "Use $explain to explain this OnO code path."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,7 @@
+interface:
+  display_name: "OnO Test Writer"
+  short_description: "OnO 테스트 작성과 보강"
+  default_prompt: "Use $test-writer to add focused tests for this OnO change."
+
+policy:
+  allow_implicit_invocation: true

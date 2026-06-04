@@ -1,0 +1,7 @@
+interface:
+  display_name: "OnO Perf"
+  short_description: "OnO 성능 병목 진단"
+  default_prompt: "Use $perf to audit this performance issue."
+
+policy:
+  allow_implicit_invocation: true

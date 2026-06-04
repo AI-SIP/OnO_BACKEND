@@ -1,0 +1,7 @@
+interface:
+  display_name: "OnO Feat"
+  short_description: "OnO 기능 구현 워크플로우"
+  default_prompt: "Use $feat to implement this OnO feature."
+
+policy:
+  allow_implicit_invocation: true
