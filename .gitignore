@@ -68,5 +68,8 @@ monitoring/README.md
 .DS_Store
 
 ### Local agent guidance
-/AGENTS.md
 .claude.md
+
+### Claude Code local settings (machine-specific, not team-shared)
+.claude/settings.local.json
+.claude/hooks/__pycache__/

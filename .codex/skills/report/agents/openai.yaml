@@ -1,0 +1,7 @@
+interface:
+  display_name: "OnO Report"
+  short_description: "OnO 변경 보고서 작성"
+  default_prompt: "Use $report to summarize this OnO change."
+
+policy:
+  allow_implicit_invocation: true

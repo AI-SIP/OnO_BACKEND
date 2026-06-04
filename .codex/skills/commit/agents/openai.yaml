@@ -1,0 +1,7 @@
+interface:
+  display_name: "OnO Commit"
+  short_description: "OnO 커밋 단위 제안"
+  default_prompt: "Use $commit to suggest commit units."
+
+policy:
+  allow_implicit_invocation: true

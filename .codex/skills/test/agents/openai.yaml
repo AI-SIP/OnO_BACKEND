@@ -1,0 +1,7 @@
+interface:
+  display_name: "OnO Test"
+  short_description: "OnO 테스트 작성 실행"
+  default_prompt: "Use $test to write and run focused tests."
+
+policy:
+  allow_implicit_invocation: true

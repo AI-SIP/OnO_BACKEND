@@ -1,0 +1,43 @@
+---
+name: check
+description: Use for read-only OnO change review. Trigger on "check", "check <commit>", risk review, or pre-deploy review. If no argument is provided, review current git changes.
+---
+
+# OnO Check
+
+## Scope
+
+- 인자가 있으면 해당 커밋/범위부터 현재까지 확인한다.
+- 인자가 없으면 `git status`와 `git diff HEAD` 기준의 현재 변경사항을 확인한다.
+- 코드는 수정하지 않는다.
+
+## Workflow
+
+1. `git status`, `git diff`, 필요 시 `git log/show`로 변경 범위를 좁힌다.
+2. 변경된 파일과 영향받는 사용자 흐름 기준으로 검토한다.
+3. 1차 검토:
+   - 사용자 데이터 격리, 인증/인가 누락
+   - N+1, 풀스캔, pagination/index, connection pool 위험
+   - null/empty, 예외 처리, rollback, 동시성, 비즈니스 정합성
+   - FCM/메일 실발송, 잘못된 DB write, schema 안전성
+4. 2차 반증:
+   - 발견한 문제가 실제로 도달 가능한지 확인한다.
+   - 상위 validation, 권한 체크, transaction 경계가 이미 막는지 확인한다.
+   - 반대로 1차에서 놓친 사용자 영향 흐름이 있는지 확인한다.
+5. 완료 직전에 아래 자가 반증 질문에 답하고, 필요한 경우 위험도 판단을 수정한다.
+   - 내가 놓쳤을 가능성이 큰 것은?
+   - 이 변경이 실제 사용자에게 깨질 수 있는 경로는?
+   - 이 결론이 틀렸다면 어떤 조건 때문인가?
+6. 가능한 경우 관련 테스트/정적 검사/빌드 명령을 제안하거나 실행한다. 읽기 전용 프로파일이면 실행 가능 범위만 명시한다.
+
+## Output
+
+위험도 순서로 보고한다.
+
+- 🔴 즉시 수정 필요
+- 🟠 배포 전 수정 권장
+- 🟡 다음 이터레이션
+- 🟢 이상 없음
+
+각 항목은 `파일:라인`, 사용자 영향, 수정 방향을 포함한다.
+마지막에 자가 반증 결과를 짧게 포함한다.
