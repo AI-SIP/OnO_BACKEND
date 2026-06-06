@@ -143,22 +143,64 @@ OnO 작업 에이전트 지침
 [Fix] 오답노트 PDF 내보내기 오류 수정 - null 응답 방어 로딩 상태 개선
 ```
 
-### `pr <커밋 해쉬>`
+### `pr`
 
-사용자가 입력한 커밋을 포함해, 해당 커밋부터 현재까지의 변경사항을 파악한 뒤, PR 제목 및 내용을 markdown으로 작성한다.
+현재 브랜치의 개발 내역을 바탕으로 `AI-SIP/OnO_BACKEND` GitHub Repository에 `develop` 브랜치로 merge 요청하는 Pull Request를 직접 생성한다.
 
-- `<커밋 해쉬>`부터 현재까지의 커밋 내역과 diff를 확인한다.
-- 작업 트리에 아직 커밋되지 않은 변경사항이 있으면 함께 확인하고, PR 초안에 반영 여부를 명시한다.
+- `codex_apps` GitHub 도구가 아니라 `mcp__github__` MCP 서버의 `create_pull_request` 도구를 사용한다.
+- Repository는 항상 `owner=AI-SIP`, `repo=OnO_BACKEND`를 사용한다.
+- base branch는 항상 `develop`으로 지정한다.
+- `main` branch를 base로 하는 PR은 절대 생성하지 않는다. `main` merge와 production 배포는 항상 사용자가 직접 담당한다.
+- 현재 브랜치가 `main` 또는 `develop`이면 PR을 생성하지 말고, 작업 브랜치에서 실행해야 한다고 보고한다.
+- 현재 브랜치 이름과 원격 브랜치 존재 여부를 확인한다.
+- 작업 트리에 아직 커밋되지 않은 변경사항이 있으면 PR을 생성하지 말고, 먼저 커밋 또는 정리가 필요하다고 보고한다.
+- 현재 브랜치가 원격에 push되어 있지 않으면 PR을 생성할 수 없으므로 사용자에게 push 필요 여부를 확인한다.
+- `develop..현재브랜치`의 커밋 로그와 diff를 확인해 PR 제목과 본문을 작성한다.
+- PR 생성 전에 GitHub에서 open issue를 검색해 현재 변경사항과 관련된 이슈가 있는지 확인한다.
+- 관련 이슈가 있으면 PR 본문 `연관 이슈` 항목에 `close #이슈번호`를 포함해 merge 시 자동 종료되도록 작성한다.
+- 관련 이슈가 없으면 `연관 이슈` 항목에는 관련 이슈 없음이라고 명시한다.
 - 아래 PR 템플릿을 반드시 확인한다.
 
 ```text
 /Users/ksm/programing/sw_maestro/OnO_BACKEND/backend/.github/PULL_REQUEST_TEMPLATE.md
 ```
 
-- PR 제목과 본문은 템플릿 양식에 맞춰 작성한다.
-- PR markdown 파일은 `plan`에서 만든 기능 문서 폴더 안에, 구현 명세서와 같은 위치에 저장한다.
-- 어떤 기능 문서 폴더를 사용해야 할지 명확하지 않으면 사용자에게 확인한다.
+- PR 제목과 본문은 템플릿 양식에 맞춰 작성하고, PR markdown 파일은 별도로 만들지 않는다.
 - PR 본문에는 변경사항 요약, 사용자 영향, 검증 결과, 배포 리스크를 포함한다.
+- Reviewers는 지정하지 않는다.
+- PR 생성 후 생성된 PR 번호에 `mcp__github__` MCP 서버의 `issue_write` 도구를 `method=update`로 호출해 Assignees와 Labels를 설정한다.
+- Assignees는 항상 `KiSeungMin`으로 지정한다.
+- Labels는 변경 성격에 맞게 `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `bug` 중 적절한 후보를 고르되, `get_label`로 존재 여부를 확인한 label만 적용한다.
+- milestone, project, issue fields, type 등 나머지 항목은 지정하지 않는다.
+- PR 생성 후에는 PR 번호, URL, base/head branch, assignee, 적용한 label, main을 target으로 사용하지 않았다는 점을 간결하게 보고한다.
+
+### `/issue <내용 또는 파일 경로>`
+
+사용자가 자유롭게 작성한 내용이나 파일 내용을 바탕으로 `AI-SIP/OnO_BACKEND` GitHub Repository에 이슈를 생성한다.
+
+- `codex_apps` GitHub 도구가 아니라 `mcp__github__` MCP 서버의 `issue_write` 도구를 사용한다.
+- Repository는 항상 `owner=AI-SIP`, `repo=OnO_BACKEND`를 사용한다.
+- Assignees는 항상 `KiSeungMin`으로 지정한다.
+- 사용자가 파일 경로를 전달하면 먼저 해당 파일을 읽고, 파일 내용을 이슈 원문으로 사용한다.
+- 사용자가 직접 내용을 입력하면 그 내용을 이슈 원문으로 사용한다.
+- 원문이 부족해도 가능한 범위에서 이슈를 생성하되, 운영 영향이나 재현 조건처럼 필수 판단에 필요한 정보가 없으면 이슈 본문에 "확인 필요"로 명시한다.
+- 아래 이슈 템플릿을 반드시 확인하고, 입력 성격에 맞는 템플릿을 선택해 본문을 채운다.
+
+```text
+/Users/ksm/programing/sw_maestro/OnO_BACKEND/backend/.github/ISSUE_TEMPLATE/bug-report-template.md
+/Users/ksm/programing/sw_maestro/OnO_BACKEND/backend/.github/ISSUE_TEMPLATE/common-issue-template.md
+```
+
+- 버그, 오류, 예외, 장애, 잘못된 동작, 회귀 이슈는 `bug-report-template.md` 형식을 사용한다.
+  - 제목은 `[bug] ...` 형식으로 작성한다.
+  - label은 `bug`를 포함한다.
+  - 본문에는 버그 설명, 발생 상황, 예상 결과를 템플릿 항목에 맞춰 정리한다.
+- 기능 추가, 개선, 리팩터링, 문서, 설정, 운영 작업은 `common-issue-template.md` 형식을 사용한다.
+  - 제목은 `[feat]`, `[fix]`, `[refactor]`, `[chore]`, `[docs]`, `[test]` 중 가장 적절한 타입을 골라 작성한다.
+  - label은 선택한 타입과 이슈 성격에 맞게 적용하되, 존재 여부가 불확실한 label은 무리하게 붙이지 않는다.
+  - 본문에는 Description, TODO, ETC를 템플릿 항목에 맞춰 정리한다.
+- GitHub issue type 기능이 사용 가능하면 입력 성격에 맞는 type을 설정한다. 유효한 type을 확인할 수 없거나 Repository가 issue type을 지원하지 않으면 `type` 필드는 생략한다.
+- 이슈 생성 후에는 이슈 번호, URL, 적용한 assignee, label, type을 사용자에게 간결하게 보고한다.
 
 ### `check <커밋 번호>`
 
