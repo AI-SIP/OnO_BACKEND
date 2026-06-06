@@ -4,6 +4,8 @@ import com.aisip.OnO.backend.user.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -21,6 +23,10 @@ public interface UserRepository extends JpaRepository<User, Long>, UserRepositor
     Optional<User> findByIdentifier(String identifier);
 
     Optional<User> findByName(String name);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.id = :userId")
+    Optional<User> findByIdForUpdate(@Param("userId") Long userId);
 
     Page<User> findAll(Pageable pageable);
 
