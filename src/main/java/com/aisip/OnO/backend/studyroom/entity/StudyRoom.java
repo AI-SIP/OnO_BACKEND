@@ -53,4 +53,8 @@ public class StudyRoom extends BaseEntity {
     public void updateHostUserId(Long hostUserId) {
         this.hostUserId = hostUserId;
     }
+
+    public void updateThumbnailUrl(String thumbnailUrl) {
+        this.thumbnailUrl = thumbnailUrl;
+    }
 }

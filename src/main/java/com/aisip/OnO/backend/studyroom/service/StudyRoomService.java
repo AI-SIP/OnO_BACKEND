@@ -10,12 +10,16 @@ import com.aisip.OnO.backend.studyroom.entity.StudyRoomMemberRole;
 import com.aisip.OnO.backend.studyroom.exception.StudyRoomErrorCase;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomMemberRepository;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomRepository;
+import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.exception.UserErrorCase;
 import com.aisip.OnO.backend.user.repository.UserRepository;
+import com.aisip.OnO.backend.util.fileupload.exception.FileUploadErrorCase;
+import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -33,6 +37,8 @@ public class StudyRoomService {
     private final StudyRoomAccessService accessService;
     private final StudyRoomStatsService statsService;
     private final StudyRoomMapper mapper;
+    private final FileUploadService fileUploadService;
+    private final S3DeleteProducer s3DeleteProducer;
 
     @Transactional(readOnly = true)
     public List<StudyRoomListResponse> getMyRooms(Long userId) {
@@ -131,6 +137,22 @@ public class StudyRoomService {
         member.updateWeeklyGoal(weeklyGoal == null || weeklyGoal == 0 ? null : weeklyGoal);
         StudyRoomStats stats = statsService.getWeeklyStats(List.of(userId)).get(userId);
         return new GoalUpdateResponse(member.getWeeklyGoal(), member.getWeeklyGoal() == null ? null : stats.weeklyProblemCount());
+    }
+
+    @Transactional
+    public StudyRoomThumbnailUpdateResponse updateThumbnail(Long roomId, Long userId, MultipartFile thumbnail) {
+        accessService.validateHost(roomId, userId);
+        if (thumbnail == null || thumbnail.isEmpty()) {
+            throw new ApplicationException(FileUploadErrorCase.FILE_UPLOAD_FAILED);
+        }
+        StudyRoom room = accessService.getRoomOrThrow(roomId);
+        String previousThumbnailUrl = room.getThumbnailUrl();
+        String thumbnailUrl = fileUploadService.uploadFileToS3(thumbnail);
+        room.updateThumbnailUrl(thumbnailUrl);
+        if (previousThumbnailUrl != null && !previousThumbnailUrl.isBlank()) {
+            s3DeleteProducer.sendDeleteMessage(previousThumbnailUrl, roomId);
+        }
+        return new StudyRoomThumbnailUpdateResponse(thumbnailUrl);
     }
 
     StudyRoomDetailResponse buildDetail(StudyRoom room) {

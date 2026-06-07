@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.studyroom.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
@@ -25,15 +26,20 @@ import com.aisip.OnO.backend.studyroom.repository.StudyRoomMemberRepository;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.util.RandomUserGenerator;
+import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 @SpringBootTest
 class StudyRoomServiceIntegrationTest {
@@ -64,6 +70,12 @@ class StudyRoomServiceIntegrationTest {
 
     @Autowired
     private ProblemSolveRepository problemSolveRepository;
+
+    @MockBean
+    private FileUploadService fileUploadService;
+
+    @MockBean
+    private S3DeleteProducer s3DeleteProducer;
 
     @Test
     void createRoomCreatesHostMember() {
@@ -178,6 +190,40 @@ class StudyRoomServiceIntegrationTest {
             assertThat(item.userId()).isEqualTo(member.getId());
             assertThat(item.todayPracticeCount()).isZero();
         });
+    }
+
+    @Test
+    void updateThumbnailUploadsAndStoresThumbnailUrl() {
+        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
+        StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
+        MockMultipartFile firstThumbnail = new MockMultipartFile("thumbnail", "first.png", "image/png", "first".getBytes());
+        MockMultipartFile secondThumbnail = new MockMultipartFile("thumbnail", "second.png", "image/png", "second".getBytes());
+        given(fileUploadService.uploadFileToS3(firstThumbnail)).willReturn("https://cdn.example.com/first.png");
+        given(fileUploadService.uploadFileToS3(secondThumbnail)).willReturn("https://cdn.example.com/second.png");
+
+        assertThat(studyRoomService.updateThumbnail(room.roomId(), host.getId(), firstThumbnail).thumbnailUrl())
+                .isEqualTo("https://cdn.example.com/first.png");
+        assertThat(studyRoomService.updateThumbnail(room.roomId(), host.getId(), secondThumbnail).thumbnailUrl())
+                .isEqualTo("https://cdn.example.com/second.png");
+
+        assertThat(roomRepository.findById(room.roomId()).orElseThrow().getThumbnailUrl())
+                .isEqualTo("https://cdn.example.com/second.png");
+        verify(s3DeleteProducer).sendDeleteMessage("https://cdn.example.com/first.png", room.roomId());
+    }
+
+    @Test
+    void nonHostCannotUpdateThumbnail() {
+        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
+        User member = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "멤버", "member"));
+        StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
+        InviteCodeResponse invite = inviteService.issueInviteCode(room.roomId(), host.getId());
+        inviteService.join(new StudyRoomJoinRequest(invite.code()), member.getId());
+        MockMultipartFile thumbnail = new MockMultipartFile("thumbnail", "first.png", "image/png", "first".getBytes());
+
+        assertThatThrownBy(() -> studyRoomService.updateThumbnail(room.roomId(), member.getId(), thumbnail))
+                .isInstanceOf(ApplicationException.class)
+                .extracting("errorCase")
+                .isEqualTo(StudyRoomErrorCase.STUDY_ROOM_HOST_ONLY);
     }
 
     @Test

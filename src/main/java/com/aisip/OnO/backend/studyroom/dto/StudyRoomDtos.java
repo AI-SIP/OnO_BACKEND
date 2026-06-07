@@ -44,6 +44,9 @@ public final class StudyRoomDtos {
                                           int todayPracticeCount) {
     }
 
+    public record StudyRoomThumbnailUpdateResponse(String thumbnailUrl) {
+    }
+
     public record InviteCodeResponse(String code, LocalDateTime expiredAt) {
     }
 

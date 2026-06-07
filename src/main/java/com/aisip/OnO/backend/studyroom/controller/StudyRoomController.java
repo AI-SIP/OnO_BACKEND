@@ -6,8 +6,10 @@ import com.aisip.OnO.backend.studyroom.service.StudyRoomInviteService;
 import com.aisip.OnO.backend.studyroom.service.StudyRoomService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -68,6 +70,12 @@ public class StudyRoomController {
     public CommonResponse<GoalUpdateResponse> updateGoal(@PathVariable("roomId") Long roomId,
                                                          @RequestBody StudyRoomGoalUpdateRequest request) {
         return CommonResponse.success(studyRoomService.updateGoal(roomId, currentUserId(), request));
+    }
+
+    @PatchMapping(value = "/{roomId}/thumbnail", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public CommonResponse<StudyRoomThumbnailUpdateResponse> updateThumbnail(@PathVariable("roomId") Long roomId,
+                                                                           @RequestParam("thumbnail") MultipartFile thumbnail) {
+        return CommonResponse.success(studyRoomService.updateThumbnail(roomId, currentUserId(), thumbnail));
     }
 
     private Long currentUserId() {
