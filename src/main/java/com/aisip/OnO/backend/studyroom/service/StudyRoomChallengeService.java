@@ -79,11 +79,12 @@ public class StudyRoomChallengeService {
 
     private ChallengeResponse toResponse(StudyRoomChallenge challenge, List<StudyRoomMember> members, boolean persistStatus) {
         List<Long> userIds = members.stream().map(member -> member.getUser().getId()).toList();
+        AggregationRange range = resolveAggregationRange(challenge, LocalDateTime.now());
         LocalDate streakBaseDate = min(LocalDate.now(), challenge.getEndAt().toLocalDate());
         Map<Long, Integer> streaks = statsService.currentStreaks(userIds, streakBaseDate, challenge.getStartAt().toLocalDate());
-        Map<Long, StudyRoomStats> stats = statsService.getStats(userIds, challenge.getStartAt(), challenge.getEndAt(), streaks);
+        Map<Long, StudyRoomStats> stats = statsService.getStats(userIds, range.start(), range.end(), streaks);
         Map<Long, Integer> attendanceDays = isAttendanceMetric(challenge.getMetric())
-                ? statsService.attendanceDayCounts(userIds, challenge.getStartAt(), challenge.getEndAt())
+                ? statsService.attendanceDayCounts(userIds, range.start(), range.end())
                 : Map.of();
         List<ChallengeMemberProgressResponse> memberProgress = challenge.getType() == StudyRoomChallengeType.GROUP
                 ? List.of()
@@ -126,11 +127,13 @@ public class StudyRoomChallengeService {
         if (challenge.getStatus() != StudyRoomChallengeStatus.IN_PROGRESS) {
             return challenge.getStatus();
         }
-        boolean completed = challenge.getType() == StudyRoomChallengeType.GROUP
-                ? groupCurrent != null && groupCurrent >= challenge.getTargetValue()
-                : !memberProgress.isEmpty() && memberProgress.stream().allMatch(ChallengeMemberProgressResponse::cleared);
-        if (completed) {
-            return StudyRoomChallengeStatus.COMPLETED;
+        if (challenge.getPeriod() == null) {
+            boolean completed = challenge.getType() == StudyRoomChallengeType.GROUP
+                    ? groupCurrent != null && groupCurrent >= challenge.getTargetValue()
+                    : !memberProgress.isEmpty() && memberProgress.stream().allMatch(ChallengeMemberProgressResponse::cleared);
+            if (completed) {
+                return StudyRoomChallengeStatus.COMPLETED;
+            }
         }
         if (challenge.getEndAt().isBefore(LocalDateTime.now())) {
             return StudyRoomChallengeStatus.EXPIRED;
@@ -152,6 +155,43 @@ public class StudyRoomChallengeService {
     private boolean isAttendanceMetric(StudyRoomChallengeMetric metric) {
         return metric == StudyRoomChallengeMetric.ATTENDANCE || metric == StudyRoomChallengeMetric.STREAK;
     }
+
+    private AggregationRange resolveAggregationRange(StudyRoomChallenge challenge, LocalDateTime now) {
+        LocalDateTime startAt = challenge.getStartAt();
+        LocalDateTime endAt = challenge.getEndAt();
+        StudyRoomChallengePeriod period = challenge.getPeriod();
+        if (period == null) {
+            return new AggregationRange(startAt, endAt);
+        }
+        LocalDateTime anchor = clamp(now, startAt, endAt);
+        LocalDateTime windowStart = startAt;
+        LocalDateTime windowEnd = addPeriod(windowStart, period);
+        while (!windowEnd.isAfter(anchor) && windowEnd.isBefore(endAt)) {
+            windowStart = windowEnd;
+            windowEnd = addPeriod(windowStart, period);
+        }
+        return new AggregationRange(windowStart, windowEnd.isAfter(endAt) ? endAt : windowEnd);
+    }
+
+    private LocalDateTime addPeriod(LocalDateTime base, StudyRoomChallengePeriod period) {
+        return switch (period) {
+            case DAILY -> base.plusDays(1);
+            case WEEKLY -> base.plusDays(7);
+            case MONTHLY -> base.plusMonths(1);
+        };
+    }
+
+    private LocalDateTime clamp(LocalDateTime value, LocalDateTime lower, LocalDateTime upper) {
+        if (value.isBefore(lower)) {
+            return lower;
+        }
+        if (value.isAfter(upper)) {
+            return upper;
+        }
+        return value;
+    }
+
+    private record AggregationRange(LocalDateTime start, LocalDateTime end) {}
 
     private void validateCreateRequest(ChallengeCreateRequest request) {
         if (request.title() == null || request.title().isBlank() || request.title().length() > 40
