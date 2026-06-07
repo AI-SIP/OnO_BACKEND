@@ -34,6 +34,14 @@ public interface StudyRoomMemberRepository extends JpaRepository<StudyRoomMember
     @Query("select m from StudyRoomMember m join fetch m.room where m.user.id = :userId order by m.createdAt desc")
     List<StudyRoomMember> findAllWithRoomByUserId(@Param("userId") Long userId);
 
+    @Query("""
+            select m.room.id, count(m.id)
+            from StudyRoomMember m
+            where m.room.id in :roomIds
+            group by m.room.id
+            """)
+    List<Object[]> countMembersByRoomIds(@Param("roomIds") Collection<Long> roomIds);
+
     @Modifying
     @Query("delete from StudyRoomMember m where m.room.id = :roomId and m.user.id = :userId")
     void deleteByRoomIdAndUserId(@Param("roomId") Long roomId, @Param("userId") Long userId);

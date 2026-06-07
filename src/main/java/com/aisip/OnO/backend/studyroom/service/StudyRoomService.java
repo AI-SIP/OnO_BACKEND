@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.studyroom.service;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomDtos.*;
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomStats;
+import com.aisip.OnO.backend.studyroom.dto.StudyRoomTodayPracticeSummary;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoom;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomMember;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomMemberRole;
@@ -35,8 +36,20 @@ public class StudyRoomService {
 
     @Transactional(readOnly = true)
     public List<StudyRoomListResponse> getMyRooms(Long userId) {
-        return memberRepository.findAllWithRoomByUserId(userId).stream()
-                .map(mapper::toListResponse)
+        List<StudyRoomMember> memberships = memberRepository.findAllWithRoomByUserId(userId);
+        List<Long> roomIds = memberships.stream().map(member -> member.getRoom().getId()).toList();
+        if (roomIds.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Integer> memberCounts = memberRepository.countMembersByRoomIds(roomIds).stream()
+                .collect(java.util.stream.Collectors.toMap(row -> (Long) row[0], row -> Math.toIntExact((Long) row[1])));
+        Map<Long, StudyRoomTodayPracticeSummary> todayPracticeSummaries = statsService.getTodayPracticeSummariesByRoomIds(roomIds);
+        return memberships.stream()
+                .map(member -> mapper.toListResponse(
+                        member,
+                        memberCounts.getOrDefault(member.getRoom().getId(), 0),
+                        todayPracticeSummaries.getOrDefault(member.getRoom().getId(), StudyRoomTodayPracticeSummary.empty())
+                ))
                 .toList();
     }
 
@@ -124,7 +137,8 @@ public class StudyRoomService {
         List<StudyRoomMember> members = memberRepository.findAllWithUserByRoomId(room.getId());
         List<Long> userIds = members.stream().map(member -> member.getUser().getId()).toList();
         Map<Long, StudyRoomStats> stats = statsService.getWeeklyStats(userIds);
-        return mapper.toDetailResponse(room, members, stats);
+        Map<Long, Integer> todayPracticeCounts = statsService.getTodayPracticeCounts(userIds);
+        return mapper.toDetailResponse(room, members, stats, todayPracticeCounts);
     }
 
     private String validateName(String name) {

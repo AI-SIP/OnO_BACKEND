@@ -22,15 +22,16 @@ public final class StudyRoomDtos {
     public record ReactionToggleRequest(String emoji) {
     }
 
-    public record ChallengeCreateRequest(String title, String type, String metric, Integer targetValue,
-                                         LocalDateTime startAt, LocalDateTime endAt) {
+    public record ChallengeCreateRequest(String title, String type, String metric, String period,
+                                         Integer targetValue, LocalDateTime startAt, LocalDateTime endAt) {
     }
 
     public record SharedProblemCreateRequest(Long problemId, String comment) {
     }
 
     public record StudyRoomListResponse(Long roomId, String name, Long hostUserId, int memberCount,
-                                        String thumbnailUrl, boolean hasUnreadReport) {
+                                        String thumbnailUrl, boolean hasUnreadReport,
+                                        int todayPracticeMemberCount, int todayPracticeCount) {
     }
 
     public record StudyRoomDetailResponse(Long roomId, String name, Long hostUserId, String thumbnailUrl,
@@ -39,7 +40,8 @@ public final class StudyRoomDtos {
 
     public record StudyRoomMemberResponse(Long userId, String name, Long totalStudyLevel, int currentStreak,
                                           int weeklyProblemCount, int weeklyPracticeCount,
-                                          Integer weeklyGoal, Integer goalProgress) {
+                                          Integer weeklyGoal, Integer goalProgress,
+                                          int todayPracticeCount) {
     }
 
     public record InviteCodeResponse(String code, LocalDateTime expiredAt) {
@@ -62,8 +64,8 @@ public final class StudyRoomDtos {
     public record FeedReactionToggleResponse(Long feedId, List<ReactionResponse> reactions) {
     }
 
-    public record ChallengeResponse(Long challengeId, String title, String type, String metric, Integer targetValue,
-                                    LocalDateTime startAt, LocalDateTime endAt, String status,
+    public record ChallengeResponse(Long challengeId, String title, String type, String metric, String period,
+                                    Integer targetValue, LocalDateTime startAt, LocalDateTime endAt, String status,
                                     List<ChallengeMemberProgressResponse> memberProgress,
                                     Integer groupCurrent) {
     }

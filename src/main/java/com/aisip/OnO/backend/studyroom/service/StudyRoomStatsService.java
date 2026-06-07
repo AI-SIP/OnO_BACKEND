@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.studyroom.service;
 
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomStats;
+import com.aisip.OnO.backend.studyroom.dto.StudyRoomTodayPracticeSummary;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,38 @@ public class StudyRoomStatsService {
         return getStats(userIds, start, end, today);
     }
 
+    public Map<Long, Integer> getTodayPracticeCounts(Collection<Long> userIds) {
+        LocalDate today = LocalDate.now(KST);
+        return countPractices(userIds, today.atStartOfDay(), today.atTime(LocalTime.MAX));
+    }
+
+    public Map<Long, StudyRoomTodayPracticeSummary> getTodayPracticeSummariesByRoomIds(Collection<Long> roomIds) {
+        List<Long> ids = roomIds.stream().distinct().toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        LocalDate today = LocalDate.now(KST);
+        List<Object[]> rows = entityManager.createQuery("""
+                        select m.room.id, count(distinct ps.userId), count(ps.id)
+                        from StudyRoomMember m
+                        join ProblemSolve ps on ps.userId = m.user.id
+                        where m.room.id in :roomIds and ps.practicedAt between :start and :end
+                        group by m.room.id
+                        """, Object[].class)
+                .setParameter("roomIds", ids)
+                .setParameter("start", today.atStartOfDay())
+                .setParameter("end", today.atTime(LocalTime.MAX))
+                .getResultList();
+        Map<Long, StudyRoomTodayPracticeSummary> result = new HashMap<>();
+        for (Object[] row : rows) {
+            result.put((Long) row[0], new StudyRoomTodayPracticeSummary(
+                    Math.toIntExact((Long) row[1]),
+                    Math.toIntExact((Long) row[2])
+            ));
+        }
+        return result;
+    }
+
     public Map<Long, StudyRoomStats> getStats(Collection<Long> userIds, LocalDateTime start, LocalDateTime end, LocalDate today) {
         List<Long> ids = userIds.stream().distinct().toList();
         Map<Long, Integer> streaks = currentStreaks(ids, today);
@@ -53,6 +86,23 @@ public class StudyRoomStatsService {
                     practices.getOrDefault(userId, 0),
                     streaks.getOrDefault(userId, 0)
             ));
+        }
+        return result;
+    }
+
+    public Map<Long, Integer> attendanceDayCounts(Collection<Long> userIds, LocalDateTime start, LocalDateTime end) {
+        List<Long> ids = userIds.stream().distinct().toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        LocalDate today = end.toLocalDate();
+        Map<Long, TreeSet<LocalDate>> studyDates = new HashMap<>();
+        addStudyDates(studyDates, findProblemStudyDates(ids, today, start));
+        addStudyDates(studyDates, findPracticeStudyDates(ids, today, start));
+
+        Map<Long, Integer> result = new HashMap<>();
+        for (Long userId : ids) {
+            result.put(userId, studyDates.getOrDefault(userId, new TreeSet<>()).size());
         }
         return result;
     }

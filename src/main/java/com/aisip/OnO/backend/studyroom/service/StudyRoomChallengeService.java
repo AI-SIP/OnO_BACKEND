@@ -39,19 +39,23 @@ public class StudyRoomChallengeService {
 
     @Transactional
     public ChallengeResponse createChallenge(Long roomId, Long userId, ChallengeCreateRequest request) {
-        accessService.validateHost(roomId, userId);
+        accessService.validateMember(roomId, userId);
         validateCreateRequest(request);
         refreshRoomChallengeStatuses(roomId);
         if (challengeRepository.countByRoomIdAndStatus(roomId, StudyRoomChallengeStatus.IN_PROGRESS) >= MAX_IN_PROGRESS_CHALLENGE_COUNT) {
             throw new ApplicationException(StudyRoomErrorCase.CHALLENGE_LIMIT_EXCEEDED);
         }
         LocalDateTime startAt = request.startAt() == null ? LocalDateTime.now() : request.startAt();
+        StudyRoomChallengePeriod period = request.period() == null
+                ? null
+                : parseEnum(request.period(), StudyRoomChallengePeriod.class);
         StudyRoom room = accessService.getRoomOrThrow(roomId);
         StudyRoomChallenge challenge = challengeRepository.save(StudyRoomChallenge.create(
                 room,
                 request.title().trim(),
                 parseEnum(request.type(), StudyRoomChallengeType.class),
                 parseEnum(request.metric(), StudyRoomChallengeMetric.class),
+                period,
                 request.targetValue(),
                 startAt,
                 request.endAt()
@@ -78,17 +82,24 @@ public class StudyRoomChallengeService {
         LocalDate streakBaseDate = min(LocalDate.now(), challenge.getEndAt().toLocalDate());
         Map<Long, Integer> streaks = statsService.currentStreaks(userIds, streakBaseDate, challenge.getStartAt().toLocalDate());
         Map<Long, StudyRoomStats> stats = statsService.getStats(userIds, challenge.getStartAt(), challenge.getEndAt(), streaks);
+        Map<Long, Integer> attendanceDays = isAttendanceMetric(challenge.getMetric())
+                ? statsService.attendanceDayCounts(userIds, challenge.getStartAt(), challenge.getEndAt())
+                : Map.of();
         List<ChallengeMemberProgressResponse> memberProgress = challenge.getType() == StudyRoomChallengeType.GROUP
                 ? List.of()
                 : members.stream()
                 .map(member -> {
-                    int current = metricValue(challenge.getMetric(), stats.get(member.getUser().getId()));
+                    int current = metricValue(challenge.getMetric(), stats.get(member.getUser().getId()),
+                            attendanceDays.getOrDefault(member.getUser().getId(), 0));
                     return new ChallengeMemberProgressResponse(member.getUser().getId(), member.getUser().getName(),
                             current, current >= challenge.getTargetValue());
                 })
                 .toList();
         Integer groupCurrent = challenge.getType() == StudyRoomChallengeType.GROUP
-                ? stats.values().stream().mapToInt(stat -> metricValue(challenge.getMetric(), stat)).sum()
+                ? userIds.stream()
+                .mapToInt(memberId -> metricValue(challenge.getMetric(), stats.get(memberId),
+                        attendanceDays.getOrDefault(memberId, 0)))
+                .sum()
                 : null;
         StudyRoomChallengeStatus status = effectiveStatus(challenge, memberProgress, groupCurrent);
         if (persistStatus && challenge.getStatus() != status) {
@@ -99,6 +110,7 @@ public class StudyRoomChallengeService {
                 challenge.getTitle(),
                 toApiValue(challenge.getType().name()),
                 toApiValue(challenge.getMetric().name()),
+                challenge.getPeriod() == null ? null : toApiValue(challenge.getPeriod().name()),
                 challenge.getTargetValue(),
                 challenge.getStartAt(),
                 challenge.getEndAt(),
@@ -126,15 +138,19 @@ public class StudyRoomChallengeService {
         return StudyRoomChallengeStatus.IN_PROGRESS;
     }
 
-    private int metricValue(StudyRoomChallengeMetric metric, StudyRoomStats stats) {
+    private int metricValue(StudyRoomChallengeMetric metric, StudyRoomStats stats, int attendanceDays) {
         if (stats == null) {
             return 0;
         }
         return switch (metric) {
-            case WEEKLY_PROBLEM_COUNT -> stats.weeklyProblemCount();
-            case WEEKLY_PRACTICE_COUNT -> stats.weeklyPracticeCount();
-            case STREAK -> stats.currentStreak();
+            case PROBLEM_COUNT, WEEKLY_PROBLEM_COUNT -> stats.weeklyProblemCount();
+            case PRACTICE_COUNT, WEEKLY_PRACTICE_COUNT -> stats.weeklyPracticeCount();
+            case ATTENDANCE, STREAK -> attendanceDays;
         };
+    }
+
+    private boolean isAttendanceMetric(StudyRoomChallengeMetric metric) {
+        return metric == StudyRoomChallengeMetric.ATTENDANCE || metric == StudyRoomChallengeMetric.STREAK;
     }
 
     private void validateCreateRequest(ChallengeCreateRequest request) {

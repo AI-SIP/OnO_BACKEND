@@ -161,7 +161,10 @@ public class StudyRoomWeeklyReportService {
                     challenge.getStartAt().toLocalDate()
             );
             Map<Long, StudyRoomStats> stats = statsService.getStats(userIds, challenge.getStartAt(), challenge.getEndAt(), streaks);
-            if (isChallengeCompleted(challenge, members, stats)) {
+            Map<Long, Integer> attendanceDays = isAttendanceMetric(challenge.getMetric())
+                    ? statsService.attendanceDayCounts(userIds, challenge.getStartAt(), challenge.getEndAt())
+                    : Map.of();
+            if (isChallengeCompleted(challenge, members, stats, attendanceDays)) {
                 challenge.updateStatus(StudyRoomChallengeStatus.COMPLETED);
                 continue;
             }
@@ -172,27 +175,34 @@ public class StudyRoomWeeklyReportService {
     }
 
     private boolean isChallengeCompleted(StudyRoomChallenge challenge, List<StudyRoomMember> members,
-                                         Map<Long, StudyRoomStats> stats) {
+                                         Map<Long, StudyRoomStats> stats, Map<Long, Integer> attendanceDays) {
         if (members.isEmpty()) {
             return false;
         }
         if (challenge.getType() == StudyRoomChallengeType.GROUP) {
-            int groupCurrent = stats.values().stream()
-                    .mapToInt(stat -> metricValue(challenge.getMetric(), stat))
+            int groupCurrent = members.stream()
+                    .mapToInt(member -> metricValue(challenge.getMetric(),
+                            stats.getOrDefault(member.getUser().getId(), new StudyRoomStats(0, 0, 0)),
+                            attendanceDays.getOrDefault(member.getUser().getId(), 0)))
                     .sum();
             return groupCurrent >= challenge.getTargetValue();
         }
         return members.stream()
                 .allMatch(member -> metricValue(challenge.getMetric(),
-                        stats.getOrDefault(member.getUser().getId(), new StudyRoomStats(0, 0, 0))) >= challenge.getTargetValue());
+                        stats.getOrDefault(member.getUser().getId(), new StudyRoomStats(0, 0, 0)),
+                        attendanceDays.getOrDefault(member.getUser().getId(), 0)) >= challenge.getTargetValue());
     }
 
-    private int metricValue(StudyRoomChallengeMetric metric, StudyRoomStats stats) {
+    private int metricValue(StudyRoomChallengeMetric metric, StudyRoomStats stats, int attendanceDays) {
         return switch (metric) {
-            case WEEKLY_PROBLEM_COUNT -> stats.weeklyProblemCount();
-            case WEEKLY_PRACTICE_COUNT -> stats.weeklyPracticeCount();
-            case STREAK -> stats.currentStreak();
+            case PROBLEM_COUNT, WEEKLY_PROBLEM_COUNT -> stats.weeklyProblemCount();
+            case PRACTICE_COUNT, WEEKLY_PRACTICE_COUNT -> stats.weeklyPracticeCount();
+            case ATTENDANCE, STREAK -> attendanceDays;
         };
+    }
+
+    private boolean isAttendanceMetric(StudyRoomChallengeMetric metric) {
+        return metric == StudyRoomChallengeMetric.ATTENDANCE || metric == StudyRoomChallengeMetric.STREAK;
     }
 
     private LocalDate min(LocalDate left, LocalDate right) {

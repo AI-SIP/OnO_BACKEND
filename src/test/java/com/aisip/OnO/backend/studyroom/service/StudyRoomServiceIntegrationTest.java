@@ -1,7 +1,14 @@
 package com.aisip.OnO.backend.studyroom.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
+import com.aisip.OnO.backend.problem.entity.Problem;
+import com.aisip.OnO.backend.problem.repository.ProblemRepository;
+import com.aisip.OnO.backend.problemsolve.entity.AnswerStatus;
+import com.aisip.OnO.backend.problemsolve.entity.ProblemSolve;
+import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveRepository;
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomDtos.InviteCodeResponse;
+import com.aisip.OnO.backend.studyroom.dto.StudyRoomDtos.StudyRoomListResponse;
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomDtos.StudyRoomCreateRequest;
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomDtos.StudyRoomDetailResponse;
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomDtos.StudyRoomGoalUpdateRequest;
@@ -21,6 +28,9 @@ import com.aisip.OnO.backend.util.RandomUserGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -48,6 +58,12 @@ class StudyRoomServiceIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private ProblemRepository problemRepository;
+
+    @Autowired
+    private ProblemSolveRepository problemSolveRepository;
 
     @Test
     void createRoomCreatesHostMember() {
@@ -99,13 +115,14 @@ class StudyRoomServiceIntegrationTest {
                 StudyRoomFeedEventType.SESSION_STARTED,
                 "{}"
         ));
-        StudyRoomFeedReaction reaction = feedReactionRepository.save(StudyRoomFeedReaction.create(feed, host, "🔥"));
+        StudyRoomFeedReaction reaction = feedReactionRepository.save(StudyRoomFeedReaction.create(feed, host, "fired_up_sparkle_eyes"));
 
         feedReactionRepository.delete(reaction);
         feedReactionRepository.flush();
-        StudyRoomFeedReaction recreated = feedReactionRepository.saveAndFlush(StudyRoomFeedReaction.create(feed, host, "🔥"));
+        StudyRoomFeedReaction recreated = feedReactionRepository.saveAndFlush(StudyRoomFeedReaction.create(feed, host, "fired_up_sparkle_eyes"));
 
         assertThat(recreated.getId()).isNotNull();
+        assertThat(recreated.getEmoji()).isEqualTo("fired_up_sparkle_eyes");
     }
 
     @Test
@@ -118,6 +135,49 @@ class StudyRoomServiceIntegrationTest {
                 .isInstanceOf(ApplicationException.class)
                 .extracting("errorCase")
                 .isEqualTo(StudyRoomErrorCase.STUDY_ROOM_FORBIDDEN);
+    }
+
+    @Test
+    void getMyRoomsIncludesTodayPracticeSummary() {
+        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
+        User member = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "멤버", "member"));
+        StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
+        InviteCodeResponse invite = inviteService.issueInviteCode(room.roomId(), host.getId());
+        inviteService.join(new StudyRoomJoinRequest(invite.code()), member.getId());
+        createPractice(host.getId(), 2);
+        createPractice(member.getId(), 3);
+
+        List<StudyRoomListResponse> rooms = studyRoomService.getMyRooms(host.getId());
+
+        StudyRoomListResponse response = rooms.stream()
+                .filter(item -> item.roomId().equals(room.roomId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(response.memberCount()).isEqualTo(2);
+        assertThat(response.todayPracticeMemberCount()).isEqualTo(2);
+        assertThat(response.todayPracticeCount()).isEqualTo(5);
+    }
+
+    @Test
+    void getRoomIncludesMemberTodayPracticeCount() {
+        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
+        User member = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "멤버", "member"));
+        StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
+        InviteCodeResponse invite = inviteService.issueInviteCode(room.roomId(), host.getId());
+        inviteService.join(new StudyRoomJoinRequest(invite.code()), member.getId());
+        createPractice(host.getId(), 2);
+        createPractice(member.getId(), 0);
+
+        StudyRoomDetailResponse response = studyRoomService.getRoom(room.roomId(), host.getId());
+
+        assertThat(response.members()).anySatisfy(item -> {
+            assertThat(item.userId()).isEqualTo(host.getId());
+            assertThat(item.todayPracticeCount()).isEqualTo(2);
+        });
+        assertThat(response.members()).anySatisfy(item -> {
+            assertThat(item.userId()).isEqualTo(member.getId());
+            assertThat(item.todayPracticeCount()).isZero();
+        });
     }
 
     @Test
@@ -155,5 +215,23 @@ class StudyRoomServiceIntegrationTest {
                 .isEqualTo(20);
         assertThat(studyRoomService.updateGoal(room.roomId(), host.getId(), new StudyRoomGoalUpdateRequest(0)).weeklyGoal())
                 .isNull();
+    }
+
+    private void createPractice(Long userId, int count) {
+        Problem problem = problemRepository.save(Problem.from(
+                new ProblemRegisterDto(null, "memo", "reference", null, LocalDateTime.now()),
+                userId
+        ));
+        for (int i = 0; i < count; i++) {
+            problemSolveRepository.save(ProblemSolve.create(
+                    problem,
+                    userId,
+                    LocalDateTime.now(),
+                    AnswerStatus.CORRECT,
+                    null,
+                    null,
+                    60
+            ));
+        }
     }
 }

@@ -35,6 +35,10 @@ public class StudyRoomChallenge extends BaseEntity {
     @Column(nullable = false, length = 40)
     private StudyRoomChallengeMetric metric;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "period", length = 20)
+    private StudyRoomChallengePeriod period;
+
     @Column(name = "target_value", nullable = false)
     private Integer targetValue;
 
@@ -49,13 +53,14 @@ public class StudyRoomChallenge extends BaseEntity {
     private StudyRoomChallengeStatus status;
 
     public static StudyRoomChallenge create(StudyRoom room, String title, StudyRoomChallengeType type,
-                                            StudyRoomChallengeMetric metric, Integer targetValue,
-                                            LocalDateTime startAt, LocalDateTime endAt) {
+                                            StudyRoomChallengeMetric metric, StudyRoomChallengePeriod period,
+                                            Integer targetValue, LocalDateTime startAt, LocalDateTime endAt) {
         return StudyRoomChallenge.builder()
                 .room(room)
                 .title(title)
                 .type(type)
                 .metric(metric)
+                .period(period)
                 .targetValue(targetValue)
                 .startAt(startAt)
                 .endAt(endAt)
