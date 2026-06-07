@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.studyroom.service;
 
+import com.aisip.OnO.backend.common.emoji.CustomEmojiValidator;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomDtos.*;
@@ -35,7 +36,6 @@ import static org.springframework.transaction.event.TransactionPhase.AFTER_COMMI
 public class StudyRoomFeedService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    private static final Set<String> ALLOWED_FEED_EMOJIS = Set.of("🔥", "👍", "🎉");
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {
     };
 
@@ -46,6 +46,7 @@ public class StudyRoomFeedService {
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
     private final StudyRoomReactionService reactionService;
+    private final CustomEmojiValidator customEmojiValidator;
 
     @Transactional(readOnly = true)
     public CursorPageResponse<FeedItemResponse> getFeed(Long roomId, Long userId, Long cursor, int size) {
@@ -68,9 +69,7 @@ public class StudyRoomFeedService {
     @Transactional
     public FeedReactionToggleResponse toggleReaction(Long roomId, Long feedId, Long userId, ReactionToggleRequest request) {
         accessService.validateMember(roomId, userId);
-        if (!ALLOWED_FEED_EMOJIS.contains(request.emoji())) {
-            throw new ApplicationException(StudyRoomErrorCase.INVALID_REACTION_EMOJI);
-        }
+        customEmojiValidator.validate(request.emoji());
         StudyRoomFeed feed = feedRepository.findByIdAndRoomId(feedId, roomId)
                 .orElseThrow(() -> new ApplicationException(StudyRoomErrorCase.STUDY_ROOM_NOT_FOUND));
         User user = userRepository.findById(userId)

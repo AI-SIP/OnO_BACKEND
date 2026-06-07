@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.studyroom.service;
 
+import com.aisip.OnO.backend.common.emoji.CustomEmojiValidator;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.problem.entity.Problem;
@@ -22,14 +23,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class StudyRoomSharedProblemService {
-
-    private static final Set<String> ALLOWED_SHARED_PROBLEM_EMOJIS = Set.of("😱", "🔥", "👍", "🎉");
 
     private final StudyRoomAccessService accessService;
     private final StudyRoomSharedProblemRepository sharedProblemRepository;
@@ -38,6 +36,7 @@ public class StudyRoomSharedProblemService {
     private final ProblemService problemService;
     private final StudyRoomReactionService reactionService;
     private final ApplicationEventPublisher eventPublisher;
+    private final CustomEmojiValidator customEmojiValidator;
 
     @Transactional(readOnly = true)
     public CursorPageResponse<SharedProblemResponse> getSharedProblems(Long roomId, Long userId, Long cursor, int size) {
@@ -79,9 +78,7 @@ public class StudyRoomSharedProblemService {
     @Transactional
     public SharedProblemReactionToggleResponse toggleReaction(Long roomId, Long sharedProblemId, Long userId, ReactionToggleRequest request) {
         accessService.validateMember(roomId, userId);
-        if (!ALLOWED_SHARED_PROBLEM_EMOJIS.contains(request.emoji())) {
-            throw new ApplicationException(StudyRoomErrorCase.INVALID_REACTION_EMOJI);
-        }
+        customEmojiValidator.validate(request.emoji());
         StudyRoomSharedProblem sharedProblem = sharedProblemRepository.findByIdAndRoomId(sharedProblemId, roomId)
                 .orElseThrow(() -> new ApplicationException(StudyRoomErrorCase.SHARED_PROBLEM_NOT_FOUND));
         User user = userRepository.findById(userId)

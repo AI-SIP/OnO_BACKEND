@@ -26,7 +26,7 @@ public class StudyRoomFeedReaction extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false, length = 16)
+    @Column(nullable = false, length = 80)
     private String emoji;
 
     public static StudyRoomFeedReaction create(StudyRoomFeed feed, User user, String emoji) {

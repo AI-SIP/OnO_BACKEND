@@ -26,7 +26,7 @@ public class StudyRoomSharedProblemReaction extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false, length = 16)
+    @Column(nullable = false, length = 80)
     private String emoji;
 
     public static StudyRoomSharedProblemReaction create(StudyRoomSharedProblem sharedProblem, User user, String emoji) {
