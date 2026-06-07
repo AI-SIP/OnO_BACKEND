@@ -1,6 +1,9 @@
 package com.aisip.OnO.backend.learningcalendar.service;
 
+import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.learningcalendar.dto.LearningCalendarMoodRequestDto;
 import com.aisip.OnO.backend.learningcalendar.dto.LearningCalendarResponseDto;
+import com.aisip.OnO.backend.learningcalendar.exception.LearningCalendarErrorCase;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
@@ -24,6 +27,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -96,6 +100,42 @@ class LearningCalendarServiceTest {
         assertThat(records.get(LocalDate.of(2026, 5, 2)).noteWriteCount()).isEqualTo(1);
         assertThat(records.get(LocalDate.of(2026, 5, 6)).hasStudied()).isFalse();
         assertThat(records.get(LocalDate.of(2026, 5, 6)).reviewedItems()).isEmpty();
+        assertThat(records.get(LocalDate.of(2026, 5, 1)).moodEmojiKey()).isNull();
+    }
+
+    @Test
+    @DisplayName("학습 기록이 있는 날짜에 감정 이모지를 저장하고 조회한다")
+    void updateMood_success() {
+        User targetUser = createUser("calendar-mood-user");
+        Long userId = targetUser.getId();
+        createProblemWrite(userId, LocalDateTime.of(2026, 6, 7, 8, 0));
+
+        learningCalendarService.updateMood(userId,
+                new LearningCalendarMoodRequestDto(LocalDate.of(2026, 6, 7), "happy_tears"));
+        learningCalendarService.updateMood(userId,
+                new LearningCalendarMoodRequestDto(LocalDate.of(2026, 6, 7), "success_checkmark"));
+
+        LearningCalendarResponseDto response = learningCalendarService.getLearningCalendar(
+                userId,
+                2026,
+                6,
+                LocalDate.of(2026, 6, 8)
+        );
+
+        Map<LocalDate, LearningCalendarResponseDto.DailyStudyRecord> records = response.records().stream()
+                .collect(Collectors.toMap(LearningCalendarResponseDto.DailyStudyRecord::date, record -> record));
+        assertThat(records.get(LocalDate.of(2026, 6, 7)).moodEmojiKey()).isEqualTo("success_checkmark");
+    }
+
+    @Test
+    @DisplayName("학습 기록이 없는 날짜에는 감정 이모지를 저장할 수 없다")
+    void updateMood_recordNotFound() {
+        User targetUser = createUser("calendar-mood-empty-user");
+
+        assertThatThrownBy(() -> learningCalendarService.updateMood(targetUser.getId(),
+                new LearningCalendarMoodRequestDto(LocalDate.of(2026, 6, 7), "happy_tears")))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessageContaining(LearningCalendarErrorCase.CALENDAR_RECORD_NOT_FOUND.getMessage());
     }
 
     @Test

@@ -20,6 +20,7 @@ import java.util.List;
 
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -53,6 +54,7 @@ class LearningCalendarControllerTest {
                         .noteWriteCount(1)
                         .studyMinutes(12)
                         .reviewedItems(List.of("이차방정식 오답노트"))
+                        .moodEmojiKey("happy_tears")
                         .build()))
                 .build();
         given(learningCalendarService.getLearningCalendar(7L, 2026, 5)).willReturn(response);
@@ -72,9 +74,35 @@ class LearningCalendarControllerTest {
                 .andExpect(jsonPath("$.data.records[0].reviewCount").value(2))
                 .andExpect(jsonPath("$.data.records[0].noteWriteCount").value(1))
                 .andExpect(jsonPath("$.data.records[0].studyMinutes").value(12))
-                .andExpect(jsonPath("$.data.records[0].reviewedItems[0]").value("이차방정식 오답노트"));
+                .andExpect(jsonPath("$.data.records[0].reviewedItems[0]").value("이차방정식 오답노트"))
+                .andExpect(jsonPath("$.data.records[0].moodEmojiKey").value("happy_tears"));
 
         verify(learningCalendarService).getLearningCalendar(7L, 2026, 5);
+    }
+
+    @Test
+    @DisplayName("학습 달력 감정 이모지 저장")
+    @WithMockCustomUser(userId = 7L)
+    void updateMood() throws Exception {
+        given(learningCalendarService.updateMood(7L, new com.aisip.OnO.backend.learningcalendar.dto.LearningCalendarMoodRequestDto(
+                LocalDate.of(2026, 6, 7),
+                "happy_tears"
+        ))).willReturn(new com.aisip.OnO.backend.learningcalendar.dto.LearningCalendarMoodResponseDto(
+                LocalDate.of(2026, 6, 7),
+                "happy_tears"
+        ));
+
+        mockMvc.perform(patch("/api/learning-calendar/mood")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "date": "2026-06-07",
+                                  "emojiKey": "happy_tears"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.date").value("2026-06-07"))
+                .andExpect(jsonPath("$.data.emojiKey").value("happy_tears"));
     }
 
     @Test

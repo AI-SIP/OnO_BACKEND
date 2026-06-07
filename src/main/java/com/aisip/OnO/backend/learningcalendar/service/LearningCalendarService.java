@@ -1,6 +1,13 @@
 package com.aisip.OnO.backend.learningcalendar.service;
 
+import com.aisip.OnO.backend.common.emoji.CustomEmojiValidator;
+import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.learningcalendar.dto.LearningCalendarMoodRequestDto;
+import com.aisip.OnO.backend.learningcalendar.dto.LearningCalendarMoodResponseDto;
 import com.aisip.OnO.backend.learningcalendar.dto.LearningCalendarResponseDto;
+import com.aisip.OnO.backend.learningcalendar.entity.LearningCalendarMood;
+import com.aisip.OnO.backend.learningcalendar.exception.LearningCalendarErrorCase;
+import com.aisip.OnO.backend.learningcalendar.repository.LearningCalendarMoodRepository;
 import com.aisip.OnO.backend.learningcalendar.repository.LearningCalendarQueryRepository;
 import com.aisip.OnO.backend.util.redis.StreakCacheService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +31,8 @@ public class LearningCalendarService {
 
     private final LearningCalendarQueryRepository calendarRepository;
     private final StreakCacheService streakCacheService;
+    private final LearningCalendarMoodRepository moodRepository;
+    private final CustomEmojiValidator customEmojiValidator;
 
     public LearningCalendarResponseDto getLearningCalendar(Long userId, int year, int month) {
         return getLearningCalendar(userId, year, month, LocalDate.now());
@@ -45,13 +54,17 @@ public class LearningCalendarService {
         Map<LocalDate, List<String>> reviewedItems = toReviewedItemsMap(
                 calendarRepository.findReviewItems(userId, start, end)
         );
+        Map<LocalDate, String> moodEmojiKeys = moodRepository.findAllByUserIdAndStudyDateBetween(userId, startDate, endDate)
+                .stream()
+                .collect(Collectors.toMap(LearningCalendarMood::getStudyDate, LearningCalendarMood::getEmojiKey));
 
         List<LearningCalendarResponseDto.DailyStudyRecord> records = startDate.datesUntil(endDate.plusDays(1))
                 .map(date -> buildDailyRecord(
                         date,
                         reviewStats.get(date),
                         noteWriteStats.get(date),
-                        reviewedItems.getOrDefault(date, List.of())
+                        reviewedItems.getOrDefault(date, List.of()),
+                        moodEmojiKeys.get(date)
                 ))
                 .toList();
 
@@ -71,11 +84,27 @@ public class LearningCalendarService {
                 .build();
     }
 
+    @Transactional
+    public LearningCalendarMoodResponseDto updateMood(Long userId, LearningCalendarMoodRequestDto request) {
+        if (request == null || request.date() == null) {
+            throw new ApplicationException(LearningCalendarErrorCase.INVALID_DATE_FORMAT);
+        }
+        customEmojiValidator.validate(request.emojiKey());
+        if (!calendarRepository.existsStudyRecord(userId, request.date())) {
+            throw new ApplicationException(LearningCalendarErrorCase.CALENDAR_RECORD_NOT_FOUND);
+        }
+        LearningCalendarMood mood = moodRepository.findByUserIdAndStudyDate(userId, request.date())
+                .orElseGet(() -> moodRepository.save(LearningCalendarMood.create(userId, request.date(), request.emojiKey())));
+        mood.updateEmojiKey(request.emojiKey());
+        return new LearningCalendarMoodResponseDto(mood.getStudyDate(), mood.getEmojiKey());
+    }
+
     private LearningCalendarResponseDto.DailyStudyRecord buildDailyRecord(
             LocalDate date,
             LearningCalendarQueryRepository.DailyReviewStat reviewStat,
             LearningCalendarQueryRepository.DailyNoteWriteStat noteWriteStat,
-            List<String> reviewedItems
+            List<String> reviewedItems,
+            String moodEmojiKey
     ) {
         int reviewCount = reviewStat == null ? 0 : toInt(reviewStat.reviewCount());
         int noteWriteCount = noteWriteStat == null ? 0 : toInt(noteWriteStat.noteWriteCount());
@@ -88,6 +117,7 @@ public class LearningCalendarService {
                 .noteWriteCount(noteWriteCount)
                 .studyMinutes(studyMinutes)
                 .reviewedItems(reviewedItems)
+                .moodEmojiKey(moodEmojiKey)
                 .build();
     }
 

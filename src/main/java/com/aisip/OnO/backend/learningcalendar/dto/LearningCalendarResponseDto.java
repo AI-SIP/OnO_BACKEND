@@ -22,7 +22,8 @@ public record LearningCalendarResponseDto(
             int reviewCount,
             int noteWriteCount,
             int studyMinutes,
-            List<String> reviewedItems
+            List<String> reviewedItems,
+            String moodEmojiKey
     ) {
     }
 }
