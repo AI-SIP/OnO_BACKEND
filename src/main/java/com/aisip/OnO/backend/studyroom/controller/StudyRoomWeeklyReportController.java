@@ -17,13 +17,14 @@ public class StudyRoomWeeklyReportController {
     private final StudyRoomWeeklyReportService reportService;
 
     @GetMapping
-    public CommonResponse<List<WeeklyReportResponse>> getReports(@PathVariable Long roomId,
-                                                                 @RequestParam(defaultValue = "4") int limit) {
+    public CommonResponse<List<WeeklyReportResponse>> getReports(@PathVariable("roomId") Long roomId,
+                                                                 @RequestParam(value = "limit", defaultValue = "4") int limit) {
         return CommonResponse.success(reportService.getReports(roomId, currentUserId(), limit));
     }
 
     @PatchMapping("/{reportId}/read")
-    public CommonResponse<WeeklyReportReadResponse> markRead(@PathVariable Long roomId, @PathVariable Long reportId) {
+    public CommonResponse<WeeklyReportReadResponse> markRead(@PathVariable("roomId") Long roomId,
+                                                             @PathVariable("reportId") Long reportId) {
         return CommonResponse.success(reportService.markRead(roomId, reportId, currentUserId()));
     }
 

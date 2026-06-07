@@ -31,18 +31,18 @@ public class StudyRoomController {
     }
 
     @GetMapping("/{roomId}")
-    public CommonResponse<StudyRoomDetailResponse> getRoom(@PathVariable Long roomId) {
+    public CommonResponse<StudyRoomDetailResponse> getRoom(@PathVariable("roomId") Long roomId) {
         return CommonResponse.success(studyRoomService.getRoom(roomId, currentUserId()));
     }
 
     @DeleteMapping("/{roomId}")
-    public CommonResponse<String> deleteRoom(@PathVariable Long roomId) {
+    public CommonResponse<String> deleteRoom(@PathVariable("roomId") Long roomId) {
         studyRoomService.deleteRoom(roomId, currentUserId());
         return CommonResponse.success("스터디룸 삭제가 완료되었습니다.");
     }
 
     @PostMapping("/{roomId}/invite")
-    public CommonResponse<InviteCodeResponse> issueInviteCode(@PathVariable Long roomId) {
+    public CommonResponse<InviteCodeResponse> issueInviteCode(@PathVariable("roomId") Long roomId) {
         return CommonResponse.success(inviteService.issueInviteCode(roomId, currentUserId()));
     }
 
@@ -52,19 +52,20 @@ public class StudyRoomController {
     }
 
     @DeleteMapping("/{roomId}/leave")
-    public CommonResponse<String> leaveRoom(@PathVariable Long roomId) {
+    public CommonResponse<String> leaveRoom(@PathVariable("roomId") Long roomId) {
         studyRoomService.leaveRoom(roomId, currentUserId());
         return CommonResponse.success("스터디룸 탈퇴가 완료되었습니다.");
     }
 
     @DeleteMapping("/{roomId}/members/{memberId}")
-    public CommonResponse<String> kickMember(@PathVariable Long roomId, @PathVariable Long memberId) {
+    public CommonResponse<String> kickMember(@PathVariable("roomId") Long roomId,
+                                             @PathVariable("memberId") Long memberId) {
         studyRoomService.kickMember(roomId, memberId, currentUserId());
         return CommonResponse.success("스터디룸 멤버 강퇴가 완료되었습니다.");
     }
 
     @PutMapping("/{roomId}/members/me/goal")
-    public CommonResponse<GoalUpdateResponse> updateGoal(@PathVariable Long roomId,
+    public CommonResponse<GoalUpdateResponse> updateGoal(@PathVariable("roomId") Long roomId,
                                                          @RequestBody StudyRoomGoalUpdateRequest request) {
         return CommonResponse.success(studyRoomService.updateGoal(roomId, currentUserId(), request));
     }

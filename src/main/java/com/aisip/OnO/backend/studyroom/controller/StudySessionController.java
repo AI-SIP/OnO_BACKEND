@@ -16,18 +16,19 @@ public class StudySessionController {
     private final StudySessionService sessionService;
 
     @GetMapping("/active")
-    public CommonResponse<ActiveStudySessionsResponse> getActiveSessions(@PathVariable Long roomId) {
+    public CommonResponse<ActiveStudySessionsResponse> getActiveSessions(@PathVariable("roomId") Long roomId) {
         return CommonResponse.success(sessionService.getActiveSessions(roomId, currentUserId()));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public CommonResponse<StudySessionStartResponse> start(@PathVariable Long roomId) {
+    public CommonResponse<StudySessionStartResponse> start(@PathVariable("roomId") Long roomId) {
         return CommonResponse.success(sessionService.start(roomId, currentUserId()));
     }
 
     @PatchMapping("/{sessionId}/end")
-    public CommonResponse<StudySessionEndResponse> end(@PathVariable Long roomId, @PathVariable Long sessionId) {
+    public CommonResponse<StudySessionEndResponse> end(@PathVariable("roomId") Long roomId,
+                                                       @PathVariable("sessionId") Long sessionId) {
         return CommonResponse.success(sessionService.end(roomId, sessionId, currentUserId()));
     }
 

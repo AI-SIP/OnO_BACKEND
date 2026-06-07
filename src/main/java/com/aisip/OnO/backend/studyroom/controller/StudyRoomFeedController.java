@@ -16,15 +16,15 @@ public class StudyRoomFeedController {
     private final StudyRoomFeedService feedService;
 
     @GetMapping
-    public CommonResponse<CursorPageResponse<FeedItemResponse>> getFeed(@PathVariable Long roomId,
+    public CommonResponse<CursorPageResponse<FeedItemResponse>> getFeed(@PathVariable("roomId") Long roomId,
                                                                         @RequestParam(value = "cursor", required = false) Long cursor,
-                                                                        @RequestParam(defaultValue = "30") int size) {
+                                                                        @RequestParam(value = "size", defaultValue = "30") int size) {
         return CommonResponse.success(feedService.getFeed(roomId, currentUserId(), cursor, size));
     }
 
     @PostMapping("/{feedId}/reactions")
-    public CommonResponse<FeedReactionToggleResponse> toggleReaction(@PathVariable Long roomId,
-                                                                     @PathVariable Long feedId,
+    public CommonResponse<FeedReactionToggleResponse> toggleReaction(@PathVariable("roomId") Long roomId,
+                                                                     @PathVariable("feedId") Long feedId,
                                                                      @RequestBody ReactionToggleRequest request) {
         return CommonResponse.success(feedService.toggleReaction(roomId, feedId, currentUserId(), request));
     }

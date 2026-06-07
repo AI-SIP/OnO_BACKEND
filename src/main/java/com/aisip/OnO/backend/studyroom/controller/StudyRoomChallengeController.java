@@ -18,19 +18,20 @@ public class StudyRoomChallengeController {
     private final StudyRoomChallengeService challengeService;
 
     @GetMapping
-    public CommonResponse<List<ChallengeResponse>> getChallenges(@PathVariable Long roomId) {
+    public CommonResponse<List<ChallengeResponse>> getChallenges(@PathVariable("roomId") Long roomId) {
         return CommonResponse.success(challengeService.getChallenges(roomId, currentUserId()));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public CommonResponse<ChallengeResponse> createChallenge(@PathVariable Long roomId,
+    public CommonResponse<ChallengeResponse> createChallenge(@PathVariable("roomId") Long roomId,
                                                              @RequestBody ChallengeCreateRequest request) {
         return CommonResponse.success(challengeService.createChallenge(roomId, currentUserId(), request));
     }
 
     @DeleteMapping("/{challengeId}")
-    public CommonResponse<String> deleteChallenge(@PathVariable Long roomId, @PathVariable Long challengeId) {
+    public CommonResponse<String> deleteChallenge(@PathVariable("roomId") Long roomId,
+                                                  @PathVariable("challengeId") Long challengeId) {
         challengeService.deleteChallenge(roomId, challengeId, currentUserId());
         return CommonResponse.success("챌린지 삭제가 완료되었습니다.");
     }
