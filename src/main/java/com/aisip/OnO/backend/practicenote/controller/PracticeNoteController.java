@@ -73,9 +73,10 @@ public class PracticeNoteController {
 
     // ✅ 복습 완료 횟수 증가
     @PatchMapping("/{practiceId}/complete")
-    public CommonResponse<String> addPracticeCount(@PathVariable("practiceId") Long practiceId) {
+    public CommonResponse<String> addPracticeCount(@PathVariable("practiceId") Long practiceId,
+                                                   @RequestBody(required = false) PracticeNoteCompleteRequestDto request) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        practiceNoteService.addPracticeNoteCount(userId, practiceId);
+        practiceNoteService.addPracticeNoteCount(userId, practiceId, request);
 
         log.info("userId: {} completed problem practice with practiceNoteId: {}", userId, practiceId);
         return CommonResponse.success("복습을 완료했습니다.");

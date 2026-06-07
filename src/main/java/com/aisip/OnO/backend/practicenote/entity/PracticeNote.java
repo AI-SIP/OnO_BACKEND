@@ -35,6 +35,9 @@ public class PracticeNote extends BaseEntity {
 
     private LocalDateTime lastSolvedAt;
 
+    @Column(length = 80)
+    private String lastSessionMoodEmojiKey;
+
     @Embedded
     private PracticeNotification practiceNotification;
 
@@ -61,6 +64,11 @@ public class PracticeNote extends BaseEntity {
     public void updatePracticeNoteCount() {
         this.practiceCount += 1;
         this.lastSolvedAt = LocalDateTime.now();
+    }
+
+    public void updatePracticeNoteCount(String moodEmojiKey) {
+        updatePracticeNoteCount();
+        this.lastSessionMoodEmojiKey = moodEmojiKey;
     }
 
     public void updateNotification(PracticeNotification practiceNotification) {

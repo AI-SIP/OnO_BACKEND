@@ -1,10 +1,12 @@
 package com.aisip.OnO.backend.practicenote.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.common.emoji.CustomEmojiErrorCase;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDetailResponseDto;
+import com.aisip.OnO.backend.practicenote.dto.PracticeNoteCompleteRequestDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteThumbnailResponseDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteUpdateDto;
@@ -280,6 +282,35 @@ class PracticeNoteServiceTest {
         //then
         PracticeNote practiceNote = practiceNoteRepository.findById(practiceNoteId).get();
         assertThat(practiceNote.getPracticeCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("복습 완료 소감 이모지를 최신 복습노트에 저장한다")
+    void addPracticeNoteCount_withMoodEmojiKey() {
+        Long practiceNoteId = practiceNoteList.get(0).getId();
+
+        practiceNoteService.addPracticeNoteCount(userId, practiceNoteId,
+                new PracticeNoteCompleteRequestDto("success_checkmark"));
+
+        PracticeNote practiceNote = practiceNoteRepository.findById(practiceNoteId).get();
+        assertThat(practiceNote.getPracticeCount()).isEqualTo(1);
+        assertThat(practiceNote.getLastSessionMoodEmojiKey()).isEqualTo("success_checkmark");
+
+        PracticeNoteDetailResponseDto detail = practiceNoteService.findPracticeNoteDetail(practiceNoteId, userId);
+        assertThat(detail.lastSessionMoodEmojiKey()).isEqualTo("success_checkmark");
+        assertThat(practiceNoteService.findAllPracticeThumbnailsByUser(userId).get(0).lastSessionMoodEmojiKey())
+                .isEqualTo("success_checkmark");
+    }
+
+    @Test
+    @DisplayName("지원하지 않는 복습 완료 소감 이모지는 예외")
+    void addPracticeNoteCount_invalidMoodEmojiKey() {
+        Long practiceNoteId = practiceNoteList.get(0).getId();
+
+        assertThatThrownBy(() -> practiceNoteService.addPracticeNoteCount(userId, practiceNoteId,
+                new PracticeNoteCompleteRequestDto("not_supported")))
+                .isInstanceOf(ApplicationException.class)
+                .hasMessageContaining(CustomEmojiErrorCase.INVALID_EMOJI_KEY.getMessage());
     }
 
     @Test
