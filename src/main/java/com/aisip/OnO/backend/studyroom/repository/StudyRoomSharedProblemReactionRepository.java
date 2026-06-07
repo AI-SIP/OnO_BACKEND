@@ -17,4 +17,6 @@ public interface StudyRoomSharedProblemReactionRepository extends JpaRepository<
     List<StudyRoomSharedProblemReaction> findAllBySharedProblemIds(@Param("sharedProblemIds") Collection<Long> sharedProblemIds);
 
     List<StudyRoomSharedProblemReaction> findAllBySharedProblemId(Long sharedProblemId);
+
+    void deleteBySharedProblemId(Long sharedProblemId);
 }

@@ -98,6 +98,7 @@ public class StudyRoomSharedProblemService {
         if (!sharedProblem.getSharedByUser().getId().equals(userId)) {
             throw new ApplicationException(StudyRoomErrorCase.STUDY_ROOM_FORBIDDEN);
         }
+        reactionRepository.deleteBySharedProblemId(sharedProblemId);
         sharedProblemRepository.delete(sharedProblem);
     }
 
