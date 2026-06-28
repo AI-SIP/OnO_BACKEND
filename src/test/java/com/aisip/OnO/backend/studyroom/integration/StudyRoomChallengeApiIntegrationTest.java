@@ -36,6 +36,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -147,6 +149,80 @@ class StudyRoomChallengeApiIntegrationTest {
                 LocalDateTime.now().plusDays(1)
         );
 
+        authenticate(member.getId());
+        mockMvc.perform(post("/api/study-room/{roomId}/challenges", roomId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(10016));
+    }
+
+    @Test
+    void hostCanDeleteChallengeAndMemberCannot() throws Exception {
+        ChallengeCreateRequest request = new ChallengeCreateRequest(
+                "삭제 테스트", "individual", "practice_count", null,
+                3, null, LocalDateTime.now().plusDays(7)
+        );
+        // 방장으로 챌린지 생성: 세션 간 인증 공유 문제를 피하기 위해 auth() RequestPostProcessor 사용
+        MvcResult createResult = mockMvc.perform(post("/api/study-room/{roomId}/challenges", roomId)
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                host.getId(), null, List.of(new SimpleGrantedAuthority("ROLE_MEMBER")))))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        Number challengeIdValue = JsonPath.read(createResult.getResponse().getContentAsString(), "$.data.challengeId");
+        Long challengeId = challengeIdValue.longValue();
+
+        // 멤버는 삭제 불가 - HOST_ONLY (10003)
+        mockMvc.perform(delete("/api/study-room/{roomId}/challenges/{challengeId}", roomId, challengeId)
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                member.getId(), null, List.of(new SimpleGrantedAuthority("ROLE_MEMBER"))))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(10003));
+
+        // 방장은 삭제 가능
+        mockMvc.perform(delete("/api/study-room/{roomId}/challenges/{challengeId}", roomId, challengeId)
+                        .with(authentication(new UsernamePasswordAuthenticationToken(
+                                host.getId(), null, List.of(new SimpleGrantedAuthority("ROLE_MEMBER"))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value("챌린지 삭제가 완료되었습니다."));
+    }
+
+    @Test
+    void createChallengeRejectsTitleTooLong() throws Exception {
+        ChallengeCreateRequest request = new ChallengeCreateRequest(
+                "a".repeat(41), "individual", "practice_count", null,
+                3, null, LocalDateTime.now().plusDays(7)
+        );
+        authenticate(member.getId());
+        mockMvc.perform(post("/api/study-room/{roomId}/challenges", roomId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(10016));
+    }
+
+    @Test
+    void createChallengeRejectsPastEndAt() throws Exception {
+        ChallengeCreateRequest request = new ChallengeCreateRequest(
+                "과거 종료일", "individual", "practice_count", null,
+                3, null, LocalDateTime.now().minusDays(1)
+        );
+        authenticate(member.getId());
+        mockMvc.perform(post("/api/study-room/{roomId}/challenges", roomId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(10016));
+    }
+
+    @Test
+    void createChallengeRejectsStartAtAfterEndAt() throws Exception {
+        ChallengeCreateRequest request = new ChallengeCreateRequest(
+                "날짜 역전", "individual", "practice_count", null,
+                3, LocalDateTime.now().plusDays(5), LocalDateTime.now().plusDays(3)
+        );
         authenticate(member.getId());
         mockMvc.perform(post("/api/study-room/{roomId}/challenges", roomId)
                         .contentType(MediaType.APPLICATION_JSON)
