@@ -68,7 +68,7 @@ public class StudyRoomService {
 
     @Transactional
     public StudyRoomDetailResponse createRoom(StudyRoomCreateRequest request, Long userId) {
-        String name = validateName(request.name());
+        String name = validateName(request == null ? null : request.name());
         User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
         if (memberRepository.countByUserId(userId) >= MAX_USER_ROOM_COUNT) {
@@ -77,6 +77,15 @@ public class StudyRoomService {
         StudyRoom room = StudyRoom.create(name, userId);
         room.addMember(StudyRoomMember.create(user, StudyRoomMemberRole.HOST));
         roomRepository.save(room);
+        return buildDetail(room);
+    }
+
+    @Transactional
+    public StudyRoomDetailResponse updateRoom(Long roomId, Long userId, StudyRoomUpdateRequest request) {
+        String name = validateName(request == null ? null : request.name());
+        accessService.validateHost(roomId, userId);
+        StudyRoom room = lockRoom(roomId);
+        room.updateName(name);
         return buildDetail(room);
     }
 

@@ -70,7 +70,8 @@ public class StudyRoomMapper {
                 weeklyPracticeCount,
                 member.getWeeklyGoal(),
                 goalProgress,
-                todayPracticeCount
+                todayPracticeCount,
+                todayPracticeCount > 0
         );
     }
 }

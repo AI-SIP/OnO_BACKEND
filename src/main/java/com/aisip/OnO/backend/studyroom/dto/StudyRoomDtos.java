@@ -13,6 +13,9 @@ public final class StudyRoomDtos {
     public record StudyRoomCreateRequest(String name) {
     }
 
+    public record StudyRoomUpdateRequest(String name) {
+    }
+
     public record StudyRoomJoinRequest(String code) {
     }
 
@@ -41,7 +44,7 @@ public final class StudyRoomDtos {
     public record StudyRoomMemberResponse(Long userId, String name, Long totalStudyLevel, int currentStreak,
                                           int weeklyProblemCount, int weeklyPracticeCount,
                                           Integer weeklyGoal, Integer goalProgress,
-                                          int todayPracticeCount) {
+                                          int todayPracticeCount, boolean practicedToday) {
     }
 
     public record StudyRoomThumbnailUpdateResponse(String thumbnailUrl) {

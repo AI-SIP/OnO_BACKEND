@@ -37,6 +37,12 @@ public class StudyRoomController {
         return CommonResponse.success(studyRoomService.getRoom(roomId, currentUserId()));
     }
 
+    @PatchMapping("/{roomId}")
+    public CommonResponse<StudyRoomDetailResponse> updateRoom(@PathVariable("roomId") Long roomId,
+                                                              @RequestBody StudyRoomUpdateRequest request) {
+        return CommonResponse.success(studyRoomService.updateRoom(roomId, currentUserId(), request));
+    }
+
     @DeleteMapping("/{roomId}")
     public CommonResponse<String> deleteRoom(@PathVariable("roomId") Long roomId) {
         studyRoomService.deleteRoom(roomId, currentUserId());

@@ -100,13 +100,50 @@ class StudyRoomApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.memberCount").value(2))
                 .andExpect(jsonPath("$.data.members[?(@.userId == " + host.getId() + ")].todayPracticeCount").value(2))
-                .andExpect(jsonPath("$.data.members[?(@.userId == " + member.getId() + ")].todayPracticeCount").value(3));
+                .andExpect(jsonPath("$.data.members[?(@.userId == " + host.getId() + ")].practicedToday").value(true))
+                .andExpect(jsonPath("$.data.members[?(@.userId == " + member.getId() + ")].todayPracticeCount").value(3))
+                .andExpect(jsonPath("$.data.members[?(@.userId == " + member.getId() + ")].practicedToday").value(true));
 
         mockMvc.perform(get("/api/study-room")
                         .with(auth()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@.roomId == " + roomId + ")].todayPracticeMemberCount").value(2))
                 .andExpect(jsonPath("$.data[?(@.roomId == " + roomId + ")].todayPracticeCount").value(5));
+    }
+
+    @Test
+    void hostCanUpdateRoomNameAndMemberCannotUpdateRoomName() throws Exception {
+        User host = saveUser("방장", "room-update-host");
+        User member = saveUser("멤버", "room-update-member");
+        authenticate(host.getId());
+        Long roomId = createRoom("기존 이름");
+        String inviteCode = issueInviteCode(roomId);
+        authenticate(member.getId());
+        join(inviteCode);
+
+        mockMvc.perform(patch("/api/study-room/{roomId}", roomId)
+                        .with(auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new StudyRoomUpdateRequest("멤버 수정"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(10003));
+
+        authenticate(host.getId());
+        mockMvc.perform(patch("/api/study-room/{roomId}", roomId)
+                        .with(auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new StudyRoomUpdateRequest("  새 스터디룸  "))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.roomId").value(roomId))
+                .andExpect(jsonPath("$.data.name").value("새 스터디룸"))
+                .andExpect(jsonPath("$.data.memberCount").value(2));
+
+        mockMvc.perform(patch("/api/study-room/{roomId}", roomId)
+                        .with(auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new StudyRoomUpdateRequest(" "))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(10016));
     }
 
     @Test
