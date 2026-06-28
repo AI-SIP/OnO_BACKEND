@@ -95,6 +95,27 @@ public class StudyRoomService {
     }
 
     @Transactional
+    public StudyRoomDetailResponse updateRoom(Long roomId, Long userId, String name, MultipartFile thumbnailImage) {
+        if ((name == null || name.isBlank()) && (thumbnailImage == null || thumbnailImage.isEmpty())) {
+            throw new ApplicationException(StudyRoomErrorCase.INVALID_STUDY_ROOM_REQUEST);
+        }
+        accessService.validateHost(roomId, userId);
+        StudyRoom room = lockRoom(roomId);
+        if (name != null) {
+            room.updateName(validateName(name));
+        }
+        if (thumbnailImage != null) {
+            validateThumbnail(thumbnailImage);
+            String previousThumbnailUrl = room.getThumbnailUrl();
+            String thumbnailUrl = fileUploadService.uploadFileToS3(thumbnailImage);
+            deleteThumbnailOnRollback(thumbnailUrl, roomId);
+            room.updateThumbnailUrl(thumbnailUrl);
+            deleteThumbnailAsync(previousThumbnailUrl, roomId);
+        }
+        return buildDetail(room);
+    }
+
+    @Transactional
     public void deleteRoom(Long roomId, Long userId) {
         accessService.validateHost(roomId, userId);
         StudyRoom room = lockRoom(roomId);

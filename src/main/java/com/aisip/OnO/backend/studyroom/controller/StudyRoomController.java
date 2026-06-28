@@ -15,7 +15,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/study-room")
+@RequestMapping({"/api/study-room", "/api/study-rooms"})
 public class StudyRoomController {
 
     private final StudyRoomService studyRoomService;
@@ -37,10 +37,17 @@ public class StudyRoomController {
         return CommonResponse.success(studyRoomService.getRoom(roomId, currentUserId()));
     }
 
-    @PatchMapping("/{roomId}")
+    @PatchMapping(value = "/{roomId}", consumes = MediaType.APPLICATION_JSON_VALUE)
     public CommonResponse<StudyRoomDetailResponse> updateRoom(@PathVariable("roomId") Long roomId,
                                                               @RequestBody StudyRoomUpdateRequest request) {
         return CommonResponse.success(studyRoomService.updateRoom(roomId, currentUserId(), request));
+    }
+
+    @PatchMapping(value = "/{roomId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public CommonResponse<StudyRoomDetailResponse> updateRoomMultipart(@PathVariable("roomId") Long roomId,
+                                                                       @RequestParam(value = "name", required = false) String name,
+                                                                       @RequestPart(value = "thumbnailImage", required = false) MultipartFile thumbnailImage) {
+        return CommonResponse.success(studyRoomService.updateRoom(roomId, currentUserId(), name, thumbnailImage));
     }
 
     @DeleteMapping("/{roomId}")

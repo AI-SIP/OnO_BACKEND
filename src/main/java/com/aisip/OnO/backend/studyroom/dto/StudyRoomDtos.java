@@ -32,6 +32,9 @@ public final class StudyRoomDtos {
     public record SharedProblemCreateRequest(Long problemId, String comment) {
     }
 
+    public record SharedProblemCommentRequest(String content) {
+    }
+
     public record StudyRoomListResponse(Long roomId, String name, Long hostUserId, int memberCount,
                                         String thumbnailUrl, boolean hasUnreadReport,
                                         int todayPracticeMemberCount, int todayPracticeCount) {
@@ -99,6 +102,11 @@ public final class StudyRoomDtos {
     }
 
     public record SharedProblemReactionToggleResponse(Long sharedProblemId, List<ReactionResponse> reactions) {
+    }
+
+    public record SharedProblemCommentResponse(Long commentId, String content, Long authorId, String authorName,
+                                               String authorProfileImageUrl, LocalDateTime createdAt,
+                                               LocalDateTime updatedAt, boolean isEdited, boolean isMine) {
     }
 
     public record WeeklyReportResponse(Long reportId, LocalDate weekStart, LocalDate weekEnd,

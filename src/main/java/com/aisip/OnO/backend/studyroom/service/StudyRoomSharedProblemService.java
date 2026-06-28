@@ -32,6 +32,7 @@ public class StudyRoomSharedProblemService {
     private final StudyRoomAccessService accessService;
     private final StudyRoomSharedProblemRepository sharedProblemRepository;
     private final StudyRoomSharedProblemReactionRepository reactionRepository;
+    private final StudyRoomSharedProblemCommentRepository commentRepository;
     private final UserRepository userRepository;
     private final ProblemService problemService;
     private final StudyRoomReactionService reactionService;
@@ -98,6 +99,7 @@ public class StudyRoomSharedProblemService {
         if (!sharedProblem.getSharedByUser().getId().equals(userId)) {
             throw new ApplicationException(StudyRoomErrorCase.STUDY_ROOM_FORBIDDEN);
         }
+        commentRepository.deleteBySharedProblemId(sharedProblemId);
         reactionRepository.deleteBySharedProblemId(sharedProblemId);
         sharedProblemRepository.delete(sharedProblem);
     }

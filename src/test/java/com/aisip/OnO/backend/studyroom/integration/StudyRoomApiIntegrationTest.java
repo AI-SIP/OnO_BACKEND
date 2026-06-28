@@ -188,6 +188,28 @@ class StudyRoomApiIntegrationTest {
     }
 
     @Test
+    void hostCanUpdateRoomNameAndThumbnailInSingleMultipartRequest() throws Exception {
+        User host = saveUser("방장", "room-multipart-host");
+        authenticate(host.getId());
+        Long roomId = createRoom("기존 통합 수정방");
+        MockMultipartFile thumbnailImage = new MockMultipartFile("thumbnailImage", "thumbnail.png", "image/png", pngBytes());
+        given(fileUploadService.uploadFileToS3(any())).willReturn("https://cdn.example.com/updated-room.png");
+
+        mockMvc.perform(multipart("/api/study-rooms/{roomId}", roomId)
+                        .file(thumbnailImage)
+                        .param("name", "통합 수정방")
+                        .with(request -> {
+                            request.setMethod("PATCH");
+                            return request;
+                        })
+                        .with(auth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.roomId").value(roomId))
+                .andExpect(jsonPath("$.data.name").value("통합 수정방"))
+                .andExpect(jsonPath("$.data.thumbnailUrl").value("https://cdn.example.com/updated-room.png"));
+    }
+
+    @Test
     void thumbnailUploadRejectsInvalidImageFile() throws Exception {
         User host = saveUser("방장", "thumbnail-invalid-host");
         authenticate(host.getId());
