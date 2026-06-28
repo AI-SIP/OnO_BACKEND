@@ -25,7 +25,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class StudyRoomSharedProblemCommentService {
 
-    private static final int MAX_COMMENT_LENGTH = 1000;
+    private static final int MAX_COMMENT_LENGTH = 300;
 
     private final StudyRoomAccessService accessService;
     private final StudyRoomSharedProblemRepository sharedProblemRepository;
@@ -69,7 +69,7 @@ public class StudyRoomSharedProblemCommentService {
         accessService.validateMember(roomId, userId);
         StudyRoomSharedProblemComment comment = getCommentOrThrow(roomId, sharedProblemId, commentId);
         if (!comment.getAuthor().getId().equals(userId)) {
-            throw new ApplicationException(StudyRoomErrorCase.STUDY_ROOM_FORBIDDEN);
+            throw new ApplicationException(StudyRoomErrorCase.SHARED_PROBLEM_COMMENT_FORBIDDEN);
         }
         comment.updateContent(validateContent(request));
         return toResponse(comment, userId);
@@ -82,7 +82,7 @@ public class StudyRoomSharedProblemCommentService {
         boolean mine = comment.getAuthor().getId().equals(userId);
         boolean host = member.getRole() == StudyRoomMemberRole.HOST;
         if (!mine && !host) {
-            throw new ApplicationException(StudyRoomErrorCase.STUDY_ROOM_FORBIDDEN);
+            throw new ApplicationException(StudyRoomErrorCase.SHARED_PROBLEM_COMMENT_FORBIDDEN);
         }
         commentRepository.delete(comment);
     }
@@ -100,7 +100,7 @@ public class StudyRoomSharedProblemCommentService {
     private String validateContent(SharedProblemCommentRequest request) {
         String content = request == null ? null : request.content();
         if (content == null || content.isBlank() || content.length() > MAX_COMMENT_LENGTH) {
-            throw new ApplicationException(StudyRoomErrorCase.INVALID_STUDY_ROOM_REQUEST);
+            throw new ApplicationException(StudyRoomErrorCase.INVALID_SHARED_PROBLEM_COMMENT);
         }
         return content.trim();
     }

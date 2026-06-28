@@ -3,6 +3,9 @@ package com.aisip.OnO.backend.studyroom.integration;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
+import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
+import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveRegisterDto;
+import com.aisip.OnO.backend.problemsolve.entity.AnswerStatus;
 import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveRepository;
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomDtos.*;
 import com.aisip.OnO.backend.user.entity.User;
@@ -174,6 +177,53 @@ class StudyRoomSharedProblemApiTest {
         String secondBody = secondResult.getResponse().getContentAsString();
         List<Object> secondContent = JsonPath.read(secondBody, "$.data.content");
         assertThat(secondContent).hasSize(2);
+    }
+
+    @Test
+    void sharedProblemDoesNotAllowOtherMemberToUseOriginalProblemAsOwnStudyData() throws Exception {
+        User host = saveUser("방장", "shared-readonly-host");
+        User member = saveUser("멤버", "shared-readonly-member");
+        authenticate(host.getId());
+        Long roomId = createRoom("읽기 전용 정책방");
+        String code = issueInviteCode(roomId);
+        Problem hostProblem = createProblem(host.getId());
+        shareProblem(roomId, hostProblem.getId(), "읽기 전용 공유 문제");
+
+        authenticate(member.getId());
+        join(code);
+
+        mockMvc.perform(get("/api/problems/{problemId}", hostProblem.getId())
+                        .with(auth()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(4002));
+
+        mockMvc.perform(post("/api/problem-solves")
+                        .with(auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ProblemSolveRegisterDto(
+                                hostProblem.getId(),
+                                LocalDateTime.now(),
+                                AnswerStatus.CORRECT,
+                                "타인 공유 문제 복습 시도",
+                                List.of(),
+                                60
+                        ))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(4002));
+
+        mockMvc.perform(post("/api/practiceNotes")
+                        .with(auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new PracticeNoteRegisterDto(
+                                null,
+                                "타인 공유 문제 편입 시도",
+                                List.of(hostProblem.getId()),
+                                null
+                        ))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(4002));
+
+        assertThat(problemSolveRepository.countByProblemId(hostProblem.getId())).isZero();
     }
 
     // ========== 헬퍼 ==========

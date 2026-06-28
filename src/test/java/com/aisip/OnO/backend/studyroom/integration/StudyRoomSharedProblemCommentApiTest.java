@@ -117,7 +117,7 @@ class StudyRoomSharedProblemCommentApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new SharedProblemCommentRequest("권한 없는 수정"))))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode").value(10002));
+                .andExpect(jsonPath("$.errorCode").value(10019));
 
         authenticate(host.getId());
         mockMvc.perform(delete("/api/study-rooms/{roomId}/shared-problems/{sharedProblemId}/comments/{commentId}",
@@ -176,14 +176,14 @@ class StudyRoomSharedProblemCommentApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new SharedProblemCommentRequest(" "))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value(10016));
+                .andExpect(jsonPath("$.errorCode").value(10018));
 
         mockMvc.perform(post("/api/study-rooms/{roomId}/shared-problems/{sharedProblemId}/comments", roomId, sharedProblemId)
                         .with(auth())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new SharedProblemCommentRequest("a".repeat(1001)))))
+                        .content(objectMapper.writeValueAsString(new SharedProblemCommentRequest("a".repeat(301)))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value(10016));
+                .andExpect(jsonPath("$.errorCode").value(10018));
     }
 
     private User saveUser(String name, String emailPrefix) {
