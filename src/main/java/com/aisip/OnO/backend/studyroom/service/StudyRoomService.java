@@ -19,9 +19,13 @@ import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -30,6 +34,7 @@ public class StudyRoomService {
 
     public static final int MAX_ROOM_MEMBER_COUNT = 20;
     public static final int MAX_USER_ROOM_COUNT = 10;
+    private static final long MAX_THUMBNAIL_SIZE_BYTES = 5 * 1024 * 1024;
 
     private final StudyRoomRepository roomRepository;
     private final StudyRoomMemberRepository memberRepository;
@@ -93,6 +98,7 @@ public class StudyRoomService {
     public void deleteRoom(Long roomId, Long userId) {
         accessService.validateHost(roomId, userId);
         StudyRoom room = lockRoom(roomId);
+        deleteThumbnailAsync(room.getThumbnailUrl(), roomId);
         roomRepository.delete(room);
     }
 
@@ -118,6 +124,7 @@ public class StudyRoomService {
                 .findFirst()
                 .orElse(null);
         if (nextHost == null) {
+            deleteThumbnailAsync(room.getThumbnailUrl(), roomId);
             roomRepository.delete(room);
             return;
         }
@@ -151,16 +158,13 @@ public class StudyRoomService {
     @Transactional
     public StudyRoomThumbnailUpdateResponse updateThumbnail(Long roomId, Long userId, MultipartFile thumbnail) {
         accessService.validateHost(roomId, userId);
-        if (thumbnail == null || thumbnail.isEmpty()) {
-            throw new ApplicationException(FileUploadErrorCase.FILE_UPLOAD_FAILED);
-        }
+        validateThumbnail(thumbnail);
         StudyRoom room = accessService.getRoomOrThrow(roomId);
         String previousThumbnailUrl = room.getThumbnailUrl();
         String thumbnailUrl = fileUploadService.uploadFileToS3(thumbnail);
+        deleteThumbnailOnRollback(thumbnailUrl, roomId);
         room.updateThumbnailUrl(thumbnailUrl);
-        if (previousThumbnailUrl != null && !previousThumbnailUrl.isBlank()) {
-            s3DeleteProducer.sendDeleteMessage(previousThumbnailUrl, roomId);
-        }
+        deleteThumbnailAsync(previousThumbnailUrl, roomId);
         return new StudyRoomThumbnailUpdateResponse(thumbnailUrl);
     }
 
@@ -177,5 +181,110 @@ public class StudyRoomService {
             throw new ApplicationException(StudyRoomErrorCase.INVALID_STUDY_ROOM_REQUEST);
         }
         return name.trim();
+    }
+
+    private void validateThumbnail(MultipartFile thumbnail) {
+        if (thumbnail == null || thumbnail.isEmpty()) {
+            throw new ApplicationException(FileUploadErrorCase.INVALID_IMAGE_FILE);
+        }
+        if (thumbnail.getSize() > MAX_THUMBNAIL_SIZE_BYTES) {
+            throw new ApplicationException(FileUploadErrorCase.FILE_SIZE_EXCEEDED);
+        }
+
+        String extension = getLowercaseExtension(thumbnail.getOriginalFilename());
+        String contentType = thumbnail.getContentType();
+        if (!isAllowedImageType(contentType, extension) || !hasAllowedImageSignature(thumbnail, contentType)) {
+            throw new ApplicationException(FileUploadErrorCase.INVALID_IMAGE_FILE);
+        }
+    }
+
+    private String getLowercaseExtension(String originalFilename) {
+        if (originalFilename == null) {
+            throw new ApplicationException(FileUploadErrorCase.INVALID_IMAGE_FILE);
+        }
+        int dotIndex = originalFilename.lastIndexOf('.');
+        if (dotIndex < 0 || dotIndex == originalFilename.length() - 1) {
+            throw new ApplicationException(FileUploadErrorCase.INVALID_IMAGE_FILE);
+        }
+        return originalFilename.substring(dotIndex + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isAllowedImageType(String contentType, String extension) {
+        if (contentType == null) {
+            return false;
+        }
+        return switch (contentType) {
+            case "image/jpeg" -> extension.equals("jpg") || extension.equals("jpeg");
+            case "image/png" -> extension.equals("png");
+            case "image/webp" -> extension.equals("webp");
+            default -> false;
+        };
+    }
+
+    private boolean hasAllowedImageSignature(MultipartFile thumbnail, String contentType) {
+        byte[] header = new byte[12];
+        int read;
+        try {
+            read = thumbnail.getInputStream().read(header);
+        } catch (IOException e) {
+            throw new ApplicationException(FileUploadErrorCase.FILE_UPLOAD_FAILED);
+        }
+
+        return switch (contentType) {
+            case "image/jpeg" -> read >= 3
+                    && (header[0] & 0xFF) == 0xFF
+                    && (header[1] & 0xFF) == 0xD8
+                    && (header[2] & 0xFF) == 0xFF;
+            case "image/png" -> read >= 8
+                    && (header[0] & 0xFF) == 0x89
+                    && header[1] == 0x50
+                    && header[2] == 0x4E
+                    && header[3] == 0x47
+                    && header[4] == 0x0D
+                    && header[5] == 0x0A
+                    && header[6] == 0x1A
+                    && header[7] == 0x0A;
+            case "image/webp" -> read >= 12
+                    && header[0] == 0x52
+                    && header[1] == 0x49
+                    && header[2] == 0x46
+                    && header[3] == 0x46
+                    && header[8] == 0x57
+                    && header[9] == 0x45
+                    && header[10] == 0x42
+                    && header[11] == 0x50;
+            default -> false;
+        };
+    }
+
+    private void deleteThumbnailAsync(String thumbnailUrl, Long roomId) {
+        if (thumbnailUrl == null || thumbnailUrl.isBlank()) {
+            return;
+        }
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            s3DeleteProducer.sendDeleteMessage(thumbnailUrl, roomId);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                s3DeleteProducer.sendDeleteMessage(thumbnailUrl, roomId);
+            }
+        });
+    }
+
+    private void deleteThumbnailOnRollback(String thumbnailUrl, Long roomId) {
+        if (thumbnailUrl == null || thumbnailUrl.isBlank()
+                || !TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_ROLLED_BACK) {
+                    s3DeleteProducer.sendDeleteMessage(thumbnailUrl, roomId);
+                }
+            }
+        });
     }
 }

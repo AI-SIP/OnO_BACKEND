@@ -26,6 +26,7 @@ import com.aisip.OnO.backend.studyroom.repository.StudyRoomMemberRepository;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.util.RandomUserGenerator;
+import com.aisip.OnO.backend.util.fileupload.exception.FileUploadErrorCase;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +40,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @SpringBootTest
@@ -196,8 +198,8 @@ class StudyRoomServiceIntegrationTest {
     void updateThumbnailUploadsAndStoresThumbnailUrl() {
         User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
         StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
-        MockMultipartFile firstThumbnail = new MockMultipartFile("thumbnail", "first.png", "image/png", "first".getBytes());
-        MockMultipartFile secondThumbnail = new MockMultipartFile("thumbnail", "second.png", "image/png", "second".getBytes());
+        MockMultipartFile firstThumbnail = new MockMultipartFile("thumbnail", "first.png", "image/png", pngBytes());
+        MockMultipartFile secondThumbnail = new MockMultipartFile("thumbnail", "second.png", "image/png", pngBytes());
         given(fileUploadService.uploadFileToS3(firstThumbnail)).willReturn("https://cdn.example.com/first.png");
         given(fileUploadService.uploadFileToS3(secondThumbnail)).willReturn("https://cdn.example.com/second.png");
 
@@ -218,12 +220,38 @@ class StudyRoomServiceIntegrationTest {
         StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
         InviteCodeResponse invite = inviteService.issueInviteCode(room.roomId(), host.getId());
         inviteService.join(new StudyRoomJoinRequest(invite.code()), member.getId());
-        MockMultipartFile thumbnail = new MockMultipartFile("thumbnail", "first.png", "image/png", "first".getBytes());
+        MockMultipartFile thumbnail = new MockMultipartFile("thumbnail", "first.png", "image/png", pngBytes());
 
         assertThatThrownBy(() -> studyRoomService.updateThumbnail(room.roomId(), member.getId(), thumbnail))
                 .isInstanceOf(ApplicationException.class)
                 .extracting("errorCase")
                 .isEqualTo(StudyRoomErrorCase.STUDY_ROOM_HOST_ONLY);
+    }
+
+    @Test
+    void updateThumbnailRejectsInvalidMimeAndSignature() {
+        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
+        StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
+        MockMultipartFile thumbnail = new MockMultipartFile("thumbnail", "first.png", "image/png", "not-image".getBytes());
+
+        assertThatThrownBy(() -> studyRoomService.updateThumbnail(room.roomId(), host.getId(), thumbnail))
+                .isInstanceOf(ApplicationException.class)
+                .extracting("errorCase")
+                .isEqualTo(FileUploadErrorCase.INVALID_IMAGE_FILE);
+        verify(fileUploadService, never()).uploadFileToS3(thumbnail);
+    }
+
+    @Test
+    void updateThumbnailRejectsOversizedImage() {
+        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
+        StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
+        MockMultipartFile thumbnail = new MockMultipartFile("thumbnail", "large.png", "image/png", largePngBytes());
+
+        assertThatThrownBy(() -> studyRoomService.updateThumbnail(room.roomId(), host.getId(), thumbnail))
+                .isInstanceOf(ApplicationException.class)
+                .extracting("errorCase")
+                .isEqualTo(FileUploadErrorCase.FILE_SIZE_EXCEEDED);
+        verify(fileUploadService, never()).uploadFileToS3(thumbnail);
     }
 
     @Test
@@ -279,5 +307,20 @@ class StudyRoomServiceIntegrationTest {
                     60
             ));
         }
+    }
+
+    private byte[] pngBytes() {
+        return new byte[]{
+                (byte) 0x89, 0x50, 0x4E, 0x47,
+                0x0D, 0x0A, 0x1A, 0x0A,
+                0x00, 0x00, 0x00, 0x0D
+        };
+    }
+
+    private byte[] largePngBytes() {
+        byte[] bytes = new byte[(5 * 1024 * 1024) + 1];
+        byte[] header = pngBytes();
+        System.arraycopy(header, 0, bytes, 0, header.length);
+        return bytes;
     }
 }

@@ -15,6 +15,8 @@ import com.aisip.OnO.backend.studyroom.repository.StudyRoomRepository;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.util.RandomUserGenerator;
+import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.AfterEach;
@@ -22,7 +24,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -35,6 +39,8 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -67,6 +73,12 @@ class StudyRoomApiIntegrationTest {
 
     @Autowired
     private ProblemSolveRepository problemSolveRepository;
+
+    @MockBean
+    private FileUploadService fileUploadService;
+
+    @MockBean
+    private S3DeleteProducer s3DeleteProducer;
 
     private Long authenticatedUserId;
 
@@ -144,6 +156,53 @@ class StudyRoomApiIntegrationTest {
                         .content(objectMapper.writeValueAsString(new StudyRoomUpdateRequest(" "))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value(10016));
+    }
+
+    @Test
+    void hostCanUpdateThumbnailAndResponsesIncludeThumbnailUrl() throws Exception {
+        User host = saveUser("방장", "thumbnail-host");
+        authenticate(host.getId());
+        Long roomId = createRoom("썸네일방");
+        MockMultipartFile thumbnail = new MockMultipartFile("thumbnail", "thumbnail.png", "image/png", pngBytes());
+        given(fileUploadService.uploadFileToS3(any())).willReturn("https://cdn.example.com/study-room.png");
+
+        mockMvc.perform(multipart("/api/study-room/{roomId}/thumbnail", roomId)
+                        .file(thumbnail)
+                        .with(request -> {
+                            request.setMethod("PATCH");
+                            return request;
+                        })
+                        .with(auth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.thumbnailUrl").value("https://cdn.example.com/study-room.png"));
+
+        mockMvc.perform(get("/api/study-room/{roomId}", roomId)
+                        .with(auth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.thumbnailUrl").value("https://cdn.example.com/study-room.png"));
+
+        mockMvc.perform(get("/api/study-room")
+                        .with(auth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.roomId == " + roomId + ")].thumbnailUrl").value("https://cdn.example.com/study-room.png"));
+    }
+
+    @Test
+    void thumbnailUploadRejectsInvalidImageFile() throws Exception {
+        User host = saveUser("방장", "thumbnail-invalid-host");
+        authenticate(host.getId());
+        Long roomId = createRoom("썸네일 검증방");
+        MockMultipartFile thumbnail = new MockMultipartFile("thumbnail", "thumbnail.png", "image/png", "not-image".getBytes());
+
+        mockMvc.perform(multipart("/api/study-room/{roomId}/thumbnail", roomId)
+                        .file(thumbnail)
+                        .with(request -> {
+                            request.setMethod("PATCH");
+                            return request;
+                        })
+                        .with(auth()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(2003));
     }
 
     @Test
@@ -409,5 +468,13 @@ class StudyRoomApiIntegrationTest {
                     60
             ));
         }
+    }
+
+    private byte[] pngBytes() {
+        return new byte[]{
+                (byte) 0x89, 0x50, 0x4E, 0x47,
+                0x0D, 0x0A, 0x1A, 0x0A,
+                0x00, 0x00, 0x00, 0x0D
+        };
     }
 }
