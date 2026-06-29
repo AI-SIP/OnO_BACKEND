@@ -3,10 +3,12 @@ package com.aisip.OnO.backend.studyroom.service;
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomDtos.ChallengeResponse;
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomStats;
 import com.aisip.OnO.backend.studyroom.entity.*;
+import com.aisip.OnO.backend.studyroom.quartz.ChallengeNotificationScheduler;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomChallengeRepository;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomMemberRepository;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.util.RandomUserGenerator;
+import com.aisip.OnO.backend.util.fcm.service.FcmService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,11 +43,17 @@ class StudyRoomChallengeServiceTest {
     @Mock
     private StudyRoomStatsService statsService;
 
+    @Mock
+    private ChallengeNotificationScheduler notificationScheduler;
+
+    @Mock
+    private FcmService fcmService;
+
     private StudyRoomChallengeService challengeService;
 
     @BeforeEach
     void setUp() {
-        challengeService = new StudyRoomChallengeService(accessService, challengeRepository, memberRepository, statsService);
+        challengeService = new StudyRoomChallengeService(accessService, challengeRepository, memberRepository, statsService, notificationScheduler, fcmService);
     }
 
     @Test
@@ -64,7 +72,7 @@ class StudyRoomChallengeServiceTest {
         );
 
         given(memberRepository.findAllWithUserByRoomId(10L)).willReturn(List.of(member));
-        given(challengeRepository.findActiveByRoomId(eq(10L), eq(StudyRoomChallengeStatus.IN_PROGRESS), any(LocalDateTime.class)))
+        given(challengeRepository.findAllByRoomIdOrderByEndAtAsc(10L))
                 .willReturn(List.of(challenge));
         given(statsService.currentStreaks(anyList(), any(), any())).willReturn(Map.of(user.getId(), 0));
         given(statsService.getStats(anyList(), any(LocalDateTime.class), any(LocalDateTime.class), anyMap()))
@@ -103,7 +111,7 @@ class StudyRoomChallengeServiceTest {
         given(memberRepository.findAllWithUserByRoomId(10L))
                 .willReturn(List.of(StudyRoomMember.create(first, StudyRoomMemberRole.HOST),
                         StudyRoomMember.create(second, StudyRoomMemberRole.MEMBER)));
-        given(challengeRepository.findActiveByRoomId(eq(10L), eq(StudyRoomChallengeStatus.IN_PROGRESS), any(LocalDateTime.class)))
+        given(challengeRepository.findAllByRoomIdOrderByEndAtAsc(10L))
                 .willReturn(List.of(challenge));
         given(statsService.currentStreaks(anyList(), any(), any())).willReturn(Map.of(first.getId(), 0, second.getId(), 0));
         given(statsService.getStats(anyList(), any(LocalDateTime.class), any(LocalDateTime.class), anyMap()))
@@ -135,7 +143,7 @@ class StudyRoomChallengeServiceTest {
         );
 
         given(memberRepository.findAllWithUserByRoomId(10L)).willReturn(List.of(member));
-        given(challengeRepository.findActiveByRoomId(eq(10L), eq(StudyRoomChallengeStatus.IN_PROGRESS), any(LocalDateTime.class)))
+        given(challengeRepository.findAllByRoomIdOrderByEndAtAsc(10L))
                 .willReturn(List.of(challenge));
         given(statsService.currentStreaks(anyList(), any(), any())).willReturn(Map.of(user.getId(), 0));
         // practice_count=1, target=2 → cleared=false
@@ -180,7 +188,7 @@ class StudyRoomChallengeServiceTest {
                         StudyRoomMember.create(member1, StudyRoomMemberRole.HOST),
                         StudyRoomMember.create(member2, StudyRoomMemberRole.MEMBER)
                 ));
-        given(challengeRepository.findActiveByRoomId(eq(10L), eq(StudyRoomChallengeStatus.IN_PROGRESS), any(LocalDateTime.class)))
+        given(challengeRepository.findAllByRoomIdOrderByEndAtAsc(10L))
                 .willReturn(List.of(challenge));
         given(statsService.currentStreaks(anyList(), any(), any()))
                 .willReturn(Map.of(member1.getId(), 0, member2.getId(), 0));
@@ -221,7 +229,7 @@ class StudyRoomChallengeServiceTest {
 
         given(memberRepository.findAllWithUserByRoomId(10L))
                 .willReturn(List.of(StudyRoomMember.create(user, StudyRoomMemberRole.HOST)));
-        given(challengeRepository.findActiveByRoomId(eq(10L), eq(StudyRoomChallengeStatus.IN_PROGRESS), any(LocalDateTime.class)))
+        given(challengeRepository.findAllByRoomIdOrderByEndAtAsc(10L))
                 .willReturn(List.of(challenge));
         given(statsService.currentStreaks(anyList(), any(), any())).willReturn(Map.of(user.getId(), 0));
         // practice_count=1, target=10 → 미달성이고 endAt도 과거
@@ -249,7 +257,7 @@ class StudyRoomChallengeServiceTest {
 
         given(memberRepository.findAllWithUserByRoomId(10L))
                 .willReturn(List.of(StudyRoomMember.create(user, StudyRoomMemberRole.HOST)));
-        given(challengeRepository.findActiveByRoomId(eq(10L), eq(StudyRoomChallengeStatus.IN_PROGRESS), any(LocalDateTime.class)))
+        given(challengeRepository.findAllByRoomIdOrderByEndAtAsc(10L))
                 .willReturn(List.of(challenge));
         given(statsService.currentStreaks(anyList(), any(), any())).willReturn(Map.of(user.getId(), 0));
         given(statsService.getStats(anyList(), any(LocalDateTime.class), any(LocalDateTime.class), anyMap()))
@@ -285,7 +293,7 @@ class StudyRoomChallengeServiceTest {
         );
 
         given(memberRepository.findAllWithUserByRoomId(10L)).willReturn(List.of(member));
-        given(challengeRepository.findActiveByRoomId(eq(10L), eq(StudyRoomChallengeStatus.IN_PROGRESS), any(LocalDateTime.class)))
+        given(challengeRepository.findAllByRoomIdOrderByEndAtAsc(10L))
                 .willReturn(List.of(challenge));
         given(statsService.currentStreaks(anyList(), any(), any())).willReturn(Map.of(user.getId(), 0));
         // practice_count=1, target=3 → 미달성 → status = in_progress
@@ -325,7 +333,7 @@ class StudyRoomChallengeServiceTest {
         );
 
         given(memberRepository.findAllWithUserByRoomId(10L)).willReturn(List.of(member));
-        given(challengeRepository.findActiveByRoomId(eq(10L), eq(StudyRoomChallengeStatus.IN_PROGRESS), any(LocalDateTime.class)))
+        given(challengeRepository.findAllByRoomIdOrderByEndAtAsc(10L))
                 .willReturn(List.of(challenge));
         given(statsService.currentStreaks(anyList(), any(), any())).willReturn(Map.of(user.getId(), 7));
         given(statsService.getStats(anyList(), any(LocalDateTime.class), any(LocalDateTime.class), anyMap()))
@@ -350,7 +358,7 @@ class StudyRoomChallengeServiceTest {
         StudyRoom room = StudyRoom.create("테스트방", 1L);
         setField(room, "id", 10L);
         StudyRoomChallenge challenge = StudyRoomChallenge.create(room, "테스트 챌린지", type, metric, period,
-                targetValue, startAt, endAt);
+                null, targetValue, startAt, endAt);
         setField(challenge, "id", 100L);
         return challenge;
     }

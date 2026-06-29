@@ -99,6 +99,7 @@ class StudyRoomChallengeApiIntegrationTest {
                 "individual",
                 "practice_count",
                 "weekly",
+                null,
                 2,
                 startAt,
                 startAt.plusWeeks(3)
@@ -144,6 +145,7 @@ class StudyRoomChallengeApiIntegrationTest {
                 "individual",
                 "practice_count",
                 "yearly",
+                null,
                 1,
                 null,
                 LocalDateTime.now().plusDays(1)
@@ -161,7 +163,7 @@ class StudyRoomChallengeApiIntegrationTest {
     void hostCanDeleteChallengeAndMemberCannot() throws Exception {
         ChallengeCreateRequest request = new ChallengeCreateRequest(
                 "삭제 테스트", "individual", "practice_count", null,
-                3, null, LocalDateTime.now().plusDays(7)
+                null, 3, null, LocalDateTime.now().plusDays(7)
         );
         // 방장으로 챌린지 생성: 세션 간 인증 공유 문제를 피하기 위해 auth() RequestPostProcessor 사용
         MvcResult createResult = mockMvc.perform(post("/api/study-room/{roomId}/challenges", roomId)
@@ -193,7 +195,7 @@ class StudyRoomChallengeApiIntegrationTest {
     void createChallengeRejectsTitleTooLong() throws Exception {
         ChallengeCreateRequest request = new ChallengeCreateRequest(
                 "a".repeat(41), "individual", "practice_count", null,
-                3, null, LocalDateTime.now().plusDays(7)
+                null, 3, null, LocalDateTime.now().plusDays(7)
         );
         authenticate(member.getId());
         mockMvc.perform(post("/api/study-room/{roomId}/challenges", roomId)
@@ -207,7 +209,7 @@ class StudyRoomChallengeApiIntegrationTest {
     void createChallengeRejectsPastEndAt() throws Exception {
         ChallengeCreateRequest request = new ChallengeCreateRequest(
                 "과거 종료일", "individual", "practice_count", null,
-                3, null, LocalDateTime.now().minusDays(1)
+                null, 3, null, LocalDateTime.now().minusDays(1)
         );
         authenticate(member.getId());
         mockMvc.perform(post("/api/study-room/{roomId}/challenges", roomId)
@@ -221,7 +223,7 @@ class StudyRoomChallengeApiIntegrationTest {
     void createChallengeRejectsStartAtAfterEndAt() throws Exception {
         ChallengeCreateRequest request = new ChallengeCreateRequest(
                 "날짜 역전", "individual", "practice_count", null,
-                3, LocalDateTime.now().plusDays(5), LocalDateTime.now().plusDays(3)
+                null, 3, LocalDateTime.now().plusDays(5), LocalDateTime.now().plusDays(3)
         );
         authenticate(member.getId());
         mockMvc.perform(post("/api/study-room/{roomId}/challenges", roomId)

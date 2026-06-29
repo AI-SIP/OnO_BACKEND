@@ -26,10 +26,18 @@ public class StudyRoomController {
         return CommonResponse.success(studyRoomService.getMyRooms(currentUserId()));
     }
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public CommonResponse<StudyRoomDetailResponse> createRoom(@RequestBody StudyRoomCreateRequest request) {
         return CommonResponse.success(studyRoomService.createRoom(request, currentUserId()));
+    }
+
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public CommonResponse<StudyRoomDetailResponse> createRoomMultipart(
+            @RequestParam("name") String name,
+            @RequestPart(value = "thumbnailImage", required = false) MultipartFile thumbnailImage) {
+        return CommonResponse.success(studyRoomService.createRoom(name, thumbnailImage, currentUserId()));
     }
 
     @GetMapping("/{roomId}")

@@ -24,20 +24,4 @@ public class StudyRoomScheduler {
                 .build();
     }
 
-    @Bean
-    public JobDetail studySessionCleanupJobDetail() {
-        return JobBuilder.newJob(StudySessionCleanupJob.class)
-                .withIdentity("studySessionCleanupJob")
-                .storeDurably()
-                .build();
-    }
-
-    @Bean
-    public Trigger studySessionCleanupTrigger() {
-        return TriggerBuilder.newTrigger()
-                .forJob(studySessionCleanupJobDetail())
-                .withIdentity("studySessionCleanupTrigger")
-                .withSchedule(SimpleScheduleBuilder.simpleSchedule().withIntervalInHours(1).repeatForever())
-                .build();
-    }
 }

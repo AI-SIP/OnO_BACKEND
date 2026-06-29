@@ -73,15 +73,26 @@ public class StudyRoomService {
 
     @Transactional
     public StudyRoomDetailResponse createRoom(StudyRoomCreateRequest request, Long userId) {
-        String name = validateName(request == null ? null : request.name());
+        return createRoom(request == null ? null : request.name(), null, userId);
+    }
+
+    @Transactional
+    public StudyRoomDetailResponse createRoom(String name, MultipartFile thumbnailImage, Long userId) {
+        String validatedName = validateName(name);
         User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
         if (memberRepository.countByUserId(userId) >= MAX_USER_ROOM_COUNT) {
             throw new ApplicationException(StudyRoomErrorCase.STUDY_ROOM_LIMIT_EXCEEDED);
         }
-        StudyRoom room = StudyRoom.create(name, userId);
+        StudyRoom room = StudyRoom.create(validatedName, userId);
         room.addMember(StudyRoomMember.create(user, StudyRoomMemberRole.HOST));
         roomRepository.save(room);
+        if (thumbnailImage != null && !thumbnailImage.isEmpty()) {
+            validateThumbnail(thumbnailImage);
+            String thumbnailUrl = fileUploadService.uploadFileToS3(thumbnailImage);
+            deleteThumbnailOnRollback(thumbnailUrl, room.getId());
+            room.updateThumbnailUrl(thumbnailUrl);
+        }
         return buildDetail(room);
     }
 

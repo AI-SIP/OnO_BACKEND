@@ -257,7 +257,7 @@ class StudyRoomApiIntegrationTest {
         authenticate(host.getId());
         Long roomId = createRoom("피드 반응방");
         StudyRoom room = roomRepository.findById(roomId).orElseThrow();
-        StudyRoomFeed feed = feedRepository.save(StudyRoomFeed.create(room, host, StudyRoomFeedEventType.SESSION_STARTED, "{}"));
+        StudyRoomFeed feed = feedRepository.save(StudyRoomFeed.create(room, host, StudyRoomFeedEventType.PROBLEM_REGISTERED, "{}"));
 
         mockMvc.perform(post("/api/study-room/{roomId}/feed/{feedId}/reactions", roomId, feed.getId())
                         .with(auth())
@@ -320,35 +320,6 @@ class StudyRoomApiIntegrationTest {
     }
 
     @Test
-    void studySessionStartActiveDuplicateAndEndApiFlow() throws Exception {
-        User host = saveUser("방장", "session-host");
-        authenticate(host.getId());
-        Long roomId = createRoom("세션방");
-
-        Long sessionId = startSession(roomId);
-        mockMvc.perform(get("/api/study-room/{roomId}/sessions/active", roomId)
-                        .with(auth()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.activeSessions[0].userId").value(host.getId()));
-
-        mockMvc.perform(post("/api/study-room/{roomId}/sessions", roomId)
-                        .with(auth()))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.errorCode").value(10011));
-
-        mockMvc.perform(patch("/api/study-room/{roomId}/sessions/{sessionId}/end", roomId, sessionId)
-                        .with(auth()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.sessionId").value(sessionId))
-                .andExpect(jsonPath("$.data.endedAt").exists());
-
-        mockMvc.perform(get("/api/study-room/{roomId}/sessions/active", roomId)
-                        .with(auth()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.activeSessions").isEmpty());
-    }
-
-    @Test
     void challengeApiUsesCurrentPeriodPracticeCountsAndKeepsPeriodChallengeInProgress() throws Exception {
         User host = saveUser("방장", "challenge-host");
         authenticate(host.getId());
@@ -364,6 +335,7 @@ class StudyRoomApiIntegrationTest {
                                 "individual",
                                 "practice_count",
                                 "weekly",
+                                null,
                                 2,
                                 startAt,
                                 endAt
@@ -389,6 +361,7 @@ class StudyRoomApiIntegrationTest {
                                 "individual",
                                 "practice_count",
                                 "weekly",
+                                null,
                                 2,
                                 startAt,
                                 endAt
@@ -444,14 +417,6 @@ class StudyRoomApiIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new StudyRoomJoinRequest(inviteCode))))
                 .andExpect(status().isOk());
-    }
-
-    private Long startSession(Long roomId) throws Exception {
-        MvcResult result = mockMvc.perform(post("/api/study-room/{roomId}/sessions", roomId)
-                        .with(auth()))
-                .andExpect(status().isCreated())
-                .andReturn();
-        return readLong(result, "$.data.sessionId");
     }
 
     private Long shareProblem(Long roomId, Long problemId, String comment) throws Exception {

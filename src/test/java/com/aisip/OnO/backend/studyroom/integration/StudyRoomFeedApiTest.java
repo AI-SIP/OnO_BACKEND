@@ -85,7 +85,7 @@ class StudyRoomFeedApiTest {
         // 피드 5개 직접 저장 (DB에 직접 저장 → 연속 ID 보장)
         StudyRoom room = roomRepository.findById(roomId).orElseThrow();
         for (int i = 0; i < 5; i++) {
-            feedRepository.save(StudyRoomFeed.create(room, host, StudyRoomFeedEventType.SESSION_STARTED, "{}"));
+            feedRepository.save(StudyRoomFeed.create(room, host, StudyRoomFeedEventType.PROBLEM_REGISTERED, "{}"));
         }
 
         // 첫 번째 페이지: size=3 → 3개, hasNext=true
@@ -128,7 +128,7 @@ class StudyRoomFeedApiTest {
         // 피드 1개 직접 저장
         StudyRoom room = roomRepository.findById(roomId).orElseThrow();
         StudyRoomFeed feed = feedRepository.save(
-                StudyRoomFeed.create(room, host, StudyRoomFeedEventType.SESSION_STARTED, "{}"));
+                StudyRoomFeed.create(room, host, StudyRoomFeedEventType.PROBLEM_REGISTERED, "{}"));
 
         // host가 반응 추가 → count=1
         authenticate(host.getId());
@@ -160,7 +160,7 @@ class StudyRoomFeedApiTest {
         // 피드 1개 직접 저장
         StudyRoom room = roomRepository.findById(roomId).orElseThrow();
         StudyRoomFeed feed = feedRepository.save(
-                StudyRoomFeed.create(room, host, StudyRoomFeedEventType.SESSION_STARTED, "{}"));
+                StudyRoomFeed.create(room, host, StudyRoomFeedEventType.PROBLEM_REGISTERED, "{}"));
 
         // 외부인이 반응 시도 → 403 (10002)
         authenticate(outsider.getId());
