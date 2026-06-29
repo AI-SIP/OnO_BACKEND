@@ -77,6 +77,9 @@ public class StudyRoomSharedProblemService {
         if (request.problemId() == null || request.comment() != null && request.comment().length() > 100) {
             throw new ApplicationException(StudyRoomErrorCase.INVALID_STUDY_ROOM_REQUEST);
         }
+        if (sharedProblemRepository.existsByRoomIdAndProblemId(roomId, request.problemId())) {
+            throw new ApplicationException(StudyRoomErrorCase.ALREADY_SHARED_PROBLEM);
+        }
         Problem problem = problemService.findProblemEntityWithImageData(request.problemId(), userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));

@@ -23,4 +23,6 @@ public interface StudyRoomSharedProblemRepository extends JpaRepository<StudyRoo
                                                        Pageable pageable);
 
     Optional<StudyRoomSharedProblem> findByIdAndRoomId(Long id, Long roomId);
+
+    boolean existsByRoomIdAndProblemId(Long roomId, Long problemId);
 }

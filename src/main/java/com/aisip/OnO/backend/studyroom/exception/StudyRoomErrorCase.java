@@ -26,7 +26,8 @@ public enum StudyRoomErrorCase implements ErrorCase {
     INVALID_STUDY_ROOM_REQUEST(400, 10016, "스터디룸 요청 값이 올바르지 않습니다."),
     SHARED_PROBLEM_COMMENT_NOT_FOUND(404, 10017, "공유 문제 댓글을 찾을 수 없습니다."),
     INVALID_SHARED_PROBLEM_COMMENT(400, 10018, "공유 문제 댓글 내용이 올바르지 않습니다."),
-    SHARED_PROBLEM_COMMENT_FORBIDDEN(403, 10019, "공유 문제 댓글에 대한 권한이 없습니다.");
+    SHARED_PROBLEM_COMMENT_FORBIDDEN(403, 10019, "공유 문제 댓글에 대한 권한이 없습니다."),
+    ALREADY_SHARED_PROBLEM(409, 10020, "이미 공유된 문제입니다.");
 
     private final Integer httpStatusCode;
     private final Integer errorCode;
