@@ -119,9 +119,15 @@ public class StudyRoomChallengeService {
                 : null;
         StudyRoomChallengeStatus status = effectiveStatus(challenge, memberProgress, groupCurrent);
         if (persistStatus && challenge.getStatus() != status) {
-            challenge.updateStatus(status);
             if (status == StudyRoomChallengeStatus.COMPLETED) {
-                notifyChallengeCompleted(challenge, members);
+                // 원자적 UPDATE WHERE status = 'IN_PROGRESS' — 단 하나의 스레드만 1을 반환해 FCM 중복 발송 방지
+                int updated = challengeRepository.tryTransitionFromInProgress(challenge.getId(), status, LocalDateTime.now());
+                if (updated > 0) {
+                    challenge.updateStatus(status);
+                    notifyChallengeCompleted(challenge, members);
+                }
+            } else {
+                challenge.updateStatus(status);
             }
         }
         return new ChallengeResponse(

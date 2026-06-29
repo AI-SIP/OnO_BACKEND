@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.studyroom.repository;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomChallenge;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomChallengeStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -38,4 +39,15 @@ public interface StudyRoomChallengeRepository extends JpaRepository<StudyRoomCha
                                                           @Param("status") StudyRoomChallengeStatus status,
                                                           @Param("start") LocalDateTime start,
                                                           @Param("end") LocalDateTime end);
+
+    /**
+     * IN_PROGRESS 상태인 챌린지를 원자적으로 targetStatus로 전이.
+     * 동시 호출 시 단 하나의 스레드만 1을 반환 — FCM 중복 발송 방지에 사용.
+     */
+    @Modifying
+    @Query("update StudyRoomChallenge c set c.status = :targetStatus, c.completedAt = :now " +
+            "where c.id = :id and c.status = 'IN_PROGRESS'")
+    int tryTransitionFromInProgress(@Param("id") Long id,
+                                    @Param("targetStatus") StudyRoomChallengeStatus targetStatus,
+                                    @Param("now") LocalDateTime now);
 }
