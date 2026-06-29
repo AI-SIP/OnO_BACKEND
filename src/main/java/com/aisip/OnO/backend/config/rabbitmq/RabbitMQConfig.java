@@ -6,6 +6,7 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -61,10 +62,12 @@ public class RabbitMQConfig {
      */
     @Bean
     public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
-            ConnectionFactory connectionFactory) {
+            ConnectionFactory connectionFactory,
+            @Value("${spring.rabbitmq.listener.simple.auto-startup:true}") boolean autoStartup) {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
         factory.setMessageConverter(messageConverter());
+        factory.setAutoStartup(autoStartup);
         factory.setConcurrentConsumers(3); // 동시 처리 스레드 수
         factory.setMaxConcurrentConsumers(10); // 최대 동시 처리 스레드 수
         factory.setPrefetchCount(1); // 한 번에 가져올 메시지 수

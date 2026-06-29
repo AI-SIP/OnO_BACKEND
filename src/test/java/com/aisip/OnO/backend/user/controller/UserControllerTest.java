@@ -50,6 +50,7 @@ class UserControllerTest {
                 1L,  // userId
                 "testUser",  // name
                 "test@example.com",  // email
+                null,
                 1L,  // level
                 0L,  // point
                 1L,

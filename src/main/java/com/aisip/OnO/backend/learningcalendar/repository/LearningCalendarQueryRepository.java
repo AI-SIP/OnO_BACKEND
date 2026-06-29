@@ -128,6 +128,27 @@ public class LearningCalendarQueryRepository {
                 .toList();
     }
 
+    public boolean existsStudyRecord(Long userId, LocalDate date) {
+        LocalDateTime start = date.atStartOfDay();
+        LocalDateTime end = date.atTime(23, 59, 59);
+        Integer reviewExists = queryFactory
+                .selectOne()
+                .from(problemSolve)
+                .where(problemSolve.userId.eq(userId)
+                        .and(problemSolve.practicedAt.between(start, end)))
+                .fetchFirst();
+        if (reviewExists != null) {
+            return true;
+        }
+        Integer noteWriteExists = queryFactory
+                .selectOne()
+                .from(problem)
+                .where(problem.userId.eq(userId)
+                        .and(problem.createdAt.between(start, end)))
+                .fetchFirst();
+        return noteWriteExists != null;
+    }
+
     private int secondsToMinutes(Integer seconds) {
         return seconds == null ? 0 : seconds / 60;
     }

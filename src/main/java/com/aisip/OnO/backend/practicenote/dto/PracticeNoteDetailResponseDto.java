@@ -21,6 +21,8 @@ public record PracticeNoteDetailResponseDto(
 
         LocalDateTime lastSolvedAt,
 
+        String lastSessionMoodEmojiKey,
+
         LocalDateTime createdAt,
 
         LocalDateTime updatedAt
@@ -41,6 +43,7 @@ public record PracticeNoteDetailResponseDto(
                 .problemIdList(problemIdList)
                 .practiceNotification(notificationDto)
                 .lastSolvedAt(practiceNote.getLastSolvedAt())
+                .lastSessionMoodEmojiKey(practiceNote.getLastSessionMoodEmojiKey())
                 .createdAt(practiceNote.getCreatedAt())
                 .updatedAt(practiceNote.getUpdatedAt())
                 .build();

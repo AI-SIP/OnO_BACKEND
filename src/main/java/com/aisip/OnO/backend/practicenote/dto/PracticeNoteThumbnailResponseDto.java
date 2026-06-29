@@ -15,7 +15,9 @@ public record PracticeNoteThumbnailResponseDto(
 
         Long practiceCount,
 
-        LocalDateTime lastSolvedAt
+        LocalDateTime lastSolvedAt,
+
+        String lastSessionMoodEmojiKey
 ) {
     public static PracticeNoteThumbnailResponseDto from(@NotNull PracticeNote practiceNote) {
         return PracticeNoteThumbnailResponseDto.builder()
@@ -23,6 +25,7 @@ public record PracticeNoteThumbnailResponseDto(
                 .practiceTitle(practiceNote.getTitle())
                 .practiceCount(practiceNote.getPracticeCount())
                 .lastSolvedAt(practiceNote.getLastSolvedAt())
+                .lastSessionMoodEmojiKey(practiceNote.getLastSessionMoodEmojiKey())
                 .build();
     }
 }

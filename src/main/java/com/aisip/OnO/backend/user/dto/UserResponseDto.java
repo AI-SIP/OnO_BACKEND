@@ -12,6 +12,7 @@ public record UserResponseDto (
     Long userId,
     String name,
     String email,
+    String profileImageUrl,
     Long attendanceLevel,
     Long attendancePoint,
     Long noteWriteLevel,
@@ -35,6 +36,7 @@ public record UserResponseDto (
                 .userId(user.getId())
                 .name(user.getName())
                 .email(user.getEmail())
+                .profileImageUrl(user.getProfileImageUrl())
                 .attendanceLevel(getResponseLevel(missionStatus.getAttendanceLevel()))
                 .attendancePoint(getResponsePoint(missionStatus.getAttendanceLevel(), missionStatus.getAttendancePoint()))
                 .noteWriteLevel(getResponseLevel(missionStatus.getNoteWriteLevel()))
