@@ -18,9 +18,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.springframework.transaction.annotation.Propagation;
 
 @Slf4j
 @Service
@@ -222,6 +224,34 @@ public class StudyRoomChallengeService {
                 || request.period() != null && request.periodDays() != null
                 || request.periodDays() != null && request.periodDays() < 1) {
             throw new ApplicationException(StudyRoomErrorCase.INVALID_STUDY_ROOM_REQUEST);
+        }
+    }
+
+    /**
+     * 사용자의 학습 활동 이후 해당 사용자가 속한 룸들의 IN_PROGRESS 챌린지 완료 여부를 즉시 확인합니다.
+     * REQUIRES_NEW로 독립 트랜잭션 실행 — 실패해도 피드 생성 트랜잭션에 영향 없음.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void checkAndNotifyChallengeCompletionForUser(Long userId) {
+        List<StudyRoomMember> memberships = memberRepository.findAllWithRoomByUserId(userId);
+        if (memberships.isEmpty()) {
+            return;
+        }
+
+        List<Long> roomIds = memberships.stream()
+                .map(m -> m.getRoom().getId())
+                .toList();
+        List<StudyRoomChallenge> inProgressChallenges =
+                challengeRepository.findAllByRoomIdsAndStatus(roomIds, StudyRoomChallengeStatus.IN_PROGRESS);
+        if (inProgressChallenges.isEmpty()) {
+            return;
+        }
+
+        Map<Long, List<StudyRoomMember>> membersByRoom = new HashMap<>();
+        for (StudyRoomChallenge challenge : inProgressChallenges) {
+            Long roomId = challenge.getRoom().getId();
+            membersByRoom.computeIfAbsent(roomId, id -> memberRepository.findAllWithUserByRoomId(id));
+            toResponse(challenge, membersByRoom.get(roomId), true);
         }
     }
 
