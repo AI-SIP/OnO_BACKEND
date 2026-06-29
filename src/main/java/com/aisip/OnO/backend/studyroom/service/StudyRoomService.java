@@ -246,7 +246,7 @@ public class StudyRoomService {
             return false;
         }
         return switch (contentType) {
-            case "image/jpeg" -> extension.equals("jpg") || extension.equals("jpeg");
+            case "image/jpeg", "image/jpg" -> extension.equals("jpg") || extension.equals("jpeg");
             case "image/png" -> extension.equals("png");
             case "image/webp" -> extension.equals("webp");
             default -> false;
@@ -263,7 +263,7 @@ public class StudyRoomService {
         }
 
         return switch (contentType) {
-            case "image/jpeg" -> read >= 3
+            case "image/jpeg", "image/jpg" -> read >= 3
                     && (header[0] & 0xFF) == 0xFF
                     && (header[1] & 0xFF) == 0xD8
                     && (header[2] & 0xFF) == 0xFF;
