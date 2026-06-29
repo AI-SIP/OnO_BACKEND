@@ -26,7 +26,8 @@ public final class StudyRoomDtos {
     }
 
     public record ChallengeCreateRequest(String title, String type, String metric, String period,
-                                         Integer targetValue, LocalDateTime startAt, LocalDateTime endAt) {
+                                         Integer periodDays, Integer targetValue,
+                                         LocalDateTime startAt, LocalDateTime endAt) {
     }
 
     public record SharedProblemCreateRequest(Long problemId, String comment) {
@@ -75,7 +76,8 @@ public final class StudyRoomDtos {
     }
 
     public record ChallengeResponse(Long challengeId, String title, String type, String metric, String period,
-                                    Integer targetValue, LocalDateTime startAt, LocalDateTime endAt, String status,
+                                    Integer periodDays, Integer targetValue,
+                                    LocalDateTime startAt, LocalDateTime endAt, String status,
                                     List<ChallengeMemberProgressResponse> memberProgress,
                                     Integer groupCurrent) {
     }

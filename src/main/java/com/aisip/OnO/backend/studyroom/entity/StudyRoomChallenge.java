@@ -39,6 +39,9 @@ public class StudyRoomChallenge extends BaseEntity {
     @Column(name = "period", length = 20)
     private StudyRoomChallengePeriod period;
 
+    @Column(name = "period_days")
+    private Integer periodDays;
+
     @Column(name = "target_value", nullable = false)
     private Integer targetValue;
 
@@ -54,13 +57,15 @@ public class StudyRoomChallenge extends BaseEntity {
 
     public static StudyRoomChallenge create(StudyRoom room, String title, StudyRoomChallengeType type,
                                             StudyRoomChallengeMetric metric, StudyRoomChallengePeriod period,
-                                            Integer targetValue, LocalDateTime startAt, LocalDateTime endAt) {
+                                            Integer periodDays, Integer targetValue,
+                                            LocalDateTime startAt, LocalDateTime endAt) {
         return StudyRoomChallenge.builder()
                 .room(room)
                 .title(title)
                 .type(type)
                 .metric(metric)
                 .period(period)
+                .periodDays(periodDays)
                 .targetValue(targetValue)
                 .startAt(startAt)
                 .endAt(endAt)
