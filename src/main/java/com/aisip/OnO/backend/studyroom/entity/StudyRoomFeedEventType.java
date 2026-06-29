@@ -6,6 +6,5 @@ public enum StudyRoomFeedEventType {
     STREAK_MILESTONE,
     LEVEL_UP,
     CHALLENGE_CLEARED,
-    SESSION_STARTED,
     PROBLEM_SHARED
 }

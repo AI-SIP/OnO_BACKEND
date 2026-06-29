@@ -115,8 +115,8 @@ class StudyRoomFeedServiceUnitTest {
     void nonProblemRegisteredEventAlwaysCreatesNewFeed() {
         given(feedRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
 
-        // SESSION_STARTED는 당일 중복 체크 없이 항상 새 피드 생성
-        feedService.createFeedsForUserRooms(1L, StudyRoomFeedEventType.SESSION_STARTED, Map.of());
+        // PROBLEM_REGISTERED 외 이벤트는 당일 중복 체크 없이 항상 새 피드 생성
+        feedService.createFeedsForUserRooms(1L, StudyRoomFeedEventType.PRACTICE_COMPLETED, Map.of());
 
         // 새 피드가 저장되어야 함
         verify(feedRepository).save(any(StudyRoomFeed.class));

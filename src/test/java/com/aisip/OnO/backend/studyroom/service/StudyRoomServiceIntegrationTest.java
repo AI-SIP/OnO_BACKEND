@@ -126,7 +126,7 @@ class StudyRoomServiceIntegrationTest {
         StudyRoomFeed feed = feedRepository.save(StudyRoomFeed.create(
                 roomRepository.findById(room.roomId()).orElseThrow(),
                 host,
-                StudyRoomFeedEventType.SESSION_STARTED,
+                StudyRoomFeedEventType.PROBLEM_REGISTERED,
                 "{}"
         ));
         StudyRoomFeedReaction reaction = feedReactionRepository.save(StudyRoomFeedReaction.create(feed, host, "fired_up_sparkle_eyes"));

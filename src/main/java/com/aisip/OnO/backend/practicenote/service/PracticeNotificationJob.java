@@ -30,7 +30,7 @@ public class PracticeNotificationJob extends QuartzJobBean {
                 new NotificationRequestDto(
                         "User Token",
                         "오답노트를 복습할 시간이예요!",
-                        practiceTitle + " 복습노트를 공부할 시간입니다!",
+                        practiceTitle + " 복습 세트를 공부할 시간입니다!",
                         Map.of("practiceId", String.valueOf(practiceId))
                 )
         );

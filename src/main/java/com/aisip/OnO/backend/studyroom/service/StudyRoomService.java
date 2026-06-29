@@ -73,15 +73,26 @@ public class StudyRoomService {
 
     @Transactional
     public StudyRoomDetailResponse createRoom(StudyRoomCreateRequest request, Long userId) {
-        String name = validateName(request == null ? null : request.name());
+        return createRoom(request == null ? null : request.name(), null, userId);
+    }
+
+    @Transactional
+    public StudyRoomDetailResponse createRoom(String name, MultipartFile thumbnailImage, Long userId) {
+        String validatedName = validateName(name);
         User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
         if (memberRepository.countByUserId(userId) >= MAX_USER_ROOM_COUNT) {
             throw new ApplicationException(StudyRoomErrorCase.STUDY_ROOM_LIMIT_EXCEEDED);
         }
-        StudyRoom room = StudyRoom.create(name, userId);
+        StudyRoom room = StudyRoom.create(validatedName, userId);
         room.addMember(StudyRoomMember.create(user, StudyRoomMemberRole.HOST));
         roomRepository.save(room);
+        if (thumbnailImage != null && !thumbnailImage.isEmpty()) {
+            validateThumbnail(thumbnailImage);
+            String thumbnailUrl = fileUploadService.uploadFileToS3(thumbnailImage);
+            deleteThumbnailOnRollback(thumbnailUrl, room.getId());
+            room.updateThumbnailUrl(thumbnailUrl);
+        }
         return buildDetail(room);
     }
 
@@ -213,7 +224,7 @@ public class StudyRoomService {
         }
 
         String extension = getLowercaseExtension(thumbnail.getOriginalFilename());
-        String contentType = thumbnail.getContentType();
+        String contentType = normalizeContentType(thumbnail.getContentType(), extension);
         if (!isAllowedImageType(contentType, extension) || !hasAllowedImageSignature(thumbnail, contentType)) {
             throw new ApplicationException(FileUploadErrorCase.INVALID_IMAGE_FILE);
         }
@@ -230,12 +241,24 @@ public class StudyRoomService {
         return originalFilename.substring(dotIndex + 1).toLowerCase(Locale.ROOT);
     }
 
+    private String normalizeContentType(String contentType, String extension) {
+        if (contentType == null || "application/octet-stream".equals(contentType)) {
+            return switch (extension) {
+                case "jpg", "jpeg" -> "image/jpeg";
+                case "png" -> "image/png";
+                case "webp" -> "image/webp";
+                default -> contentType != null ? contentType : "";
+            };
+        }
+        return contentType;
+    }
+
     private boolean isAllowedImageType(String contentType, String extension) {
         if (contentType == null) {
             return false;
         }
         return switch (contentType) {
-            case "image/jpeg" -> extension.equals("jpg") || extension.equals("jpeg");
+            case "image/jpeg", "image/jpg" -> extension.equals("jpg") || extension.equals("jpeg");
             case "image/png" -> extension.equals("png");
             case "image/webp" -> extension.equals("webp");
             default -> false;
@@ -252,7 +275,7 @@ public class StudyRoomService {
         }
 
         return switch (contentType) {
-            case "image/jpeg" -> read >= 3
+            case "image/jpeg", "image/jpg" -> read >= 3
                     && (header[0] & 0xFF) == 0xFF
                     && (header[1] & 0xFF) == 0xD8
                     && (header[2] & 0xFF) == 0xFF;

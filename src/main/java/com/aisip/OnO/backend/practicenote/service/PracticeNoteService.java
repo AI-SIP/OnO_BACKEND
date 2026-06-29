@@ -44,7 +44,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional
 public class PracticeNoteService {
-    private static final String DEFAULT_PRACTICE_NOTE_TITLE = "복습노트";
+    private static final String DEFAULT_PRACTICE_NOTE_TITLE = "복습 세트";
 
     private final ProblemRepository problemRepository;
 

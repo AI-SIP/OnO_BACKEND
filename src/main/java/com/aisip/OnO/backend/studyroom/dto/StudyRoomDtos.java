@@ -85,19 +85,6 @@ public final class StudyRoomDtos {
     public record ChallengeMemberProgressResponse(Long userId, String name, int current, boolean cleared) {
     }
 
-    public record ActiveStudySessionsResponse(List<ActiveStudySessionResponse> activeSessions) {
-    }
-
-    public record ActiveStudySessionResponse(Long userId, String name, LocalDateTime startedAt) {
-    }
-
-    public record StudySessionStartResponse(Long sessionId, LocalDateTime startedAt) {
-    }
-
-    public record StudySessionEndResponse(Long sessionId, LocalDateTime startedAt, LocalDateTime endedAt,
-                                          Integer durationMinutes) {
-    }
-
     public record SharedProblemResponse(Long sharedProblemId, Long sharedByUserId, String sharedByName,
                                         String sharedByProfileImageUrl,
                                         Long problemId, String problemImageUrl, List<String> problemImageUrls, String reference,

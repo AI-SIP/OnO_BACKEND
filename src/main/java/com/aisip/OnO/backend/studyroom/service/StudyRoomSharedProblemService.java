@@ -122,7 +122,7 @@ public class StudyRoomSharedProblemService {
         if (added && !sharerId.equals(userId)) {
             notifyUser(sharerId,
                     "공유 문제에 반응이 달렸어요",
-                    user.getName() + "님이 " + request.emoji() + " 반응을 남겼어요.",
+                    user.getName() + "님이 반응을 추가했어요.",
                     Map.of("type", "SHARED_PROBLEM_REACTION", "roomId", String.valueOf(roomId), "sharedProblemId", String.valueOf(sharedProblemId)));
         }
         return new SharedProblemReactionToggleResponse(sharedProblemId,
