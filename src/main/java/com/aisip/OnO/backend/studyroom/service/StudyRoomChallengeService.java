@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -28,12 +29,14 @@ public class StudyRoomChallengeService {
     private final StudyRoomMemberRepository memberRepository;
     private final StudyRoomStatsService statsService;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<ChallengeResponse> getChallenges(Long roomId, Long userId) {
         accessService.validateMember(roomId, userId);
         List<StudyRoomMember> members = memberRepository.findAllWithUserByRoomId(roomId);
-        return challengeRepository.findActiveByRoomId(roomId, StudyRoomChallengeStatus.IN_PROGRESS, LocalDateTime.now()).stream()
-                .map(challenge -> toResponse(challenge, members, false))
+        return challengeRepository.findAllByRoomIdOrderByEndAtAsc(roomId).stream()
+                .map(challenge -> toResponse(challenge, members, true))
+                .sorted(Comparator.comparing((ChallengeResponse r) -> "in_progress".equals(r.status()) ? 0 : 1)
+                        .thenComparing(Comparator.comparing(ChallengeResponse::endAt).reversed()))
                 .toList();
     }
 
@@ -56,6 +59,7 @@ public class StudyRoomChallengeService {
                 parseEnum(request.type(), StudyRoomChallengeType.class),
                 parseEnum(request.metric(), StudyRoomChallengeMetric.class),
                 period,
+                period == null ? request.periodDays() : null,
                 request.targetValue(),
                 startAt,
                 request.endAt()
@@ -112,6 +116,7 @@ public class StudyRoomChallengeService {
                 toApiValue(challenge.getType().name()),
                 toApiValue(challenge.getMetric().name()),
                 challenge.getPeriod() == null ? null : toApiValue(challenge.getPeriod().name()),
+                challenge.getPeriodDays(),
                 challenge.getTargetValue(),
                 challenge.getStartAt(),
                 challenge.getEndAt(),
@@ -127,7 +132,7 @@ public class StudyRoomChallengeService {
         if (challenge.getStatus() != StudyRoomChallengeStatus.IN_PROGRESS) {
             return challenge.getStatus();
         }
-        if (challenge.getPeriod() == null) {
+        if (challenge.getPeriod() == null && challenge.getPeriodDays() == null) {
             boolean completed = challenge.getType() == StudyRoomChallengeType.GROUP
                     ? groupCurrent != null && groupCurrent >= challenge.getTargetValue()
                     : !memberProgress.isEmpty() && memberProgress.stream().allMatch(ChallengeMemberProgressResponse::cleared);
@@ -160,25 +165,29 @@ public class StudyRoomChallengeService {
         LocalDateTime startAt = challenge.getStartAt();
         LocalDateTime endAt = challenge.getEndAt();
         StudyRoomChallengePeriod period = challenge.getPeriod();
-        if (period == null) {
+        Integer periodDays = challenge.getPeriodDays();
+        if (period == null && periodDays == null) {
             return new AggregationRange(startAt, endAt);
         }
         LocalDateTime anchor = clamp(now, startAt, endAt);
         LocalDateTime windowStart = startAt;
-        LocalDateTime windowEnd = addPeriod(windowStart, period);
+        LocalDateTime windowEnd = addPeriod(windowStart, period, periodDays);
         while (!windowEnd.isAfter(anchor) && windowEnd.isBefore(endAt)) {
             windowStart = windowEnd;
-            windowEnd = addPeriod(windowStart, period);
+            windowEnd = addPeriod(windowStart, period, periodDays);
         }
         return new AggregationRange(windowStart, windowEnd.isAfter(endAt) ? endAt : windowEnd);
     }
 
-    private LocalDateTime addPeriod(LocalDateTime base, StudyRoomChallengePeriod period) {
-        return switch (period) {
-            case DAILY -> base.plusDays(1);
-            case WEEKLY -> base.plusDays(7);
-            case MONTHLY -> base.plusMonths(1);
-        };
+    private LocalDateTime addPeriod(LocalDateTime base, StudyRoomChallengePeriod period, Integer periodDays) {
+        if (period != null) {
+            return switch (period) {
+                case DAILY -> base.plusDays(1);
+                case WEEKLY -> base.plusDays(7);
+                case MONTHLY -> base.plusMonths(1);
+            };
+        }
+        return base.plusDays(periodDays);
     }
 
     private LocalDateTime clamp(LocalDateTime value, LocalDateTime lower, LocalDateTime upper) {
@@ -197,7 +206,9 @@ public class StudyRoomChallengeService {
         if (request.title() == null || request.title().isBlank() || request.title().length() > 40
                 || request.targetValue() == null || request.targetValue() < 1
                 || request.endAt() == null || !request.endAt().isAfter(LocalDateTime.now())
-                || request.startAt() != null && !request.startAt().isBefore(request.endAt())) {
+                || request.startAt() != null && !request.startAt().isBefore(request.endAt())
+                || request.period() != null && request.periodDays() != null
+                || request.periodDays() != null && request.periodDays() < 1) {
             throw new ApplicationException(StudyRoomErrorCase.INVALID_STUDY_ROOM_REQUEST);
         }
     }
