@@ -15,7 +15,10 @@ import com.aisip.OnO.backend.studyroom.repository.*;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.exception.UserErrorCase;
 import com.aisip.OnO.backend.user.repository.UserRepository;
+import com.aisip.OnO.backend.util.fcm.dto.NotificationRequestDto;
+import com.aisip.OnO.backend.util.fcm.service.FcmService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -25,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class StudyRoomSharedProblemService {
@@ -34,11 +38,13 @@ public class StudyRoomSharedProblemService {
     private final StudyRoomSharedProblemReactionRepository reactionRepository;
     private final StudyRoomSharedProblemCommentRepository commentRepository;
     private final StudyRoomSharedProblemCommentReactionRepository commentReactionRepository;
+    private final StudyRoomMemberRepository memberRepository;
     private final UserRepository userRepository;
     private final ProblemService problemService;
     private final StudyRoomReactionService reactionService;
     private final ApplicationEventPublisher eventPublisher;
     private final CustomEmojiValidator customEmojiValidator;
+    private final FcmService fcmService;
 
     @Transactional(readOnly = true)
     public CursorPageResponse<SharedProblemResponse> getSharedProblems(Long roomId, Long userId, Long cursor, int size) {
@@ -88,6 +94,10 @@ public class StudyRoomSharedProblemService {
         eventPublisher.publishEvent(new StudyRoomActivityEvent(userId, StudyRoomFeedEventType.PROBLEM_SHARED,
                 Map.of("reference", problem.getReference() == null ? "" : problem.getReference(),
                         "sharedProblemId", sharedProblem.getId())));
+        notifyRoomMembers(roomId, userId,
+                user.getName() + "님이 문제를 공유했어요",
+                referenceOrFallback(problem.getReference()),
+                Map.of("type", "SHARED_PROBLEM", "roomId", String.valueOf(roomId), "sharedProblemId", String.valueOf(sharedProblem.getId())));
         return toResponse(sharedProblem, List.of(), 0L, userId);
     }
 
@@ -99,9 +109,22 @@ public class StudyRoomSharedProblemService {
                 .orElseThrow(() -> new ApplicationException(StudyRoomErrorCase.SHARED_PROBLEM_NOT_FOUND));
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
-        reactionRepository.findBySharedProblemIdAndUserIdAndEmoji(sharedProblemId, userId, request.emoji())
-                .ifPresentOrElse(reactionRepository::delete,
-                        () -> reactionRepository.save(StudyRoomSharedProblemReaction.create(sharedProblem, user, request.emoji())));
+        boolean added;
+        var existing = reactionRepository.findBySharedProblemIdAndUserIdAndEmoji(sharedProblemId, userId, request.emoji());
+        if (existing.isPresent()) {
+            reactionRepository.delete(existing.get());
+            added = false;
+        } else {
+            reactionRepository.save(StudyRoomSharedProblemReaction.create(sharedProblem, user, request.emoji()));
+            added = true;
+        }
+        Long sharerId = sharedProblem.getSharedByUser().getId();
+        if (added && !sharerId.equals(userId)) {
+            notifyUser(sharerId,
+                    "공유 문제에 반응이 달렸어요",
+                    user.getName() + "님이 " + request.emoji() + " 반응을 남겼어요.",
+                    Map.of("type", "SHARED_PROBLEM_REACTION", "roomId", String.valueOf(roomId), "sharedProblemId", String.valueOf(sharedProblemId)));
+        }
         return new SharedProblemReactionToggleResponse(sharedProblemId,
                 reactionService.summarizeSharedProblemReactions(reactionRepository.findAllBySharedProblemId(sharedProblemId), userId));
     }
@@ -156,5 +179,27 @@ public class StudyRoomSharedProblemService {
         return problemImageUrls(problem).stream()
                 .findFirst()
                 .orElse(null);
+    }
+
+    private void notifyRoomMembers(Long roomId, Long excludeUserId, String title, String body, Map<String, String> data) {
+        NotificationRequestDto dto = new NotificationRequestDto(null, title, body, data);
+        memberRepository.findAllWithUserByRoomId(roomId).forEach(member -> {
+            Long memberId = member.getUser().getId();
+            if (!memberId.equals(excludeUserId)) {
+                notifyUser(memberId, dto);
+            }
+        });
+    }
+
+    private void notifyUser(Long userId, String title, String body, Map<String, String> data) {
+        notifyUser(userId, new NotificationRequestDto(null, title, body, data));
+    }
+
+    private void notifyUser(Long userId, NotificationRequestDto dto) {
+        try {
+            fcmService.sendNotificationToAllUserDevice(userId, dto);
+        } catch (Exception e) {
+            log.warn("공유 문제 알림 발송 실패 - userId: {}", userId, e);
+        }
     }
 }

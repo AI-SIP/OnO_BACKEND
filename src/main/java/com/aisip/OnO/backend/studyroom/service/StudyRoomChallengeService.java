@@ -5,9 +5,13 @@ import com.aisip.OnO.backend.studyroom.dto.StudyRoomDtos.*;
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomStats;
 import com.aisip.OnO.backend.studyroom.entity.*;
 import com.aisip.OnO.backend.studyroom.exception.StudyRoomErrorCase;
+import com.aisip.OnO.backend.studyroom.quartz.ChallengeNotificationScheduler;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomChallengeRepository;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomMemberRepository;
+import com.aisip.OnO.backend.util.fcm.dto.NotificationRequestDto;
+import com.aisip.OnO.backend.util.fcm.service.FcmService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +22,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class StudyRoomChallengeService {
@@ -28,6 +33,8 @@ public class StudyRoomChallengeService {
     private final StudyRoomChallengeRepository challengeRepository;
     private final StudyRoomMemberRepository memberRepository;
     private final StudyRoomStatsService statsService;
+    private final ChallengeNotificationScheduler notificationScheduler;
+    private final FcmService fcmService;
 
     @Transactional
     public List<ChallengeResponse> getChallenges(Long roomId, Long userId) {
@@ -64,6 +71,7 @@ public class StudyRoomChallengeService {
                 startAt,
                 request.endAt()
         ));
+        notificationScheduler.scheduleNotifications(challenge);
         return toResponse(challenge, memberRepository.findAllWithUserByRoomId(roomId), true);
     }
 
@@ -72,6 +80,7 @@ public class StudyRoomChallengeService {
         accessService.validateHost(roomId, userId);
         StudyRoomChallenge challenge = challengeRepository.findByIdAndRoomId(challengeId, roomId)
                 .orElseThrow(() -> new ApplicationException(StudyRoomErrorCase.CHALLENGE_NOT_FOUND));
+        notificationScheduler.cancelNotifications(challengeId);
         challengeRepository.delete(challenge);
     }
 
@@ -109,6 +118,9 @@ public class StudyRoomChallengeService {
         StudyRoomChallengeStatus status = effectiveStatus(challenge, memberProgress, groupCurrent);
         if (persistStatus && challenge.getStatus() != status) {
             challenge.updateStatus(status);
+            if (status == StudyRoomChallengeStatus.COMPLETED) {
+                notifyChallengeCompleted(challenge, members);
+            }
         }
         return new ChallengeResponse(
                 challenge.getId(),
@@ -211,6 +223,20 @@ public class StudyRoomChallengeService {
                 || request.periodDays() != null && request.periodDays() < 1) {
             throw new ApplicationException(StudyRoomErrorCase.INVALID_STUDY_ROOM_REQUEST);
         }
+    }
+
+    private void notifyChallengeCompleted(StudyRoomChallenge challenge, List<StudyRoomMember> members) {
+        NotificationRequestDto dto = new NotificationRequestDto(null,
+                "챌린지 달성! 🎉",
+                "'" + challenge.getTitle() + "' 챌린지를 달성했어요!",
+                Map.of("type", "CHALLENGE_COMPLETED", "roomId", String.valueOf(challenge.getRoom().getId())));
+        members.forEach(member -> {
+            try {
+                fcmService.sendNotificationToAllUserDevice(member.getUser().getId(), dto);
+            } catch (Exception e) {
+                log.warn("챌린지 달성 알림 발송 실패 - userId: {}", member.getUser().getId(), e);
+            }
+        });
     }
 
     private LocalDate min(LocalDate left, LocalDate right) {
