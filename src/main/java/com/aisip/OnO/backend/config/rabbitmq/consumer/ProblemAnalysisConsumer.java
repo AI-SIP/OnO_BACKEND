@@ -30,7 +30,7 @@ public class ProblemAnalysisConsumer {
      * - concurrency: 동시 처리 개수 (1-3개, OpenAI Rate Limit 고려)
      * - 예외 발생 시 자동으로 재시도 → 실패하면 DLQ로 이동
      */
-    @RabbitListener(queues = RabbitMQConfig.GPT_ANALYSIS_QUEUE, concurrency = "1-3")
+    @RabbitListener(queues = RabbitMQConfig.GPT_ANALYSIS_QUEUE, concurrency = "1-2")
     public void handleAnalysisMessage(ProblemAnalysisMessage message) {
         log.info("RabbitMQ message received - queue: {}, operation: {}, problemId: {}, messageRetryCount: {}",
                 RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", message.getProblemId(), message.getRetryCount());

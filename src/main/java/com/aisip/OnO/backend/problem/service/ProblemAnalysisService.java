@@ -127,38 +127,23 @@ public class ProblemAnalysisService {
 
     /**
      * 동기적으로 문제 이미지를 분석합니다 (RabbitMQ Consumer에서 호출)
-     * - 동시성 문제 해결: 이미 생성된 PROCESSING 엔티티만 조회하여 업데이트
+     * - 트랜잭션을 OpenAI 호출 전후로 분리해 DB 커넥션 장기 점유를 방지
      */
-    @Transactional
     public void analyzeProblemSync(Long problemId) {
         log.info("Starting sync analysis for problemId: {}", problemId);
 
         try {
-            // 1. Problem 조회
-            Problem problem = problemRepository.findById(problemId)
-                    .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
-
-            // 2. 문제 이미지 url 조회
-            List<String> problemImageUrls = problemImageDataRepository.findAllByProblemId(problemId)
-                    .stream()
-                    .filter(data -> data.getProblemImageType().equals(ProblemImageType.PROBLEM_IMAGE))
-                    .map(ProblemImageData::getImageUrl)
-                    .toList();
-
-            // 3. 기존 분석 조회 (동시성 문제 해결: 새로 생성하지 않고 조회만)
-            ProblemAnalysis analysis = analysisRepository.findByProblemId(problemId)
-                    .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_ANALYSIS_NOT_FOUND));
-
-            // 4. 이미 완료된 경우 스킵
-            if (analysis.getStatus().equals(AnalysisStatus.COMPLETED)) {
+            // Phase 1: 짧은 readOnly 트랜잭션으로 필요한 데이터 조회
+            AnalysisPreparation prep = fetchAnalysisPreparation(problemId);
+            if (prep.alreadyCompleted()) {
                 log.info("Analysis already completed for problemId: {}", problemId);
                 return;
             }
 
-            // 5. OpenAI API 호출 (여러 이미지를 하나의 문제로 분석)
-            ProblemAnalysisResult result = openAIClient.analyzeImages(problemImageUrls);
+            // Phase 2: 트랜잭션 없이 OpenAI 호출 (DB 커넥션 미점유)
+            ProblemAnalysisResult result = openAIClient.analyzeImages(prep.imageUrls());
 
-            // 6. keyPoints를 JSON 문자열로 변환
+            // Phase 3: 결과를 짧은 쓰기 트랜잭션으로 저장
             String keyPointsJson;
             try {
                 keyPointsJson = objectMapper.writeValueAsString(result.getKeyPoints());
@@ -166,27 +151,14 @@ public class ProblemAnalysisService {
                 log.error("JSON 변환 실패 for problemId: {}", problemId, jsonException);
                 throw new RuntimeException("JSON 변환 실패", jsonException);
             }
-
-            // 7. 분석 결과 업데이트 (COMPLETED)
-            analysis.updateWithSuccess(
-                    result.getSubject(),
-                    result.getProblemType(),
-                    keyPointsJson,
-                    result.getSolution(),
-                    result.getCommonMistakes(),
-                    result.getStudyTips()
-            );
-
-            analysisRepository.save(analysis);
+            saveAnalysisSuccess(problemId, result, keyPointsJson);
             log.info("Analysis completed successfully for problemId: {}", problemId);
 
         } catch (ApplicationException e) {
-            // 삭제된 문제는 재시도 가치가 없어 상위 Consumer에서 비재시도 처리한다.
             if (e.getErrorCase() == ProblemErrorCase.PROBLEM_NOT_FOUND) {
                 log.warn("Skipping analysis because problem was deleted or missing. problemId: {}", problemId);
                 throw e;
             }
-
             log.error("Application error during sync analysis for problemId: {}", problemId, e);
             handleAnalysisError(problemId, e);
             throw e;
@@ -197,9 +169,43 @@ public class ProblemAnalysisService {
         } catch (Exception e) {
             log.error("Error during sync analysis for problemId: {}", problemId, e);
             handleAnalysisError(problemId, e);
-            throw e; // RabbitMQ 재시도를 위해 예외 다시 던짐
+            throw e;
         }
     }
+
+    @Transactional(readOnly = true)
+    public AnalysisPreparation fetchAnalysisPreparation(Long problemId) {
+        problemRepository.findById(problemId)
+                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
+
+        List<String> imageUrls = problemImageDataRepository.findAllByProblemId(problemId)
+                .stream()
+                .filter(data -> data.getProblemImageType().equals(ProblemImageType.PROBLEM_IMAGE))
+                .map(ProblemImageData::getImageUrl)
+                .toList();
+
+        ProblemAnalysis analysis = analysisRepository.findByProblemId(problemId)
+                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_ANALYSIS_NOT_FOUND));
+
+        return new AnalysisPreparation(imageUrls, analysis.getStatus().equals(AnalysisStatus.COMPLETED));
+    }
+
+    @Transactional
+    public void saveAnalysisSuccess(Long problemId, ProblemAnalysisResult result, String keyPointsJson) {
+        ProblemAnalysis analysis = analysisRepository.findByProblemId(problemId)
+                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_ANALYSIS_NOT_FOUND));
+        analysis.updateWithSuccess(
+                result.getSubject(),
+                result.getProblemType(),
+                keyPointsJson,
+                result.getSolution(),
+                result.getCommonMistakes(),
+                result.getStudyTips()
+        );
+        analysisRepository.save(analysis);
+    }
+
+    public record AnalysisPreparation(List<String> imageUrls, boolean alreadyCompleted) {}
 
     /**
      * 비동기로 문제 이미지를 분석합니다 (기존 @Async 방식, deprecated)
