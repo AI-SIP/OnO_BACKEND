@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.studyroom.service;
 
+import com.aisip.OnO.backend.common.emoji.CustomEmojiValidator;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomDtos.*;
@@ -7,8 +8,10 @@ import com.aisip.OnO.backend.studyroom.entity.StudyRoomMember;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomMemberRole;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomSharedProblem;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomSharedProblemComment;
+import com.aisip.OnO.backend.studyroom.entity.StudyRoomSharedProblemCommentReaction;
 import com.aisip.OnO.backend.studyroom.exception.StudyRoomErrorCase;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomSharedProblemCommentRepository;
+import com.aisip.OnO.backend.studyroom.repository.StudyRoomSharedProblemCommentReactionRepository;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomSharedProblemRepository;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.exception.UserErrorCase;
@@ -20,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,7 +35,10 @@ public class StudyRoomSharedProblemCommentService {
     private final StudyRoomAccessService accessService;
     private final StudyRoomSharedProblemRepository sharedProblemRepository;
     private final StudyRoomSharedProblemCommentRepository commentRepository;
+    private final StudyRoomSharedProblemCommentReactionRepository commentReactionRepository;
     private final UserRepository userRepository;
+    private final StudyRoomReactionService reactionService;
+    private final CustomEmojiValidator customEmojiValidator;
 
     @Transactional(readOnly = true)
     public CursorPageResponse<SharedProblemCommentResponse> getComments(Long roomId, Long sharedProblemId,
@@ -42,8 +50,15 @@ public class StudyRoomSharedProblemCommentService {
                 sharedProblemId, cursor, PageRequest.of(0, safeSize + 1));
         boolean hasNext = comments.size() > safeSize;
         List<StudyRoomSharedProblemComment> contentComments = hasNext ? comments.subList(0, safeSize) : comments;
+        List<Long> commentIds = contentComments.stream()
+                .map(StudyRoomSharedProblemComment::getId)
+                .toList();
+        Map<Long, List<StudyRoomSharedProblemCommentReaction>> reactions = commentIds.isEmpty()
+                ? Map.of()
+                : commentReactionRepository.findAllByCommentIds(commentIds).stream()
+                .collect(Collectors.groupingBy(reaction -> reaction.getComment().getId()));
         List<SharedProblemCommentResponse> content = contentComments.stream()
-                .map(comment -> toResponse(comment, userId))
+                .map(comment -> toResponse(comment, reactions.getOrDefault(comment.getId(), List.of()), userId))
                 .toList();
         Long nextCursor = hasNext && !contentComments.isEmpty()
                 ? contentComments.get(contentComments.size() - 1).getId()
@@ -60,7 +75,7 @@ public class StudyRoomSharedProblemCommentService {
                 .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
         StudyRoomSharedProblemComment comment = commentRepository.save(
                 StudyRoomSharedProblemComment.create(sharedProblem, user, validateContent(request)));
-        return toResponse(comment, userId, false);
+        return toResponse(comment, List.of(), userId, false);
     }
 
     @Transactional
@@ -72,7 +87,22 @@ public class StudyRoomSharedProblemCommentService {
             throw new ApplicationException(StudyRoomErrorCase.SHARED_PROBLEM_COMMENT_FORBIDDEN);
         }
         comment.updateContent(validateContent(request));
-        return toResponse(comment, userId, true);
+        return toResponse(comment, commentReactionRepository.findAllByCommentId(commentId), userId, true);
+    }
+
+    @Transactional
+    public SharedProblemCommentReactionToggleResponse toggleReaction(Long roomId, Long sharedProblemId, Long commentId,
+                                                                     Long userId, ReactionToggleRequest request) {
+        accessService.validateMember(roomId, userId);
+        customEmojiValidator.validate(request.emoji());
+        StudyRoomSharedProblemComment comment = getCommentOrThrow(roomId, sharedProblemId, commentId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
+        commentReactionRepository.findByCommentIdAndUserIdAndEmoji(commentId, userId, request.emoji())
+                .ifPresentOrElse(commentReactionRepository::delete,
+                        () -> commentReactionRepository.save(StudyRoomSharedProblemCommentReaction.create(comment, user, request.emoji())));
+        return new SharedProblemCommentReactionToggleResponse(commentId,
+                reactionService.summarizeSharedProblemCommentReactions(commentReactionRepository.findAllByCommentId(commentId), userId));
     }
 
     @Transactional
@@ -84,6 +114,7 @@ public class StudyRoomSharedProblemCommentService {
         if (!mine && !host) {
             throw new ApplicationException(StudyRoomErrorCase.SHARED_PROBLEM_COMMENT_FORBIDDEN);
         }
+        commentReactionRepository.deleteByCommentId(commentId);
         commentRepository.delete(comment);
     }
 
@@ -106,10 +137,19 @@ public class StudyRoomSharedProblemCommentService {
     }
 
     private SharedProblemCommentResponse toResponse(StudyRoomSharedProblemComment comment, Long userId) {
-        return toResponse(comment, userId, false);
+        return toResponse(comment, List.of(), userId, false);
     }
 
-    private SharedProblemCommentResponse toResponse(StudyRoomSharedProblemComment comment, Long userId, boolean forceEdited) {
+    private SharedProblemCommentResponse toResponse(StudyRoomSharedProblemComment comment,
+                                                    List<StudyRoomSharedProblemCommentReaction> reactions,
+                                                    Long userId) {
+        return toResponse(comment, reactions, userId, false);
+    }
+
+    private SharedProblemCommentResponse toResponse(StudyRoomSharedProblemComment comment,
+                                                    List<StudyRoomSharedProblemCommentReaction> reactions,
+                                                    Long userId,
+                                                    boolean forceEdited) {
         LocalDateTime createdAt = comment.getCreatedAt();
         LocalDateTime updatedAt = comment.getUpdatedAt();
         Long authorId = comment.getAuthor().getId();
@@ -120,12 +160,13 @@ public class StudyRoomSharedProblemCommentService {
                 comment.getContent(),
                 authorId,
                 comment.getAuthor().getName(),
-                null,
+                comment.getAuthor().getProfileImageUrl(),
                 createdAt,
                 updatedAt,
                 forceEdited || createdAt != null && updatedAt != null && updatedAt.isAfter(createdAt),
                 mine,
-                canDelete
+                canDelete,
+                reactionService.summarizeSharedProblemCommentReactions(reactions, userId)
         );
     }
 }

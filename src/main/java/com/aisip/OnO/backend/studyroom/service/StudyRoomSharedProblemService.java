@@ -33,6 +33,7 @@ public class StudyRoomSharedProblemService {
     private final StudyRoomSharedProblemRepository sharedProblemRepository;
     private final StudyRoomSharedProblemReactionRepository reactionRepository;
     private final StudyRoomSharedProblemCommentRepository commentRepository;
+    private final StudyRoomSharedProblemCommentReactionRepository commentReactionRepository;
     private final UserRepository userRepository;
     private final ProblemService problemService;
     private final StudyRoomReactionService reactionService;
@@ -46,12 +47,23 @@ public class StudyRoomSharedProblemService {
         List<StudyRoomSharedProblem> sharedProblems = sharedProblemRepository.findByRoomIdAndCursor(roomId, cursor, PageRequest.of(0, safeSize + 1));
         boolean hasNext = sharedProblems.size() > safeSize;
         List<StudyRoomSharedProblem> contentSharedProblems = hasNext ? sharedProblems.subList(0, safeSize) : sharedProblems;
-        Map<Long, List<StudyRoomSharedProblemReaction>> reactions = reactionRepository.findAllBySharedProblemIds(
-                        contentSharedProblems.stream().map(StudyRoomSharedProblem::getId).toList())
-                .stream()
+        List<Long> sharedProblemIds = contentSharedProblems.stream()
+                .map(StudyRoomSharedProblem::getId)
+                .toList();
+        Map<Long, List<StudyRoomSharedProblemReaction>> reactions = sharedProblemIds.isEmpty()
+                ? Map.of()
+                : reactionRepository.findAllBySharedProblemIds(sharedProblemIds).stream()
                 .collect(Collectors.groupingBy(reaction -> reaction.getSharedProblem().getId()));
+        Map<Long, Long> commentCounts = sharedProblemIds.isEmpty()
+                ? Map.of()
+                : commentRepository.countBySharedProblemIds(sharedProblemIds).stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
         List<SharedProblemResponse> content = contentSharedProblems.stream()
-                .map(sharedProblem -> toResponse(sharedProblem, reactions.getOrDefault(sharedProblem.getId(), List.of()), userId))
+                .map(sharedProblem -> toResponse(
+                        sharedProblem,
+                        reactions.getOrDefault(sharedProblem.getId(), List.of()),
+                        commentCounts.getOrDefault(sharedProblem.getId(), 0L),
+                        userId))
                 .toList();
         Long nextCursor = hasNext && !contentSharedProblems.isEmpty()
                 ? contentSharedProblems.get(contentSharedProblems.size() - 1).getId()
@@ -73,7 +85,7 @@ public class StudyRoomSharedProblemService {
         eventPublisher.publishEvent(new StudyRoomActivityEvent(userId, StudyRoomFeedEventType.PROBLEM_SHARED,
                 Map.of("reference", problem.getReference() == null ? "" : problem.getReference(),
                         "sharedProblemId", sharedProblem.getId())));
-        return toResponse(sharedProblem, List.of(), userId);
+        return toResponse(sharedProblem, List.of(), 0L, userId);
     }
 
     @Transactional
@@ -99,6 +111,7 @@ public class StudyRoomSharedProblemService {
         if (!sharedProblem.getSharedByUser().getId().equals(userId)) {
             throw new ApplicationException(StudyRoomErrorCase.STUDY_ROOM_FORBIDDEN);
         }
+        commentReactionRepository.deleteBySharedProblemId(sharedProblemId);
         commentRepository.deleteBySharedProblemId(sharedProblemId);
         reactionRepository.deleteBySharedProblemId(sharedProblemId);
         sharedProblemRepository.delete(sharedProblem);
@@ -106,25 +119,38 @@ public class StudyRoomSharedProblemService {
 
     private SharedProblemResponse toResponse(StudyRoomSharedProblem sharedProblem,
                                              List<StudyRoomSharedProblemReaction> reactions,
+                                             long commentCount,
                                              Long userId) {
         Problem problem = sharedProblem.getProblem();
         return new SharedProblemResponse(
                 sharedProblem.getId(),
                 sharedProblem.getSharedByUser().getId(),
                 sharedProblem.getSharedByUser().getName(),
+                sharedProblem.getSharedByUser().getProfileImageUrl(),
                 problem.getId(),
                 problemImageUrl(problem),
-                problem.getReference(),
+                problemImageUrls(problem),
+                referenceOrFallback(problem.getReference()),
                 sharedProblem.getComment(),
+                commentCount,
                 sharedProblem.getCreatedAt(),
                 reactionService.summarizeSharedProblemReactions(reactions, userId)
         );
     }
 
-    private String problemImageUrl(Problem problem) {
+    private String referenceOrFallback(String reference) {
+        return reference == null || reference.isBlank() ? "공유 문제" : reference;
+    }
+
+    private List<String> problemImageUrls(Problem problem) {
         return problem.getProblemImageDataList().stream()
                 .filter(image -> image.getProblemImageType() == ProblemImageType.PROBLEM_IMAGE)
                 .map(ProblemImageData::getImageUrl)
+                .toList();
+    }
+
+    private String problemImageUrl(Problem problem) {
+        return problemImageUrls(problem).stream()
                 .findFirst()
                 .orElse(null);
     }

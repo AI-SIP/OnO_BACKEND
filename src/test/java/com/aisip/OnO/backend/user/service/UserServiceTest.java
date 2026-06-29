@@ -4,12 +4,15 @@ import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.folder.service.FolderService;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
 import com.aisip.OnO.backend.problem.service.ProblemService;
+import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomSharedProblemCommentRepository;
+import com.aisip.OnO.backend.studyroom.repository.StudyRoomSharedProblemCommentReactionRepository;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.exception.UserErrorCase;
 import com.aisip.OnO.backend.user.repository.UserRepository;
+import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.util.webhook.DiscordWebhookNotificationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.List;
 import java.util.Optional;
@@ -43,6 +47,12 @@ class UserServiceTest {
     private PracticeNoteService practiceNoteService;
     @Mock
     private StudyRoomSharedProblemCommentRepository sharedProblemCommentRepository;
+    @Mock
+    private StudyRoomSharedProblemCommentReactionRepository sharedProblemCommentReactionRepository;
+    @Mock
+    private FileUploadService fileUploadService;
+    @Mock
+    private S3DeleteProducer s3DeleteProducer;
     @Mock
     private DiscordWebhookNotificationService discordWebhookNotificationService;
 
@@ -250,6 +260,8 @@ class UserServiceTest {
 
         // Then
         assertThat(user.getIdentifier()).startsWith("deleted:" + userId + ":");
+        verify(sharedProblemCommentReactionRepository, times(1)).deleteByCommentAuthorId(userId);
+        verify(sharedProblemCommentReactionRepository, times(1)).deleteByUserId(userId);
         verify(sharedProblemCommentRepository, times(1)).deleteByAuthorId(userId);
         verify(practiceNoteService, times(1)).deleteAllPracticesByUser(userId);
         verify(problemService, times(1)).deleteAllUserProblems(userId);
@@ -257,5 +269,52 @@ class UserServiceTest {
         verify(userRepository, times(1)).findById(userId);
         verify(userRepository, times(1)).deleteById(userId);
         verify(userRepository, times(2)).flush();
+    }
+
+    @Test
+    @DisplayName("프로필 이미지 업로드")
+    void updateProfileImage() {
+        // Given
+        Long userId = 1L;
+        User user = User.from(userRegisterDto);
+        MockMultipartFile profileImage = pngFile();
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(fileUploadService.uploadFileToS3(any())).thenReturn("https://cdn.example.com/profile.png");
+
+        // When
+        UserResponseDto response = userService.updateProfileImage(userId, profileImage);
+
+        // Then
+        assertThat(response.profileImageUrl()).isEqualTo("https://cdn.example.com/profile.png");
+        assertThat(user.getProfileImageUrl()).isEqualTo("https://cdn.example.com/profile.png");
+        verify(fileUploadService, times(1)).uploadFileToS3(profileImage);
+        verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
+    }
+
+    @Test
+    @DisplayName("프로필 이미지 삭제")
+    void deleteProfileImage() {
+        // Given
+        Long userId = 1L;
+        User user = User.from(userRegisterDto);
+        user.updateProfileImageUrl("https://cdn.example.com/old-profile.png");
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        // When
+        UserResponseDto response = userService.deleteProfileImage(userId);
+
+        // Then
+        assertThat(response.profileImageUrl()).isNull();
+        assertThat(user.getProfileImageUrl()).isNull();
+        verify(s3DeleteProducer, times(1)).sendDeleteMessage("https://cdn.example.com/old-profile.png", userId);
+    }
+
+    private MockMultipartFile pngFile() {
+        byte[] content = new byte[] {
+                (byte) 0x89, 0x50, 0x4E, 0x47,
+                0x0D, 0x0A, 0x1A, 0x0A,
+                0x00, 0x00, 0x00, 0x00
+        };
+        return new MockMultipartFile("profileImage", "profile.png", "image/png", content);
     }
 }

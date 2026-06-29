@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.studyroom.service;
 
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomDtos.ReactionResponse;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomFeedReaction;
+import com.aisip.OnO.backend.studyroom.entity.StudyRoomSharedProblemCommentReaction;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomSharedProblemReaction;
 import org.springframework.stereotype.Component;
 
@@ -20,6 +21,10 @@ public class StudyRoomReactionService {
 
     public List<ReactionResponse> summarizeSharedProblemReactions(Collection<StudyRoomSharedProblemReaction> reactions, Long userId) {
         return summarize(reactions, userId, StudyRoomSharedProblemReaction::getEmoji, reaction -> reaction.getUser().getId());
+    }
+
+    public List<ReactionResponse> summarizeSharedProblemCommentReactions(Collection<StudyRoomSharedProblemCommentReaction> reactions, Long userId) {
+        return summarize(reactions, userId, StudyRoomSharedProblemCommentReaction::getEmoji, reaction -> reaction.getUser().getId());
     }
 
     private <T> List<ReactionResponse> summarize(Collection<T> reactions, Long userId,

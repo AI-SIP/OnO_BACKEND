@@ -1,7 +1,10 @@
 package com.aisip.OnO.backend.studyroom.integration;
 
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
+import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
+import com.aisip.OnO.backend.problem.entity.ProblemImageData;
+import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveRegisterDto;
@@ -40,6 +43,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class StudyRoomSharedProblemApiTest {
+
+    private static final String EMOJI = "fired_up_sparkle_eyes";
 
     @Autowired
     private MockMvc mockMvc;
@@ -126,6 +131,13 @@ class StudyRoomSharedProblemApiTest {
 
         // host가 공유 후 본인 삭제
         Long sharedProblemId = shareProblem(roomId, problem.getId(), "내 공유 문제");
+        Long commentId = createComment(roomId, sharedProblemId, "삭제 전 댓글");
+        mockMvc.perform(post("/api/study-rooms/{roomId}/shared-problems/{sharedProblemId}/comments/{commentId}/reactions",
+                        roomId, sharedProblemId, commentId)
+                        .with(auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ReactionToggleRequest(EMOJI))))
+                .andExpect(status().isOk());
 
         mockMvc.perform(delete("/api/study-room/{roomId}/shared-problems/{sharedProblemId}", roomId, sharedProblemId)
                         .with(auth()))
@@ -177,6 +189,33 @@ class StudyRoomSharedProblemApiTest {
         String secondBody = secondResult.getResponse().getContentAsString();
         List<Object> secondContent = JsonPath.read(secondBody, "$.data.content");
         assertThat(secondContent).hasSize(2);
+    }
+
+    @Test
+    void sharedProblemListIncludesDetailFieldsForBoardSheet() throws Exception {
+        User host = saveUser("방장", "shared-detail-host");
+        authenticate(host.getId());
+        Long roomId = createRoom("공유 문제 상세 응답방");
+        Problem problem = createProblem(host.getId(), "", "https://cdn.example.com/problem.png");
+        Long sharedProblemId = shareProblem(roomId, problem.getId(), "풀이 의견을 남겨주세요");
+
+        createComment(roomId, sharedProblemId, "첫 번째 의견");
+        createComment(roomId, sharedProblemId, "두 번째 의견");
+
+        mockMvc.perform(get("/api/study-room/{roomId}/shared-problems", roomId)
+                        .with(auth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].sharedProblemId").value(sharedProblemId))
+                .andExpect(jsonPath("$.data.content[0].sharedByUserId").value(host.getId()))
+                .andExpect(jsonPath("$.data.content[0].sharedByName").value("방장"))
+                .andExpect(jsonPath("$.data.content[0].sharedByProfileImageUrl").isEmpty())
+                .andExpect(jsonPath("$.data.content[0].problemId").value(problem.getId()))
+                .andExpect(jsonPath("$.data.content[0].problemImageUrl").value("https://cdn.example.com/problem.png"))
+                .andExpect(jsonPath("$.data.content[0].reference").value("공유 문제"))
+                .andExpect(jsonPath("$.data.content[0].comment").value("풀이 의견을 남겨주세요"))
+                .andExpect(jsonPath("$.data.content[0].commentCount").value(2))
+                .andExpect(jsonPath("$.data.content[0].sharedAt").exists())
+                .andExpect(jsonPath("$.data.content[0].reactions").isEmpty());
     }
 
     @Test
@@ -274,10 +313,32 @@ class StudyRoomSharedProblemApiTest {
     }
 
     private Problem createProblem(Long userId) {
-        return problemRepository.save(Problem.from(
-                new ProblemRegisterDto(null, "memo", "ref", null, LocalDateTime.now()),
+        return createProblem(userId, "ref", null);
+    }
+
+    private Problem createProblem(Long userId, String reference, String problemImageUrl) {
+        Problem problem = Problem.from(
+                new ProblemRegisterDto(null, "memo", reference, null, LocalDateTime.now()),
                 userId
-        ));
+        );
+        if (problemImageUrl != null) {
+            ProblemImageData imageData = ProblemImageData.from(
+                    new ProblemImageDataRegisterDto(null, problemImageUrl, ProblemImageType.PROBLEM_IMAGE));
+            imageData.updateProblem(problem);
+        }
+        return problemRepository.save(problem);
+    }
+
+    private Long createComment(Long roomId, Long sharedProblemId, String content) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/study-rooms/{roomId}/shared-problems/{sharedProblemId}/comments",
+                        roomId, sharedProblemId)
+                        .with(auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new SharedProblemCommentRequest(content))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        Number value = JsonPath.read(result.getResponse().getContentAsString(), "$.data.commentId");
+        return value.longValue();
     }
 
     private Long shareProblem(Long roomId, Long problemId, String comment) throws Exception {

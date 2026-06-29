@@ -64,6 +64,7 @@ public class StudyRoomMapper {
         return new StudyRoomMemberResponse(
                 member.getUser().getId(),
                 member.getUser().getName(),
+                member.getUser().getProfileImageUrl(),
                 totalStudyLevel,
                 currentStreak,
                 weeklyProblemCount,

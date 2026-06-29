@@ -7,8 +7,10 @@ import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequiredArgsConstructor
@@ -45,6 +47,18 @@ public class UserController {
         userService.updateNotificationSettings(userId, dto.notificationEnabled());
 
         return CommonResponse.success("알림 설정이 변경되었습니다.");
+    }
+
+    @PatchMapping(value = "/me/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public CommonResponse<UserResponseDto> updateProfileImage(@RequestParam("profileImage") MultipartFile profileImage) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return CommonResponse.success(userService.updateProfileImage(userId, profileImage));
+    }
+
+    @DeleteMapping("/me/profile-image")
+    public CommonResponse<UserResponseDto> deleteProfileImage() {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return CommonResponse.success(userService.deleteProfileImage(userId));
     }
 
     // ✅ 사용자 계정 삭제

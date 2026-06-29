@@ -44,7 +44,8 @@ public final class StudyRoomDtos {
                                           int memberCount, List<StudyRoomMemberResponse> members) {
     }
 
-    public record StudyRoomMemberResponse(Long userId, String name, Long totalStudyLevel, int currentStreak,
+    public record StudyRoomMemberResponse(Long userId, String name, String profileImageUrl,
+                                          Long totalStudyLevel, int currentStreak,
                                           int weeklyProblemCount, int weeklyPracticeCount,
                                           Integer weeklyGoal, Integer goalProgress,
                                           int todayPracticeCount, boolean practicedToday) {
@@ -65,7 +66,7 @@ public final class StudyRoomDtos {
     public record ReactionResponse(String emoji, long count, boolean reactedByMe) {
     }
 
-    public record FeedItemResponse(Long feedId, Long userId, String userName, String eventType,
+    public record FeedItemResponse(Long feedId, Long userId, String userName, String userProfileImageUrl, String eventType,
                                    Map<String, Object> metadata, LocalDateTime createdAt,
                                    List<ReactionResponse> reactions) {
     }
@@ -96,18 +97,22 @@ public final class StudyRoomDtos {
     }
 
     public record SharedProblemResponse(Long sharedProblemId, Long sharedByUserId, String sharedByName,
-                                        Long problemId, String problemImageUrl, String reference,
-                                        String comment, LocalDateTime sharedAt,
+                                        String sharedByProfileImageUrl,
+                                        Long problemId, String problemImageUrl, List<String> problemImageUrls, String reference,
+                                        String comment, long commentCount, LocalDateTime sharedAt,
                                         List<ReactionResponse> reactions) {
     }
 
     public record SharedProblemReactionToggleResponse(Long sharedProblemId, List<ReactionResponse> reactions) {
     }
 
+    public record SharedProblemCommentReactionToggleResponse(Long commentId, List<ReactionResponse> reactions) {
+    }
+
     public record SharedProblemCommentResponse(Long commentId, String content, Long authorId, String authorName,
                                                String authorProfileImageUrl, LocalDateTime createdAt,
                                                LocalDateTime updatedAt, boolean isEdited, boolean isMine,
-                                               boolean canDelete) {
+                                               boolean canDelete, List<ReactionResponse> reactions) {
     }
 
     public record WeeklyReportResponse(Long reportId, LocalDate weekStart, LocalDate weekEnd,

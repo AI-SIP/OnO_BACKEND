@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Collection;
 
 public interface StudyRoomSharedProblemCommentRepository extends JpaRepository<StudyRoomSharedProblemComment, Long> {
 
@@ -39,6 +40,14 @@ public interface StudyRoomSharedProblemCommentRepository extends JpaRepository<S
     Optional<StudyRoomSharedProblemComment> findByIdAndSharedProblemIdAndRoomId(@Param("commentId") Long commentId,
                                                                                 @Param("sharedProblemId") Long sharedProblemId,
                                                                                 @Param("roomId") Long roomId);
+
+    @Query("""
+            select c.sharedProblem.id, count(c.id)
+            from StudyRoomSharedProblemComment c
+            where c.sharedProblem.id in :sharedProblemIds
+            group by c.sharedProblem.id
+            """)
+    List<Object[]> countBySharedProblemIds(@Param("sharedProblemIds") Collection<Long> sharedProblemIds);
 
     @Modifying
     @Query("delete from StudyRoomSharedProblemComment c where c.sharedProblem.id = :sharedProblemId")

@@ -37,6 +37,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 class StudyRoomSharedProblemCommentApiTest {
 
+    private static final String EMOJI = "fired_up_sparkle_eyes";
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -81,7 +83,8 @@ class StudyRoomSharedProblemCommentApiTest {
                 .andExpect(jsonPath("$.data.authorName").value("멤버"))
                 .andExpect(jsonPath("$.data.isEdited").value(true))
                 .andExpect(jsonPath("$.data.isMine").value(true))
-                .andExpect(jsonPath("$.data.canDelete").value(true));
+                .andExpect(jsonPath("$.data.canDelete").value(true))
+                .andExpect(jsonPath("$.data.reactions").isEmpty());
 
         MvcResult result = mockMvc.perform(get("/api/study-rooms/{roomId}/shared-problems/{sharedProblemId}/comments",
                         roomId, sharedProblemId)
@@ -92,6 +95,7 @@ class StudyRoomSharedProblemCommentApiTest {
                 .andExpect(jsonPath("$.data.content[0].content").value("수정된 풀이 의견"))
                 .andExpect(jsonPath("$.data.content[0].isMine").value(true))
                 .andExpect(jsonPath("$.data.content[0].canDelete").value(true))
+                .andExpect(jsonPath("$.data.content[0].reactions").isEmpty())
                 .andReturn();
 
         List<Object> comments = JsonPath.read(result.getResponse().getContentAsString(), "$.data.content");
@@ -128,6 +132,14 @@ class StudyRoomSharedProblemCommentApiTest {
                         .content(objectMapper.writeValueAsString(new SharedProblemCommentRequest("권한 없는 수정"))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.errorCode").value(10019));
+
+        mockMvc.perform(post("/api/study-rooms/{roomId}/shared-problems/{sharedProblemId}/comments/{commentId}/reactions",
+                        roomId, sharedProblemId, commentId)
+                        .with(auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ReactionToggleRequest(EMOJI))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reactions[0].count").value(1));
 
         authenticate(host.getId());
         mockMvc.perform(get("/api/study-rooms/{roomId}/shared-problems/{sharedProblemId}/comments",
@@ -179,6 +191,47 @@ class StudyRoomSharedProblemCommentApiTest {
 
         List<Object> comments = JsonPath.read(secondResult.getResponse().getContentAsString(), "$.data.content");
         assertThat(comments).hasSize(2);
+    }
+
+    @Test
+    void memberCanToggleSharedProblemCommentReaction() throws Exception {
+        User host = saveUser("방장", "comment-reaction-host");
+        User member = saveUser("멤버", "comment-reaction-member");
+        authenticate(host.getId());
+        Long roomId = createRoom("댓글 반응방");
+        String inviteCode = issueInviteCode(roomId);
+        Long sharedProblemId = shareProblem(roomId, createProblem(host.getId()).getId(), "공유 문제");
+        Long commentId = createComment(roomId, sharedProblemId, "방장 댓글");
+
+        authenticate(member.getId());
+        join(inviteCode);
+
+        mockMvc.perform(post("/api/study-rooms/{roomId}/shared-problems/{sharedProblemId}/comments/{commentId}/reactions",
+                        roomId, sharedProblemId, commentId)
+                        .with(auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ReactionToggleRequest(EMOJI))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.commentId").value(commentId))
+                .andExpect(jsonPath("$.data.reactions[0].emoji").value(EMOJI))
+                .andExpect(jsonPath("$.data.reactions[0].count").value(1))
+                .andExpect(jsonPath("$.data.reactions[0].reactedByMe").value(true));
+
+        mockMvc.perform(get("/api/study-rooms/{roomId}/shared-problems/{sharedProblemId}/comments",
+                        roomId, sharedProblemId)
+                        .with(auth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].reactions[0].emoji").value(EMOJI))
+                .andExpect(jsonPath("$.data.content[0].reactions[0].count").value(1))
+                .andExpect(jsonPath("$.data.content[0].reactions[0].reactedByMe").value(true));
+
+        mockMvc.perform(post("/api/study-rooms/{roomId}/shared-problems/{sharedProblemId}/comments/{commentId}/reactions",
+                        roomId, sharedProblemId, commentId)
+                        .with(auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ReactionToggleRequest(EMOJI))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reactions").isEmpty());
     }
 
     @Test

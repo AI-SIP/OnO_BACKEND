@@ -63,6 +63,14 @@ public class StudyRoomSharedProblemController {
         return CommonResponse.success(commentService.updateComment(roomId, sharedProblemId, commentId, currentUserId(), request));
     }
 
+    @PostMapping("/{sharedProblemId}/comments/{commentId}/reactions")
+    public CommonResponse<SharedProblemCommentReactionToggleResponse> toggleCommentReaction(@PathVariable("roomId") Long roomId,
+                                                                                            @PathVariable("sharedProblemId") Long sharedProblemId,
+                                                                                            @PathVariable("commentId") Long commentId,
+                                                                                            @RequestBody ReactionToggleRequest request) {
+        return CommonResponse.success(commentService.toggleReaction(roomId, sharedProblemId, commentId, currentUserId(), request));
+    }
+
     @DeleteMapping("/{sharedProblemId}/comments/{commentId}")
     public CommonResponse<String> deleteComment(@PathVariable("roomId") Long roomId,
                                                 @PathVariable("sharedProblemId") Long sharedProblemId,

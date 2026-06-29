@@ -126,6 +126,7 @@ public class StudyRoomFeedService {
                 feed.getId(),
                 feed.getUser().getId(),
                 feed.getUser().getName(),
+                feed.getUser().getProfileImageUrl(),
                 toApiValue(feed.getEventType().name()),
                 readMetadata(feed.getMetadataJson()),
                 feed.getCreatedAt(),
