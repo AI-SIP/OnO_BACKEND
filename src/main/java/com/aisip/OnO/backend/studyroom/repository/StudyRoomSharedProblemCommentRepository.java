@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.studyroom.repository;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomSharedProblemComment;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -14,6 +15,8 @@ public interface StudyRoomSharedProblemCommentRepository extends JpaRepository<S
     @Query("""
             select c
             from StudyRoomSharedProblemComment c
+            join fetch c.sharedProblem sp
+            join fetch sp.room
             join fetch c.author
             where c.sharedProblem.id = :sharedProblemId
               and (:cursor is null or c.id < :cursor)
@@ -37,5 +40,11 @@ public interface StudyRoomSharedProblemCommentRepository extends JpaRepository<S
                                                                                 @Param("sharedProblemId") Long sharedProblemId,
                                                                                 @Param("roomId") Long roomId);
 
-    void deleteBySharedProblemId(Long sharedProblemId);
+    @Modifying
+    @Query("delete from StudyRoomSharedProblemComment c where c.sharedProblem.id = :sharedProblemId")
+    void deleteBySharedProblemId(@Param("sharedProblemId") Long sharedProblemId);
+
+    @Modifying
+    @Query("delete from StudyRoomSharedProblemComment c where c.author.id = :authorId")
+    void deleteByAuthorId(@Param("authorId") Long authorId);
 }

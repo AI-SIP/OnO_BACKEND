@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.admin.dto.AdminUserResponseDto;
 import com.aisip.OnO.backend.folder.service.FolderService;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
 import com.aisip.OnO.backend.problem.service.ProblemService;
+import com.aisip.OnO.backend.studyroom.repository.StudyRoomSharedProblemCommentRepository;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.entity.User;
@@ -41,6 +42,8 @@ public class UserService {
     private final ProblemService problemService;
 
     private final PracticeNoteService practiceNoteService;
+
+    private final StudyRoomSharedProblemCommentRepository sharedProblemCommentRepository;
 
     private final DiscordWebhookNotificationService discordWebhookNotificationService;
 
@@ -143,6 +146,7 @@ public class UserService {
     @Transactional
     public void deleteUserById(Long userId) {
         User user = findUserEntity(userId);
+        sharedProblemCommentRepository.deleteByAuthorId(userId);
         practiceNoteService.deleteAllPracticesByUser(userId);
         problemService.deleteAllUserProblems(userId);
         folderService.deleteAllUserFolders(userId);

@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.folder.service.FolderService;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
 import com.aisip.OnO.backend.problem.service.ProblemService;
+import com.aisip.OnO.backend.studyroom.repository.StudyRoomSharedProblemCommentRepository;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.entity.User;
@@ -40,6 +41,8 @@ class UserServiceTest {
     private ProblemService problemService;
     @Mock
     private PracticeNoteService practiceNoteService;
+    @Mock
+    private StudyRoomSharedProblemCommentRepository sharedProblemCommentRepository;
     @Mock
     private DiscordWebhookNotificationService discordWebhookNotificationService;
 
@@ -122,8 +125,8 @@ class UserServiceTest {
         assertThat(response.email()).contains("guest");
 
         verify(userRepository, times(1)).save(any(User.class));
-        verify(folderService, times(1)).initializeDefaultFoldersIfAbsent(any(Long.class));
-        verify(practiceNoteService, times(1)).registerDefaultPractice(any(Long.class));
+        verify(folderService, times(1)).initializeDefaultFoldersIfAbsent(any());
+        verify(practiceNoteService, times(1)).registerDefaultPractice(any());
     }
 
     @Test
@@ -145,8 +148,8 @@ class UserServiceTest {
 
         // save()가 반드시 한 번 호출되어야 함
         verify(userRepository, times(1)).save(any(User.class));
-        verify(folderService, times(1)).initializeDefaultFoldersIfAbsent(any(Long.class));
-        verify(practiceNoteService, times(1)).registerDefaultPractice(any(Long.class));
+        verify(folderService, times(1)).initializeDefaultFoldersIfAbsent(any());
+        verify(practiceNoteService, times(1)).registerDefaultPractice(any());
     }
 
     @Test
@@ -247,6 +250,7 @@ class UserServiceTest {
 
         // Then
         assertThat(user.getIdentifier()).startsWith("deleted:" + userId + ":");
+        verify(sharedProblemCommentRepository, times(1)).deleteByAuthorId(userId);
         verify(practiceNoteService, times(1)).deleteAllPracticesByUser(userId);
         verify(problemService, times(1)).deleteAllUserProblems(userId);
         verify(folderService, times(1)).deleteAllUserFolders(userId);

@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.studyroom.repository;
 
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomSharedProblemReaction;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -18,5 +19,7 @@ public interface StudyRoomSharedProblemReactionRepository extends JpaRepository<
 
     List<StudyRoomSharedProblemReaction> findAllBySharedProblemId(Long sharedProblemId);
 
-    void deleteBySharedProblemId(Long sharedProblemId);
+    @Modifying
+    @Query("delete from StudyRoomSharedProblemReaction r where r.sharedProblem.id = :sharedProblemId")
+    void deleteBySharedProblemId(@Param("sharedProblemId") Long sharedProblemId);
 }
