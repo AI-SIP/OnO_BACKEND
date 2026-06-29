@@ -224,7 +224,7 @@ public class StudyRoomService {
         }
 
         String extension = getLowercaseExtension(thumbnail.getOriginalFilename());
-        String contentType = thumbnail.getContentType();
+        String contentType = normalizeContentType(thumbnail.getContentType(), extension);
         if (!isAllowedImageType(contentType, extension) || !hasAllowedImageSignature(thumbnail, contentType)) {
             throw new ApplicationException(FileUploadErrorCase.INVALID_IMAGE_FILE);
         }
@@ -239,6 +239,18 @@ public class StudyRoomService {
             throw new ApplicationException(FileUploadErrorCase.INVALID_IMAGE_FILE);
         }
         return originalFilename.substring(dotIndex + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeContentType(String contentType, String extension) {
+        if (contentType == null || "application/octet-stream".equals(contentType)) {
+            return switch (extension) {
+                case "jpg", "jpeg" -> "image/jpeg";
+                case "png" -> "image/png";
+                case "webp" -> "image/webp";
+                default -> contentType != null ? contentType : "";
+            };
+        }
+        return contentType;
     }
 
     private boolean isAllowedImageType(String contentType, String extension) {
