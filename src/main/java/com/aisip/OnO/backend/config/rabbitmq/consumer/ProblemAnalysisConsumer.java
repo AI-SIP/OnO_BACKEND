@@ -49,7 +49,8 @@ public class ProblemAnalysisConsumer {
             // 상태는 Service에서 FAILED로 업데이트됨. 재큐잉 없이 종료(ACK)
             return;
         } catch (ApplicationException e) {
-            if (e.getErrorCase() == ProblemErrorCase.PROBLEM_NOT_FOUND) {
+            if (e.getErrorCase() == ProblemErrorCase.PROBLEM_NOT_FOUND
+                    || e.getErrorCase() == ProblemErrorCase.PROBLEM_ANALYSIS_NOT_FOUND) {
                 log.warn("RabbitMQ message skipped - queue: {}, operation: {}, outcome: {}, problemId: {}, messageRetryCount: {}",
                         RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", "resource_not_found",
                         message.getProblemId(), message.getRetryCount());

@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -35,6 +36,7 @@ public class ProblemAnalysisService {
     private final ObjectMapper objectMapper;
     private final ProblemImageDataRepository problemImageDataRepository;
     private final ProblemAnalysisFailureService problemAnalysisFailureService;
+    private final ProblemAnalysisDbService problemAnalysisDbService;
 
     /**
      * 기존 분석 결과 삭제
@@ -127,14 +129,16 @@ public class ProblemAnalysisService {
 
     /**
      * 동기적으로 문제 이미지를 분석합니다 (RabbitMQ Consumer에서 호출)
-     * - 트랜잭션을 OpenAI 호출 전후로 분리해 DB 커넥션 장기 점유를 방지
+     * - NOT_SUPPORTED: 이 메서드 자체는 트랜잭션 없이 실행, DB 작업은 problemAnalysisDbService 빈을 통해 각자 독립 트랜잭션으로 처리
+     * - self-invocation 문제를 피하기 위해 Phase 1/3의 DB 작업을 별도 빈에서 처리
      */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void analyzeProblemSync(Long problemId) {
         log.info("Starting sync analysis for problemId: {}", problemId);
 
         try {
             // Phase 1: 짧은 readOnly 트랜잭션으로 필요한 데이터 조회
-            AnalysisPreparation prep = fetchAnalysisPreparation(problemId);
+            ProblemAnalysisDbService.AnalysisPreparation prep = problemAnalysisDbService.fetchAnalysisPreparation(problemId);
             if (prep.alreadyCompleted()) {
                 log.info("Analysis already completed for problemId: {}", problemId);
                 return;
@@ -151,12 +155,13 @@ public class ProblemAnalysisService {
                 log.error("JSON 변환 실패 for problemId: {}", problemId, jsonException);
                 throw new RuntimeException("JSON 변환 실패", jsonException);
             }
-            saveAnalysisSuccess(problemId, result, keyPointsJson);
+            problemAnalysisDbService.saveAnalysisSuccess(problemId, result, keyPointsJson);
             log.info("Analysis completed successfully for problemId: {}", problemId);
 
         } catch (ApplicationException e) {
-            if (e.getErrorCase() == ProblemErrorCase.PROBLEM_NOT_FOUND) {
-                log.warn("Skipping analysis because problem was deleted or missing. problemId: {}", problemId);
+            if (e.getErrorCase() == ProblemErrorCase.PROBLEM_NOT_FOUND
+                    || e.getErrorCase() == ProblemErrorCase.PROBLEM_ANALYSIS_NOT_FOUND) {
+                log.warn("Skipping analysis because problem or analysis was deleted. problemId: {}", problemId);
                 throw e;
             }
             log.error("Application error during sync analysis for problemId: {}", problemId, e);
@@ -172,40 +177,6 @@ public class ProblemAnalysisService {
             throw e;
         }
     }
-
-    @Transactional(readOnly = true)
-    public AnalysisPreparation fetchAnalysisPreparation(Long problemId) {
-        problemRepository.findById(problemId)
-                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
-
-        List<String> imageUrls = problemImageDataRepository.findAllByProblemId(problemId)
-                .stream()
-                .filter(data -> data.getProblemImageType().equals(ProblemImageType.PROBLEM_IMAGE))
-                .map(ProblemImageData::getImageUrl)
-                .toList();
-
-        ProblemAnalysis analysis = analysisRepository.findByProblemId(problemId)
-                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_ANALYSIS_NOT_FOUND));
-
-        return new AnalysisPreparation(imageUrls, analysis.getStatus().equals(AnalysisStatus.COMPLETED));
-    }
-
-    @Transactional
-    public void saveAnalysisSuccess(Long problemId, ProblemAnalysisResult result, String keyPointsJson) {
-        ProblemAnalysis analysis = analysisRepository.findByProblemId(problemId)
-                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_ANALYSIS_NOT_FOUND));
-        analysis.updateWithSuccess(
-                result.getSubject(),
-                result.getProblemType(),
-                keyPointsJson,
-                result.getSolution(),
-                result.getCommonMistakes(),
-                result.getStudyTips()
-        );
-        analysisRepository.save(analysis);
-    }
-
-    public record AnalysisPreparation(List<String> imageUrls, boolean alreadyCompleted) {}
 
     /**
      * 비동기로 문제 이미지를 분석합니다 (기존 @Async 방식, deprecated)
