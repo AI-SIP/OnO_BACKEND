@@ -106,7 +106,8 @@ public final class StudyRoomDtos {
 
     public record SharedProblemCommentResponse(Long commentId, String content, Long authorId, String authorName,
                                                String authorProfileImageUrl, LocalDateTime createdAt,
-                                               LocalDateTime updatedAt, boolean isEdited, boolean isMine) {
+                                               LocalDateTime updatedAt, boolean isEdited, boolean isMine,
+                                               boolean canDelete) {
     }
 
     public record WeeklyReportResponse(Long reportId, LocalDate weekStart, LocalDate weekEnd,

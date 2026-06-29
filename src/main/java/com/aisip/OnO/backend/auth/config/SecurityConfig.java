@@ -106,7 +106,7 @@ public class SecurityConfig {
                                 .requestMatchers("/api/folders/**").hasAnyRole("GUEST", "MEMBER", "ADMIN")
                                 .requestMatchers("/api/fileUpload/**").hasAnyRole("GUEST", "MEMBER", "ADMIN")
                                 .requestMatchers("/api/practiceNotes/**").hasAnyRole("GUEST", "MEMBER", "ADMIN")
-                                .requestMatchers("/api/study-room/**").hasAnyRole("GUEST", "MEMBER", "ADMIN")
+                                .requestMatchers("/api/study-room/**", "/api/study-rooms/**").hasAnyRole("GUEST", "MEMBER", "ADMIN")
                                 .anyRequest().authenticated()
                 )
                 .formLogin(formLogin -> formLogin

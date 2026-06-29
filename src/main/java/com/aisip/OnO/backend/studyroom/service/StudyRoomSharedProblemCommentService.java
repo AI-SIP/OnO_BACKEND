@@ -60,7 +60,7 @@ public class StudyRoomSharedProblemCommentService {
                 .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
         StudyRoomSharedProblemComment comment = commentRepository.save(
                 StudyRoomSharedProblemComment.create(sharedProblem, user, validateContent(request)));
-        return toResponse(comment, userId);
+        return toResponse(comment, userId, false);
     }
 
     @Transactional
@@ -72,7 +72,7 @@ public class StudyRoomSharedProblemCommentService {
             throw new ApplicationException(StudyRoomErrorCase.SHARED_PROBLEM_COMMENT_FORBIDDEN);
         }
         comment.updateContent(validateContent(request));
-        return toResponse(comment, userId);
+        return toResponse(comment, userId, true);
     }
 
     @Transactional
@@ -106,18 +106,26 @@ public class StudyRoomSharedProblemCommentService {
     }
 
     private SharedProblemCommentResponse toResponse(StudyRoomSharedProblemComment comment, Long userId) {
+        return toResponse(comment, userId, false);
+    }
+
+    private SharedProblemCommentResponse toResponse(StudyRoomSharedProblemComment comment, Long userId, boolean forceEdited) {
         LocalDateTime createdAt = comment.getCreatedAt();
         LocalDateTime updatedAt = comment.getUpdatedAt();
+        Long authorId = comment.getAuthor().getId();
+        boolean mine = authorId.equals(userId);
+        boolean canDelete = mine || comment.getSharedProblem().getRoom().getHostUserId().equals(userId);
         return new SharedProblemCommentResponse(
                 comment.getId(),
                 comment.getContent(),
-                comment.getAuthor().getId(),
+                authorId,
                 comment.getAuthor().getName(),
                 null,
                 createdAt,
                 updatedAt,
-                createdAt != null && updatedAt != null && updatedAt.isAfter(createdAt),
-                comment.getAuthor().getId().equals(userId)
+                forceEdited || createdAt != null && updatedAt != null && updatedAt.isAfter(createdAt),
+                mine,
+                canDelete
         );
     }
 }

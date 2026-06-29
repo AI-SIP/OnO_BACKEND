@@ -79,7 +79,9 @@ class StudyRoomSharedProblemCommentApiTest {
                 .andExpect(jsonPath("$.data.content").value("수정된 풀이 의견"))
                 .andExpect(jsonPath("$.data.authorId").value(member.getId()))
                 .andExpect(jsonPath("$.data.authorName").value("멤버"))
-                .andExpect(jsonPath("$.data.isMine").value(true));
+                .andExpect(jsonPath("$.data.isEdited").value(true))
+                .andExpect(jsonPath("$.data.isMine").value(true))
+                .andExpect(jsonPath("$.data.canDelete").value(true));
 
         MvcResult result = mockMvc.perform(get("/api/study-rooms/{roomId}/shared-problems/{sharedProblemId}/comments",
                         roomId, sharedProblemId)
@@ -89,6 +91,7 @@ class StudyRoomSharedProblemCommentApiTest {
                 .andExpect(jsonPath("$.data.content[0].commentId").value(commentId))
                 .andExpect(jsonPath("$.data.content[0].content").value("수정된 풀이 의견"))
                 .andExpect(jsonPath("$.data.content[0].isMine").value(true))
+                .andExpect(jsonPath("$.data.content[0].canDelete").value(true))
                 .andReturn();
 
         List<Object> comments = JsonPath.read(result.getResponse().getContentAsString(), "$.data.content");
@@ -111,6 +114,13 @@ class StudyRoomSharedProblemCommentApiTest {
 
         authenticate(anotherMember.getId());
         join(inviteCode);
+        mockMvc.perform(get("/api/study-rooms/{roomId}/shared-problems/{sharedProblemId}/comments",
+                        roomId, sharedProblemId)
+                        .with(auth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].isMine").value(false))
+                .andExpect(jsonPath("$.data.content[0].canDelete").value(false));
+
         mockMvc.perform(patch("/api/study-rooms/{roomId}/shared-problems/{sharedProblemId}/comments/{commentId}",
                         roomId, sharedProblemId, commentId)
                         .with(auth())
@@ -120,6 +130,13 @@ class StudyRoomSharedProblemCommentApiTest {
                 .andExpect(jsonPath("$.errorCode").value(10019));
 
         authenticate(host.getId());
+        mockMvc.perform(get("/api/study-rooms/{roomId}/shared-problems/{sharedProblemId}/comments",
+                        roomId, sharedProblemId)
+                        .with(auth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].isMine").value(false))
+                .andExpect(jsonPath("$.data.content[0].canDelete").value(true));
+
         mockMvc.perform(delete("/api/study-rooms/{roomId}/shared-problems/{sharedProblemId}/comments/{commentId}",
                         roomId, sharedProblemId, commentId)
                         .with(auth()))
