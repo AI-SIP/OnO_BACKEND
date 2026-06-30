@@ -158,8 +158,10 @@ public class FolderApiIntegrationTest {
                 .andExpect(jsonPath("$.data.subFolderList.length()").value(folder.getSubFolderList().size()))
                 .andExpect(jsonPath("$.data.subFolderList[0].folderId").value(folder.getSubFolderList().get(0).getId()))
                 .andExpect(jsonPath("$.data.subFolderList[0].folderName").value(folder.getSubFolderList().get(0).getName()))
+                .andExpect(jsonPath("$.data.subFolderList[0].problemCount").value(folder.getSubFolderList().get(0).getProblemList().size()))
                 .andExpect(jsonPath("$.data.subFolderList[1].folderId").value(folder.getSubFolderList().get(1).getId()))
                 .andExpect(jsonPath("$.data.subFolderList[1].folderName").value(folder.getSubFolderList().get(1).getName()))
+                .andExpect(jsonPath("$.data.subFolderList[1].problemCount").value(folder.getSubFolderList().get(1).getProblemList().size()))
                 .andExpect(jsonPath("$.data.problemIdList.length()").value(folder.getProblemList().size()))
                 .andExpect(jsonPath("$.data.problemIdList[0]").value(folder.getProblemList().get(0).getId()))
                 .andReturn();
@@ -181,11 +183,14 @@ public class FolderApiIntegrationTest {
                 .andExpect(jsonPath("$.data.folderId").value(folder.getId()))
                 .andExpect(jsonPath("$.data.folderName").value(folder.getName()))
                 .andExpect(jsonPath("$.data.parentFolder.folderId").value(folder.getParentFolder().getId()))
+                .andExpect(jsonPath("$.data.parentFolder.problemCount").value(folder.getParentFolder().getProblemList().size()))
                 .andExpect(jsonPath("$.data.subFolderList.length()").value(folder.getSubFolderList().size()))
                 .andExpect(jsonPath("$.data.subFolderList[0].folderId").value(folder.getSubFolderList().get(0).getId()))
                 .andExpect(jsonPath("$.data.subFolderList[0].folderName").value(folder.getSubFolderList().get(0).getName()))
+                .andExpect(jsonPath("$.data.subFolderList[0].problemCount").value(folder.getSubFolderList().get(0).getProblemList().size()))
                 .andExpect(jsonPath("$.data.subFolderList[1].folderId").value(folder.getSubFolderList().get(1).getId()))
                 .andExpect(jsonPath("$.data.subFolderList[1].folderName").value(folder.getSubFolderList().get(1).getName()))
+                .andExpect(jsonPath("$.data.subFolderList[1].problemCount").value(folder.getSubFolderList().get(1).getProblemList().size()))
                 .andExpect(jsonPath("$.data.problemIdList.length()").value(folder.getProblemList().size()))
                 .andExpect(jsonPath("$.data.problemIdList[0]").value(folder.getProblemList().get(0).getId()))
                 .andReturn();
@@ -207,6 +212,7 @@ public class FolderApiIntegrationTest {
                 .andExpect(jsonPath("$.data.folderId").value(folder.getId()))
                 .andExpect(jsonPath("$.data.folderName").value(folder.getName()))
                 .andExpect(jsonPath("$.data.parentFolder.folderId").value(folder.getParentFolder().getId()))
+                .andExpect(jsonPath("$.data.parentFolder.problemCount").value(folder.getParentFolder().getProblemList().size()))
                 .andExpect(jsonPath("$.data.subFolderList.length()").value(0))
                 .andExpect(jsonPath("$.data.problemIdList.length()").value(folder.getProblemList().size()))
                 .andExpect(jsonPath("$.data.problemIdList[0]").value(folder.getProblemList().get(0).getId()))
@@ -233,8 +239,10 @@ public class FolderApiIntegrationTest {
                 .andExpect(jsonPath("$.data.problemIdList.length()").value(rootFolder.getProblemList().size()))
                 .andExpect(jsonPath("$.data.subFolderList[0].folderId").value(rootFolder.getSubFolderList().get(0).getId()))
                 .andExpect(jsonPath("$.data.subFolderList[0].folderName").value(rootFolder.getSubFolderList().get(0).getName()))
+                .andExpect(jsonPath("$.data.subFolderList[0].problemCount").value(rootFolder.getSubFolderList().get(0).getProblemList().size()))
                 .andExpect(jsonPath("$.data.subFolderList[1].folderId").value(rootFolder.getSubFolderList().get(1).getId()))
                 .andExpect(jsonPath("$.data.subFolderList[1].folderName").value(rootFolder.getSubFolderList().get(1).getName()))
+                .andExpect(jsonPath("$.data.subFolderList[1].problemCount").value(rootFolder.getSubFolderList().get(1).getProblemList().size()))
                 .andExpect(jsonPath("$.data.problemIdList[0]").value(rootFolder.getProblemList().get(0).getId()))
                 .andReturn();
 
@@ -276,6 +284,7 @@ public class FolderApiIntegrationTest {
             Folder folder = folderList.get(i);
             assertThat(folder.getId().intValue()).isEqualTo( JsonPath.read(content, "$.data[" + i + "].folderId"));
             assertThat(folder.getName()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].folderName"));
+            assertThat(folder.getProblemList().size()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].problemCount"));
         }
 
         System.out.println("==== 응답 결과 ====");
@@ -306,6 +315,10 @@ public class FolderApiIntegrationTest {
             }
             assertThat(folder.getSubFolderList().size()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].subFolderList.length()"));
             assertThat(folder.getProblemList().size()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].problemIdList.length()"));
+            for (int j = 0; j < folder.getSubFolderList().size(); j++) {
+                assertThat(folder.getSubFolderList().get(j).getProblemList().size())
+                        .isEqualTo(JsonPath.read(content, "$.data[" + i + "].subFolderList[" + j + "].problemCount"));
+            }
         }
 
         System.out.println("==== 응답 결과 ====");

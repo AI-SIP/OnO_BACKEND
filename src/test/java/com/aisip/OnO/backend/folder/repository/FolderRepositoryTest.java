@@ -24,7 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -247,6 +249,24 @@ class FolderRepositoryTest {
             }
         } else{
             assertThat(0L).isEqualTo(1L);
+        }
+    }
+
+    @Test
+    @DisplayName("폴더별 문제 수 집계 테스트")
+    void countProblemsByFolderIdsTest() {
+        List<Long> folderIds = folderList.stream()
+                .map(Folder::getId)
+                .toList();
+
+        Map<Long, Long> problemCountsByFolderId = folderRepository.countProblemsByFolderIds(folderIds).stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]
+                ));
+
+        for (Folder folder : folderList) {
+            assertThat(problemCountsByFolderId.get(folder.getId())).isEqualTo(2L);
         }
     }
 }
