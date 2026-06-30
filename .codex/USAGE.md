@@ -191,17 +191,17 @@ $check abc1234 이후 변경사항 검토해줘
 
 ### commit
 
-현재 변경사항의 커밋 단위와 메시지만 제안할 때 사용한다. 실제 커밋은 명시 요청 전까지 실행하지 않는다.
+현재 변경사항의 커밋 단위와 메시지를 정리하고 실제 커밋까지 수행할 때 사용한다.
 
 ```text
-$commit 현재 변경사항 커밋 단위 추천해줘
+$commit 현재 변경사항 커밋해줘
 ```
 
 수행 방식:
 
 - `git status`, `git diff HEAD`로 변경 전체를 파악한다.
 - 서로 독립적인 논리 단위로 나눈다.
-- OnO 커밋 메시지 형식으로 제안한다.
+- 논리 단위별로 필요한 파일만 `git add`하고 OnO 커밋 메시지 형식으로 `git commit`을 수행한다.
 
 ```text
 [Feat] 구현 타이틀 - 구현 상세1 구현 상세2
@@ -267,7 +267,7 @@ $migrate review_schedule에 알림 실패 사유 컬럼 추가
 
 ### pr
 
-기준 커밋부터 현재까지의 변경사항으로 PR 제목과 본문 초안을 작성할 때 사용한다.
+현재 브랜치의 개발 내역을 `develop` 브랜치로 merge 요청하는 GitHub PR로 직접 생성할 때 사용한다.
 
 ```text
 $pr abc1234
@@ -276,6 +276,7 @@ $pr abc1234
 수행 방식:
 
 - `git log`, `git diff`, `git status`로 커밋된 변경과 미커밋 변경을 분리한다.
+- 원격 브랜치가 없거나 미push 커밋이 있으면 `git push -u origin 현재브랜치`로 직접 push한다.
 - `.github/PULL_REQUEST_TEMPLATE.md`를 읽고 같은 구조로 작성한다.
 - 사용자 영향, API 호환성, DB migration, 인증/권한, 검증 결과, 배포 리스크, 롤백 방법을 포함한다.
 
