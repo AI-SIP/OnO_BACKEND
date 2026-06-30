@@ -3,13 +3,13 @@ package com.aisip.OnO.backend.studyroom.service;
 import com.aisip.OnO.backend.mission.entity.UserMissionStatus;
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomDtos.*;
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomStats;
-import com.aisip.OnO.backend.studyroom.dto.StudyRoomTodayPracticeSummary;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoom;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomMember;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomWeeklyReportReadRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -19,18 +19,33 @@ public class StudyRoomMapper {
 
     private final StudyRoomWeeklyReportReadRepository reportReadRepository;
 
-    public StudyRoomListResponse toListResponse(StudyRoomMember member, int memberCount,
-                                                StudyRoomTodayPracticeSummary todayPracticeSummary) {
+    public StudyRoomListResponse toListResponse(StudyRoomMember member, List<StudyRoomMember> roomMembers,
+                                                Map<Long, Integer> todayPracticeCountByUserId) {
         StudyRoom room = member.getRoom();
+        int todayPracticeMemberCount = 0;
+        int todayPracticeCount = 0;
+        List<StudyRoomMemberSummary> memberSummaries = new ArrayList<>(roomMembers.size());
+        for (StudyRoomMember m : roomMembers) {
+            int count = todayPracticeCountByUserId.getOrDefault(m.getUser().getId(), 0);
+            boolean practicedToday = count > 0;
+            if (practicedToday) todayPracticeMemberCount++;
+            todayPracticeCount += count;
+            memberSummaries.add(new StudyRoomMemberSummary(
+                    m.getUser().getId(),
+                    m.getUser().getProfileImageUrl(),
+                    practicedToday
+            ));
+        }
         return new StudyRoomListResponse(
                 room.getId(),
                 room.getName(),
                 room.getHostUserId(),
-                memberCount,
+                roomMembers.size(),
                 room.getThumbnailUrl(),
                 reportReadRepository.existsUnreadReport(room.getId(), member.getUser().getId()),
-                todayPracticeSummary.todayPracticeMemberCount(),
-                todayPracticeSummary.todayPracticeCount()
+                todayPracticeMemberCount,
+                todayPracticeCount,
+                memberSummaries
         );
     }
 

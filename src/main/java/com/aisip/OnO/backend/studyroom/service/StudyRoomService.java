@@ -3,7 +3,6 @@ package com.aisip.OnO.backend.studyroom.service;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomDtos.*;
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomStats;
-import com.aisip.OnO.backend.studyroom.dto.StudyRoomTodayPracticeSummary;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoom;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomMember;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomMemberRole;
@@ -52,14 +51,16 @@ public class StudyRoomService {
         if (roomIds.isEmpty()) {
             return List.of();
         }
-        Map<Long, Integer> memberCounts = memberRepository.countMembersByRoomIds(roomIds).stream()
-                .collect(java.util.stream.Collectors.toMap(row -> (Long) row[0], row -> Math.toIntExact((Long) row[1])));
-        Map<Long, StudyRoomTodayPracticeSummary> todayPracticeSummaries = statsService.getTodayPracticeSummariesByRoomIds(roomIds);
+        List<StudyRoomMember> allRoomMembers = memberRepository.findAllWithRoomAndUserByRoomIds(roomIds);
+        Map<Long, List<StudyRoomMember>> membersByRoomId = allRoomMembers.stream()
+                .collect(java.util.stream.Collectors.groupingBy(m -> m.getRoom().getId()));
+        List<Long> allUserIds = allRoomMembers.stream().map(m -> m.getUser().getId()).distinct().toList();
+        Map<Long, Integer> todayPracticeCountByUserId = statsService.getTodayPracticeCounts(allUserIds);
         return memberships.stream()
                 .map(member -> mapper.toListResponse(
                         member,
-                        memberCounts.getOrDefault(member.getRoom().getId(), 0),
-                        todayPracticeSummaries.getOrDefault(member.getRoom().getId(), StudyRoomTodayPracticeSummary.empty())
+                        membersByRoomId.getOrDefault(member.getRoom().getId(), List.of()),
+                        todayPracticeCountByUserId
                 ))
                 .toList();
     }

@@ -36,9 +36,13 @@ public final class StudyRoomDtos {
     public record SharedProblemCommentRequest(String content) {
     }
 
+    public record StudyRoomMemberSummary(Long userId, String profileImageUrl, boolean practicedToday) {
+    }
+
     public record StudyRoomListResponse(Long roomId, String name, Long hostUserId, int memberCount,
                                         String thumbnailUrl, boolean hasUnreadReport,
-                                        int todayPracticeMemberCount, int todayPracticeCount) {
+                                        int todayPracticeMemberCount, int todayPracticeCount,
+                                        List<StudyRoomMemberSummary> members) {
     }
 
     public record StudyRoomDetailResponse(Long roomId, String name, Long hostUserId, String thumbnailUrl,
