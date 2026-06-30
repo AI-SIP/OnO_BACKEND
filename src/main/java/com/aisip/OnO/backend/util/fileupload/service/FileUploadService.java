@@ -7,14 +7,20 @@ import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problemsolve.entity.ProblemSolveImageData;
 import com.aisip.OnO.backend.problemsolve.exception.ProblemSolveErrorCase;
 import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveImageDataRepository;
+import com.aisip.OnO.backend.util.fileupload.dto.PresignedUrlResponse;
 import com.aisip.OnO.backend.util.fileupload.exception.FileUploadErrorCase;
+import com.amazonaws.HttpMethod;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.DeleteObjectRequest;
+import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.io.IOException;
+import java.util.Date;
+import java.util.List;
 import java.util.Objects;
+import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -58,6 +64,22 @@ public class FileUploadService {
         recordExternalCall("s3", "upload", "success", sample);
         log.info("S3 upload completed - fileSize: {}, contentType: {}", file.getSize(), file.getContentType());
         return fileUrl;
+    }
+
+    public List<PresignedUrlResponse> generatePresignedUrls(String contentType, int count) {
+        Date expiration = new Date(System.currentTimeMillis() + 10 * 60 * 1000L); // 10분
+
+        return IntStream.range(0, count)
+                .mapToObj(i -> {
+                    String fileName = createFileNameForPresigned(contentType);
+                    GeneratePresignedUrlRequest request = new GeneratePresignedUrlRequest(bucket, fileName)
+                            .withMethod(HttpMethod.PUT)
+                            .withContentType(contentType)
+                            .withExpiration(expiration);
+                    String presignedUrl = amazonS3Client.generatePresignedUrl(request).toString();
+                    return new PresignedUrlResponse(presignedUrl, getFileUrl(fileName));
+                })
+                .toList();
     }
 
     public void deleteImageFileFromS3(String imageUrl) {
@@ -108,13 +130,22 @@ public class FileUploadService {
 
     private String createFileName(MultipartFile file) {
         String originalFilename = file.getOriginalFilename();
-        String extension = originalFilename.substring(originalFilename.lastIndexOf(".")); // 확장자 추출
+        String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
 
-        String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd")); // 날짜 기반 폴더
-        String randomFileName = UUID.randomUUID().toString(); // 랜덤 UUID
+        String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
+        return "image/" + datePath + "/" + UUID.randomUUID() + extension;
+    }
 
-        // 예: image/YYYY/MM/DD/랜덤값.png
-        return "image/" + datePath + "/" + randomFileName + extension;
+    private String createFileNameForPresigned(String contentType) {
+        String extension = switch (contentType) {
+            case "image/png" -> ".png";
+            case "image/gif" -> ".gif";
+            case "image/webp" -> ".webp";
+            case "image/heic", "image/heif" -> ".heic";
+            default -> ".jpg"; // image/jpeg, image/jpg, application/octet-stream 등
+        };
+        String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
+        return "image/" + datePath + "/" + UUID.randomUUID() + extension;
     }
 
 
