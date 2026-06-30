@@ -55,6 +55,12 @@ public class UserController {
         return CommonResponse.success(userService.updateProfileImage(userId, profileImage));
     }
 
+    @PatchMapping(value = "/me/profile-image-url", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public CommonResponse<UserResponseDto> updateProfileImageByUrl(@RequestBody ProfileImageUrlRequest request) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return CommonResponse.success(userService.updateProfileImageByUrl(userId, request.profileImageUrl()));
+    }
+
     @DeleteMapping("/me/profile-image")
     public CommonResponse<UserResponseDto> deleteProfileImage() {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -67,4 +73,6 @@ public class UserController {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         userService.deleteUserById(userId);
     }
+
+    public record ProfileImageUrlRequest(String profileImageUrl) {}
 }

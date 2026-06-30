@@ -82,7 +82,7 @@ public final class StudyRoomDtos {
                                     Integer groupCurrent) {
     }
 
-    public record ChallengeMemberProgressResponse(Long userId, String name, int current, boolean cleared) {
+    public record ChallengeMemberProgressResponse(Long userId, String name, String profileImageUrl, int current, boolean cleared) {
     }
 
     public record SharedProblemResponse(Long sharedProblemId, Long sharedByUserId, String sharedByName,
@@ -105,8 +105,8 @@ public final class StudyRoomDtos {
     }
 
     public record WeeklyReportResponse(Long reportId, LocalDate weekStart, LocalDate weekEnd,
-                                       String topMemberName, Integer topMemberProblemCount,
-                                       String longestStreakName, Integer longestStreakDays,
+                                       String topMemberName, String topMemberProfileImageUrl, Integer topMemberProblemCount,
+                                       String longestStreakName, String longestStreakProfileImageUrl, Integer longestStreakDays,
                                        Integer totalProblems, Integer challengesCompleted,
                                        String cheerMessage, boolean isRead) {
     }

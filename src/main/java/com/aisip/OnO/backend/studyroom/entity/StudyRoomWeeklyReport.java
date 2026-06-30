@@ -41,6 +41,12 @@ public class StudyRoomWeeklyReport extends BaseEntity {
     @Column(name = "longest_streak_days", nullable = false)
     private Integer longestStreakDays;
 
+    @Column(name = "top_member_profile_image_url", length = 512)
+    private String topMemberProfileImageUrl;
+
+    @Column(name = "longest_streak_profile_image_url", length = 512)
+    private String longestStreakProfileImageUrl;
+
     @Column(name = "total_problems", nullable = false)
     private Integer totalProblems;
 
@@ -51,16 +57,20 @@ public class StudyRoomWeeklyReport extends BaseEntity {
     private String cheerMessage;
 
     public static StudyRoomWeeklyReport create(StudyRoom room, LocalDate weekStart, LocalDate weekEnd,
-                                               String topMemberName, int topMemberProblemCount,
-                                               String longestStreakName, int longestStreakDays,
+                                               String topMemberName, String topMemberProfileImageUrl,
+                                               int topMemberProblemCount,
+                                               String longestStreakName, String longestStreakProfileImageUrl,
+                                               int longestStreakDays,
                                                int totalProblems, int challengesCompleted, String cheerMessage) {
         return StudyRoomWeeklyReport.builder()
                 .room(room)
                 .weekStart(weekStart)
                 .weekEnd(weekEnd)
                 .topMemberName(topMemberName)
+                .topMemberProfileImageUrl(topMemberProfileImageUrl)
                 .topMemberProblemCount(topMemberProblemCount)
                 .longestStreakName(longestStreakName)
+                .longestStreakProfileImageUrl(longestStreakProfileImageUrl)
                 .longestStreakDays(longestStreakDays)
                 .totalProblems(totalProblems)
                 .challengesCompleted(challengesCompleted)

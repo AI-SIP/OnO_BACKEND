@@ -108,7 +108,7 @@ public class StudyRoomChallengeService {
                     int current = metricValue(challenge.getMetric(), stats.get(member.getUser().getId()),
                             attendanceDays.getOrDefault(member.getUser().getId(), 0));
                     return new ChallengeMemberProgressResponse(member.getUser().getId(), member.getUser().getName(),
-                            current, current >= challenge.getTargetValue());
+                            member.getUser().getProfileImageUrl(), current, current >= challenge.getTargetValue());
                 })
                 .toList();
         Integer groupCurrent = challenge.getType() == StudyRoomChallengeType.GROUP

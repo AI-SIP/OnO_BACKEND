@@ -172,6 +172,16 @@ public class UserService {
     }
 
     @Transactional
+    public UserResponseDto updateProfileImageByUrl(Long userId, String imageUrl) {
+        fileUploadService.validateS3Url(imageUrl);
+        User user = findUserEntity(userId);
+        String previousProfileImageUrl = user.getProfileImageUrl();
+        user.updateProfileImageUrl(imageUrl);
+        deleteImageAsync(previousProfileImageUrl, userId);
+        return UserResponseDto.from(user);
+    }
+
+    @Transactional
     public UserResponseDto deleteProfileImage(Long userId) {
         User user = findUserEntity(userId);
         String previousProfileImageUrl = user.getProfileImageUrl();
