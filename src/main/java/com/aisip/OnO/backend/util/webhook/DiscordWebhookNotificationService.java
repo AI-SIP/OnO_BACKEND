@@ -1,13 +1,9 @@
 package com.aisip.OnO.backend.util.webhook;
 
+import com.aisip.OnO.backend.config.rabbitmq.producer.DiscordWebhookProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -20,12 +16,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class DiscordWebhookNotificationService {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final DiscordWebhookProducer discordWebhookProducer;
     private final Map<String, Instant> lastSentAtByDedupKey = new ConcurrentHashMap<>();
     private static final Duration ERROR_NOTIFICATION_DEDUP_WINDOW = Duration.ofMinutes(5);
-
-    @Value("${discord.webhook-url}")
-    private String webhookUrl;
 
     /**
      * 에러 발생 시 Discord로 알림 전송
@@ -51,7 +44,7 @@ public class DiscordWebhookNotificationService {
                 )
         );
 
-        sendToDiscord(new DiscordWebhookPayload(null, List.of(embed)), dedupKey);
+        publishToQueue(new DiscordWebhookPayload(null, List.of(embed)), dedupKey);
     }
 
     /**
@@ -67,7 +60,7 @@ public class DiscordWebhookNotificationService {
                 List.of()
         );
 
-        sendToDiscord(new DiscordWebhookPayload(null, List.of(embed)));
+        publishToQueue(new DiscordWebhookPayload(null, List.of(embed)));
     }
 
     /**
@@ -89,33 +82,21 @@ public class DiscordWebhookNotificationService {
                 fields
         );
 
-        sendToDiscord(new DiscordWebhookPayload(null, List.of(embed)), dedupKey);
+        publishToQueue(new DiscordWebhookPayload(null, List.of(embed)), dedupKey);
     }
 
     /**
-     * Discord Webhook으로 메시지 전송 (내부 메서드)
+     * RabbitMQ를 통해 Discord Webhook 메시지를 비동기 전송합니다.
      */
-    private void sendToDiscord(DiscordWebhookPayload payload) {
-        sendToDiscord(payload, null);
+    private void publishToQueue(DiscordWebhookPayload payload, String dedupKey) {
+        discordWebhookProducer.send(payload, dedupKey);
+        if (dedupKey != null) {
+            lastSentAtByDedupKey.put(dedupKey, Instant.now());
+        }
     }
 
-    private void sendToDiscord(DiscordWebhookPayload payload, String dedupKey) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        try {
-            restTemplate.postForEntity(
-                    webhookUrl,
-                    new HttpEntity<>(payload, headers),
-                    String.class
-            );
-            if (dedupKey != null) {
-                lastSentAtByDedupKey.put(dedupKey, Instant.now());
-            }
-            log.info("Discord webhook 전송 완료: {}", payload.embeds().get(0).title());
-        } catch (Exception e) {
-            log.error("Discord webhook 전송 실패: {}", e.getMessage(), e);
-        }
+    private void publishToQueue(DiscordWebhookPayload payload) {
+        publishToQueue(payload, null);
     }
 
     private boolean shouldSuppress(String dedupKey) {
