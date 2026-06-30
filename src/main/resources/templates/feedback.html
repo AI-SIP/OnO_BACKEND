@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OnO 사용자 피드백</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --brand:    #1cba1a;
+      --brand-dk: #0f9a0d;
+      --brand-bg: #f0fdf4;
+      --brand-light: #dcfce7;
+      --t1: #1d1d1f;
+      --t2: #6e6e73;
+      --t3: #86868b;
+      --line: #d2d2d7;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Noto Sans KR", -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f9fafb;
+      color: var(--t1);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── 칩 공통 ── */
+    .chip-wrap { position: relative; display: inline-block; }
+    .chip-wrap input { position: absolute; opacity: 0; width: 0; height: 0; }
+
+    .option-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border: 1.5px solid var(--line);
+      border-radius: 9999px;
+      padding: 7px 16px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s, color .15s;
+      background: #fff;
+      font-size: .875rem;
+      color: var(--t2);
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .chip-wrap:hover .option-chip {
+      border-color: var(--brand);
+      color: var(--brand);
+    }
+
+    .chip-wrap input:checked + .option-chip {
+      background: var(--brand);
+      border-color: var(--brand);
+      color: #fff;
+    }
+
+    /* ── 기타 텍스트 입력 ── */
+    .other-text-input {
+      display: none;
+      margin-top: 10px;
+      width: 100%;
+      border: 1.5px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: .875rem;
+      color: var(--t1);
+      font-family: inherit;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .other-text-input:focus { border-color: var(--brand); }
+    .other-text-input.visible { display: block; }
+
+    /* ── 슬라이더 ── */
+    input[type="range"] { accent-color: var(--brand); }
+
+    /* ── 5점 척도 row ── */
+    .scale-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .scale-label {
+      font-size: .75rem;
+      color: var(--t3);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .scale-chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: nowrap;
+    }
+    .scale-chips .option-chip {
+      padding: 7px 14px;
+      min-width: 44px;
+      justify-content: center;
+    }
+
+    /* ── 섹션 카드 ── */
+    .section-card {
+      background: #fff;
+      border-radius: 20px;
+      border: 1px solid #f0f0f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+      padding: 28px 24px;
+      margin-bottom: 20px;
+    }
+
+    /* ── 섹션 번호 배지 ── */
+    .section-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px; height: 28px;
+      border-radius: 9999px;
+      background: var(--brand-light);
+      color: #166534;
+      font-size: .8rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* ── 질문 제목 ── */
+    .q-label {
+      font-size: .9rem;
+      font-weight: 600;
+      color: var(--t1);
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+    .q-hint {
+      font-weight: 400;
+      color: var(--t3);
+      font-size: .8rem;
+    }
+
+    /* ── 조건부 블록 ── */
+    .conditional-block {
+      display: none;
+      margin-top: 16px;
+      padding: 16px;
+      background: var(--brand-bg);
+      border-radius: 12px;
+      border: 1px solid var(--brand-light);
+    }
+    .conditional-block.visible { display: block; }
+
+    /* ── 텍스트에어리어 ── */
+    .feedback-textarea {
+      width: 100%;
+      border: 1.5px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: .875rem;
+      color: var(--t1);
+      font-family: inherit;
+      resize: none;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .feedback-textarea:focus { border-color: var(--brand); }
+    .feedback-textarea::placeholder { color: var(--t3); }
+
+    /* ── 익명 뱃지 ── */
+    .anon-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--brand-light);
+      color: #166534;
+      font-size: .78rem;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 9999px;
+    }
+
+    /* ── 제출 버튼 ── */
+    .submit-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: var(--brand);
+      color: #fff;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 14px 40px;
+      border-radius: 16px;
+      border: none;
+      cursor: pointer;
+      transition: background .2s, transform .1s;
+      font-family: inherit;
+      box-shadow: 0 4px 14px rgba(28,186,26,.3);
+    }
+    .submit-btn:hover { background: var(--brand-dk); }
+    .submit-btn:active { transform: scale(.98); }
+
+    @media (max-width: 480px) {
+      .section-card { padding: 20px 16px; }
+      .scale-chips .option-chip { padding: 7px 10px; min-width: 38px; font-size: .8rem; }
+      .scale-label { font-size: .7rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header style="background:#fff; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:100;">
+    <div style="max-width:640px; margin:0 auto; padding:0 16px; height:52px; display:flex; align-items:center;">
+      <span style="font-size:1.3rem; font-weight:700; color:var(--brand); letter-spacing:-.02em;">OnO</span>
+    </div>
+  </header>
+
+  <main style="max-width:640px; margin:0 auto; padding:28px 16px 80px;">
+
+    <!-- Intro -->
+    <div style="text-align:center; margin-bottom:32px;">
+      <div class="anon-badge" style="margin-bottom:14px;">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+        익명으로 제출됩니다
+      </div>
+      <h1 style="font-size:clamp(1.5rem,4vw,2rem); font-weight:700; color:var(--t1); margin-bottom:10px; letter-spacing:-.03em; line-height:1.3;">
+        OnO를 더 좋게 만들어 주세요 ✏️
+      </h1>
+      <p style="font-size:.9rem; color:var(--t2); line-height:1.7;">
+        모든 질문은 선택 사항입니다.<br>
+        소중한 의견은 서비스 개선에만 활용됩니다.
+      </p>
+    </div>
+
+    <form th:action="@{/feedback}" method="post">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" th:if="${_csrf != null}">
+
+      <!-- =========================================================
+           섹션 1: 만족도 & 사용 패턴
+           ========================================================= -->
+      <div class="section-card">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:24px;">
+          <span class="section-badge">1</span>
+          <span style="font-size:.95rem; font-weight:700; color:var(--t1);">만족도 &amp; 사용 패턴</span>
+        </div>
+
+        <!-- Q1: 사용 목적 -->
+        <div style="margin-bottom:24px;">
+          <p class="q-label">OnO를 주로 어떤 목적으로 사용하나요? <span class="q-hint">(복수 선택 가능)</span></p>
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <label class="chip-wrap">
+              <input type="checkbox" name="usagePurpose" value="수능">
+              <span class="option-chip">수능</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="checkbox" name="usagePurpose" value="내신">
+              <span class="option-chip">내신</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="checkbox" name="usagePurpose" value="공무원">
+              <span class="option-chip">공무원</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="checkbox" name="usagePurpose" value="자격증">
+              <span class="option-chip">자격증</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="checkbox" name="usagePurpose" value="기타"
+                     onchange="toggleCheckboxOther(this, 'usagePurposeOther')">
+              <span class="option-chip">기타</span>
+            </label>
+          </div>
+          <input type="text" id="usagePurposeOther" name="usagePurposeOther"
+                 class="other-text-input" placeholder="어떤 목적인지 알려주세요" maxlength="100">
+        </div>
+
+        <!-- Q2: 사용 빈도 -->
+        <div style="margin-bottom:24px;">
+          <p class="q-label">얼마나 자주 앱을 사용하나요?</p>
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <label class="chip-wrap">
+              <input type="radio" name="usageFrequency" value="매일">
+              <span class="option-chip">매일</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="radio" name="usageFrequency" value="주 3~4회">
+              <span class="option-chip">주 3~4회</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="radio" name="usageFrequency" value="주 1~2회">
+              <span class="option-chip">주 1~2회</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="radio" name="usageFrequency" value="가끔">
+              <span class="option-chip">가끔</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Q3: NPS -->
+        <div>
+          <p class="q-label">OnO를 친구에게 추천할 의향은?
+            <span class="q-hint">(0 = 전혀 아니다 · 10 = 강력 추천)</span>
+          </p>
+          <div style="padding:0 4px; margin-top:8px;">
+            <input type="range" id="npsRange" name="npsScore" min="0" max="10" value="7"
+                   style="width:100%; height:6px; border-radius:9999px;"
+                   oninput="document.getElementById('npsValue').textContent = this.value">
+            <div style="display:flex; justify-content:space-between; font-size:.75rem; color:var(--t3); margin-top:4px;">
+              <span>0</span><span>5</span><span>10</span>
+            </div>
+            <div style="text-align:center; margin-top:10px;">
+              <span id="npsValue"
+                    style="display:inline-flex; align-items:center; justify-content:center;
+                           width:44px; height:44px; border-radius:9999px;
+                           background:var(--brand); color:#fff;
+                           font-size:1.2rem; font-weight:700;">7</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           섹션 2: 오답 등록 & 관리
+           ========================================================= -->
+      <div class="section-card">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:24px;">
+          <span class="section-badge">2</span>
+          <span style="font-size:.95rem; font-weight:700; color:var(--t1);">오답 등록 &amp; 관리</span>
+        </div>
+
+        <!-- Q4: 불편 사항 -->
+        <div style="margin-bottom:24px;">
+          <p class="q-label">문제를 등록하거나 조회할 때 가장 불편한 점은? <span class="q-hint">(복수 선택 가능)</span></p>
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <label class="chip-wrap">
+              <input type="checkbox" name="registrationPainPoints" value="사진 촬영·편집이 번거롭다">
+              <span class="option-chip">사진 촬영·편집이 번거롭다</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="checkbox" name="registrationPainPoints" value="이미지 인식이 느리다">
+              <span class="option-chip">이미지 인식이 느리다</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="checkbox" name="registrationPainPoints" value="태그·폴더 분류가 복잡하다">
+              <span class="option-chip">태그·폴더 분류가 복잡하다</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="checkbox" name="registrationPainPoints" value="오답노트 조회·탐색이 불편하다">
+              <span class="option-chip">오답노트 조회·탐색이 불편하다</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="checkbox" name="registrationPainPoints" value="기타"
+                     onchange="toggleCheckboxOther(this, 'registrationPainPointsOther')">
+              <span class="option-chip">기타</span>
+            </label>
+          </div>
+          <input type="text" id="registrationPainPointsOther" name="registrationPainPointsOther"
+                 class="other-text-input" placeholder="불편한 점을 알려주세요" maxlength="100">
+        </div>
+
+        <!-- Q5: 분류 방식 -->
+        <div style="margin-bottom:24px;">
+          <p class="q-label">폴더와 태그 중 어떤 방식으로 주로 문제를 분류하나요?</p>
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <label class="chip-wrap">
+              <input type="radio" name="classificationMethod" value="폴더 위주">
+              <span class="option-chip">폴더 위주</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="radio" name="classificationMethod" value="태그 위주">
+              <span class="option-chip">태그 위주</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="radio" name="classificationMethod" value="둘 다 사용">
+              <span class="option-chip">둘 다 사용</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="radio" name="classificationMethod" value="분류 안 함">
+              <span class="option-chip">분류 안 함</span>
+            </label>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- =========================================================
+           섹션 3: 복습 세트
+           ========================================================= -->
+      <div class="section-card">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:24px;">
+          <span class="section-badge">3</span>
+          <span style="font-size:.95rem; font-weight:700; color:var(--t1);">복습 세트</span>
+        </div>
+
+        <!-- 복습 세트 사용 여부 -->
+        <div>
+          <p class="q-label">복습 세트를 사용하고 있나요?</p>
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <label class="chip-wrap">
+              <input type="radio" name="practiceNoteUsed" value="true" id="reviewSetYes"
+                     onchange="onReviewSetChange(true)">
+              <span class="option-chip">네, 사용 중이에요</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="radio" name="practiceNoteUsed" value="false" id="reviewSetNo"
+                     onchange="onReviewSetChange(false)">
+              <span class="option-chip">사용하지 않아요</span>
+            </label>
+          </div>
+
+          <!-- 사용 중 → 알림 질문 -->
+          <div id="reviewSetUsedBlock" class="conditional-block">
+            <p class="q-label" style="margin-bottom:10px;">복습 알림을 받으면 실제로 복습하게 되나요?</p>
+            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+              <label class="chip-wrap">
+                <input type="radio" name="notificationEffectiveness" value="항상">
+                <span class="option-chip">항상</span>
+              </label>
+              <label class="chip-wrap">
+                <input type="radio" name="notificationEffectiveness" value="가끔">
+                <span class="option-chip">가끔</span>
+              </label>
+              <label class="chip-wrap">
+                <input type="radio" name="notificationEffectiveness" value="거의 안 함">
+                <span class="option-chip">거의 안 함</span>
+              </label>
+              <label class="chip-wrap">
+                <input type="radio" name="notificationEffectiveness" value="알림을 꺼뒀다">
+                <span class="option-chip">알림을 꺼뒀다</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 사용 안 함 → 미사용 이유 -->
+          <div id="reviewSetNotUsedBlock" class="conditional-block">
+            <p class="q-label" style="margin-bottom:10px;">왜 사용하지 않나요? <span class="q-hint">(복수 선택 가능)</span></p>
+            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+              <label class="chip-wrap">
+                <input type="checkbox" name="reviewSetNonUsageReason" value="어떻게 사용하는지 몰라서">
+                <span class="option-chip">어떻게 사용하는지 몰라서</span>
+              </label>
+              <label class="chip-wrap">
+                <input type="checkbox" name="reviewSetNonUsageReason" value="필요성을 못 느껴서">
+                <span class="option-chip">필요성을 못 느껴서</span>
+              </label>
+              <label class="chip-wrap">
+                <input type="checkbox" name="reviewSetNonUsageReason" value="복습 알림이 번거로워서">
+                <span class="option-chip">복습 알림이 번거로워서</span>
+              </label>
+              <label class="chip-wrap">
+                <input type="checkbox" name="reviewSetNonUsageReason" value="기타"
+                       onchange="toggleCheckboxOther(this, 'reviewSetReasonOther')">
+                <span class="option-chip">기타</span>
+              </label>
+            </div>
+            <input type="text" id="reviewSetReasonOther" name="reviewSetNonUsageReasonOther"
+                   class="other-text-input" placeholder="이유를 알려주세요" maxlength="100">
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           섹션 4: 소셜 & 스터디룸
+           ========================================================= -->
+      <div class="section-card">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:24px;">
+          <span class="section-badge">4</span>
+          <span style="font-size:.95rem; font-weight:700; color:var(--t1);">소셜 &amp; 스터디룸</span>
+        </div>
+
+        <!-- 스터디룸 사용 여부 -->
+        <div>
+          <p class="q-label">스터디룸을 사용하고 있나요?</p>
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <label class="chip-wrap">
+              <input type="radio" name="studyRoomUsage" value="사용 중" id="studyRoomYes"
+                     onchange="onStudyRoomChange(true)">
+              <span class="option-chip">네, 사용 중이에요</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="radio" name="studyRoomUsage" value="사용하지 않음" id="studyRoomNo"
+                     onchange="onStudyRoomChange(false)">
+              <span class="option-chip">사용하지 않아요</span>
+            </label>
+          </div>
+
+          <!-- 사용 중 → Q11, Q12 -->
+          <div id="studyRoomUsedBlock" class="conditional-block">
+            <!-- Q11: 챌린지 동기 부여 -->
+            <div style="margin-bottom:18px;">
+              <p class="q-label" style="margin-bottom:10px;">챌린지 기능이 실제 학습 동기 부여에 도움이 되나요?</p>
+              <div class="scale-row">
+                <span class="scale-label">전혀 도움 안 됨</span>
+                <div class="scale-chips">
+                  <label class="chip-wrap" th:each="i : ${#numbers.sequence(1, 5)}">
+                    <input type="radio" name="challengeMotivation" th:value="${i}">
+                    <span class="option-chip" th:text="${i}">1</span>
+                  </label>
+                </div>
+                <span class="scale-label">매우 도움 됨</span>
+              </div>
+            </div>
+
+            <!-- Q12: 오답 공유 유용도 -->
+            <div>
+              <p class="q-label" style="margin-bottom:10px;">다른 사람의 오답 문제를 공유받는 기능이 유용한가요?</p>
+              <div class="scale-row">
+                <span class="scale-label">전혀 유용하지 않다</span>
+                <div class="scale-chips">
+                  <label class="chip-wrap" th:each="i : ${#numbers.sequence(1, 5)}">
+                    <input type="radio" name="problemSharingUsefulness" th:value="${i}">
+                    <span class="option-chip" th:text="${i}">1</span>
+                  </label>
+                </div>
+                <span class="scale-label">매우 유용하다</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 사용 안 함 → 미사용 이유 -->
+          <div id="studyRoomNotUsedBlock" class="conditional-block">
+            <p class="q-label" style="margin-bottom:10px;">왜 사용하지 않나요? <span class="q-hint">(복수 선택 가능)</span></p>
+            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+              <label class="chip-wrap">
+                <input type="checkbox" name="studyRoomNonUsageReason" value="혼자 공부가 편해서">
+                <span class="option-chip">혼자 공부가 편해서</span>
+              </label>
+              <label class="chip-wrap">
+                <input type="checkbox" name="studyRoomNonUsageReason" value="같이 공부할 친구가 없어서">
+                <span class="option-chip">같이 공부할 친구가 없어서</span>
+              </label>
+              <label class="chip-wrap">
+                <input type="checkbox" name="studyRoomNonUsageReason" value="기능을 몰랐다">
+                <span class="option-chip">기능을 몰랐다</span>
+              </label>
+              <label class="chip-wrap">
+                <input type="checkbox" name="studyRoomNonUsageReason" value="기타"
+                       onchange="toggleCheckboxOther(this, 'studyRoomReasonOther')">
+                <span class="option-chip">기타</span>
+              </label>
+            </div>
+            <input type="text" id="studyRoomReasonOther" name="studyRoomNonUsageReasonOther"
+                   class="other-text-input" placeholder="이유를 알려주세요" maxlength="100">
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================
+           섹션 5: 개선 요청 & 자유 의견
+           ========================================================= -->
+      <div class="section-card">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:24px;">
+          <span class="section-badge">5</span>
+          <span style="font-size:.95rem; font-weight:700; color:var(--t1);">개선 요청 &amp; 자유 의견</span>
+        </div>
+
+        <!-- Q13: 자주 쓰는 기능 -->
+        <div style="margin-bottom:24px;">
+          <p class="q-label">가장 자주 쓰는 기능은 무엇인가요?</p>
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <label class="chip-wrap">
+              <input type="radio" name="mostUsedFeature" value="오답 등록">
+              <span class="option-chip">오답 등록</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="radio" name="mostUsedFeature" value="복습 세트">
+              <span class="option-chip">복습 세트</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="radio" name="mostUsedFeature" value="스터디룸">
+              <span class="option-chip">스터디룸</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="radio" name="mostUsedFeature" value="성취 카드 공유">
+              <span class="option-chip">성취 카드 공유</span>
+            </label>
+            <label class="chip-wrap">
+              <input type="radio" name="mostUsedFeature" value="학습 달력">
+              <span class="option-chip">학습 달력</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Q14: 불편한 점 -->
+        <div style="margin-bottom:20px;">
+          <label class="q-label" for="painPoints" style="display:block;">
+            지금 당장 없애고 싶은 불편함이 있다면?
+          </label>
+          <textarea id="painPoints" name="painPoints" rows="3" class="feedback-textarea"
+                    placeholder="불편하거나 개선이 필요한 점을 자유롭게 적어주세요" maxlength="500"></textarea>
+        </div>
+
+        <!-- Q15: 원하는 기능 -->
+        <div>
+          <label class="q-label" for="desiredFeatures" style="display:block;">
+            OnO에 꼭 추가됐으면 하는 기능이 있다면?
+          </label>
+          <textarea id="desiredFeatures" name="desiredFeatures" rows="3" class="feedback-textarea"
+                    placeholder="있으면 좋겠다 싶은 기능을 알려주세요" maxlength="500"></textarea>
+        </div>
+      </div>
+
+      <!-- 제출 -->
+      <div style="text-align:center; padding-top:8px;">
+        <button type="submit" class="submit-btn" style="width:100%; max-width:360px;">
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+          </svg>
+          피드백 제출하기
+        </button>
+        <p style="font-size:.78rem; color:var(--t3); margin-top:10px;">
+          제출 후에는 수정이 불가합니다 · 익명으로 처리됩니다
+        </p>
+      </div>
+    </form>
+  </main>
+
+  <script>
+    // ── 복수선택 "기타" 체크박스 ──
+    function toggleCheckboxOther(checkbox, inputId) {
+      const input = document.getElementById(inputId);
+      if (checkbox.checked) {
+        input.classList.add('visible');
+        input.focus();
+      } else {
+        input.classList.remove('visible');
+        input.value = '';
+      }
+    }
+
+    // ── 복습 세트 사용 여부 토글 ──
+    function onReviewSetChange(used) {
+      const usedBlock    = document.getElementById('reviewSetUsedBlock');
+      const notUsedBlock = document.getElementById('reviewSetNotUsedBlock');
+      if (used) {
+        usedBlock.classList.add('visible');
+        notUsedBlock.classList.remove('visible');
+        clearGroup('reviewSetNonUsageReason');
+        hideOtherInput('reviewSetReasonOther');
+      } else {
+        usedBlock.classList.remove('visible');
+        notUsedBlock.classList.add('visible');
+        clearGroup('notificationEffectiveness');
+      }
+    }
+
+    // ── 스터디룸 사용 여부 토글 ──
+    function onStudyRoomChange(used) {
+      const usedBlock    = document.getElementById('studyRoomUsedBlock');
+      const notUsedBlock = document.getElementById('studyRoomNotUsedBlock');
+      if (used) {
+        usedBlock.classList.add('visible');
+        notUsedBlock.classList.remove('visible');
+        clearGroup('studyRoomNonUsageReason');
+        hideOtherInput('studyRoomReasonOther');
+      } else {
+        usedBlock.classList.remove('visible');
+        notUsedBlock.classList.add('visible');
+        clearGroup('challengeMotivation');
+        clearGroup('problemSharingUsefulness');
+      }
+    }
+
+    function clearGroup(name) {
+      document.querySelectorAll(`input[name="${name}"]`)
+        .forEach(el => el.checked = false);
+    }
+
+    function hideOtherInput(inputId) {
+      const el = document.getElementById(inputId);
+      if (el) { el.classList.remove('visible'); el.value = ''; }
+    }
+  </script>
+</body>
+</html>

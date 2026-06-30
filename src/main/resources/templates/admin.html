@@ -95,6 +95,24 @@
         </div>
       </a>
 
+      <!-- Study Room Card -->
+      <a th:href="@{/admin/study-rooms}" class="block group">
+        <div class="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 p-6 border-l-4 border-teal-500">
+          <div class="flex items-center justify-between mb-4">
+            <div class="p-3 bg-teal-100 rounded-full">
+              <svg class="w-8 h-8 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path>
+              </svg>
+            </div>
+            <svg class="w-6 h-6 text-gray-400 group-hover:text-teal-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-800 mb-2">스터디룸 관리</h3>
+          <p class="text-gray-600 text-sm">스터디룸 목록 조회</p>
+        </div>
+      </a>
+
       <!-- Analytics Card -->
       <a th:href="@{/admin/analysis}" class="block group">
         <div class="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 p-6 border-l-4 border-purple-500">
@@ -112,25 +130,24 @@
           <p class="text-gray-600 text-sm">시스템 통계 및 인사이트 보기</p>
         </div>
       </a>
-    </div>
 
-    <!-- Quick Stats -->
-    <div class="mt-12 bg-white rounded-lg shadow-md p-6">
-      <h3 class="text-lg font-semibold text-gray-800 mb-4">빠른 이동</h3>
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <a th:href="@{/admin/users(page=0)}" class="text-center p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-          <p class="text-sm text-gray-600">최신 유저 목록 보기</p>
-        </a>
-        <a th:href="@{/admin/problems(page=0)}" class="text-center p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-          <p class="text-sm text-gray-600">최신 문제 목록 보기</p>
-        </a>
-        <a th:href="@{/admin/practice-logs}" class="text-center p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-          <p class="text-sm text-gray-600">복습 기록 보기</p>
-        </a>
-        <a th:href="@{/admin/analysis}" class="text-center p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-          <p class="text-sm text-gray-600">통계 보기</p>
-        </a>
-      </div>
+      <!-- Feedback Card -->
+      <a th:href="@{/admin/feedbacks}" class="block group">
+        <div class="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 p-6 border-l-4 border-yellow-500">
+          <div class="flex items-center justify-between mb-4">
+            <div class="p-3 bg-yellow-100 rounded-full">
+              <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+              </svg>
+            </div>
+            <svg class="w-6 h-6 text-gray-400 group-hover:text-yellow-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </div>
+          <h3 class="text-xl font-semibold text-gray-800 mb-2">유저 피드백</h3>
+          <p class="text-gray-600 text-sm">설문 응답 목록 및 NPS 확인</p>
+        </div>
+      </a>
     </div>
   </div>
 </body>

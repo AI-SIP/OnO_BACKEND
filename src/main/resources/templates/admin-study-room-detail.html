@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title th:text="|스터디룸 상세 — ${room.name}|">스터디룸 상세 — OnO Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-white shadow-sm sticky top-0 z-10">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-3">
+      <a th:href="@{/admin/study-rooms}" class="text-gray-400 hover:text-gray-600 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+      </a>
+      <h1 class="text-xl font-bold text-gray-900" th:text="${room.name}">스터디룸 이름</h1>
+      <span class="text-sm text-gray-400">#<span th:text="${room.id}"></span></span>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+    <!-- 기본 정보 -->
+    <section class="bg-white rounded-lg shadow p-6">
+      <h2 class="text-base font-semibold text-gray-700 mb-4 flex items-center gap-2">
+        <span class="w-1 h-5 bg-teal-500 rounded-full inline-block"></span>기본 정보
+      </h2>
+      <dl class="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6 text-sm">
+        <div>
+          <dt class="text-gray-500 mb-0.5">룸 ID</dt>
+          <dd class="font-medium text-gray-900" th:text="${room.id}"></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500 mb-0.5">방장 ID</dt>
+          <dd class="font-medium text-gray-900" th:text="${room.hostUserId}"></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500 mb-0.5">생성일</dt>
+          <dd class="font-medium text-gray-900"
+              th:text="${#temporals.format(room.createdAt, 'yyyy-MM-dd HH:mm')}"></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500 mb-0.5">전체 멤버</dt>
+          <dd class="font-medium text-gray-900" th:text="${#lists.size(room.members)} + '명'"></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500 mb-0.5">공유 문제 수</dt>
+          <dd class="font-medium text-gray-900" th:text="${room.sharedProblemCount} + '개'"></dd>
+        </div>
+        <div>
+          <dt class="text-gray-500 mb-0.5">전체 챌린지</dt>
+          <dd class="font-medium text-gray-900" th:text="${#lists.size(room.challenges)} + '개'"></dd>
+        </div>
+      </dl>
+    </section>
+
+    <!-- 멤버 목록 -->
+    <section class="bg-white rounded-lg shadow overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+        <span class="w-1 h-5 bg-teal-500 rounded-full inline-block"></span>
+        <h2 class="text-base font-semibold text-gray-700">멤버 목록</h2>
+        <span class="ml-auto text-sm text-gray-400" th:text="${#lists.size(room.members)} + '명'"></span>
+      </div>
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">유저 ID</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">이름</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">역할</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">참여일</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          <tr th:each="m : ${room.members}" class="hover:bg-gray-50 transition-colors">
+            <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500" th:text="${m.userId}"></td>
+            <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900" th:text="${m.userName}"></td>
+            <td class="px-6 py-3 whitespace-nowrap text-sm">
+              <span th:if="${m.role == '방장'}"
+                    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-800">방장</span>
+              <span th:if="${m.role != '방장'}"
+                    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">멤버</span>
+            </td>
+            <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500"
+                th:text="${#temporals.format(m.joinedAt, 'yyyy-MM-dd HH:mm')}"></td>
+          </tr>
+          <tr th:if="${#lists.isEmpty(room.members)}">
+            <td colspan="4" class="px-6 py-8 text-center text-gray-400 text-sm">멤버가 없습니다.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 챌린지 목록 -->
+    <section class="bg-white rounded-lg shadow overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+        <span class="w-1 h-5 bg-teal-500 rounded-full inline-block"></span>
+        <h2 class="text-base font-semibold text-gray-700">챌린지 목록</h2>
+        <span class="ml-auto text-sm text-gray-400" th:text="${#lists.size(room.challenges)} + '개'"></span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">제목</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">유형</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">지표</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">목표</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">기간</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <tr th:each="c : ${room.challenges}" class="hover:bg-gray-50 transition-colors">
+              <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500" th:text="${c.id}"></td>
+              <td class="px-6 py-3 text-sm font-medium text-gray-900" th:text="${c.title}"></td>
+              <td class="px-6 py-3 whitespace-nowrap text-sm">
+                <span th:text="${c.type}"
+                      th:classappend="${c.type == '개인'} ? 'bg-blue-100 text-blue-700' : (${c.type == '그룹'} ? 'bg-indigo-100 text-indigo-700' : 'bg-orange-100 text-orange-700')"
+                      class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"></span>
+              </td>
+              <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-600" th:text="${c.metric}"></td>
+              <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-700 font-medium" th:text="${c.targetValue}"></td>
+              <td class="px-6 py-3 whitespace-nowrap text-sm">
+                <span th:text="${c.status}"
+                      th:classappend="${c.status == '진행 중'} ? 'bg-green-100 text-green-700' : (${c.status == '완료'} ? 'bg-blue-100 text-blue-700' : (${c.status == '실패'} ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'))"
+                      class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"></span>
+              </td>
+              <td class="px-6 py-3 whitespace-nowrap text-xs text-gray-500">
+                <span th:text="${#temporals.format(c.startAt, 'MM/dd')}"></span>
+                ~
+                <span th:text="${#temporals.format(c.endAt, 'MM/dd')}"></span>
+              </td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(room.challenges)}">
+              <td colspan="7" class="px-6 py-8 text-center text-gray-400 text-sm">챌린지가 없습니다.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>

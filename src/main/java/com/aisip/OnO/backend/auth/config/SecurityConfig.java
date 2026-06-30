@@ -95,7 +95,9 @@ public class SecurityConfig {
                                         "/grafana",
                                         "/grafana/**",
                                         "/prometheus",
-                                        "/prometheus/**"
+                                        "/prometheus/**",
+                                        "/feedback",
+                                        "/feedback/**"
                                 ).permitAll()
                                 .requestMatchers("/api/auth/logout").hasAnyRole("GUEST", "MEMBER", "ADMIN")
                                 .requestMatchers("/api/auth/**").permitAll()
