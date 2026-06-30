@@ -1,0 +1,7 @@
+interface:
+  display_name: "OnO Plan"
+  short_description: "OnO 기능 구현 명세서 작성"
+  default_prompt: "Use $plan to draft an OnO implementation plan."
+
+policy:
+  allow_implicit_invocation: true

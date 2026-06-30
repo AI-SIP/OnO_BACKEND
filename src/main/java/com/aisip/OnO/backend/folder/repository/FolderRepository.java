@@ -19,4 +19,12 @@ public interface FolderRepository extends JpaRepository<Folder, Long>, FolderRep
     @Modifying
     @Query("delete from Folder f where f.id in :folderIds")
     void deleteAllByIdIn(@Param("folderIds") Collection<Long> folderIds);
+
+    @Query("""
+            SELECT p.folder.id, COUNT(p.id)
+            FROM Problem p
+            WHERE p.folder.id IN :folderIds
+            GROUP BY p.folder.id
+            """)
+    List<Object[]> countProblemsByFolderIds(@Param("folderIds") Collection<Long> folderIds);
 }

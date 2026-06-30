@@ -15,6 +15,8 @@ import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveRepository;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
+import com.aisip.OnO.backend.studyroom.entity.StudyRoomFeedEventType;
+import com.aisip.OnO.backend.studyroom.event.StudyRoomActivityEvent;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
@@ -46,6 +49,7 @@ public class ProblemSolveService {
     private final S3DeleteProducer s3DeleteProducer;
     private final ObjectMapper objectMapper;
     private final StreakCacheService streakCacheService;
+    private final ApplicationEventPublisher eventPublisher;
     @Qualifier("s3UploadExecutor")
     private final Executor s3UploadExecutor;
 
@@ -135,6 +139,8 @@ public class ProblemSolveService {
                 problem.getConsecutiveCorrectCount()
         );
         problem.updateReviewSchedule(schedule.nextReviewAt(), schedule.reviewInterval(), schedule.consecutiveCorrectCount());
+        eventPublisher.publishEvent(new StudyRoomActivityEvent(
+                userId, StudyRoomFeedEventType.PRACTICE_COMPLETED, java.util.Map.of()));
 
         log.info("userId: {} created problem solve: {}, nextReviewAt: {}, mastered: {}",
                 userId, problemSolve.getId(), schedule.nextReviewAt(), schedule.isMastered());
@@ -172,6 +178,24 @@ public class ProblemSolveService {
         problemSolveImageDataRepository.saveAll(imageDataList);
 
         log.info("Uploaded {} images in parallel for problemSolveId: {}", images.size(), problemSolveId);
+    }
+
+    @Transactional
+    public void addImageUrls(Long problemSolveId, Long userId, List<String> imageUrls) {
+        ProblemSolve problemSolve = problemSolveRepository.findById(problemSolveId)
+                .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND));
+        if (!Objects.equals(problemSolve.getUserId(), userId)) {
+            throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_USER_UNMATCHED);
+        }
+        int existingCount = problemSolve.getImages() == null ? 0 : problemSolve.getImages().size();
+        List<ProblemSolveImageData> imageDataList = IntStream.range(0, imageUrls.size())
+                .mapToObj(i -> {
+                    fileUploadService.validateS3Url(imageUrls.get(i));
+                    return ProblemSolveImageData.create(imageUrls.get(i), existingCount + i);
+                })
+                .collect(Collectors.toList());
+        imageDataList.forEach(problemSolve::addImage);
+        problemSolveImageDataRepository.saveAll(imageDataList);
     }
 
     @Transactional

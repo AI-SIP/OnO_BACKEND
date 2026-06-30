@@ -2,11 +2,15 @@ package com.aisip.OnO.backend.folder.repository;
 
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.entity.QFolder;
+import com.querydsl.core.Tuple;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static com.aisip.OnO.backend.folder.entity.QFolder.folder;
 import static com.aisip.OnO.backend.problem.entity.QProblem.problem;
@@ -71,6 +75,23 @@ public class FolderRepositoryImpl implements FolderRepositoryCustom {
                 .where(problem.folder.id.eq(folderId))
                 .orderBy(problem.id.asc())
                 .fetch();
+    }
+
+    @Override
+    public Map<Long, List<Long>> findProblemIdsByFolderIds(Collection<Long> folderIds) {
+        if (folderIds == null || folderIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Tuple> rows = queryFactory
+                .select(problem.folder.id, problem.id)
+                .from(problem)
+                .where(problem.folder.id.in(folderIds))
+                .orderBy(problem.folder.id.asc(), problem.id.asc())
+                .fetch();
+        return rows.stream().collect(Collectors.groupingBy(
+                t -> t.get(problem.folder.id),
+                Collectors.mapping(t -> t.get(problem.id), Collectors.toList())
+        ));
     }
 
     @Override

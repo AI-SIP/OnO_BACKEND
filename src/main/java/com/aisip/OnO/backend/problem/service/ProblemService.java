@@ -11,6 +11,7 @@ import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.ProblemAnalysis;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.problem.dto.AddProblemImageUrlsRequest;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2BatchDto;
@@ -30,6 +31,8 @@ import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
 import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveRepository;
 import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveSummary;
+import com.aisip.OnO.backend.studyroom.entity.StudyRoomFeedEventType;
+import com.aisip.OnO.backend.studyroom.event.StudyRoomActivityEvent;
 import com.aisip.OnO.backend.tag.entity.ProblemTagMapping;
 import com.aisip.OnO.backend.tag.entity.Tag;
 import com.aisip.OnO.backend.tag.exception.TagErrorCase;
@@ -38,6 +41,7 @@ import com.aisip.OnO.backend.tag.repository.TagRepository;
 import com.aisip.OnO.backend.util.redis.StreakCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
@@ -88,6 +92,7 @@ public class ProblemService {
     private final ProblemTagMappingRepository problemTagMappingRepository;
     private final RateLimitService rateLimitService;
     private final StreakCacheService streakCacheService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public ProblemResponseDto findProblemForAdmin(Long problemId) {
@@ -214,6 +219,8 @@ public class ProblemService {
         analysisService.createSkippedAnalysis(problem.getId());
         streakCacheService.evict(userId);
         missionLogService.registerProblemWriteMission(userId);
+        eventPublisher.publishEvent(new StudyRoomActivityEvent(
+                userId, StudyRoomFeedEventType.PROBLEM_REGISTERED, Map.of("count", 1)));
 
         log.info("userId: {} register problemId: {}", userId, problem.getId());
 
@@ -271,6 +278,8 @@ public class ProblemService {
         analysisService.createSkippedAnalysis(problem.getId());
         streakCacheService.evict(userId);
         missionLogService.registerProblemWriteMission(userId);
+        eventPublisher.publishEvent(new StudyRoomActivityEvent(
+                userId, StudyRoomFeedEventType.PROBLEM_REGISTERED, Map.of("count", 1)));
 
         log.info("userId: {} register problem(v2) problemId: {}", userId, problem.getId());
         return problem.getId();
@@ -333,6 +342,8 @@ public class ProblemService {
 
         streakCacheService.evict(userId);
         missionLogService.registerProblemWriteMissionBatch(userId, problems.size());
+        eventPublisher.publishEvent(new StudyRoomActivityEvent(
+                userId, StudyRoomFeedEventType.PROBLEM_REGISTERED, Map.of("count", problems.size())));
 
         List<Long> problemIds = problems.stream()
                 .map(Problem::getId)
@@ -469,6 +480,22 @@ public class ProblemService {
             }
 
             log.info("Uploaded image to S3 for problemId: {}, imageType: {}", problemId, imageType);
+        }
+    }
+
+    @Transactional
+    public void addImageDataUrls(Long problemId, Long userId, AddProblemImageUrlsRequest request) {
+        Problem problem = findProblemEntity(problemId, userId);
+        for (AddProblemImageUrlsRequest.ImageUrlItem item : request.imageDataList()) {
+            fileUploadService.validateS3Url(item.imageUrl());
+            ProblemImageType imageType = ProblemImageType.valueOf(item.problemImageType());
+            ProblemImageData imageData = ProblemImageData.from(
+                    new ProblemImageDataRegisterDto(problemId, item.imageUrl(), imageType));
+            imageData.updateProblem(problem);
+            problemImageDataRepository.save(imageData);
+            if (imageType == ProblemImageType.SOLVE_IMAGE) {
+                missionLogService.registerProblemPracticeMission(userId, problemId);
+            }
         }
     }
 

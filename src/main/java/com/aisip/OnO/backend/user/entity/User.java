@@ -43,6 +43,9 @@ public class User extends BaseEntity {
 
     private String platform;
 
+    @Column(name = "profile_image_url")
+    private String profileImageUrl;
+
     private LocalDateTime lastActiveAt;
 
     private LocalDate lastNotifiedAt;
@@ -89,6 +92,10 @@ public class User extends BaseEntity {
 
     public void updateNotificationEnabled(boolean enabled) {
         this.notificationEnabled = enabled;
+    }
+
+    public void updateProfileImageUrl(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
     }
 
     public void updateUser(UserRegisterDto userRegisterDto) {

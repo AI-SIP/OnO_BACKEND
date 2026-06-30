@@ -6,6 +6,7 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -33,10 +34,14 @@ public class RabbitMQConfig {
     public static final String FCM_NOTIFICATION_QUEUE = "fcm.notification.queue";
     public static final String FCM_NOTIFICATION_DLQ = "fcm.notification.dlq";
 
+    public static final String DISCORD_WEBHOOK_QUEUE = "discord.webhook.queue";
+    public static final String DISCORD_WEBHOOK_DLQ = "discord.webhook.dlq";
+
     // ==================== Routing Key 정의 ====================
     public static final String S3_DELETE_ROUTING_KEY = "s3.delete";
     public static final String GPT_ANALYSIS_ROUTING_KEY = "gpt.analysis";
     public static final String FCM_NOTIFICATION_ROUTING_KEY = "fcm.notification";
+    public static final String DISCORD_WEBHOOK_ROUTING_KEY = "discord.webhook";
 
     /**
      * JSON 메시지 컨버터 (객체를 JSON으로 직렬화/역직렬화)
@@ -61,10 +66,12 @@ public class RabbitMQConfig {
      */
     @Bean
     public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
-            ConnectionFactory connectionFactory) {
+            ConnectionFactory connectionFactory,
+            @Value("${spring.rabbitmq.listener.simple.auto-startup:true}") boolean autoStartup) {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
         factory.setMessageConverter(messageConverter());
+        factory.setAutoStartup(autoStartup);
         factory.setConcurrentConsumers(3); // 동시 처리 스레드 수
         factory.setMaxConcurrentConsumers(10); // 최대 동시 처리 스레드 수
         factory.setPrefetchCount(1); // 한 번에 가져올 메시지 수
@@ -198,5 +205,34 @@ public class RabbitMQConfig {
                 .bind(fcmNotificationQueue())
                 .to(notificationExchange())
                 .with(FCM_NOTIFICATION_ROUTING_KEY);
+    }
+
+    // ==================== Discord Webhook Queue ====================
+
+    /**
+     * Discord Webhook Queue
+     * - DLQ 설정 포함
+     * - TTL: 5분 (300,000ms)
+     */
+    @Bean
+    public Queue discordWebhookQueue() {
+        return QueueBuilder.durable(DISCORD_WEBHOOK_QUEUE)
+                .withArgument("x-dead-letter-exchange", "")
+                .withArgument("x-dead-letter-routing-key", DISCORD_WEBHOOK_DLQ)
+                .withArgument("x-message-ttl", 300000)
+                .build();
+    }
+
+    @Bean
+    public Queue discordWebhookDLQ() {
+        return QueueBuilder.durable(DISCORD_WEBHOOK_DLQ).build();
+    }
+
+    @Bean
+    public Binding discordWebhookBinding() {
+        return BindingBuilder
+                .bind(discordWebhookQueue())
+                .to(notificationExchange())
+                .with(DISCORD_WEBHOOK_ROUTING_KEY);
     }
 }

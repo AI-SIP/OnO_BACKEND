@@ -153,7 +153,7 @@
 
     .gallery-track {
       display: flex;
-      gap: 18px;
+      gap: 34px;
       overflow-x: auto;
       scroll-snap-type: x mandatory;
       scroll-behavior: smooth;
@@ -283,7 +283,7 @@
       display: flex;
       align-items: flex-end;
       justify-content: center;
-      gap: 12px;
+      gap: 24px;
     }
     .phone-duo .phone-img { max-width: 188px; }
     .phone-duo .phone-img:last-child {
@@ -367,6 +367,65 @@
       font-size: .83rem; color: var(--t3);
     }
 
+    /* ── STUDY ROOM SHOWCASE ── */
+    .study-showcase {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+    }
+    .study-phone-duo .phone-img { max-width: 178px; }
+    .study-phone-duo .phone-img:last-child {
+      transform: translateY(34px);
+    }
+    .study-cards {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      width: 100%;
+      max-width: 430px;
+      margin-top: 28px;
+    }
+    .study-card {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      column-gap: 14px;
+      align-items: flex-start;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px 18px;
+    }
+    .study-card-kicker {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 24px;
+      min-width: 42px;
+      padding: 0 9px;
+      border-radius: 999px;
+      background: rgba(28, 186, 26, .08);
+      color: var(--brand-dk);
+      font-family: "Space Grotesk", sans-serif;
+      font-size: .72rem;
+      font-weight: 700;
+      grid-row: 1 / span 2;
+    }
+    .study-card strong {
+      display: block;
+      font-size: .96rem;
+      font-weight: 700;
+      color: var(--t1);
+      margin-bottom: 7px;
+    }
+    .study-card p {
+      font-size: .83rem;
+      color: var(--t2);
+      line-height: 1.62;
+      word-break: keep-all;
+      margin: 0;
+    }
+
     /* ── RESPONSIVE ── */
     @media (max-width: 860px) {
       .feat-inner {
@@ -378,7 +437,13 @@
       .feat-copy .band-p { max-width: none; }
       .feat-img-wrap .phone-img { max-width: 240px; }
       .phone-duo .phone-img { max-width: 155px; }
+      .study-phone-duo .phone-img { max-width: 148px; }
+      .phone-duo { gap: 16px; }
       .stat-row { justify-content: center; }
+      .study-cards {
+        max-width: none;
+        margin-top: 26px;
+      }
 
       .achieve-inner {
         grid-template-columns: 1fr;
@@ -470,6 +535,12 @@
     </div>
     <div class="gal-item">
       <img src="/images/ScreenShot/UserLevel.png" alt="학습 레벨" loading="lazy">
+    </div>
+    <div class="gal-item">
+      <img src="/images/ScreenShot/StudyRoomChallenge.png" alt="스터디룸 챌린지" loading="lazy">
+    </div>
+    <div class="gal-item">
+      <img src="/images/ScreenShot/StudyRoomShare.png" alt="스터디룸 공유 피드" loading="lazy">
     </div>
     <div class="gal-item">
       <img src="/images/ScreenShot/LearningCalendar2.png" alt="학습 달력" loading="lazy">
@@ -620,6 +691,45 @@
       <div class="phone-duo">
         <img src="/images/ScreenShot/UserLevel.png" alt="학습 레벨" class="phone-img" loading="lazy">
         <img src="/images/ScreenShot/LearningCalendar2.png" alt="학습 달력" class="phone-img" loading="lazy">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── FEATURE 7 : 스터디룸 ── -->
+<div style="background:var(--bg)">
+  <div class="feat-inner">
+    <div class="feat-copy rv">
+      <span class="band-tag">스터디룸</span>
+      <h3 class="band-h2">함께 공부하면<br>더 잘 됩니다</h3>
+      <p class="band-p">
+        친구들과 스터디룸을 만들고, 챌린지와 피드로 서로의 학습을 응원하세요.
+        혼자보다 훨씬 멀리 갈 수 있습니다.
+      </p>
+      <div class="study-cards">
+        <div class="study-card">
+          <span class="study-card-kicker">01</span>
+          <strong>함께 공부</strong>
+          <p>친구를 초대해 같은 목표를 공유하고 학습 흐름을 이어가요.</p>
+        </div>
+        <div class="study-card">
+          <span class="study-card-kicker">02</span>
+          <strong>챌린지</strong>
+          <p>문제 등록과 복습 목표를 정하고 멤버들과 함께 달성해요.</p>
+        </div>
+        <div class="study-card">
+          <span class="study-card-kicker">03</span>
+          <strong>랭킹·리포트</strong>
+          <p>멤버별 학습 기록과 주간 성과를 한눈에 비교해요.</p>
+        </div>
+      </div>
+    </div>
+    <div class="feat-img-wrap rv d1">
+      <div class="study-showcase">
+        <div class="phone-duo study-phone-duo">
+          <img src="/images/ScreenShot/StudyRoomChallenge.png" alt="스터디룸 챌린지 화면" class="phone-img" loading="lazy">
+          <img src="/images/ScreenShot/StudyRoomShare.png" alt="스터디룸 공유 피드 화면" class="phone-img" loading="lazy">
+        </div>
       </div>
     </div>
   </div>

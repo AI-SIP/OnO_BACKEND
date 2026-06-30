@@ -2,7 +2,9 @@ package com.aisip.OnO.backend.folder.repository;
 
 import com.aisip.OnO.backend.folder.entity.Folder;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public interface FolderRepositoryCustom {
@@ -16,6 +18,8 @@ public interface FolderRepositoryCustom {
     List<Folder> findAllFoldersWithDetailsByUserId(Long userId);
 
     List<Long> findProblemIdsByFolder(Long folderId);
+
+    Map<Long, List<Long>> findProblemIdsByFolderIds(Collection<Long> folderIds);
 
     /**
      * 커서 기반 하위 폴더 조회

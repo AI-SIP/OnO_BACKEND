@@ -7,8 +7,10 @@ import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequiredArgsConstructor
@@ -23,9 +25,7 @@ public class UserController {
     public CommonResponse<UserResponseDto> getUserInfo() {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         missionLogService.registerLoginMission(userId);
-        userService.touchLastActiveAt(userId);
-
-        return CommonResponse.success(userService.findUser(userId));
+        return CommonResponse.success(userService.touchAndFindUser(userId));
     }
 
     // ✅ 사용자 정보 수정
@@ -47,10 +47,30 @@ public class UserController {
         return CommonResponse.success("알림 설정이 변경되었습니다.");
     }
 
+    @PatchMapping(value = "/me/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public CommonResponse<UserResponseDto> updateProfileImage(@RequestParam("profileImage") MultipartFile profileImage) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return CommonResponse.success(userService.updateProfileImage(userId, profileImage));
+    }
+
+    @PatchMapping(value = "/me/profile-image-url", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public CommonResponse<UserResponseDto> updateProfileImageByUrl(@RequestBody ProfileImageUrlRequest request) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return CommonResponse.success(userService.updateProfileImageByUrl(userId, request.profileImageUrl()));
+    }
+
+    @DeleteMapping("/me/profile-image")
+    public CommonResponse<UserResponseDto> deleteProfileImage() {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return CommonResponse.success(userService.deleteProfileImage(userId));
+    }
+
     // ✅ 사용자 계정 삭제
     @DeleteMapping("")
     public void deleteUserInfo() {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         userService.deleteUserById(userId);
     }
+
+    public record ProfileImageUrlRequest(String profileImageUrl) {}
 }

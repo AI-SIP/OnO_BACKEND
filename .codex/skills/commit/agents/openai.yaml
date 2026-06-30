@@ -1,0 +1,7 @@
+interface:
+  display_name: "OnO Commit"
+  short_description: "OnO 커밋 생성"
+  default_prompt: "Use $commit to create git commits."
+
+policy:
+  allow_implicit_invocation: true

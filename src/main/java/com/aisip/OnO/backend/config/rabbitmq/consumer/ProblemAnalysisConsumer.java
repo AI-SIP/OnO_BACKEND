@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.config.rabbitmq.RabbitMQConfig;
 import com.aisip.OnO.backend.config.rabbitmq.message.ProblemAnalysisMessage;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
+import com.aisip.OnO.backend.problem.service.ProblemAnalysisFailureService;
 import com.aisip.OnO.backend.problem.service.ProblemAnalysisService;
 import com.aisip.OnO.backend.util.ai.NonRetryableAnalysisException;
 import com.aisip.OnO.backend.util.webhook.DiscordWebhookNotificationService;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Service;
 public class ProblemAnalysisConsumer {
 
     private final ProblemAnalysisService analysisService;
+    private final ProblemAnalysisFailureService analysisFailureService;
     private final DiscordWebhookNotificationService discordWebhookNotificationService;
 
     /**
@@ -30,7 +32,7 @@ public class ProblemAnalysisConsumer {
      * - concurrency: 동시 처리 개수 (1-3개, OpenAI Rate Limit 고려)
      * - 예외 발생 시 자동으로 재시도 → 실패하면 DLQ로 이동
      */
-    @RabbitListener(queues = RabbitMQConfig.GPT_ANALYSIS_QUEUE, concurrency = "1-3")
+    @RabbitListener(queues = RabbitMQConfig.GPT_ANALYSIS_QUEUE, concurrency = "1-2")
     public void handleAnalysisMessage(ProblemAnalysisMessage message) {
         log.info("RabbitMQ message received - queue: {}, operation: {}, problemId: {}, messageRetryCount: {}",
                 RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", message.getProblemId(), message.getRetryCount());
@@ -49,7 +51,8 @@ public class ProblemAnalysisConsumer {
             // 상태는 Service에서 FAILED로 업데이트됨. 재큐잉 없이 종료(ACK)
             return;
         } catch (ApplicationException e) {
-            if (e.getErrorCase() == ProblemErrorCase.PROBLEM_NOT_FOUND) {
+            if (e.getErrorCase() == ProblemErrorCase.PROBLEM_NOT_FOUND
+                    || e.getErrorCase() == ProblemErrorCase.PROBLEM_ANALYSIS_NOT_FOUND) {
                 log.warn("RabbitMQ message skipped - queue: {}, operation: {}, outcome: {}, problemId: {}, messageRetryCount: {}",
                         RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", "resource_not_found",
                         message.getProblemId(), message.getRetryCount());
@@ -93,6 +96,14 @@ public class ProblemAnalysisConsumer {
                 message.getProblemId(),
                 message.getRetryCount()
         );
+
+        // DLQ 도달 = 모든 재시도 소진. PROCESSING 고착 방지를 위해 FAILED로 전이
+        try {
+            analysisFailureService.markFailed(message.getProblemId(), "최대 재시도 횟수 초과 또는 큐 만료");
+        } catch (Exception e) {
+            log.error("RabbitMQ DLQ markFailed failed - problemId: {}, error: {}",
+                    message.getProblemId(), e.getMessage());
+        }
 
         try {
             discordWebhookNotificationService.sendErrorNotification(

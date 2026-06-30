@@ -1,0 +1,7 @@
+interface:
+  display_name: "OnO PR"
+  short_description: "OnO PR 생성 워크플로우"
+  default_prompt: "Use $pr to push the branch if needed and create this OnO pull request."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,7 @@
+interface:
+  display_name: "OnO Analysis"
+  short_description: "OnO 문제 원인 분석"
+  default_prompt: "Use $analysis to investigate this OnO issue."
+
+policy:
+  allow_implicit_invocation: true

@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.practicenote.service;
 
 import com.aisip.OnO.backend.admin.dto.AdminPracticeNoteResponseDto;
+import com.aisip.OnO.backend.common.emoji.CustomEmojiValidator;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
@@ -43,7 +44,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional
 public class PracticeNoteService {
-    private static final String DEFAULT_PRACTICE_NOTE_TITLE = "복습노트";
+    private static final String DEFAULT_PRACTICE_NOTE_TITLE = "복습 세트";
 
     private final ProblemRepository problemRepository;
 
@@ -56,6 +57,8 @@ public class PracticeNoteService {
     private final MissionLogService missionLogService;
 
     private final UserRepository userRepository;
+
+    private final CustomEmojiValidator customEmojiValidator;
 
     private PracticeNote getPracticeEntity(Long practiceId, Long userId){
 
@@ -137,8 +140,14 @@ public class PracticeNoteService {
     }
 
     public void addPracticeNoteCount(Long userId, Long practiceId) {
+        addPracticeNoteCount(userId, practiceId, null);
+    }
+
+    public void addPracticeNoteCount(Long userId, Long practiceId, PracticeNoteCompleteRequestDto request) {
         PracticeNote practiceNote = getPracticeEntity(practiceId, userId);
-        practiceNote.updatePracticeNoteCount();
+        String moodEmojiKey = request == null ? null : request.moodEmojiKey();
+        customEmojiValidator.validateNullable(moodEmojiKey);
+        practiceNote.updatePracticeNoteCount(moodEmojiKey);
 
         // 복습노트 사용 미션 등록
         missionLogService.registerNotePracticeMission(userId, practiceId);

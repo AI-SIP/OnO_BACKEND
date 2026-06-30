@@ -157,7 +157,9 @@ class FolderServiceTest {
         assertThat(folderResponseDto.folderName()).isEqualTo(folderList.get(0).getName());
         assertThat(folderResponseDto.parentFolder()).isNull();
         assertThat(folderResponseDto.subFolderList().get(0).folderId()).isEqualTo(folderList.get(1).getId());
+        assertThat(folderResponseDto.subFolderList().get(0).problemCount()).isEqualTo((long) folderList.get(1).getProblemList().size());
         assertThat(folderResponseDto.subFolderList().get(1).folderId()).isEqualTo(folderList.get(2).getId());
+        assertThat(folderResponseDto.subFolderList().get(1).problemCount()).isEqualTo((long) folderList.get(2).getProblemList().size());
         assertThat(folderResponseDto.problemIdList().get(0)).isEqualTo(problemList.get(0).problemId());
         assertThat(folderResponseDto.problemIdList().get(1)).isEqualTo(problemList.get(1).problemId());
     }
@@ -176,8 +178,11 @@ class FolderServiceTest {
         assertThat(folderResponseDto.folderId()).isEqualTo(folderList.get(1).getId());
         assertThat(folderResponseDto.folderName()).isEqualTo(folderList.get(1).getName());
         assertThat(folderResponseDto.parentFolder().folderId()).isEqualTo(parentFolderId);
+        assertThat(folderResponseDto.parentFolder().problemCount()).isEqualTo((long) folderList.get(0).getProblemList().size());
         assertThat(folderResponseDto.subFolderList().get(0).folderId()).isEqualTo(folderList.get(3).getId());
+        assertThat(folderResponseDto.subFolderList().get(0).problemCount()).isEqualTo((long) folderList.get(3).getProblemList().size());
         assertThat(folderResponseDto.subFolderList().get(1).folderId()).isEqualTo(folderList.get(4).getId());
+        assertThat(folderResponseDto.subFolderList().get(1).problemCount()).isEqualTo((long) folderList.get(4).getProblemList().size());
         assertThat(folderResponseDto.problemIdList().get(0)).isEqualTo(problemList.get(2).problemId());
         assertThat(folderResponseDto.problemIdList().get(1)).isEqualTo(problemList.get(3).problemId());
     }
@@ -222,6 +227,7 @@ class FolderServiceTest {
         for (int i = 0; i < folderThumbnailResponseDtoList.size(); i++) {
             assertThat(folderThumbnailResponseDtoList.get(i).folderId()).isEqualTo(folderList.get(i).getId());
             assertThat(folderThumbnailResponseDtoList.get(i).folderName()).isEqualTo(folderList.get(i).getName());
+            assertThat(folderThumbnailResponseDtoList.get(i).problemCount()).isEqualTo((long) folderList.get(i).getProblemList().size());
         }
     }
 
