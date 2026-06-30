@@ -181,6 +181,24 @@ public class ProblemSolveService {
     }
 
     @Transactional
+    public void addImageUrls(Long problemSolveId, Long userId, List<String> imageUrls) {
+        ProblemSolve problemSolve = problemSolveRepository.findById(problemSolveId)
+                .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND));
+        if (!Objects.equals(problemSolve.getUserId(), userId)) {
+            throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_USER_UNMATCHED);
+        }
+        int existingCount = problemSolve.getImages() == null ? 0 : problemSolve.getImages().size();
+        List<ProblemSolveImageData> imageDataList = IntStream.range(0, imageUrls.size())
+                .mapToObj(i -> {
+                    fileUploadService.validateS3Url(imageUrls.get(i));
+                    return ProblemSolveImageData.create(imageUrls.get(i), existingCount + i);
+                })
+                .collect(Collectors.toList());
+        imageDataList.forEach(problemSolve::addImage);
+        problemSolveImageDataRepository.saveAll(imageDataList);
+    }
+
+    @Transactional
     public void updateProblemSolve(ProblemSolveUpdateDto dto, Long userId) {
         ProblemSolve problemSolve = problemSolveRepository.findById(dto.problemSolveId())
                 .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND));

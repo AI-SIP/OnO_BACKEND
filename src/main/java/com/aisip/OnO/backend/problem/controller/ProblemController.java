@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.problem.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
+import com.aisip.OnO.backend.problem.dto.AddProblemImageUrlsRequest;
 import com.aisip.OnO.backend.problem.dto.ProblemAnalysisResponseDto;
 import com.aisip.OnO.backend.problem.dto.ReviewDueResponseDto;
 import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
@@ -163,6 +164,19 @@ public class ProblemController {
         problemService.analysisProblem(problemId, userId);
 
         return CommonResponse.success("이미지 업로드가 시작되었습니다.");
+    }
+
+    // ✅ 문제 이미지 URL 추가 (Presigned URL 방식)
+    @PostMapping("/{problemId}/imageData/urls")
+    public CommonResponse<Void> addProblemImageDataUrls(
+            @PathVariable("problemId") Long problemId,
+            @RequestBody AddProblemImageUrlsRequest request
+    ) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        problemService.addImageDataUrls(problemId, userId, request);
+        problemService.analysisProblem(problemId, userId);
+
+        return CommonResponse.success(null);
     }
 
     // ✅ 문제 이미지 비동기 업로드

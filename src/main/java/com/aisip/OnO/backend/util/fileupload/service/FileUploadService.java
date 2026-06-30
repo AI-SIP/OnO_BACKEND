@@ -66,6 +66,15 @@ public class FileUploadService {
         return fileUrl;
     }
 
+    public void validateS3Url(String url) {
+        if (url == null || url.isBlank()) {
+            throw new ApplicationException(FileUploadErrorCase.INVALID_IMAGE_FILE);
+        }
+        if (!url.startsWith("https://" + bucket + ".s3.")) {
+            throw new ApplicationException(FileUploadErrorCase.INVALID_IMAGE_FILE);
+        }
+    }
+
     public List<PresignedUrlResponse> generatePresignedUrls(String contentType, int count) {
         Date expiration = new Date(System.currentTimeMillis() + 10 * 60 * 1000L); // 10분
 

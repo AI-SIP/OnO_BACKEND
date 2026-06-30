@@ -200,6 +200,17 @@ public class StudyRoomService {
         return new StudyRoomThumbnailUpdateResponse(thumbnailUrl);
     }
 
+    @Transactional
+    public StudyRoomThumbnailUpdateResponse updateThumbnailByUrl(Long roomId, Long userId, String thumbnailUrl) {
+        accessService.validateHost(roomId, userId);
+        fileUploadService.validateS3Url(thumbnailUrl);
+        StudyRoom room = accessService.getRoomOrThrow(roomId);
+        String previousThumbnailUrl = room.getThumbnailUrl();
+        room.updateThumbnailUrl(thumbnailUrl);
+        deleteThumbnailAsync(previousThumbnailUrl, roomId);
+        return new StudyRoomThumbnailUpdateResponse(thumbnailUrl);
+    }
+
     StudyRoomDetailResponse buildDetail(StudyRoom room) {
         List<StudyRoomMember> members = memberRepository.findAllWithUserByRoomId(room.getId());
         List<Long> userIds = members.stream().map(member -> member.getUser().getId()).toList();

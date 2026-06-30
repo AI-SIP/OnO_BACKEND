@@ -113,4 +113,7 @@ public final class StudyRoomDtos {
 
     public record WeeklyReportReadResponse(Long reportId, boolean isRead) {
     }
+
+    public record ThumbnailUrlUpdateRequest(String thumbnailUrl) {
+    }
 }
