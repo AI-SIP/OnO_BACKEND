@@ -25,9 +25,7 @@ public class UserController {
     public CommonResponse<UserResponseDto> getUserInfo() {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         missionLogService.registerLoginMission(userId);
-        userService.touchLastActiveAt(userId);
-
-        return CommonResponse.success(userService.findUser(userId));
+        return CommonResponse.success(userService.touchAndFindUser(userId));
     }
 
     // ✅ 사용자 정보 수정

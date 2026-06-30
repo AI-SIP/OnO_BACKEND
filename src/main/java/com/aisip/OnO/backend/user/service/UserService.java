@@ -145,6 +145,13 @@ public class UserService {
     }
 
     @Transactional
+    public UserResponseDto touchAndFindUser(Long userId) {
+        User user = findUserEntity(userId);
+        user.touchLastActiveAt();
+        return UserResponseDto.from(user);
+    }
+
+    @Transactional
     public void updateNotificationSettings(Long userId, boolean notificationEnabled) {
         findUserEntity(userId).updateNotificationEnabled(notificationEnabled);
     }
