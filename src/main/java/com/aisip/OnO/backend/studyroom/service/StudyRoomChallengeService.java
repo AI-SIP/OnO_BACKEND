@@ -14,13 +14,17 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.springframework.transaction.annotation.Propagation;
 
 @Slf4j
 @Service
@@ -106,7 +110,7 @@ public class StudyRoomChallengeService {
                     int current = metricValue(challenge.getMetric(), stats.get(member.getUser().getId()),
                             attendanceDays.getOrDefault(member.getUser().getId(), 0));
                     return new ChallengeMemberProgressResponse(member.getUser().getId(), member.getUser().getName(),
-                            current, current >= challenge.getTargetValue());
+                            member.getUser().getProfileImageUrl(), current, current >= challenge.getTargetValue());
                 })
                 .toList();
         Integer groupCurrent = challenge.getType() == StudyRoomChallengeType.GROUP
@@ -117,9 +121,23 @@ public class StudyRoomChallengeService {
                 : null;
         StudyRoomChallengeStatus status = effectiveStatus(challenge, memberProgress, groupCurrent);
         if (persistStatus && challenge.getStatus() != status) {
-            challenge.updateStatus(status);
             if (status == StudyRoomChallengeStatus.COMPLETED) {
-                notifyChallengeCompleted(challenge, members);
+                // 원자적 UPDATE WHERE status = 'IN_PROGRESS' — 단 하나의 스레드만 1을 반환해 FCM 중복 발송 방지
+                int updated = challengeRepository.tryTransitionFromInProgress(challenge.getId(), status, LocalDateTime.now());
+                if (updated > 0) {
+                    challenge.updateStatus(status);
+                    // 트랜잭션 커밋 후 FCM 발송 — 롤백 시 중복 발송 방지
+                    final StudyRoomChallenge committedChallenge = challenge;
+                    final List<StudyRoomMember> committedMembers = members;
+                    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            notifyChallengeCompleted(committedChallenge, committedMembers);
+                        }
+                    });
+                }
+            } else {
+                challenge.updateStatus(status);
             }
         }
         return new ChallengeResponse(
@@ -224,6 +242,98 @@ public class StudyRoomChallengeService {
             throw new ApplicationException(StudyRoomErrorCase.INVALID_STUDY_ROOM_REQUEST);
         }
     }
+
+    /**
+     * 사용자의 학습 활동 이후 해당 사용자가 속한 룸들의 IN_PROGRESS 챌린지 완료 여부를 즉시 확인합니다.
+     * REQUIRES_NEW로 독립 트랜잭션 실행 — 실패해도 피드 생성 트랜잭션에 영향 없음.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void checkAndNotifyChallengeCompletionForUser(Long userId) {
+        List<StudyRoomMember> memberships = memberRepository.findAllWithRoomByUserId(userId);
+        if (memberships.isEmpty()) {
+            return;
+        }
+
+        List<Long> roomIds = memberships.stream()
+                .map(m -> m.getRoom().getId())
+                .toList();
+        List<StudyRoomChallenge> inProgressChallenges =
+                challengeRepository.findAllByRoomIdsAndStatus(roomIds, StudyRoomChallengeStatus.IN_PROGRESS);
+        if (inProgressChallenges.isEmpty()) {
+            return;
+        }
+
+        Map<Long, List<StudyRoomMember>> membersByRoom = new HashMap<>();
+        Map<StatsKey, CachedStats> statsCache = new HashMap<>();
+        for (StudyRoomChallenge challenge : inProgressChallenges) {
+            Long roomId = challenge.getRoom().getId();
+            membersByRoom.computeIfAbsent(roomId, id -> memberRepository.findAllWithUserByRoomId(id));
+            evaluateCompletionAndNotify(challenge, membersByRoom.get(roomId), statsCache);
+        }
+    }
+
+    private void evaluateCompletionAndNotify(
+            StudyRoomChallenge challenge,
+            List<StudyRoomMember> members,
+            Map<StatsKey, CachedStats> statsCache) {
+        List<Long> userIds = members.stream().map(m -> m.getUser().getId()).toList();
+        AggregationRange range = resolveAggregationRange(challenge, LocalDateTime.now());
+        LocalDate streakBaseDate = min(LocalDate.now(), challenge.getEndAt().toLocalDate());
+        boolean needsAttendance = isAttendanceMetric(challenge.getMetric());
+
+        StatsKey key = new StatsKey(userIds, streakBaseDate, challenge.getStartAt().toLocalDate(), range.start(), range.end());
+        CachedStats cached = statsCache.computeIfAbsent(key, k -> {
+            Map<Long, Integer> streaks = statsService.currentStreaks(k.userIds(), k.streakBase(), k.challengeStart());
+            Map<Long, StudyRoomStats> stats = statsService.getStats(k.userIds(), k.rangeStart(), k.rangeEnd(), streaks);
+            Map<Long, Integer> attendance = statsService.attendanceDayCounts(k.userIds(), k.rangeStart(), k.rangeEnd());
+            return new CachedStats(streaks, stats, attendance);
+        });
+
+        final CachedStats finalCached = cached;
+        List<ChallengeMemberProgressResponse> memberProgress = challenge.getType() == StudyRoomChallengeType.GROUP
+                ? List.of()
+                : members.stream()
+                .map(member -> {
+                    int current = metricValue(challenge.getMetric(),
+                            finalCached.stats().get(member.getUser().getId()),
+                            needsAttendance ? finalCached.attendanceDays().getOrDefault(member.getUser().getId(), 0) : 0);
+                    return new ChallengeMemberProgressResponse(member.getUser().getId(), member.getUser().getName(),
+                            member.getUser().getProfileImageUrl(), current, current >= challenge.getTargetValue());
+                })
+                .toList();
+        Integer groupCurrent = challenge.getType() == StudyRoomChallengeType.GROUP
+                ? userIds.stream()
+                .mapToInt(uid -> metricValue(challenge.getMetric(), finalCached.stats().get(uid),
+                        needsAttendance ? finalCached.attendanceDays().getOrDefault(uid, 0) : 0))
+                .sum()
+                : null;
+        StudyRoomChallengeStatus status = effectiveStatus(challenge, memberProgress, groupCurrent);
+
+        if (challenge.getStatus() != status) {
+            if (status == StudyRoomChallengeStatus.COMPLETED) {
+                int updated = challengeRepository.tryTransitionFromInProgress(challenge.getId(), status, LocalDateTime.now());
+                if (updated > 0) {
+                    challenge.updateStatus(status);
+                    final StudyRoomChallenge committedChallenge = challenge;
+                    final List<StudyRoomMember> committedMembers = members;
+                    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            notifyChallengeCompleted(committedChallenge, committedMembers);
+                        }
+                    });
+                }
+            } else {
+                challenge.updateStatus(status);
+            }
+        }
+    }
+
+    private record StatsKey(List<Long> userIds, LocalDate streakBase, LocalDate challengeStart,
+                            LocalDateTime rangeStart, LocalDateTime rangeEnd) {}
+
+    private record CachedStats(Map<Long, Integer> streaks, Map<Long, StudyRoomStats> stats,
+                               Map<Long, Integer> attendanceDays) {}
 
     private void notifyChallengeCompleted(StudyRoomChallenge challenge, List<StudyRoomMember> members) {
         NotificationRequestDto dto = new NotificationRequestDto(null,

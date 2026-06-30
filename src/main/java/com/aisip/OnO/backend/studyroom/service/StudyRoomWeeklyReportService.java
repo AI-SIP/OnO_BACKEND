@@ -134,8 +134,10 @@ public class StudyRoomWeeklyReportService {
                 weekStart,
                 weekEnd,
                 topProblemMember == null ? null : topProblemMember.getUser().getName(),
+                topProblemMember == null ? null : topProblemMember.getUser().getProfileImageUrl(),
                 topProblems,
                 topStreakMember == null ? null : topStreakMember.getUser().getName(),
+                topStreakMember == null ? null : topStreakMember.getUser().getProfileImageUrl(),
                 longestStreak,
                 totalProblems,
                 challengesCompleted,
@@ -211,8 +213,8 @@ public class StudyRoomWeeklyReportService {
 
     private WeeklyReportResponse toResponse(StudyRoomWeeklyReport report, boolean read) {
         return new WeeklyReportResponse(report.getId(), report.getWeekStart(), report.getWeekEnd(),
-                report.getTopMemberName(), report.getTopMemberProblemCount(),
-                report.getLongestStreakName(), report.getLongestStreakDays(),
+                report.getTopMemberName(), report.getTopMemberProfileImageUrl(), report.getTopMemberProblemCount(),
+                report.getLongestStreakName(), report.getLongestStreakProfileImageUrl(), report.getLongestStreakDays(),
                 report.getTotalProblems(), report.getChallengesCompleted(),
                 report.getCheerMessage(), read);
     }

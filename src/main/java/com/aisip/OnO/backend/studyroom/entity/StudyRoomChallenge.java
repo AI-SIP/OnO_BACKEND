@@ -55,6 +55,9 @@ public class StudyRoomChallenge extends BaseEntity {
     @Column(nullable = false, length = 20)
     private StudyRoomChallengeStatus status;
 
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
     public static StudyRoomChallenge create(StudyRoom room, String title, StudyRoomChallengeType type,
                                             StudyRoomChallengeMetric metric, StudyRoomChallengePeriod period,
                                             Integer periodDays, Integer targetValue,

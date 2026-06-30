@@ -11,6 +11,7 @@ import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.ProblemAnalysis;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.problem.dto.AddProblemImageUrlsRequest;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterV2BatchDto;
@@ -479,6 +480,22 @@ public class ProblemService {
             }
 
             log.info("Uploaded image to S3 for problemId: {}, imageType: {}", problemId, imageType);
+        }
+    }
+
+    @Transactional
+    public void addImageDataUrls(Long problemId, Long userId, AddProblemImageUrlsRequest request) {
+        Problem problem = findProblemEntity(problemId, userId);
+        for (AddProblemImageUrlsRequest.ImageUrlItem item : request.imageDataList()) {
+            fileUploadService.validateS3Url(item.imageUrl());
+            ProblemImageType imageType = ProblemImageType.valueOf(item.problemImageType());
+            ProblemImageData imageData = ProblemImageData.from(
+                    new ProblemImageDataRegisterDto(problemId, item.imageUrl(), imageType));
+            imageData.updateProblem(problem);
+            problemImageDataRepository.save(imageData);
+            if (imageType == ProblemImageType.SOLVE_IMAGE) {
+                missionLogService.registerProblemPracticeMission(userId, problemId);
+            }
         }
     }
 

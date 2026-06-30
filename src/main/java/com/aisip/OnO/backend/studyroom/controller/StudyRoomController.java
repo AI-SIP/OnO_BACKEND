@@ -99,6 +99,12 @@ public class StudyRoomController {
         return CommonResponse.success(studyRoomService.updateThumbnail(roomId, currentUserId(), thumbnail));
     }
 
+    @PatchMapping(value = "/{roomId}/thumbnail-url", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public CommonResponse<StudyRoomThumbnailUpdateResponse> updateThumbnailByUrl(@PathVariable("roomId") Long roomId,
+                                                                                 @RequestBody ThumbnailUrlUpdateRequest request) {
+        return CommonResponse.success(studyRoomService.updateThumbnailByUrl(roomId, currentUserId(), request.thumbnailUrl()));
+    }
+
     private Long currentUserId() {
         return (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
     }

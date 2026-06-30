@@ -145,6 +145,13 @@ public class UserService {
     }
 
     @Transactional
+    public UserResponseDto touchAndFindUser(Long userId) {
+        User user = findUserEntity(userId);
+        user.touchLastActiveAt();
+        return UserResponseDto.from(user);
+    }
+
+    @Transactional
     public void updateNotificationSettings(Long userId, boolean notificationEnabled) {
         findUserEntity(userId).updateNotificationEnabled(notificationEnabled);
     }
@@ -167,6 +174,16 @@ public class UserService {
         String profileImageUrl = fileUploadService.uploadFileToS3(profileImage);
         deleteImageOnRollback(profileImageUrl, userId);
         user.updateProfileImageUrl(profileImageUrl);
+        deleteImageAsync(previousProfileImageUrl, userId);
+        return UserResponseDto.from(user);
+    }
+
+    @Transactional
+    public UserResponseDto updateProfileImageByUrl(Long userId, String imageUrl) {
+        fileUploadService.validateS3Url(imageUrl);
+        User user = findUserEntity(userId);
+        String previousProfileImageUrl = user.getProfileImageUrl();
+        user.updateProfileImageUrl(imageUrl);
         deleteImageAsync(previousProfileImageUrl, userId);
         return UserResponseDto.from(user);
     }

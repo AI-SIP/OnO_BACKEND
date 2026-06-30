@@ -1,13 +1,13 @@
 package com.aisip.OnO.backend.folder.dto;
 
 import com.aisip.OnO.backend.folder.entity.Folder;
-import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import lombok.AccessLevel;
 import lombok.Builder;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Builder(access = AccessLevel.PRIVATE)
 public record FolderResponseDto (
@@ -29,15 +29,29 @@ public record FolderResponseDto (
     LocalDateTime updateAt
 ) {
     public static FolderResponseDto from(@NotNull Folder folder, List<Long> problemIdList) {
+        return from(folder, problemIdList, Map.of());
+    }
+
+    public static FolderResponseDto from(
+            @NotNull Folder folder,
+            List<Long> problemIdList,
+            Map<Long, Long> problemCountsByFolderId
+    ) {
 
         FolderThumbnailResponseDto parentFolder = folder.getParentFolder() != null
-                ? FolderThumbnailResponseDto.from(folder.getParentFolder())
+                ? FolderThumbnailResponseDto.from(
+                        folder.getParentFolder(),
+                        problemCountsByFolderId.getOrDefault(folder.getParentFolder().getId(), 0L)
+                )
                 : null;
 
         List<FolderThumbnailResponseDto> subFolderList = folder.getSubFolderList() != null
                 ? folder.getSubFolderList()
                 .stream()
-                .map(FolderThumbnailResponseDto::from)
+                .map(subFolder -> FolderThumbnailResponseDto.from(
+                        subFolder,
+                        problemCountsByFolderId.getOrDefault(subFolder.getId(), 0L)
+                ))
                 .toList()
                 : List.of();
 

@@ -36,9 +36,13 @@ public final class StudyRoomDtos {
     public record SharedProblemCommentRequest(String content) {
     }
 
+    public record StudyRoomMemberSummary(Long userId, String profileImageUrl, boolean practicedToday) {
+    }
+
     public record StudyRoomListResponse(Long roomId, String name, Long hostUserId, int memberCount,
                                         String thumbnailUrl, boolean hasUnreadReport,
-                                        int todayPracticeMemberCount, int todayPracticeCount) {
+                                        int todayPracticeMemberCount, int todayPracticeCount,
+                                        List<StudyRoomMemberSummary> members) {
     }
 
     public record StudyRoomDetailResponse(Long roomId, String name, Long hostUserId, String thumbnailUrl,
@@ -82,7 +86,7 @@ public final class StudyRoomDtos {
                                     Integer groupCurrent) {
     }
 
-    public record ChallengeMemberProgressResponse(Long userId, String name, int current, boolean cleared) {
+    public record ChallengeMemberProgressResponse(Long userId, String name, String profileImageUrl, int current, boolean cleared) {
     }
 
     public record SharedProblemResponse(Long sharedProblemId, Long sharedByUserId, String sharedByName,
@@ -105,12 +109,15 @@ public final class StudyRoomDtos {
     }
 
     public record WeeklyReportResponse(Long reportId, LocalDate weekStart, LocalDate weekEnd,
-                                       String topMemberName, Integer topMemberProblemCount,
-                                       String longestStreakName, Integer longestStreakDays,
+                                       String topMemberName, String topMemberProfileImageUrl, Integer topMemberProblemCount,
+                                       String longestStreakName, String longestStreakProfileImageUrl, Integer longestStreakDays,
                                        Integer totalProblems, Integer challengesCompleted,
                                        String cheerMessage, boolean isRead) {
     }
 
     public record WeeklyReportReadResponse(Long reportId, boolean isRead) {
+    }
+
+    public record ThumbnailUrlUpdateRequest(String thumbnailUrl) {
     }
 }

@@ -8,7 +8,6 @@ import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
-import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.service.ProblemService;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -55,7 +54,7 @@ public class FolderService {
         log.info("userId : {} find root folder id: {}", userId, rootFolder.getId());
 
         List<Long> problemIdList = folderRepository.findProblemIdsByFolder(rootFolder.getId());
-        return FolderResponseDto.from(rootFolder, problemIdList);
+        return toFolderResponseDto(rootFolder, problemIdList);
     }
 
     @Transactional(readOnly = true)
@@ -64,7 +63,7 @@ public class FolderService {
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
 
         List<Long> problemIdList = folderRepository.findProblemIdsByFolder(folder.getId());
-        return FolderResponseDto.from(folder, problemIdList);
+        return toFolderResponseDto(folder, problemIdList);
     }
 
     @Transactional(readOnly = true)
@@ -72,7 +71,7 @@ public class FolderService {
         Folder folder = findFolderWithDetailsOwnedByUser(folderId, userId);
 
         List<Long> problemIdList = folderRepository.findProblemIdsByFolder(folder.getId());
-        return FolderResponseDto.from(folder, problemIdList);
+        return toFolderResponseDto(folder, problemIdList);
     }
 
     @Transactional(readOnly = true)
@@ -94,19 +93,32 @@ public class FolderService {
 
         return folderList.isEmpty()
                 ? List.of()
-                : folderList.stream().map(FolderThumbnailResponseDto::from).collect(Collectors.toList());
+                : toFolderThumbnailDtos(folderList);
     }
 
     public List<FolderResponseDto> findAllUserFolders(Long userId) {
         List<Folder> folders = folderRepository.findAllFoldersWithDetailsByUserId(userId);
+        if (folders.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> folderIds = folders.stream().map(Folder::getId).toList();
+        Map<Long, List<Long>> problemIdsByFolder = folderRepository.findProblemIdsByFolderIds(folderIds);
+
+        Set<Long> thumbnailFolderIds = new HashSet<>();
+        for (Folder f : folders) {
+            if (f.getParentFolder() != null) thumbnailFolderIds.add(f.getParentFolder().getId());
+            if (f.getSubFolderList() != null) f.getSubFolderList().forEach(sf -> thumbnailFolderIds.add(sf.getId()));
+        }
+        Map<Long, Long> problemCounts = findProblemCountsByFolderIds(thumbnailFolderIds);
 
         log.info("userId : {} find All user folders", userId);
-        return folders.isEmpty()
-                ? List.of()
-                : folders.stream().map(folder -> {
-                    List<Long> problemIdList = folderRepository.findProblemIdsByFolder(folder.getId());
-                    return FolderResponseDto.from(folder, problemIdList);
-                }).toList();
+        return folders.stream()
+                .map(folder -> FolderResponseDto.from(
+                        folder,
+                        problemIdsByFolder.getOrDefault(folder.getId(), List.of()),
+                        problemCounts))
+                .toList();
     }
 
     private void createDefaultSubFolder(Folder rootFolder, Long userId) {
@@ -217,9 +229,7 @@ public class FolderService {
         List<Folder> content = hasNext ? folders.subList(0, size) : folders;
         Long nextCursor = hasNext ? content.get(content.size() - 1).getId() : null;
 
-        List<FolderThumbnailResponseDto> dtoList = content.stream()
-                .map(FolderThumbnailResponseDto::from)
-                .collect(Collectors.toList());
+        List<FolderThumbnailResponseDto> dtoList = toFolderThumbnailDtos(content);
 
         log.info("folderId: {} find subfolders with cursor: {}, size: {}, hasNext: {}", folderId, cursor, size, hasNext);
         return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
@@ -253,11 +263,50 @@ public class FolderService {
         List<Folder> content = hasNext ? folders.subList(0, size) : folders;
         Long nextCursor = hasNext ? content.get(content.size() - 1).getId() : null;
 
-        List<FolderThumbnailResponseDto> dtoList = content.stream()
-                .map(FolderThumbnailResponseDto::from)
-                .collect(Collectors.toList());
+        List<FolderThumbnailResponseDto> dtoList = toFolderThumbnailDtos(content);
 
         log.info("userId: {} find all folder thumbnails with cursor: {}, size: {}, hasNext: {}", userId, cursor, size, hasNext);
         return CursorPageResponse.of(dtoList, nextCursor, hasNext, size);
+    }
+
+    private FolderResponseDto toFolderResponseDto(Folder folder, List<Long> problemIdList) {
+        Set<Long> thumbnailFolderIds = new HashSet<>();
+        if (folder.getParentFolder() != null) {
+            thumbnailFolderIds.add(folder.getParentFolder().getId());
+        }
+        if (folder.getSubFolderList() != null) {
+            folder.getSubFolderList().stream()
+                    .map(Folder::getId)
+                    .forEach(thumbnailFolderIds::add);
+        }
+
+        Map<Long, Long> problemCountsByFolderId = findProblemCountsByFolderIds(thumbnailFolderIds);
+        return FolderResponseDto.from(folder, problemIdList, problemCountsByFolderId);
+    }
+
+    private List<FolderThumbnailResponseDto> toFolderThumbnailDtos(List<Folder> folders) {
+        List<Long> folderIds = folders.stream()
+                .map(Folder::getId)
+                .toList();
+        Map<Long, Long> problemCountsByFolderId = findProblemCountsByFolderIds(folderIds);
+
+        return folders.stream()
+                .map(folder -> FolderThumbnailResponseDto.from(
+                        folder,
+                        problemCountsByFolderId.getOrDefault(folder.getId(), 0L)
+                ))
+                .collect(Collectors.toList());
+    }
+
+    private Map<Long, Long> findProblemCountsByFolderIds(Collection<Long> folderIds) {
+        if (folderIds == null || folderIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return folderRepository.countProblemsByFolderIds(folderIds).stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]
+                ));
     }
 }

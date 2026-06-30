@@ -8,12 +8,18 @@ import org.jetbrains.annotations.NotNull;
 @Builder(access = AccessLevel.PRIVATE)
 public record FolderThumbnailResponseDto(
         Long folderId,
-        String folderName
+        String folderName,
+        Long problemCount
 ) {
-    public static FolderThumbnailResponseDto from(@NotNull Folder folder) {
+    public static FolderThumbnailResponseDto from(@NotNull Folder folder, Long problemCount) {
         return FolderThumbnailResponseDto.builder()
                 .folderId(folder.getId())
                 .folderName(folder.getName())
+                .problemCount(problemCount)
                 .build();
+    }
+
+    public static FolderThumbnailResponseDto from(@NotNull Folder folder) {
+        return from(folder, 0L);
     }
 }

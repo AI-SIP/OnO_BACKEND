@@ -47,6 +47,7 @@ public class StudyRoomFeedService {
     private final ObjectMapper objectMapper;
     private final StudyRoomReactionService reactionService;
     private final CustomEmojiValidator customEmojiValidator;
+    private final StudyRoomChallengeService challengeService;
 
     @Transactional(readOnly = true)
     public CursorPageResponse<FeedItemResponse> getFeed(Long roomId, Long userId, Long cursor, int size) {
@@ -88,6 +89,11 @@ public class StudyRoomFeedService {
             createFeedsForUserRooms(event.userId(), event.eventType(), event.metadata());
         } catch (Exception e) {
             log.error("Failed to create study room feed. userId: {}, eventType: {}", event.userId(), event.eventType(), e);
+        }
+        try {
+            challengeService.checkAndNotifyChallengeCompletionForUser(event.userId());
+        } catch (Exception e) {
+            log.error("Failed to check challenge completion. userId: {}, eventType: {}", event.userId(), event.eventType(), e);
         }
     }
 
