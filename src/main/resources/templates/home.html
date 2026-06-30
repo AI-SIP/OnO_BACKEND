@@ -153,7 +153,7 @@
 
     .gallery-track {
       display: flex;
-      gap: 18px;
+      gap: 34px;
       overflow-x: auto;
       scroll-snap-type: x mandatory;
       scroll-behavior: smooth;
@@ -367,37 +367,61 @@
       font-size: .83rem; color: var(--t3);
     }
 
-    /* ── STUDY ROOM CARDS ── */
-    .study-cards {
+    /* ── STUDY ROOM SHOWCASE ── */
+    .study-showcase {
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      max-width: 380px;
+      align-items: center;
+      gap: 28px;
+    }
+    .study-phone-duo .phone-img { max-width: 178px; }
+    .study-phone-duo .phone-img:last-child {
+      transform: translateY(34px);
+    }
+    .study-cards {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      width: 100%;
+      max-width: 430px;
+      margin-top: 28px;
     }
     .study-card {
-      display: flex;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      column-gap: 14px;
       align-items: flex-start;
-      gap: 16px;
-      background: var(--bg2);
-      border-radius: 18px;
-      padding: 20px 22px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px 18px;
     }
-    .study-card-icon {
-      font-size: 1.75rem;
-      flex-shrink: 0;
-      line-height: 1;
+    .study-card-kicker {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 24px;
+      min-width: 42px;
+      padding: 0 9px;
+      border-radius: 999px;
+      background: rgba(28, 186, 26, .08);
+      color: var(--brand-dk);
+      font-family: "Space Grotesk", sans-serif;
+      font-size: .72rem;
+      font-weight: 700;
+      grid-row: 1 / span 2;
     }
     .study-card strong {
       display: block;
-      font-size: .94rem;
+      font-size: .96rem;
       font-weight: 700;
       color: var(--t1);
-      margin-bottom: 4px;
+      margin-bottom: 7px;
     }
     .study-card p {
-      font-size: .84rem;
+      font-size: .83rem;
       color: var(--t2);
-      line-height: 1.55;
+      line-height: 1.62;
       word-break: keep-all;
       margin: 0;
     }
@@ -413,9 +437,13 @@
       .feat-copy .band-p { max-width: none; }
       .feat-img-wrap .phone-img { max-width: 240px; }
       .phone-duo .phone-img { max-width: 155px; }
+      .study-phone-duo .phone-img { max-width: 148px; }
       .phone-duo { gap: 16px; }
       .stat-row { justify-content: center; }
-      .study-cards { max-width: none; }
+      .study-cards {
+        max-width: none;
+        margin-top: 26px;
+      }
 
       .achieve-inner {
         grid-template-columns: 1fr;
@@ -507,6 +535,12 @@
     </div>
     <div class="gal-item">
       <img src="/images/ScreenShot/UserLevel.png" alt="학습 레벨" loading="lazy">
+    </div>
+    <div class="gal-item">
+      <img src="/images/ScreenShot/StudyRoomChallenge.png" alt="스터디룸 챌린지" loading="lazy">
+    </div>
+    <div class="gal-item">
+      <img src="/images/ScreenShot/StudyRoomShare.png" alt="스터디룸 공유 피드" loading="lazy">
     </div>
     <div class="gal-item">
       <img src="/images/ScreenShot/LearningCalendar2.png" alt="학습 달력" loading="lazy">
@@ -672,36 +706,29 @@
         친구들과 스터디룸을 만들고, 챌린지와 피드로 서로의 학습을 응원하세요.
         혼자보다 훨씬 멀리 갈 수 있습니다.
       </p>
-    </div>
-    <div class="feat-img-wrap rv d1">
       <div class="study-cards">
         <div class="study-card">
-          <span class="study-card-icon">👥</span>
-          <div>
-            <strong>스터디룸 개설</strong>
-            <p>초대 코드로 친구를 불러 함께 공부하는 공간을 만드세요.</p>
-          </div>
+          <span class="study-card-kicker">01</span>
+          <strong>함께 공부</strong>
+          <p>친구를 초대해 같은 목표를 공유하고 학습 흐름을 이어가요.</p>
         </div>
         <div class="study-card">
-          <span class="study-card-icon">🏆</span>
-          <div>
-            <strong>챌린지 설정</strong>
-            <p>문제 등록 수, 복습 횟수 등 목표를 정하고 함께 달성해요.</p>
-          </div>
+          <span class="study-card-kicker">02</span>
+          <strong>챌린지</strong>
+          <p>문제 등록과 복습 목표를 정하고 멤버들과 함께 달성해요.</p>
         </div>
         <div class="study-card">
-          <span class="study-card-icon">📰</span>
-          <div>
-            <strong>학습 피드</strong>
-            <p>멤버들의 오답노트·복습 활동을 실시간으로 확인하고 응원해요.</p>
-          </div>
+          <span class="study-card-kicker">03</span>
+          <strong>랭킹·리포트</strong>
+          <p>멤버별 학습 기록과 주간 성과를 한눈에 비교해요.</p>
         </div>
-        <div class="study-card">
-          <span class="study-card-icon">📊</span>
-          <div>
-            <strong>주간 리포트</strong>
-            <p>팀원들의 주간 학습 성과를 한눈에 비교할 수 있어요.</p>
-          </div>
+      </div>
+    </div>
+    <div class="feat-img-wrap rv d1">
+      <div class="study-showcase">
+        <div class="phone-duo study-phone-duo">
+          <img src="/images/ScreenShot/StudyRoomChallenge.png" alt="스터디룸 챌린지 화면" class="phone-img" loading="lazy">
+          <img src="/images/ScreenShot/StudyRoomShare.png" alt="스터디룸 공유 피드 화면" class="phone-img" loading="lazy">
         </div>
       </div>
     </div>
