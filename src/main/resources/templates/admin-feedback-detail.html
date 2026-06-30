@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OnO 관리자 - 피드백 상세</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+
+  <nav class="bg-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <div class="flex items-center">
+          <a th:href="@{/admin/main}">
+            <h1 class="text-2xl font-bold text-indigo-600">OnO 관리자</h1>
+          </a>
+        </div>
+        <div class="flex items-center space-x-4">
+          <a th:href="@{/admin/feedbacks}" class="text-indigo-600 px-3 py-2 rounded-md text-sm font-medium border-b-2 border-indigo-600">피드백</a>
+          <form th:action="@{/logout}" method="post">
+            <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition">로그아웃</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="mb-6 flex items-center gap-3">
+      <a th:href="@{/admin/feedbacks}" class="text-gray-500 hover:text-indigo-600 transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+      </a>
+      <div>
+        <h2 class="text-2xl font-bold text-gray-900">피드백 상세</h2>
+        <p class="text-sm text-gray-500 mt-0.5">
+          #<span th:text="${feedback.id}">1</span> ·
+          <span th:text="${feedback.submittedAt != null ? #temporals.format(feedback.submittedAt, 'yyyy-MM-dd HH:mm') : '-'}">-</span>
+          · IP: <span th:text="${feedback.ipAddress ?: '-'}">-</span>
+        </p>
+      </div>
+    </div>
+
+    <div class="space-y-4">
+
+      <!-- Section 1 -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-sm font-semibold text-indigo-700 uppercase tracking-wide mb-4">1. 만족도 &amp; 사용 패턴</h3>
+        <dl class="space-y-3">
+          <div class="flex gap-4">
+            <dt class="text-sm text-gray-500 w-40 flex-shrink-0">사용 목적</dt>
+            <dd class="text-sm text-gray-900 font-medium" th:text="${feedback.usagePurpose ?: '응답 없음'}">-</dd>
+          </div>
+          <div class="flex gap-4">
+            <dt class="text-sm text-gray-500 w-40 flex-shrink-0">사용 빈도</dt>
+            <dd class="text-sm text-gray-900 font-medium" th:text="${feedback.usageFrequency ?: '응답 없음'}">-</dd>
+          </div>
+          <div class="flex gap-4">
+            <dt class="text-sm text-gray-500 w-40 flex-shrink-0">NPS 점수</dt>
+            <dd class="text-sm font-bold"
+                th:class="${feedback.npsScore != null ? (feedback.npsScore >= 9 ? 'text-green-600' : (feedback.npsScore >= 7 ? 'text-yellow-600' : 'text-red-500')) : 'text-gray-400'}"
+                th:text="${feedback.npsScore != null ? feedback.npsScore + ' / 10' : '응답 없음'}">-</dd>
+          </div>
+        </dl>
+      </div>
+
+      <!-- Section 2 -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-sm font-semibold text-green-700 uppercase tracking-wide mb-4">2. 오답 등록 &amp; 관리</h3>
+        <dl class="space-y-3">
+          <div class="flex gap-4">
+            <dt class="text-sm text-gray-500 w-40 flex-shrink-0">등록·조회 불편 사항</dt>
+            <dd class="text-sm text-gray-900 font-medium" th:text="${feedback.registrationPainPoints ?: '응답 없음'}">-</dd>
+          </div>
+          <div class="flex gap-4">
+            <dt class="text-sm text-gray-500 w-40 flex-shrink-0">분류 방식</dt>
+            <dd class="text-sm text-gray-900 font-medium" th:text="${feedback.classificationMethod ?: '응답 없음'}">-</dd>
+          </div>
+          <div class="flex gap-4">
+            <dt class="text-sm text-gray-500 w-40 flex-shrink-0">템플릿 적합도</dt>
+            <dd class="text-sm text-gray-900 font-medium"
+                th:text="${feedback.templateSatisfaction != null ? feedback.templateSatisfaction + ' / 5' : '응답 없음'}">-</dd>
+          </div>
+        </dl>
+      </div>
+
+      <!-- Section 3 -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-sm font-semibold text-blue-700 uppercase tracking-wide mb-4">3. 복습 세트</h3>
+        <dl class="space-y-3">
+          <div class="flex gap-4">
+            <dt class="text-sm text-gray-500 w-40 flex-shrink-0">복습 세트 사용 여부</dt>
+            <dd class="text-sm text-gray-900 font-medium"
+                th:text="${feedback.practiceNoteUsed == null ? '응답 없음' : (feedback.practiceNoteUsed ? '사용 중' : '사용하지 않음')}">-</dd>
+          </div>
+          <div class="flex gap-4" th:if="${feedback.practiceNoteUsed != null and feedback.practiceNoteUsed}">
+            <dt class="text-sm text-gray-500 w-40 flex-shrink-0">알림 효과</dt>
+            <dd class="text-sm text-gray-900 font-medium" th:text="${feedback.notificationEffectiveness ?: '응답 없음'}">-</dd>
+          </div>
+          <div class="flex gap-4" th:if="${feedback.practiceNoteUsed != null and !feedback.practiceNoteUsed}">
+            <dt class="text-sm text-gray-500 w-40 flex-shrink-0">미사용 이유</dt>
+            <dd class="text-sm text-gray-900 font-medium" th:text="${feedback.reviewSetNonUsageReason ?: '응답 없음'}">-</dd>
+          </div>
+        </dl>
+      </div>
+
+      <!-- Section 4 -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-sm font-semibold text-pink-700 uppercase tracking-wide mb-4">4. 소셜 &amp; 스터디룸</h3>
+        <dl class="space-y-3">
+          <div class="flex gap-4">
+            <dt class="text-sm text-gray-500 w-40 flex-shrink-0">스터디룸 사용 여부</dt>
+            <dd class="text-sm text-gray-900 font-medium" th:text="${feedback.studyRoomUsage ?: '응답 없음'}">-</dd>
+          </div>
+          <div class="flex gap-4" th:if="${'사용하지 않음'.equals(feedback.studyRoomUsage)}">
+            <dt class="text-sm text-gray-500 w-40 flex-shrink-0">미사용 이유</dt>
+            <dd class="text-sm text-gray-900 font-medium" th:text="${feedback.studyRoomNonUsageReason ?: '응답 없음'}">-</dd>
+          </div>
+          <div class="flex gap-4" th:if="${'사용 중'.equals(feedback.studyRoomUsage)}">
+            <dt class="text-sm text-gray-500 w-40 flex-shrink-0">챌린지 동기 부여</dt>
+            <dd class="text-sm text-gray-900 font-medium"
+                th:text="${feedback.challengeMotivation != null ? feedback.challengeMotivation + ' / 5' : '응답 없음'}">-</dd>
+          </div>
+          <div class="flex gap-4" th:if="${'사용 중'.equals(feedback.studyRoomUsage)}">
+            <dt class="text-sm text-gray-500 w-40 flex-shrink-0">오답 공유 유용도</dt>
+            <dd class="text-sm text-gray-900 font-medium"
+                th:text="${feedback.problemSharingUsefulness != null ? feedback.problemSharingUsefulness + ' / 5' : '응답 없음'}">-</dd>
+          </div>
+        </dl>
+      </div>
+
+      <!-- Section 5 -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-sm font-semibold text-yellow-700 uppercase tracking-wide mb-4">5. 개선 요청 &amp; 자유 의견</h3>
+        <dl class="space-y-4">
+          <div class="flex gap-4">
+            <dt class="text-sm text-gray-500 w-40 flex-shrink-0">자주 쓰는 기능</dt>
+            <dd class="text-sm text-gray-900 font-medium" th:text="${feedback.mostUsedFeature ?: '응답 없음'}">-</dd>
+          </div>
+          <div>
+            <dt class="text-sm text-gray-500 mb-2">없애고 싶은 불편함</dt>
+            <dd class="text-sm text-gray-900 bg-gray-50 rounded-lg p-3 leading-relaxed whitespace-pre-wrap"
+                th:text="${feedback.painPoints ?: '응답 없음'}">-</dd>
+          </div>
+          <div>
+            <dt class="text-sm text-gray-500 mb-2">원하는 기능</dt>
+            <dd class="text-sm text-gray-900 bg-gray-50 rounded-lg p-3 leading-relaxed whitespace-pre-wrap"
+                th:text="${feedback.desiredFeatures ?: '응답 없음'}">-</dd>
+          </div>
+        </dl>
+      </div>
+
+    </div>
+
+    <div class="mt-6 text-center">
+      <a th:href="@{/admin/feedbacks}"
+         class="inline-flex items-center gap-2 text-gray-600 hover:text-indigo-600 transition text-sm font-medium">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+    </div>
+  </div>
+</body>
+</html>
