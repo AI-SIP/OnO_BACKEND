@@ -98,14 +98,27 @@ public class FolderService {
 
     public List<FolderResponseDto> findAllUserFolders(Long userId) {
         List<Folder> folders = folderRepository.findAllFoldersWithDetailsByUserId(userId);
+        if (folders.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> folderIds = folders.stream().map(Folder::getId).toList();
+        Map<Long, List<Long>> problemIdsByFolder = folderRepository.findProblemIdsByFolderIds(folderIds);
+
+        Set<Long> thumbnailFolderIds = new HashSet<>();
+        for (Folder f : folders) {
+            if (f.getParentFolder() != null) thumbnailFolderIds.add(f.getParentFolder().getId());
+            if (f.getSubFolderList() != null) f.getSubFolderList().forEach(sf -> thumbnailFolderIds.add(sf.getId()));
+        }
+        Map<Long, Long> problemCounts = findProblemCountsByFolderIds(thumbnailFolderIds);
 
         log.info("userId : {} find All user folders", userId);
-        return folders.isEmpty()
-                ? List.of()
-                : folders.stream().map(folder -> {
-                    List<Long> problemIdList = folderRepository.findProblemIdsByFolder(folder.getId());
-                    return toFolderResponseDto(folder, problemIdList);
-                }).toList();
+        return folders.stream()
+                .map(folder -> FolderResponseDto.from(
+                        folder,
+                        problemIdsByFolder.getOrDefault(folder.getId(), List.of()),
+                        problemCounts))
+                .toList();
     }
 
     private void createDefaultSubFolder(Folder rootFolder, Long userId) {

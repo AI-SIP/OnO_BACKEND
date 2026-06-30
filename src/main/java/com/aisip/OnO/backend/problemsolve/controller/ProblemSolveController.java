@@ -5,9 +5,11 @@ import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveRegisterDto;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveResponseDto;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveUpdateDto;
 import com.aisip.OnO.backend.problemsolve.service.ProblemSolveService;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -92,14 +94,14 @@ public class ProblemSolveController {
     @PostMapping("/{problemSolveId}/image-urls")
     public CommonResponse<Void> addProblemSolveImageUrls(
             @PathVariable("problemSolveId") Long problemSolveId,
-            @RequestBody ImageUrlsRequest request) {
+            @Validated @RequestBody ImageUrlsRequest request) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         problemSolveService.addImageUrls(problemSolveId, userId, request.imageUrls());
 
         return CommonResponse.success(null);
     }
 
-    public record ImageUrlsRequest(List<String> imageUrls) {}
+    public record ImageUrlsRequest(@NotNull List<String> imageUrls) {}
 
     // 복습 기록 수정
     @PatchMapping("")

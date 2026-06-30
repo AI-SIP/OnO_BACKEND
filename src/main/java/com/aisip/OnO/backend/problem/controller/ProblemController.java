@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.propertyeditors.CustomNumberEditor;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -170,7 +171,7 @@ public class ProblemController {
     @PostMapping("/{problemId}/imageData/urls")
     public CommonResponse<Void> addProblemImageDataUrls(
             @PathVariable("problemId") Long problemId,
-            @RequestBody AddProblemImageUrlsRequest request
+            @Validated @RequestBody AddProblemImageUrlsRequest request
     ) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         problemService.addImageDataUrls(problemId, userId, request);
