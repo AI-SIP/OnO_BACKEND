@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.problemsolve.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
+import com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderService;
 import com.aisip.OnO.backend.util.redis.StreakCacheService;
 import com.aisip.OnO.backend.problem.service.ReviewIntervalCalculator;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveRegisterDto;
@@ -27,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -50,6 +53,7 @@ public class ProblemSolveService {
     private final ObjectMapper objectMapper;
     private final StreakCacheService streakCacheService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ProblemReviewReminderService reminderService;
     @Qualifier("s3UploadExecutor")
     private final Executor s3UploadExecutor;
 
@@ -141,6 +145,11 @@ public class ProblemSolveService {
         problem.updateReviewSchedule(schedule.nextReviewAt(), schedule.reviewInterval(), schedule.consecutiveCorrectCount());
         eventPublisher.publishEvent(new StudyRoomActivityEvent(
                 userId, StudyRoomFeedEventType.PRACTICE_COMPLETED, java.util.Map.of()));
+
+        LocalDateTime practicedAt = dto.practicedAt() != null
+                ? dto.practicedAt()
+                : LocalDateTime.now(ZoneId.of("Asia/Seoul"));
+        reminderService.skipDuePendingByProblemSolve(userId, dto.problemId(), practicedAt);
 
         log.info("userId: {} created problem solve: {}, nextReviewAt: {}, mastered: {}",
                 userId, problemSolve.getId(), schedule.nextReviewAt(), schedule.isMastered());

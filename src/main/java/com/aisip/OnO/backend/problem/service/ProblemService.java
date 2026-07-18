@@ -38,6 +38,8 @@ import com.aisip.OnO.backend.tag.entity.Tag;
 import com.aisip.OnO.backend.tag.exception.TagErrorCase;
 import com.aisip.OnO.backend.tag.repository.ProblemTagMappingRepository;
 import com.aisip.OnO.backend.tag.repository.TagRepository;
+import com.aisip.OnO.backend.problem.event.ProblemCreatedEvent;
+import com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderService;
 import com.aisip.OnO.backend.util.redis.StreakCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -93,6 +95,7 @@ public class ProblemService {
     private final RateLimitService rateLimitService;
     private final StreakCacheService streakCacheService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ProblemReviewReminderService reminderService;
 
     @Transactional(readOnly = true)
     public ProblemResponseDto findProblemForAdmin(Long problemId) {
@@ -221,6 +224,9 @@ public class ProblemService {
         missionLogService.registerProblemWriteMission(userId);
         eventPublisher.publishEvent(new StudyRoomActivityEvent(
                 userId, StudyRoomFeedEventType.PROBLEM_REGISTERED, Map.of("count", 1)));
+        eventPublisher.publishEvent(new ProblemCreatedEvent(userId, List.of(
+                new ProblemCreatedEvent.ProblemData(problem.getId(), problem.getMemo(), problem.getReference(), problem.getCreatedAt())
+        )));
 
         log.info("userId: {} register problemId: {}", userId, problem.getId());
 
@@ -280,6 +286,9 @@ public class ProblemService {
         missionLogService.registerProblemWriteMission(userId);
         eventPublisher.publishEvent(new StudyRoomActivityEvent(
                 userId, StudyRoomFeedEventType.PROBLEM_REGISTERED, Map.of("count", 1)));
+        eventPublisher.publishEvent(new ProblemCreatedEvent(userId, List.of(
+                new ProblemCreatedEvent.ProblemData(problem.getId(), problem.getMemo(), problem.getReference(), problem.getCreatedAt())
+        )));
 
         log.info("userId: {} register problem(v2) problemId: {}", userId, problem.getId());
         return problem.getId();
@@ -348,6 +357,11 @@ public class ProblemService {
         List<Long> problemIds = problems.stream()
                 .map(Problem::getId)
                 .toList();
+
+        eventPublisher.publishEvent(new ProblemCreatedEvent(userId, problems.stream()
+                .map(p -> new ProblemCreatedEvent.ProblemData(p.getId(), p.getMemo(), p.getReference(), p.getCreatedAt()))
+                .toList()));
+
         log.info("userId: {} register problems(v2 batch) problemIds: {}", userId, problemIds);
         return problemIds;
     }
@@ -560,6 +574,7 @@ public class ProblemService {
 
         problem.updateProblem(problemRegisterDto);
         syncProblemTags(problem, userId, problemRegisterDto.tagIds());
+        reminderService.refreshSnapshot(problem.getId(), problem.getMemo(), problem.getReference());
 
         log.info("userId: {} update problemId: {}", userId, problem.getId());
     }
@@ -702,12 +717,15 @@ public class ProblemService {
         // 4. PracticeNote 매핑 삭제 (동기 - 데이터 정합성 보장)
         practiceNoteRepository.deleteProblemFromAllPractice(problemId);
 
-        // 5. 문제 삭제 (Soft Delete)
+        // 5. 미발송 알림 예약 취소
+        reminderService.cancelPendingByProblem(problemId);
+
+        // 6. 문제 삭제 (Soft Delete)
         problemRepository.deleteById(problemId);
 
         log.info("problemId: {} DB 삭제 완료", problemId);
 
-        // 6. S3 파일 삭제는 비동기로 처리 (RabbitMQ Producer)
+        // 7. S3 파일 삭제는 비동기로 처리 (RabbitMQ Producer)
         imageDataList.forEach(imageData -> {
             try {
                 s3DeleteProducer.sendDeleteMessage(imageData.getImageUrl(), problemId);
