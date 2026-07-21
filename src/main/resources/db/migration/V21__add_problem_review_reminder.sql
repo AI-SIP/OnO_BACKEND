@@ -6,14 +6,14 @@ CREATE TABLE problem_review_reminder (
     problem_reference_snapshot VARCHAR(255) NULL,
     sequence                   INT         NOT NULL,
     interval_days              INT         NOT NULL,
-    scheduled_at               DATETIME    NOT NULL,
+    scheduled_at               DATETIME(6)    NOT NULL,
     status                     VARCHAR(30) NOT NULL,
-    sent_at                    DATETIME    NULL,
+    sent_at                    DATETIME(6)    NULL,
     last_error_message         VARCHAR(500) NULL,
     retry_count                INT         NOT NULL DEFAULT 0,
-    created_at                 DATETIME    NULL,
-    updated_at                 DATETIME    NULL,
-    deleted_at                 DATETIME    NULL,
+    created_at                 DATETIME(6)    NULL,
+    updated_at                 DATETIME(6)    NULL,
+    deleted_at                 DATETIME(6)    NULL,
     PRIMARY KEY (id)
 );
 
