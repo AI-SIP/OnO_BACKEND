@@ -103,8 +103,8 @@ class StudyRoomWeeklyReportApiTest {
                 room,
                 LocalDate.now().minusDays(7),
                 LocalDate.now().minusDays(1),
-                "방장", 5,
-                "방장", 3,
+                "방장", null, 5,
+                "방장", null, 3,
                 5, 0,
                 "이번 주도 수고하셨습니다!"
         ));
@@ -157,8 +157,8 @@ class StudyRoomWeeklyReportApiTest {
                 room,
                 LocalDate.now().minusDays(7),
                 LocalDate.now().minusDays(1),
-                "방장", 5,
-                "방장", 3,
+                "방장", null, 5,
+                "방장", null, 3,
                 5, 0,
                 "이번 주도 수고하셨습니다!"
         ));
