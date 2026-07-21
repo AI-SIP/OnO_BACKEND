@@ -1,9 +1,11 @@
 package com.aisip.OnO.backend.problem.reminder;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -12,26 +14,46 @@ public interface ProblemReviewReminderRepository extends JpaRepository<ProblemRe
 
     boolean existsByProblemIdAndSequence(Long problemId, int sequence);
 
-    @Query("SELECT r FROM ProblemReviewReminder r WHERE r.status = :status AND r.scheduledAt <= :now AND r.deletedAt IS NULL ORDER BY r.userId ASC, r.scheduledAt ASC")
+    @Query("""
+            SELECT r FROM ProblemReviewReminder r
+            WHERE r.status = :status
+              AND r.scheduledAt <= :now
+              AND r.deletedAt IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM ProblemReviewReminder sent
+                  WHERE sent.userId = r.userId
+                    AND sent.status = :sent
+                    AND sent.sentAt >= :startOfDay
+                    AND sent.sentAt < :endOfDay
+                    AND sent.deletedAt IS NULL
+              )
+              AND EXISTS (
+                  SELECT 1 FROM User u
+                  WHERE u.id = r.userId
+                    AND u.notificationEnabled = true
+              )
+              AND EXISTS (
+                  SELECT 1 FROM FcmToken t
+                  WHERE t.userId = r.userId
+              )
+            ORDER BY r.scheduledAt ASC, r.userId ASC
+            """)
     List<ProblemReviewReminder> findDueReminders(
             @Param("status") ProblemReviewReminderStatus status,
-            @Param("now") LocalDateTime now
-    );
-
-    @Query("SELECT COUNT(r) > 0 FROM ProblemReviewReminder r WHERE r.userId = :userId AND r.status = :sent AND r.sentAt >= :startOfDay AND r.sentAt < :endOfDay AND r.deletedAt IS NULL")
-    boolean hasSentTodayForUser(
-            @Param("userId") Long userId,
+            @Param("now") LocalDateTime now,
             @Param("sent") ProblemReviewReminderStatus sent,
             @Param("startOfDay") LocalDateTime startOfDay,
-            @Param("endOfDay") LocalDateTime endOfDay
+            @Param("endOfDay") LocalDateTime endOfDay,
+            Pageable pageable
     );
 
     @Modifying(clearAutomatically = true)
-    @Query("UPDATE ProblemReviewReminder r SET r.status = :newStatus WHERE r.id = :id AND r.status = :expectedStatus")
+    @Query("UPDATE ProblemReviewReminder r SET r.status = :newStatus, r.updatedAt = :updatedAt WHERE r.id = :id AND r.status = :expectedStatus")
     int tryUpdateStatus(
             @Param("id") Long id,
             @Param("expectedStatus") ProblemReviewReminderStatus expectedStatus,
-            @Param("newStatus") ProblemReviewReminderStatus newStatus
+            @Param("newStatus") ProblemReviewReminderStatus newStatus,
+            @Param("updatedAt") LocalDateTime updatedAt
     );
 
     @Modifying(clearAutomatically = true)
@@ -50,6 +72,7 @@ public interface ProblemReviewReminderRepository extends JpaRepository<ProblemRe
             @Param("failed") ProblemReviewReminderStatus failed
     );
 
+    @Transactional
     @Modifying(clearAutomatically = true)
     @Query("UPDATE ProblemReviewReminder r SET r.status = :failed, r.retryCount = r.retryCount + 1, r.lastErrorMessage = 'stuck recovery' WHERE r.status = :sending AND r.updatedAt < :stuckBefore AND r.deletedAt IS NULL")
     int recoverStuckRows(

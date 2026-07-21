@@ -44,7 +44,7 @@ public class FcmNotificationProducer {
             log.error("RabbitMQ message send failed - exchange: {}, routingKey: {}, operation: {}, userId: {}, error: {}",
                     RabbitMQConfig.NOTIFICATION_EXCHANGE, RabbitMQConfig.FCM_NOTIFICATION_ROUTING_KEY,
                     "fcm_notification", userId, e.getMessage(), e);
-            // 알림 전송 실패해도 예외를 던지지 않음 (알림은 선택적 기능)
+            throw new IllegalStateException("RabbitMQ FCM notification enqueue failed", e);
         }
     }
 }
