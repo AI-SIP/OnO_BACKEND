@@ -51,6 +51,7 @@ import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
@@ -480,6 +481,8 @@ public class ProblemService {
             MultipartFile imageFile = images.get(i);
             ProblemImageType imageType = imageTypes.get(i);
 
+            validateSolveImageNotRegisteredToday(problemId, imageType);
+
             // S3에 업로드
             String imageUrl = fileUploadService.uploadFileToS3(imageFile);
 
@@ -503,6 +506,7 @@ public class ProblemService {
         for (AddProblemImageUrlsRequest.ImageUrlItem item : request.imageDataList()) {
             fileUploadService.validateS3Url(item.imageUrl());
             ProblemImageType imageType = ProblemImageType.valueOf(item.problemImageType());
+            validateSolveImageNotRegisteredToday(problemId, imageType);
             ProblemImageData imageData = ProblemImageData.from(
                     new ProblemImageDataRegisterDto(problemId, item.imageUrl(), imageType));
             imageData.updateProblem(problem);
@@ -510,6 +514,25 @@ public class ProblemService {
             if (imageType == ProblemImageType.SOLVE_IMAGE) {
                 missionLogService.registerProblemPracticeMission(userId, problemId);
             }
+        }
+    }
+
+    private void validateSolveImageNotRegisteredToday(Long problemId, ProblemImageType imageType) {
+        if (imageType != ProblemImageType.SOLVE_IMAGE) {
+            return;
+        }
+
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        LocalTime startOfDay = LocalTime.MIN;
+        LocalTime endOfDay = LocalTime.MAX;
+        boolean alreadyRegistered = problemImageDataRepository.existsByProblemIdAndProblemImageTypeAndCreatedAtBetween(
+                problemId,
+                ProblemImageType.SOLVE_IMAGE,
+                today.atTime(startOfDay),
+                today.atTime(endOfDay)
+        );
+        if (alreadyRegistered) {
+            throw new ApplicationException(ProblemErrorCase.PROBLEM_SOLVE_IMAGE_ALREADY_REGISTERED);
         }
     }
 
