@@ -51,6 +51,9 @@ class StudyRoomFeedServiceUnitTest {
     @Mock
     private CustomEmojiValidator customEmojiValidator;
 
+    @Mock
+    private StudyRoomChallengeService challengeService;
+
     private StudyRoomFeedService feedService;
 
     private User user;
@@ -71,7 +74,7 @@ class StudyRoomFeedServiceUnitTest {
         feedService = new StudyRoomFeedService(
                 accessService, memberRepository, feedRepository,
                 reactionRepository, userRepository, new ObjectMapper(),
-                reactionService, customEmojiValidator
+                reactionService, customEmojiValidator, challengeService
         );
 
         given(userRepository.findById(1L)).willReturn(Optional.of(user));

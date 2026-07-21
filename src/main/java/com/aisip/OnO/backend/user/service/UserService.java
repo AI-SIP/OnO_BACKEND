@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.user.service;
 import com.aisip.OnO.backend.admin.dto.AdminUserResponseDto;
 import com.aisip.OnO.backend.folder.service.FolderService;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
+import com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderService;
 import com.aisip.OnO.backend.problem.service.ProblemService;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomSharedProblemCommentRepository;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomSharedProblemCommentReactionRepository;
@@ -52,6 +53,8 @@ public class UserService {
     private final ProblemService problemService;
 
     private final PracticeNoteService practiceNoteService;
+
+    private final ProblemReviewReminderService reminderService;
 
     private final StudyRoomSharedProblemCommentRepository sharedProblemCommentRepository;
 
@@ -205,6 +208,7 @@ public class UserService {
         sharedProblemCommentReactionRepository.deleteByUserId(userId);
         sharedProblemCommentRepository.deleteByAuthorId(userId);
         practiceNoteService.deleteAllPracticesByUser(userId);
+        reminderService.cancelAllByUser(userId);
         problemService.deleteAllUserProblems(userId);
         folderService.deleteAllUserFolders(userId);
 

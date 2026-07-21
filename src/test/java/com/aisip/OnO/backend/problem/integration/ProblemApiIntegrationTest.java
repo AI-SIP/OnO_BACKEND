@@ -10,12 +10,17 @@ import com.aisip.OnO.backend.util.RandomUserGenerator;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.repository.FolderRepository;
+import com.aisip.OnO.backend.problem.dto.AddProblemImageUrlsRequest;
 import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
-import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
+import com.aisip.OnO.backend.problem.entity.ProblemAnalysis;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
+import com.aisip.OnO.backend.problem.reminder.ProblemReviewReminder;
+import com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderRepository;
+import com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderStatus;
+import com.aisip.OnO.backend.problem.repository.ProblemAnalysisRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -67,6 +72,12 @@ class ProblemApiIntegrationTest {
     private ProblemImageDataRepository problemImageDataRepository;
 
     @Autowired
+    private ProblemAnalysisRepository problemAnalysisRepository;
+
+    @Autowired
+    private ProblemReviewReminderRepository reminderRepository;
+
+    @Autowired
     private FolderRepository folderRepository;
 
     @Autowired
@@ -110,6 +121,9 @@ class ProblemApiIntegrationTest {
                 Problem problem = RandomProblemGenerator.createRandomProblemWithFolder(folder, userId);
                 problem.updateFolder(folder);
                 problemRepository.save(problem);
+                ProblemAnalysis analysis = ProblemAnalysis.createSkipped(problem);
+                problem.updateProblemAnalysis(analysis);
+                problemAnalysisRepository.save(analysis);
 
                 List<ProblemImageData> imageDataList = RandomProblemGenerator.createDefaultProblemImageDataList(problem.getId());
 
@@ -124,9 +138,19 @@ class ProblemApiIntegrationTest {
         }
     }
 
+    private void authenticateAsFixtureUser() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        userId, null, List.of(new SimpleGrantedAuthority("ROLE_MEMBER"))
+                )
+        );
+    }
+
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
+        reminderRepository.deleteAll();
+        problemAnalysisRepository.deleteAll();
         problemImageDataRepository.deleteAll(problemImageDataList);
         problemRepository.deleteAll(problemList);
         folderRepository.deleteAll(folderList);
@@ -254,23 +278,6 @@ class ProblemApiIntegrationTest {
     @WithMockCustomUser()
     void registerProblem() throws Exception {
         // given
-        List<ProblemImageDataRegisterDto> problemImageDataRegisterDtoList = List.of(
-                new ProblemImageDataRegisterDto(
-                        null,
-                        "problemImageUrl",
-                        ProblemImageType.PROBLEM_IMAGE
-                ),
-                new ProblemImageDataRegisterDto(
-                        null,
-                        "answerImageUrl",
-                        ProblemImageType.ANSWER_IMAGE
-                ),
-                new ProblemImageDataRegisterDto(
-                        null,
-                        "solveImageUrl",
-                        ProblemImageType.SOLVE_IMAGE
-                )
-        );
         ProblemRegisterDto problemRegisterDto = new ProblemRegisterDto(
                 null,
                 "memo",
@@ -297,7 +304,7 @@ class ProblemApiIntegrationTest {
 
         assertThat(problem.getMemo()).isEqualTo(problemRegisterDto.memo());
         assertThat(problem.getReference()).isEqualTo(problemRegisterDto.reference());
-        assertThat(problem.getProblemImageDataList().size()).isEqualTo(3);
+        assertThat(problem.getProblemImageDataList()).isEmpty();
     }
 
     @Test
@@ -305,17 +312,17 @@ class ProblemApiIntegrationTest {
     @WithMockCustomUser()
     void registerProblemImageData() throws Exception {
         // given
+        authenticateAsFixtureUser();
         Long problemId = problemList.get(0).getId();
-        ProblemImageDataRegisterDto problemImageDataRegisterDto = new ProblemImageDataRegisterDto(
-                problemId,
-                "solveImageUrl",
-                ProblemImageType.SOLVE_IMAGE
-        );
+        int beforeCount = problemImageDataRepository.findAllByProblemId(problemId).size();
+        AddProblemImageUrlsRequest request = new AddProblemImageUrlsRequest(List.of(
+                new AddProblemImageUrlsRequest.ImageUrlItem("problemImageUrl", ProblemImageType.PROBLEM_IMAGE.name())
+        ));
 
         // when & then
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.post("/api/problems/imageData")
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.post("/api/problems/{problemId}/imageData/urls", problemId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(problemImageDataRegisterDto)))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -331,8 +338,10 @@ class ProblemApiIntegrationTest {
 
         Problem problem = optionalProblem.get();
         List<ProblemImageData> problemImageDataList = problem.getProblemImageDataList();
-        assertThat(problemImageDataList.size()).isEqualTo(3);
-        assertThat(problemImageDataList.get(problemImageDataList.size() - 1).getImageUrl()).isEqualTo("solveImageUrl");
+        assertThat(problemImageDataList).hasSize(beforeCount + 1);
+        assertThat(problemImageDataList)
+                .extracting(ProblemImageData::getImageUrl)
+                .contains("problemImageUrl");
     }
 
     @Test
@@ -340,29 +349,33 @@ class ProblemApiIntegrationTest {
     @WithMockCustomUser()
     void registerProblemImageDataDuplicateSolveImage() throws Exception {
         // given
-        Long problemId = problemList.get(0).getId();
+        authenticateAsFixtureUser();
+        Problem problem = RandomProblemGenerator.createRandomProblemWithFolder(folderList.get(0), userId);
+        problem.updateFolder(folderList.get(0));
+        problemRepository.save(problem);
+        ProblemAnalysis analysis = ProblemAnalysis.createSkipped(problem);
+        problem.updateProblemAnalysis(analysis);
+        problemAnalysisRepository.save(analysis);
+        problemList.add(problem);
+        Long problemId = problem.getId();
 
         // 첫 번째 복습 이미지 등록
-        ProblemImageDataRegisterDto firstSolveImage = new ProblemImageDataRegisterDto(
-                problemId,
-                "solveImageUrl1",
-                ProblemImageType.SOLVE_IMAGE
-        );
+        AddProblemImageUrlsRequest firstSolveImage = new AddProblemImageUrlsRequest(List.of(
+                new AddProblemImageUrlsRequest.ImageUrlItem("solveImageUrl1", ProblemImageType.SOLVE_IMAGE.name())
+        ));
 
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/problems/imageData")
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/problems/{problemId}/imageData/urls", problemId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(firstSolveImage)))
                 .andExpect(status().isOk());
 
         // 같은 날 두 번째 복습 이미지 등록 시도
-        ProblemImageDataRegisterDto secondSolveImage = new ProblemImageDataRegisterDto(
-                problemId,
-                "solveImageUrl2",
-                ProblemImageType.SOLVE_IMAGE
-        );
+        AddProblemImageUrlsRequest secondSolveImage = new AddProblemImageUrlsRequest(List.of(
+                new AddProblemImageUrlsRequest.ImageUrlItem("solveImageUrl2", ProblemImageType.SOLVE_IMAGE.name())
+        ));
 
         // when & then - 예외 발생 확인
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.post("/api/problems/imageData")
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.post("/api/problems/{problemId}/imageData/urls", problemId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(secondSolveImage)))
                 .andExpect(status().isBadRequest())
@@ -379,8 +392,8 @@ class ProblemApiIntegrationTest {
         Optional<Problem> optionalProblem = problemRepository.findProblemWithImageData(problemId);
         assertThat(optionalProblem.isPresent()).isTrue();
 
-        Problem problem = optionalProblem.get();
-        long solveImageCount = problem.getProblemImageDataList().stream()
+        Problem updatedProblem = optionalProblem.get();
+        long solveImageCount = updatedProblem.getProblemImageDataList().stream()
                 .filter(imageData -> imageData.getProblemImageType().equals(ProblemImageType.SOLVE_IMAGE))
                 .count();
 
@@ -460,69 +473,35 @@ class ProblemApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("문제 이미지 수정")
+    @DisplayName("문제 이미지 URL 추가")
     @WithMockCustomUser()
-    void updateProblemImageData() throws Exception {
+    void addProblemImageDataUrls() throws Exception {
         // given
+        authenticateAsFixtureUser();
         Long problemId = problemList.get(0).getId();
-
-        ProblemImageDataRegisterDto problemImageDataRegisterDto1 = new ProblemImageDataRegisterDto(
-                problemId,
-                "problemImageUrl1",
-                ProblemImageType.PROBLEM_IMAGE
-        );
-
-        ProblemImageDataRegisterDto problemImageDataRegisterDto2 = new ProblemImageDataRegisterDto(
-                problemId,
-                "answerImageUrl2",
-                ProblemImageType.ANSWER_IMAGE
-        );
-
-        ProblemImageDataRegisterDto problemImageDataRegisterDto3 = new ProblemImageDataRegisterDto(
-                problemId,
-                "answerImageUrl3",
-                ProblemImageType.SOLVE_IMAGE
-        );
-
-        List<ProblemImageDataRegisterDto> imageDataRegisterDtoList = List.of(problemImageDataRegisterDto1, problemImageDataRegisterDto2, problemImageDataRegisterDto3);
-
-        ProblemRegisterDto problemRegisterDto = new ProblemRegisterDto(
-                problemId,
-                null,
-                null,
-                null,
-                null
-        );
+        int beforeCount = problemImageDataRepository.findAllByProblemId(problemId).size();
+        AddProblemImageUrlsRequest request = new AddProblemImageUrlsRequest(List.of(
+                new AddProblemImageUrlsRequest.ImageUrlItem("problemImageUrl1", ProblemImageType.PROBLEM_IMAGE.name()),
+                new AddProblemImageUrlsRequest.ImageUrlItem("answerImageUrl2", ProblemImageType.ANSWER_IMAGE.name())
+        ));
 
         // when & then
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.patch("/api/problems/imageData")
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.post("/api/problems/{problemId}/imageData/urls", problemId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(problemRegisterDto)))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andReturn();
 
         String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        JsonNode root = objectMapper.readTree(json);
-        JsonNode dataNode = root.get("data");
 
         System.out.println("==== 응답 결과 ====");
         System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
 
-        Optional<Problem> optionalProblem = problemRepository.findProblemWithImageData(problemId);
-        assertThat(optionalProblem.isPresent()).isTrue();
-
-        Problem problem = optionalProblem.get();
-        List<ProblemImageData> imageDataList = problem.getProblemImageDataList();
-
-        assertThat(imageDataList.size()).isEqualTo(3);
-        for(int i = 0; i < imageDataList.size(); i++) {
-            assertThat(imageDataList.get(i).getProblem().getId()).isEqualTo(problemId);
-            assertThat(imageDataList.get(i).getImageUrl()).isEqualTo(imageDataRegisterDtoList.get(i).imageUrl());
-            assertThat(imageDataList.get(i).getProblemImageType()).isEqualTo(imageDataRegisterDtoList.get(i).problemImageType());
-        }
-
-        List<ProblemImageData> problemImageDataList = problemImageDataRepository.findAllByProblemId(problemId);
-        assertThat(problemImageDataList.size()).isEqualTo(3);
+        List<ProblemImageData> imageDataList = problemImageDataRepository.findAllByProblemId(problemId);
+        assertThat(imageDataList).hasSize(beforeCount + 2);
+        assertThat(imageDataList)
+                .extracting(ProblemImageData::getImageUrl)
+                .contains("problemImageUrl1", "answerImageUrl2");
     }
 
     @Test
@@ -573,5 +552,126 @@ class ProblemApiIntegrationTest {
         System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
 
         assertThat(problemRepository.findAllByUserId(userId).size()).isEqualTo(0);
+    }
+
+    // ──────────── 리마인더 통합 테스트 ────────────
+
+    @Test
+    @DisplayName("POST /api/problems 성공 후 DB에 reminder row 5개가 SCHEDULED 상태로 생성된다")
+    void registerProblem_createsReminderRows() throws Exception {
+        // given: setUp에서 저장한 userId를 SecurityContext에 세팅
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        userId, null, List.of(new SimpleGrantedAuthority("ROLE_MEMBER"))
+                )
+        );
+        Long folderId = folderList.get(0).getId();
+        ProblemRegisterDto dto = new ProblemRegisterDto(
+                null, "remind-memo", "remind-ref", folderId, LocalDateTime.now()
+        );
+
+        // when
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.post("/api/problems")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        // 응답에서 problemId 추출
+        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        JsonNode root = objectMapper.readTree(json);
+        Long createdProblemId = root.get("data").asLong();
+
+        // then: AFTER_COMMIT 이벤트가 이미 처리되었으므로 row가 바로 존재해야 함
+        List<ProblemReviewReminder> reminderRows = reminderRepository.findAll().stream()
+                .filter(r -> r.getProblemId().equals(createdProblemId))
+                .toList();
+
+        assertThat(reminderRows).hasSize(5);
+        assertThat(reminderRows).allMatch(r -> r.getStatus() == ProblemReviewReminderStatus.SCHEDULED);
+    }
+
+    @Test
+    @DisplayName("PATCH /api/problems/info 후 reminder SCHEDULED row의 snapshot이 새 값으로 갱신된다")
+    void updateProblemInfo_updatesReminderSnapshot() throws Exception {
+        // given
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        userId, null, List.of(new SimpleGrantedAuthority("ROLE_MEMBER"))
+                )
+        );
+        Problem targetProblem = problemList.get(0);
+        Long problemId = targetProblem.getId();
+
+        // reminder row 5개 직접 삽입
+        for (int i = 1; i <= 5; i++) {
+            reminderRepository.save(ProblemReviewReminder.create(
+                    userId, problemId, "old memo", "old ref",
+                    i, i, LocalDateTime.now().plusDays(i)
+            ));
+        }
+
+        String newMemo = "updated memo";
+        String newRef = "updated ref";
+        ProblemRegisterDto updateDto = new ProblemRegisterDto(
+                problemId, newMemo, newRef, null, null
+        );
+
+        // when
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problems/info")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateDto)))
+                .andExpect(status().isOk());
+
+        // then
+        List<ProblemReviewReminder> scheduledRows = reminderRepository.findAll().stream()
+                .filter(r -> r.getProblemId().equals(problemId)
+                        && r.getStatus() == ProblemReviewReminderStatus.SCHEDULED)
+                .toList();
+
+        assertThat(scheduledRows).hasSize(5);
+        assertThat(scheduledRows).allMatch(r ->
+                newMemo.equals(r.getProblemMemoSnapshot()) &&
+                newRef.equals(r.getProblemReferenceSnapshot())
+        );
+    }
+
+    @Test
+    @DisplayName("DELETE /api/problems 후 해당 problemId의 reminder row가 CANCELED 상태가 된다")
+    void deleteProblems_cancelsReminderRows() throws Exception {
+        // given
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        userId, null, List.of(new SimpleGrantedAuthority("ROLE_MEMBER"))
+                )
+        );
+        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+
+        Problem targetProblem = problemList.get(0);
+        Long problemId = targetProblem.getId();
+
+        // reminder row 5개 직접 삽입
+        for (int i = 1; i <= 5; i++) {
+            reminderRepository.save(ProblemReviewReminder.create(
+                    userId, problemId, "memo", "ref",
+                    i, i, LocalDateTime.now().plusDays(i)
+            ));
+        }
+
+        ProblemDeleteRequestDto deleteDto = new ProblemDeleteRequestDto(List.of(problemId));
+
+        // when
+        mockMvc.perform(MockMvcRequestBuilders.delete("/api/problems")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(deleteDto)))
+                .andExpect(status().isOk());
+
+        // then
+        List<ProblemReviewReminder> reminderRows = reminderRepository.findAll().stream()
+                .filter(r -> r.getProblemId().equals(problemId))
+                .toList();
+
+        assertThat(reminderRows).hasSize(5);
+        assertThat(reminderRows).allMatch(r -> r.getStatus() == ProblemReviewReminderStatus.CANCELED);
     }
 }
