@@ -131,6 +131,9 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
+      # dev 는 회귀 확인 용도라 prod 보다 짧게 둔다 (기본값은 15일)
+      - --storage.tsdb.retention.time=30d
+      - --storage.tsdb.retention.size=5GB
       - --web.external-url=${PROMETHEUS_DEV_EXTERNAL_URL:-http://localhost:9091}
       - --web.route-prefix=${PROMETHEUS_DEV_ROUTE_PREFIX:-/}
     ports:

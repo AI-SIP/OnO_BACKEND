@@ -196,6 +196,11 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
+      # 보존 기간을 지정하지 않으면 기본 15일이라 월 단위 비교가 불가능하다.
+      # 현재 시계열 약 12,000개 / 스크레이프 60초 기준 하루 약 28MB, 90일이면 약 2.5GB.
+      # size 는 디스크가 가득 차는 것을 막는 안전장치이고, 둘 중 먼저 걸리는 쪽이 적용된다.
+      - --storage.tsdb.retention.time=90d
+      - --storage.tsdb.retention.size=10GB
       - --web.external-url=${PROMETHEUS_PROD_EXTERNAL_URL:-http://localhost:9090}
       - --web.route-prefix=${PROMETHEUS_PROD_ROUTE_PREFIX:-/}
     ports:
