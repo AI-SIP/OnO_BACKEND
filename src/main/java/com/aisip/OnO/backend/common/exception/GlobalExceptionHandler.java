@@ -18,6 +18,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -78,6 +79,31 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<CommonResponse> handleBadRequestException(Exception ex, WebRequest request) {
         return handleSpringStatusException(ex, request, HttpStatus.BAD_REQUEST, "잘못된 요청입니다.");
+    }
+
+    /**
+     * 업로드 용량 초과(413)는 4xx 라서 logByStatus 를 타면 log.warn 이 되고,
+     * 그러면 Sentry Logback appender(ERROR 이상)에 걸리지 않아 조용히 묻힌다.
+     * 사용자가 파일을 못 올리고 있다는 신호라 반드시 보여야 해서 error 로 올린다.
+     * (spring.servlet.multipart.max-file-size = 50MB)
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<CommonResponse> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex,
+                                                                              WebRequest request) {
+        HttpStatus status = HttpStatus.PAYLOAD_TOO_LARGE;
+        String message = "업로드 가능한 파일 크기를 초과했습니다.";
+        CommonResponse commonResponse = CommonResponse.error(status.value(), message);
+
+        putErrorMdc(status.value(), ex);
+        log.error("Upload size exceeded - status: {}, exceptionType: {}, detail: {}",
+                status.value(),
+                ex.getClass().getSimpleName(),
+                ex.getMessage(),
+                ex);
+
+        return ResponseEntity
+                .status(status)
+                .body(commonResponse);
     }
 
     @ExceptionHandler(Exception.class)
