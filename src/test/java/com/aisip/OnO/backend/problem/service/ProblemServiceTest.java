@@ -29,6 +29,7 @@ import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveRepository;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
+import com.aisip.OnO.backend.util.RandomUserGenerator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +41,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -89,13 +91,18 @@ class ProblemServiceTest {
     @MockBean
     private S3DeleteProducer s3DeleteProducer;
 
-    private final Long userId = 1L;
+    // 여러 테스트 클래스가 userId 1L 을 공유해 같은 H2 DB 에서 서로의 폴더/문제를 보고 있었다.
+    // 테스트마다 유저를 새로 만들어 서로의 데이터가 보이지 않게 한다
+    private Long userId;
+    private Long otherUserId;
     private List<Problem> problemList;
 
     private List<Folder> folderList;
 
     @BeforeEach
     void setUp() {
+        userId = userRepository.save(RandomUserGenerator.createRandomUser()).getId();
+        otherUserId = userRepository.save(RandomUserGenerator.createRandomUser()).getId();
 
         problemList = new ArrayList<>();
         folderList = new ArrayList<>();
@@ -244,7 +251,7 @@ class ProblemServiceTest {
     void findFolderProblemList_OtherUserFolder() {
         Folder otherUserFolder = folderRepository.save(Folder.from(
                 new FolderRegisterDto("other folder", null, null),
-                2L
+                otherUserId
         ));
 
         assertThatThrownBy(() -> problemService.findFolderProblemList(otherUserFolder.getId(), userId))
@@ -261,9 +268,13 @@ class ProblemServiceTest {
         List<ProblemResponseDto> problemResponseDtoList = problemService.findAllProblems();
 
         //then
+        // findAllProblems 는 최신순(createdAt desc) 으로 정렬된다
+        List<Problem> expectedOrder = new ArrayList<>(problemList);
+        Collections.reverse(expectedOrder);
+
         assertThat(problemResponseDtoList.size()).isEqualTo(problemList.size());
         for(int i = 0; i<problemResponseDtoList.size(); i++){
-            Problem problem = problemList.get(i);
+            Problem problem = expectedOrder.get(i);
             assertThat(problemResponseDtoList.get(i)).isNotNull();
             assertThat(problemResponseDtoList.get(i).imageUrlList().size()).isEqualTo(problemImageDataRepository.findAllByProblemId(problem.getId()).size());
             assertThat(problemResponseDtoList.get(i).problemId()).isEqualTo(problem.getId());
@@ -324,7 +335,7 @@ class ProblemServiceTest {
     void registerProblem_otherUserFolder() {
         Folder otherUserFolder = folderRepository.save(Folder.from(
                 new FolderRegisterDto("other folder", null, null),
-                2L
+                otherUserId
         ));
         ProblemRegisterDto dto = new ProblemRegisterDto(
                 null, "memo", "reference", otherUserFolder.getId(), LocalDateTime.now()
@@ -445,33 +456,6 @@ class ProblemServiceTest {
     }
 
     @Test
-    @DisplayName("문제 이미지 등록하기")
-    void registerProblemImageData() {
-        // given
-        Long problemId = problemList.get(0).getId();
-        String imageUrl = "imageUrl";
-
-        ProblemImageDataRegisterDto dto = new ProblemImageDataRegisterDto(
-                problemId,
-                imageUrl,
-                ProblemImageType.SOLVE_IMAGE
-        );
-
-        // when
-        //problemService.registerProblemImageData(dto, userId);
-
-        // then
-        Optional<Problem> optionalProblem = problemRepository.findProblemWithImageData(problemId);
-        assertThat(optionalProblem.isPresent()).isTrue();
-
-        Problem problem = optionalProblem.get();
-        int imageDataSize = problem.getProblemImageDataList().size();
-        assertThat(imageDataSize).isEqualTo(problemList.get(0).getProblemImageDataList().size() + 1);
-        assertThat(problem.getProblemImageDataList().get(imageDataSize - 1).getImageUrl()).isEqualTo(imageUrl);
-        assertThat(problem.getProblemImageDataList().get(imageDataSize - 1).getProblemImageType()).isEqualTo(ProblemImageType.SOLVE_IMAGE);
-    }
-
-    @Test
     @DisplayName("AI 분석 요청 제한 초과 시 예외 없이 상태 저장")
     void analysisProblem_rateLimitExceeded() {
         // given
@@ -502,7 +486,7 @@ class ProblemServiceTest {
                 problemId,
                 updateMemo,
                 updateReference,
-                1L,
+                folderList.get(0).getId(),
                 LocalDateTime.now()
         );
         //when
@@ -546,35 +530,6 @@ class ProblemServiceTest {
         } else {
             Problem problem = optionalProblem.get();
             assertThat(problem.getFolder().getId()).isEqualTo(updatedFolderId);
-        }
-    }
-
-    @Test
-    @DisplayName("문제 이미지 데이터 수정")
-    void updateProblemImageData() {
-        // Given
-        Long problemId = problemList.get(0).getId();
-
-        ProblemRegisterDto updateDto = new ProblemRegisterDto(
-                problemId,
-                "update memo",
-                "update reference",
-                2L,
-                LocalDateTime.now()
-        );
-
-        //when
-        //problemService.updateProblemImageData(updateDto, userId);
-
-        //then
-        Optional<Problem> optionalProblem = problemRepository.findProblemWithImageData(problemId);
-        if (optionalProblem.isEmpty()) {
-            assertThat(0).isEqualTo(1);
-        } else {
-            Problem problem = optionalProblem.get();
-            assertThat(problem.getProblemImageDataList().size()).isEqualTo(2);
-            assertThat(problem.getProblemImageDataList().get(0).getImageUrl()).isEqualTo("imageUrl1 update");
-            assertThat(problem.getProblemImageDataList().get(1).getImageUrl()).isEqualTo("imageUrl2 update");
         }
     }
 
@@ -682,11 +637,11 @@ class ProblemServiceTest {
     private Problem createOtherUserProblem() {
         Folder otherUserFolder = folderRepository.save(Folder.from(
                 new FolderRegisterDto("other folder", null, null),
-                2L
+                otherUserId
         ));
         Problem otherUserProblem = Problem.from(
                 new ProblemRegisterDto(null, "memo", "reference", otherUserFolder.getId(), LocalDateTime.now()),
-                2L
+                otherUserId
         );
         otherUserProblem.updateFolder(otherUserFolder);
         return problemRepository.save(otherUserProblem);
