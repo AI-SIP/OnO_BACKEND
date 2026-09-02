@@ -10,6 +10,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -128,6 +130,16 @@ class OpenAIClientTest {
         }
 
         @Test
+        @DisplayName("언어 표기 없는 ``` 코드블록도 파싱한다")
+        void parsesPlainFencedJson() {
+            respondWithContent("```\n" + analysisJson() + "\n```");
+
+            ProblemAnalysisResult result = openAIClient.analyzeImage("https://cdn.test/image.jpg");
+
+            assertThat(result.getSubject()).isEqualTo("수학");
+        }
+
+        @Test
         @DisplayName("이스케이프가 깨진 LaTeX 응답은 관대한 파서로 복구한다")
         void recoversFromInvalidEscapeSequences() {
             respondWithContent("{\"subject\":\"수학\",\"solution\":\"x = \\( a + b \\) 형태로 두세요.\"}");
@@ -203,6 +215,60 @@ class OpenAIClientTest {
             assertThatThrownBy(() -> openAIClient.analyzeImage("https://cdn.test/image.jpg"))
                     .isInstanceOf(NonRetryableAnalysisException.class)
                     .hasMessageContaining("할당량");
+        }
+
+        @ParameterizedTest(name = "\"{0}\"")
+        @ValueSource(strings = {
+                "이 사진으로는 문제를 분석할 수 없습니다.",
+                "글씨를 인식할 수 없어요.",
+                "문제 조건이 명확하지 않습니다.",
+                "이미지가 잘려 있습니다.",
+                "이미지에 있는 문제를 확인해 주세요.",
+                "죄송하지만 도와드릴 수 없습니다.",
+                "다른 이미지를 제공해 주세요."
+        })
+        @DisplayName("한국어 분석 불가 문구는 전부 재시도 대상에서 제외한다")
+        void detectsEveryKoreanNotAnalyzablePhrase(String content) {
+            respondWithContent(content);
+
+            assertThatThrownBy(() -> openAIClient.analyzeImage("https://cdn.test/image.jpg"))
+                    .as("이 문구를 놓치면 분석 불가 이미지가 큐에서 무한 재시도된다")
+                    .isInstanceOf(NonRetryableAnalysisException.class)
+                    .hasMessageContaining("분석이 불가능한 이미지");
+        }
+
+        @ParameterizedTest(name = "\"{0}\"")
+        @ValueSource(strings = {
+                "I'm sorry, but that is not possible.",
+                "I am sorry about this.",
+                "I can't assist with that.",
+                "I cannot assist with that.",
+                "We can't help with this request.",
+                "We cannot help with this request.",
+                "The model is unable to assist.",
+                "The model is unable to help.",
+                "Sorry, I won't do that.",
+                "As an AI, I cannot do that.",
+                "Well, I can't do that."
+        })
+        @DisplayName("영어 거절 문구는 전부 재시도 대상에서 제외한다")
+        void detectsEveryEnglishRefusalPhrase(String content) {
+            respondWithContent(content);
+
+            assertThatThrownBy(() -> openAIClient.analyzeImage("https://cdn.test/image.jpg"))
+                    .as("거절 문구를 놓치면 같은 요청이 계속 재시도된다")
+                    .isInstanceOf(NonRetryableAnalysisException.class)
+                    .hasMessageContaining("거절");
+        }
+
+        @Test
+        @DisplayName("여는 중괄호로 시작하지만 닫히지 않은 응답은 JSON 이 아닌 것으로 본다")
+        void treatsUnclosedBraceAsNonJson() {
+            respondWithContent("{ 이 문제는 함수의 극한을 묻고 있습니다");
+
+            assertThatThrownBy(() -> openAIClient.analyzeImage("https://cdn.test/image.jpg"))
+                    .isInstanceOf(NonRetryableAnalysisException.class)
+                    .hasMessageContaining("JSON 형식이 아닌");
         }
 
         @Test
@@ -289,6 +355,21 @@ class OpenAIClientTest {
 
             assertThatThrownBy(() -> openAIClient.analyzeImage("https://cdn.test/image.jpg"))
                     .isInstanceOf(RuntimeException.class);
+        }
+
+        @Test
+        @DisplayName("content 가 null 이면 NonRetryable 이 아니라 재시도 가능한 실패다")
+        void wrapsNullContent() {
+            server.expect(requestTo(API_URL))
+                    .andRespond(withSuccess("{\"choices\":[{\"message\":{\"content\":null}}]}",
+                            MediaType.APPLICATION_JSON));
+
+            assertThatThrownBy(() -> openAIClient.analyzeImage("https://cdn.test/image.jpg"))
+                    .as("응답 자체가 비어 온 것은 모델의 거절이 아니므로 재시도할 수 있어야 한다")
+                    .isInstanceOf(RuntimeException.class)
+                    .isNotInstanceOf(NonRetryableAnalysisException.class);
+
+            assertThat(externalTimer("analyze_images", "failure")).isNotNull();
         }
     }
 

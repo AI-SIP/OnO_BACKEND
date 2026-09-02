@@ -169,6 +169,21 @@ class FileUploadServiceTest {
         }
 
         @Test
+        @DisplayName("파일명 없는 파트도 400 으로 거절한다")
+        void rejectsPartWithoutFilename() {
+            MultipartFile fileWithoutName = mock(MultipartFile.class);
+            when(fileWithoutName.getOriginalFilename()).thenReturn(null);
+
+            assertThatThrownBy(() -> fileUploadService.uploadFileToS3(fileWithoutName))
+                    .as("filename 헤더가 없는 멀티파트 파트가 500 이 되면 안 된다")
+                    .isInstanceOf(ApplicationException.class)
+                    .extracting(exception -> ((ApplicationException) exception).getErrorCase())
+                    .isEqualTo(FileUploadErrorCase.INVALID_IMAGE_FILE);
+
+            verifyNoInteractions(amazonS3Client);
+        }
+
+        @Test
         @DisplayName("확장자 검증에 걸리면 S3 호출 없이 끝난다")
         void doesNotCallS3WhenFilenameIsInvalid() {
             assertThatThrownBy(() -> fileUploadService.uploadFileToS3(imageFile("no-extension")))

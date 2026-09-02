@@ -16,11 +16,14 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.ErrorResponseException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,6 +34,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.sql.SQLIntegrityConstraintViolationException;
@@ -198,6 +203,15 @@ class GlobalExceptionHandlerTest {
         }
 
         @Test
+        @DisplayName("MethodArgumentNotValidException - 검증 메시지가 하나도 없으면 기본 문구로 내려준다")
+        void fallsBackToDefaultMessageWithoutValidationErrors() throws Exception {
+            mockMvc.perform(get("/test/method-argument-not-valid/empty"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode").value(400))
+                    .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
+        }
+
+        @Test
         @DisplayName("400 계열은 어떤 경우에도 Discord 알림을 보내지 않는다")
         void neverNotifiesDiscordForBadRequests() throws Exception {
             mockMvc.perform(get("/test/bind-exception"));
@@ -281,9 +295,41 @@ class GlobalExceptionHandlerTest {
         }
 
         @Test
+        @DisplayName("H2 의 unique constraint 문구도 409 로 본다 - 테스트 DB 와 운영 DB 문구가 다르다")
+        void returnsConflictForUniqueConstraintWording() throws Exception {
+            mockMvc.perform(get("/test/data-integrity/unique-constraint"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.message").value("이미 존재하는 데이터입니다."));
+        }
+
+        @Test
+        @DisplayName("Data truncation 만 있어도 길이 초과로 분류한다")
+        void returnsBadRequestForTruncationWordingOnly() throws Exception {
+            mockMvc.perform(get("/test/data-integrity/truncation-only"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("입력값이 허용된 길이를 초과했습니다."));
+        }
+
+        @Test
+        @DisplayName("Hibernate 의 not-null 문구도 필수값 누락으로 분류한다")
+        void returnsBadRequestForHibernateNotNullWording() throws Exception {
+            mockMvc.perform(get("/test/data-integrity/not-null-property"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("필수 입력값이 누락되었습니다."));
+        }
+
+        @Test
         @DisplayName("분류되지 않은 제약 위반도 기본 400 으로 떨어진다")
         void returnsBadRequestForUnclassifiedViolation() throws Exception {
             mockMvc.perform(get("/test/data-integrity/unknown"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("요청 데이터가 저장 조건을 만족하지 않습니다."));
+        }
+
+        @Test
+        @DisplayName("원인 메시지가 비어 있어도 500 이 아니라 400 으로 떨어진다")
+        void returnsBadRequestWhenCauseMessageIsNull() throws Exception {
+            mockMvc.perform(get("/test/data-integrity/null-message"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.message").value("요청 데이터가 저장 조건을 만족하지 않습니다."));
         }
@@ -304,6 +350,51 @@ class GlobalExceptionHandlerTest {
 
             assertThat(MDC.get("errorCode")).isEqualTo("409");
             assertThat(MDC.get("exceptionType")).isEqualTo("DataIntegrityViolationException");
+        }
+    }
+
+    @Nested
+    @DisplayName("업로드 멀티파트 오류는 500 이 아니라 400 이다")
+    class MultipartHandling {
+
+        @Test
+        @DisplayName("용량 초과는 400 + 2004 로 응답한다")
+        void returnsBadRequestForMaxUploadSize() throws Exception {
+            mockMvc.perform(get("/test/multipart/too-large"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode")
+                            .value(FileUploadErrorCase.FILE_SIZE_EXCEEDED.getErrorCode()))
+                    .andExpect(jsonPath("$.message")
+                            .value(FileUploadErrorCase.FILE_SIZE_EXCEEDED.getMessage()));
+        }
+
+        @Test
+        @DisplayName("큰 사진 한 장으로 Discord 에러 알림이 나가면 안 된다")
+        void doesNotNotifyDiscordForMaxUploadSize() throws Exception {
+            mockMvc.perform(get("/test/multipart/too-large"));
+
+            verifyNoInteractions(discordWebhookNotificationService);
+        }
+
+        @Test
+        @DisplayName("깨진 멀티파트 본문은 400 + 2001 로 응답한다")
+        void returnsBadRequestForBrokenMultipart() throws Exception {
+            mockMvc.perform(get("/test/multipart/broken"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode")
+                            .value(FileUploadErrorCase.FILE_UPLOAD_FAILED.getErrorCode()));
+
+            verifyNoInteractions(discordWebhookNotificationService);
+        }
+
+        @Test
+        @DisplayName("MDC 에는 파일 업로드 에러코드가 남는다")
+        void putsFileUploadErrorCodeIntoMdc() throws Exception {
+            mockMvc.perform(get("/test/multipart/too-large"));
+
+            assertThat(MDC.get("errorCode"))
+                    .isEqualTo(String.valueOf(FileUploadErrorCase.FILE_SIZE_EXCEEDED.getErrorCode()));
+            assertThat(MDC.get("exceptionType")).isEqualTo("MaxUploadSizeExceededException");
         }
     }
 
@@ -348,6 +439,44 @@ class GlobalExceptionHandlerTest {
 
             verifyNoInteractions(discordWebhookNotificationService);
         }
+
+        @Test
+        @DisplayName("ErrorResponseException 에 detail 이 있으면 그 문구를 쓴다")
+        void usesProblemDetailMessage() throws Exception {
+            mockMvc.perform(get("/test/error-response/with-detail"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.errorCode").value(409))
+                    .andExpect(jsonPath("$.message").value("이미 처리된 요청입니다."));
+        }
+
+        @Test
+        @DisplayName("detail 이 공백이면 기본 문구로 대체한다 - 빈 메시지를 사용자에게 보이지 않는다")
+        void replacesBlankProblemDetailMessage() throws Exception {
+            mockMvc.perform(get("/test/error-response/blank-detail"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
+        }
+
+        @Test
+        @DisplayName("바디가 없는 ErrorResponse 도 기본 문구로 응답한다")
+        void handlesErrorResponseWithoutBody() throws Exception {
+            mockMvc.perform(get("/test/error-response/no-body"))
+                    .andExpect(status().isIAmATeapot())
+                    .andExpect(jsonPath("$.errorCode").value(418))
+                    .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
+
+            verifyNoInteractions(discordWebhookNotificationService);
+        }
+
+        @Test
+        @DisplayName("ErrorResponse 인데 5xx 면 Discord 로 알린다")
+        void notifiesDiscordForServerSideErrorResponse() throws Exception {
+            mockMvc.perform(get("/test/error-response/server-error"))
+                    .andExpect(status().isServiceUnavailable());
+
+            verify(discordWebhookNotificationService).sendErrorNotification(
+                    anyString(), any(), anyString(), anyString());
+        }
     }
 
     @RestController
@@ -380,9 +509,55 @@ class GlobalExceptionHandlerTest {
             throw new MethodArgumentNotValidException(parameter, bindingResult);
         }
 
+        @GetMapping("/method-argument-not-valid/empty")
+        String methodArgumentNotValidWithoutErrors() throws Exception {
+            BeanPropertyBindingResult bindingResult =
+                    new BeanPropertyBindingResult(new SampleRequest(""), "sampleRequest");
+
+            MethodParameter parameter = new MethodParameter(
+                    ExceptionThrowingController.class.getDeclaredMethod("body", SampleRequest.class), 0);
+            throw new MethodArgumentNotValidException(parameter, bindingResult);
+        }
+
         @PostMapping("/body")
         String body(@RequestBody SampleRequest request) {
             return request.name();
+        }
+
+        @GetMapping("/multipart/too-large")
+        String maxUploadSizeExceeded() {
+            throw new MaxUploadSizeExceededException(50L * 1024 * 1024);
+        }
+
+        @GetMapping("/multipart/broken")
+        String brokenMultipart() {
+            throw new MultipartException("Failed to parse multipart servlet request");
+        }
+
+        @GetMapping("/error-response/with-detail")
+        String errorResponseWithDetail() {
+            throw new ErrorResponseException(
+                    HttpStatus.CONFLICT,
+                    ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "이미 처리된 요청입니다."),
+                    null);
+        }
+
+        @GetMapping("/error-response/blank-detail")
+        String errorResponseWithBlankDetail() {
+            throw new ErrorResponseException(
+                    HttpStatus.CONFLICT,
+                    ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "   "),
+                    null);
+        }
+
+        @GetMapping("/error-response/no-body")
+        String errorResponseWithoutBody() throws Exception {
+            throw new BodylessErrorResponseException(HttpStatus.I_AM_A_TEAPOT);
+        }
+
+        @GetMapping("/error-response/server-error")
+        String serverSideErrorResponse() throws Exception {
+            throw new BodylessErrorResponseException(HttpStatus.SERVICE_UNAVAILABLE);
         }
 
         @GetMapping("/type-mismatch/{id}")
@@ -447,6 +622,36 @@ class GlobalExceptionHandlerTest {
                     new java.sql.SQLException("Column 'user_id' cannot be null"));
         }
 
+        @GetMapping("/data-integrity/unique-constraint")
+        String uniqueConstraint() {
+            throw new DataIntegrityViolationException(
+                    "could not execute statement",
+                    new java.sql.SQLException(
+                            "Unique constraint or index violation: \"IDX_TAG_USER_NORMALIZED\""));
+        }
+
+        @GetMapping("/data-integrity/truncation-only")
+        String truncationOnly() {
+            throw new DataIntegrityViolationException(
+                    "could not execute statement",
+                    new java.sql.SQLException("Data truncation: value too long"));
+        }
+
+        @GetMapping("/data-integrity/not-null-property")
+        String notNullProperty() {
+            throw new DataIntegrityViolationException(
+                    "could not execute statement",
+                    new org.hibernate.PropertyValueException(
+                            "not-null property references a null or transient value",
+                            "FcmToken",
+                            "token"));
+        }
+
+        @GetMapping("/data-integrity/null-message")
+        String nullCauseMessage() {
+            throw new DataIntegrityViolationException(null, new IllegalStateException());
+        }
+
         @GetMapping("/data-integrity/unknown")
         String unknownViolation() {
             throw new DataIntegrityViolationException("알 수 없는 제약 위반");
@@ -459,5 +664,31 @@ class GlobalExceptionHandlerTest {
     }
 
     record SampleRequest(String name) {
+    }
+
+    /**
+     * {@code getBody()} 가 null 인 {@link ErrorResponse}.
+     *
+     * <p>스프링이 기본 제공하는 예외는 항상 ProblemDetail 을 채우지만, 서드파티 예외나
+     * 직접 구현한 ErrorResponse 는 그렇지 않을 수 있다. 이때 NPE 로 500 이 되면 안 된다.
+     */
+    static class BodylessErrorResponseException extends Exception implements ErrorResponse {
+
+        private final HttpStatus status;
+
+        BodylessErrorResponseException(HttpStatus status) {
+            super("body 없는 ErrorResponse");
+            this.status = status;
+        }
+
+        @Override
+        public HttpStatusCode getStatusCode() {
+            return status;
+        }
+
+        @Override
+        public ProblemDetail getBody() {
+            return null;
+        }
     }
 }

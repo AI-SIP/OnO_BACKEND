@@ -51,12 +51,18 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
         return Optional.ofNullable(problem);
     }
 
+    /**
+     * problemAnalysis 는 mappedBy OneToOne 이라 프록시로 미룰 수도, 배치 페치로 묶을 수도 없다.
+     * fetch join 하지 않으면 Hibernate 가 "행마다 분석이 있는지" 확인하는 쿼리를 한 번씩 더 던져
+     * 문제 개수에 비례해 쿼리가 늘어난다(N+1). 응답 DTO 가 이 값을 항상 읽으므로 함께 가져온다.
+     */
     @Override
     public List<Problem> findAllByUserId(Long userId) {
         return queryFactory
                 .selectFrom(problem)
                 .leftJoin(QProblem.problem.folder).fetchJoin()
                 .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
+                .leftJoin(problem.problemAnalysis, problemAnalysis).fetchJoin()
                 .where(problem.userId.eq(userId))
                 .orderBy(problem.id.asc())
                 .fetch();
@@ -68,6 +74,7 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
                 .selectFrom(problem)
                 .leftJoin(QProblem.problem.folder).fetchJoin()
                 .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
+                .leftJoin(problem.problemAnalysis, problemAnalysis).fetchJoin()
                 .where(problem.folder.id.eq(folderId))
                 .orderBy(problem.id.asc())
                 .fetch();

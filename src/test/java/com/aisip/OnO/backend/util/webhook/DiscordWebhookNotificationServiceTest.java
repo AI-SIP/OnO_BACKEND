@@ -143,6 +143,28 @@ class DiscordWebhookNotificationServiceTest {
         }
 
         @Test
+        @DisplayName("공백만 있는 값도 null 과 같은 unknown 키로 묶는다")
+        void normalizesBlankValues() {
+            notificationService.sendErrorNotification(null, "첫 번째", null, null);
+            notificationService.sendErrorNotification("   ", "두 번째", "\t", "");
+
+            ArgumentCaptor<String> dedupKey = ArgumentCaptor.forClass(String.class);
+            verify(discordWebhookProducer, times(1)).send(any(), dedupKey.capture());
+            assertThat(dedupKey.getValue())
+                    .as("공백을 별도 키로 세면 같은 장애가 두 번 알림된다")
+                    .isEqualTo("unknown|unknown|unknown");
+        }
+
+        @Test
+        @DisplayName("공백이 섞인 경로는 한 칸으로 정규화해 같은 키로 본다")
+        void collapsesWhitespaceInsideValues() {
+            notificationService.sendErrorNotification("/api/problems  v2", "첫 번째", "500", "IllegalStateException");
+            notificationService.sendErrorNotification("/api/problems v2", "두 번째", "500", "IllegalStateException");
+
+            verify(discordWebhookProducer, times(1)).send(any(), anyString());
+        }
+
+        @Test
         @DisplayName("커스텀 embed 도 제목/설명 기준으로 중복을 억제한다")
         void suppressesIdenticalCustomEmbed() {
             notificationService.sendCustomEmbed("배치 실패", "리마인더 발송 실패", List.of());

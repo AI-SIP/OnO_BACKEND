@@ -74,7 +74,7 @@ public class FolderService {
         return toFolderResponseDto(folder, problemIdList);
     }
 
-    @Transactional(readOnly = true)
+    // 호출자의 트랜잭션 안에서 실행된다. private 에 붙인 @Transactional 은 프록시가 가로채지 못해 무효다.
     private Folder findFolderEntity(Long folderId) {
         return folderRepository.findById(folderId)
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));

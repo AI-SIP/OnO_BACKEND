@@ -560,7 +560,8 @@ public class ProblemService {
         analysisProblemWithoutOwnerCheck(problemId, userId);
     }
 
-    @Transactional
+    // 호출자(analysisProblem)의 트랜잭션 안에서 실행된다.
+    // private 메서드에 @Transactional 을 붙여도 Spring 프록시가 가로채지 못해 아무 효과가 없다.
     private void analysisProblemWithoutOwnerCheck(Long problemId, Long userId) {
         // 이미 분석이 완료된 문제는 재요청하지 않음
         if (problemAnalysisRepository.findByProblemId(problemId)
@@ -734,7 +735,7 @@ public class ProblemService {
      * - S3 파일 삭제: 비동기 (RabbitMQ Producer로 전송)
      * - PracticeNote 매핑 삭제: 동기 (데이터 정합성)
      */
-    @Transactional
+    // 호출자(deleteProblem / deleteFolderProblems / deleteAllUserProblems)의 트랜잭션 안에서 실행된다.
     private void deleteProblemWithoutOwnerCheck(Long problemId) {
         // 1. 이미지 데이터 조회
         List<ProblemImageData> imageDataList = problemImageDataRepository.findAllByProblemId(problemId);
@@ -797,7 +798,7 @@ public class ProblemService {
         problemIdList.forEach(problemId -> deleteProblem(problemId, userId));
     }
 
-    @Transactional
+    // 호출자(deleteAllByFolderIds)의 트랜잭션 안에서 실행된다.
     private void deleteFolderProblems(Long folderId) {
         problemRepository.findAllByFolderId(folderId)
                 .forEach(problem -> {

@@ -416,12 +416,23 @@ class LearningCalendarServiceTest extends LearningCalendarTestSupport {
             assertThat(response.thisMonthStudyDays()).isZero();
         }
 
+        /**
+         * 기록은 서울 기준 오늘 하루치만 만든다.
+         *
+         * <p>기본 시간대가 서울보다 앞서든 뒤서든, 그 시간대의 "오늘"에는 기록이 없다.
+         * 따라서 JVM 기본 시간대를 보는 구현이면 연속일수가 0 이 되고,
+         * Asia/Seoul 을 보는 구현이면 1 이 된다. 어느 시간대가 선택되든 결론이 같아
+         * 실행 시각에 관계없이 결정적이다.
+         *
+         * <p>처음에는 "하루 뒤" 기록도 함께 만들어 미래 기록이 연속에 포함되지 않는지까지
+         * 확인하려 했지만, 그 경우 선택되는 시간대에 따라 기대값이 갈려 자정 부근에만
+         * 깨지는 테스트가 됐다. 미래 날짜 기록은 프로덕션에 존재하지도 않으므로 걷어냈다.
+         */
         @Test
         @DisplayName("JVM 기본 시간대가 달라도 Asia/Seoul 기준 오늘로 연속일수를 계산한다")
         void currentStreakUsesSeoulToday() {
             LocalDate seoulToday = LocalDate.now(KST);
-            Problem note = saveNoteWrittenAt(userId, seoulToday.atTime(12, 0));
-            saveSolveAt(userId, note, seoulToday.plusDays(1).atTime(12, 0), 60);
+            saveNoteWrittenAt(userId, seoulToday.atTime(12, 0));
 
             TimeZone originalTimeZone = TimeZone.getDefault();
             try {
@@ -431,7 +442,7 @@ class LearningCalendarServiceTest extends LearningCalendarTestSupport {
                         userId, seoulToday.getYear(), seoulToday.getMonthValue());
 
                 assertThat(response.currentStreak())
-                        .as("서울 기준 오늘 하루만 연속. 하루 뒤 기록은 아직 연속에 들어가면 안 된다")
+                        .as("기본 시간대의 오늘에는 기록이 없다. 서울 기준으로 세야 1 이 나온다")
                         .isEqualTo(1);
             } finally {
                 TimeZone.setDefault(originalTimeZone);
