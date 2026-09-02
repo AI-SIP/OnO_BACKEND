@@ -53,12 +53,27 @@ groups:
           summary: "High API p95 latency on {{ $labels.job }}"
           description: "HTTP API p95 latency is above 1.5s for 10 minutes."
 
+      # 분모에서 봇 트래픽을 뺀다. 전체 요청의 92%가 /api 밖 경로(스캐너)라
+      # 그대로 두면 실제 API 의 5xx 비율이 1/13 로 희석된다.
       - alert: OnOBackendHigh5xxRatio
-        expr: (sum by (job) (rate(http_server_requests_seconds_count{job=~"ono-backend-.*",status=~"5.."}[5m])) / clamp_min(sum by (job) (rate(http_server_requests_seconds_count{job=~"ono-backend-.*"}[5m])), 1e-9)) > 0.05
+        expr: (sum by (job) (rate(http_server_requests_seconds_count{job=~"ono-backend-.*",status=~"5..",uri=~"/api.*"}[5m])) / clamp_min(sum by (job) (rate(http_server_requests_seconds_count{job=~"ono-backend-.*",uri=~"/api.*"}[5m])), 1e-9)) > 0.05
         for: 10m
         labels:
           severity: warning
           service: ono-backend
         annotations:
           summary: "High 5xx ratio on {{ $labels.job }}"
-          description: "5xx ratio is above 5% for 10 minutes."
+          description: "API 5xx ratio is above 5% for 10 minutes."
+
+      # API 트래픽이 하루 약 780건(분당 0.5건)이라 비율+for:10m 조합으로는
+      # 짧게 터지는 장애를 못 잡는다. 실제로 8/30 태그 중복 500 12건, 8/25 memo 500 3건이
+      # 모두 몇 분 안에 끝나 위 규칙을 통과했다. 건수 기준으로 한 번 더 본다.
+      - alert: OnOBackendApi5xxBurst
+        expr: sum by (job) (increase(http_server_requests_seconds_count{job=~"ono-backend-.*",status=~"5..",uri=~"/api.*"}[10m])) >= 3
+        for: 0m
+        labels:
+          severity: warning
+          service: ono-backend
+        annotations:
+          summary: "API 5xx burst on {{ $labels.job }}"
+          description: "10분 동안 /api 경로에서 5xx 가 3건 이상 발생했습니다."
