@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.problem.service;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.ratelimit.RateLimitService;
 import com.aisip.OnO.backend.config.rabbitmq.producer.ProblemAnalysisProducer;
+import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
@@ -46,6 +47,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.util.ReflectionTestUtils.setField;
 
@@ -82,6 +85,9 @@ class ProblemServiceTest {
 
     @MockBean
     private ProblemAnalysisProducer analysisProducer;
+
+    @MockBean
+    private S3DeleteProducer s3DeleteProducer;
 
     private final Long userId = 1L;
     private List<Problem> problemList;
@@ -579,11 +585,10 @@ class ProblemServiceTest {
         Long problemId = problemList.get(0).getId();
 
         // When
-        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
         problemService.deleteProblem(problemId, userId);
 
-        // Then
-        verify(fileUploadService, times(2)).deleteImageFileFromS3(anyString());
+        // Then - S3 삭제는 RabbitMQ 로 비동기 전송된다
+        verify(s3DeleteProducer, times(2)).sendDeleteMessage(anyString(), anyLong());
         assertThat(problemRepository.findAll().size()).isEqualTo(problemList.size() - 1);
     }
 
@@ -591,13 +596,10 @@ class ProblemServiceTest {
     @DisplayName("특정 유저의 모든 문제 삭제하기")
     void deleteProblems_userId() {
         // when
-        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
-
-        // when
         problemService.deleteAllUserProblems(userId);
 
         // then
-        verify(fileUploadService, times(2  * problemList.size())).deleteImageFileFromS3(anyString());
+        verify(s3DeleteProducer, times(2 * problemList.size())).sendDeleteMessage(anyString(), anyLong());
         assertThat(problemRepository.findAll().size()).isEqualTo(0);
     }
 
@@ -613,11 +615,10 @@ class ProblemServiceTest {
         }
 
         // when
-        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
         problemService.deleteProblemList(userId, problemIdList);
 
         // then
-        verify(fileUploadService, times(2 * problemIdList.size())).deleteImageFileFromS3(anyString());
+        verify(s3DeleteProducer, times(2 * problemIdList.size())).sendDeleteMessage(anyString(), anyLong());
         assertThat(problemRepository.findAll().size()).isEqualTo(problemList.size() - (long) deleteCount);
     }
 
@@ -632,7 +633,7 @@ class ProblemServiceTest {
         problemService.deleteAllByFolderIds(userId, folderIdList);
 
         // then
-        verify(fileUploadService, times(2 * problemCount)).deleteImageFileFromS3(anyString());
+        verify(s3DeleteProducer, times(2 * problemCount)).sendDeleteMessage(anyString(), anyLong());
         assertThat(problemRepository.findAll().size()).isEqualTo(problemList.size() - (long) problemCount);
     }
 

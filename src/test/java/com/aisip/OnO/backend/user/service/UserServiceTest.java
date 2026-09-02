@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.user.service;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.folder.service.FolderService;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
+import com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderService;
 import com.aisip.OnO.backend.problem.service.ProblemService;
 import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomSharedProblemCommentRepository;
@@ -45,6 +46,8 @@ class UserServiceTest {
     private ProblemService problemService;
     @Mock
     private PracticeNoteService practiceNoteService;
+    @Mock
+    private ProblemReviewReminderService reminderService;
     @Mock
     private StudyRoomSharedProblemCommentRepository sharedProblemCommentRepository;
     @Mock
@@ -266,6 +269,7 @@ class UserServiceTest {
         verify(practiceNoteService, times(1)).deleteAllPracticesByUser(userId);
         verify(problemService, times(1)).deleteAllUserProblems(userId);
         verify(folderService, times(1)).deleteAllUserFolders(userId);
+        verify(reminderService, times(1)).cancelAllByUser(userId);
         verify(userRepository, times(1)).findById(userId);
         verify(userRepository, times(1)).deleteById(userId);
         verify(userRepository, times(2)).flush();

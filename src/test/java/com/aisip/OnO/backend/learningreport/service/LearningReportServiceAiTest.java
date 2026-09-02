@@ -14,6 +14,7 @@ import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.util.ai.OpenAIClient;
+import com.aisip.OnO.backend.util.redis.RedisSingleDataService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -58,6 +59,11 @@ class LearningReportServiceAiTest {
 
     @MockBean
     private OpenAIClient openAIClient;
+
+    // 캐시가 살아 있으면 AI 호출 없이 캐시 값이 반환돼 테스트가 실행 순서와 외부 Redis 상태에 좌우된다.
+    // 목으로 대체하면 getSingleData 가 null 을 반환해 항상 캐시 미스가 된다
+    @MockBean
+    private RedisSingleDataService redisSingleDataService;
 
     @Test
     @DisplayName("학습 리포트 조회 - AI 추천 결과가 recommendations에 반영된다")

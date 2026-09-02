@@ -358,7 +358,8 @@ public class FolderApiIntegrationTest {
     @DisplayName("updateFolder() api 테스트 - 이름 변경")
     public void updateFolderTest_FolderName() throws Exception {
         //given
-        Long folderId = folderList.get(0).getId();
+        // 루트 폴더는 이름을 바꿀 수 없다(ROOT_FOLDER_CANNOT_UPDATE). 하위 폴더로 검증한다
+        Long folderId = folderList.get(1).getId();
         String folderName = "new FolderName";
         FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
                 folderName,
