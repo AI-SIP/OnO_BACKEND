@@ -53,9 +53,20 @@
 --   3. VARCHAR 축소는 INPLACE 가 불가능해 테이블 전체 재작성 + 쓰기 차단이다. 확장보다 위험하다.
 --   4. flyway_schema_history 에서 해당 버전 행을 지운다. 안 지우면 스키마와 이력이 영구히 어긋난다.
 
+--
+-- [collation 명시 이유 - 프로덕션 실측 반영]
+-- 프로덕션 조회 결과 이 컬럼은 utf8mb4 / utf8mb4_unicode_ci 이고 octet_length 는 1020 이다.
+-- MODIFY COLUMN 은 명시하지 않은 CHARACTER SET/COLLATE 를 테이블 기본값으로 리셋하므로,
+-- 테이블 기본값이 컬럼과 다를 경우 collation 이 바뀌면서 인덱스 재구축(COPY)이 일어난다.
+-- 현재 값을 그대로 재기술해 테이블 기본값이 무엇이든 컬럼 정의가 바뀌지 않도록 한다.
+--
+-- 길이 프리픽스: 1020 octet -> 목표 크기도 255 octet 초과라 둘 다 2바이트 구간이다.
+-- 프리픽스 크기가 바뀌지 않으므로 메타데이터 변경만으로 끝난다.
+
 
 SET SESSION lock_wait_timeout = 10;
 
 ALTER TABLE refresh_token
-    MODIFY COLUMN refresh_token VARCHAR(512) NOT NULL,
+    MODIFY COLUMN refresh_token VARCHAR(512)
+        CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
     ALGORITHM=INPLACE, LOCK=NONE;

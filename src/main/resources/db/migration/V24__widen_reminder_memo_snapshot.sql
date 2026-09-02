@@ -6,6 +6,15 @@
 --
 -- 같은 테이블의 problem_reference_snapshot(255) 은 원본 problem.reference 가 255 라 그대로 둔다.
 --
+-- [프로덕션 적용 순서 - 실측 반영]
+-- 프로덕션 조회 결과 problem_review_reminder 테이블 자체가 아직 없다. V21 이 프로덕션에
+-- 적용되지 않았다는 뜻이다. Flyway 는 버전 순서대로 적용하므로 다음 배포에서
+-- V21 이 테이블을 만든 뒤 이 파일이 컬럼을 넓힌다. 순서상 문제는 없다.
+--
+-- V21 을 직접 고쳐 처음부터 VARCHAR(1000) 으로 만드는 편이 깔끔해 보이지만 그렇게 하지 않는다.
+-- V21 이 dev 에는 이미 적용됐을 수 있고, validate-on-migrate: true 이므로 적용된 마이그레이션의
+-- 내용을 바꾸면 체크섬 불일치로 dev 기동이 실패한다.
+--
 -- [락 / 알고리즘]
 -- ALGORITHM=INPLACE, LOCK=NONE 을 명시한다. 절이 없으면 MySQL 이 알아서 고르는데,
 -- INPLACE 가 불가능한 조건이면 에러 없이 조용히 COPY 로 내려가 테이블을 통째로 재작성하고
@@ -46,9 +55,20 @@
 --   3. VARCHAR 축소는 INPLACE 가 불가능해 테이블 전체 재작성 + 쓰기 차단이다. 확장보다 위험하다.
 --   4. flyway_schema_history 에서 해당 버전 행을 지운다. 안 지우면 스키마와 이력이 영구히 어긋난다.
 
+--
+-- [collation 명시 이유 - 프로덕션 실측 반영]
+-- 프로덕션 조회 결과 이 컬럼은 utf8mb4 / utf8mb4_unicode_ci 이고 octet_length 는 1020 이다.
+-- MODIFY COLUMN 은 명시하지 않은 CHARACTER SET/COLLATE 를 테이블 기본값으로 리셋하므로,
+-- 테이블 기본값이 컬럼과 다를 경우 collation 이 바뀌면서 인덱스 재구축(COPY)이 일어난다.
+-- 현재 값을 그대로 재기술해 테이블 기본값이 무엇이든 컬럼 정의가 바뀌지 않도록 한다.
+--
+-- 길이 프리픽스: 1020 octet -> 목표 크기도 255 octet 초과라 둘 다 2바이트 구간이다.
+-- 프리픽스 크기가 바뀌지 않으므로 메타데이터 변경만으로 끝난다.
+
 
 SET SESSION lock_wait_timeout = 10;
 
 ALTER TABLE problem_review_reminder
-    MODIFY COLUMN problem_memo_snapshot VARCHAR(1000) NULL,
+    MODIFY COLUMN problem_memo_snapshot VARCHAR(1000)
+        CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL,
     ALGORITHM=INPLACE, LOCK=NONE;
