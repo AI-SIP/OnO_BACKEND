@@ -18,6 +18,8 @@ import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import jakarta.persistence.EntityManager;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -157,5 +159,52 @@ class ProblemRepositoryTest {
 
         assertThat(problems).hasSize(5);
         assertThat(problems.get(0).getProblemImageDataList()).hasSize(3); // fetch join 확인
+    }
+
+    /**
+     * 컬렉션 fetch join + limit 을 한 쿼리로 쓰면 Hibernate 가 SQL 에 LIMIT 을 걸지 못하고
+     * 조건에 맞는 행을 전부 읽은 뒤 메모리에서 잘라냈다 (HHH90003004).
+     * 쿼리 "횟수"는 그때도 1번이라 지표가 못 된다. 실제로 몇 건을 읽었는지로 고정한다.
+     */
+    @Test
+    @DisplayName("폴더 커서 조회 - 폴더에 5건이 있어도 요청한 size 만큼만 읽는다")
+    void findProblemsByFolderWithCursor_readsOnlyRequestedRows() {
+        Statistics statistics = em.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
+        statistics.setStatisticsEnabled(true);
+        statistics.clear();
+
+        List<Problem> problems = problemRepository.findProblemsByFolderWithCursor(savedFolder.getId(), null, 2);
+
+        // hasNext 판단용 +1개
+        assertThat(problems).hasSize(3);
+        assertThat(problems.get(0).getProblemImageDataList()).hasSize(3);
+
+        // 폴더에는 5건이 있다. 전부 읽어 메모리에서 자르던 시절에는 5건이 적재됐다
+        long loadedProblems = statistics.getEntityStatistics(Problem.class.getName()).getLoadCount();
+        assertThat(loadedProblems).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("폴더 커서 조회 - 커서 이후 문제만 반환한다")
+    void findProblemsByFolderWithCursor_respectsCursor() {
+        List<Problem> firstPage = problemRepository.findProblemsByFolderWithCursor(savedFolder.getId(), null, 2);
+        Long cursor = firstPage.get(1).getId();
+
+        List<Problem> secondPage = problemRepository.findProblemsByFolderWithCursor(savedFolder.getId(), cursor, 2);
+
+        assertThat(secondPage).isNotEmpty();
+        assertThat(secondPage).allSatisfy(problem ->
+                assertThat(problem.getId()).isGreaterThan(cursor));
+        assertThat(secondPage.get(0).getProblemImageDataList()).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("제목 커서 조회 - size 만큼만 반환하고 이미지가 붙는다")
+    void findProblemsByTitleWithCursor_limits() {
+        List<Problem> problems =
+                problemRepository.findProblemsByTitleWithCursor("reference", savedUser.getId(), null, 2);
+
+        assertThat(problems).hasSize(3);
+        assertThat(problems.get(0).getProblemImageDataList()).hasSize(3);
     }
 }
