@@ -960,18 +960,15 @@ public class ProblemService {
     @Transactional(readOnly = true)
     public ReviewDueResponseDto getReviewDueProblems(Long userId) {
         LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
-        List<Problem> dueProblems = problemRepository.findReviewDueProblems(userId, today);
+        List<ReviewDueResponseDto.ReviewDueProblemDto> problemDtos =
+                problemRepository.findReviewDueProblemDtos(userId, today);
 
-        long overdueCount = dueProblems.stream()
-                .filter(p -> p.getNextReviewAt().isBefore(today))
+        long overdueCount = problemDtos.stream()
+                .filter(dto -> dto.nextReviewAt().isBefore(today))
                 .count();
 
-        List<ReviewDueResponseDto.ReviewDueProblemDto> problemDtos = dueProblems.stream()
-                .map(ReviewDueResponseDto.ReviewDueProblemDto::from)
-                .collect(Collectors.toList());
-
         return ReviewDueResponseDto.builder()
-                .dueCount(dueProblems.size())
+                .dueCount(problemDtos.size())
                 .overdueCount(overdueCount)
                 .problems(problemDtos)
                 .build();

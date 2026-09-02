@@ -25,6 +25,9 @@ import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,6 +46,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -82,6 +86,9 @@ class ProblemApiIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private EntityManagerFactory entityManagerFactory;
 
     @MockBean
     private FileUploadService fileUploadService;
@@ -305,6 +312,54 @@ class ProblemApiIntegrationTest {
         assertThat(problem.getMemo()).isEqualTo(problemRegisterDto.memo());
         assertThat(problem.getReference()).isEqualTo(problemRegisterDto.reference());
         assertThat(problem.getProblemImageDataList()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("복습 예정 조회 - 문제 6개를 조회해도 쿼리는 1번만 나간다 (problem_analysis N+1 회귀 방지)")
+    @WithMockCustomUser()
+    void getReviewDueProblemsDoesNotTriggerNPlusOne() throws Exception {
+        // given - 픽스처 문제 6개를 모두 오늘 복습 대상으로 만든다. 각 문제에는 ProblemAnalysis 가 붙어 있다.
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        problemList.forEach(problem -> {
+            problem.updateReviewSchedule(today, 1, 0);
+            problemRepository.save(problem);
+        });
+
+        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        statistics.setStatisticsEnabled(true);
+        statistics.clear();
+
+        // when
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/api/problems/review-due"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        // then
+        JsonNode data = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8)).get("data");
+        assertThat(data.get("dueCount").asInt()).isEqualTo(problemList.size());
+        assertThat(data.get("problems")).hasSize(problemList.size());
+
+        // 엔티티로 읽던 시절에는 문제 수만큼 problem_analysis 조회가 더 나갔다
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("복습 예정 조회 - overdueCount 는 오늘 이전 예정 건만 센다")
+    @WithMockCustomUser()
+    void getReviewDueProblemsCountsOverdueOnly() throws Exception {
+        // given
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        for (int i = 0; i < problemList.size(); i++) {
+            Problem problem = problemList.get(i);
+            problem.updateReviewSchedule(i < 2 ? today.minusDays(3) : today, 1, 0);
+            problemRepository.save(problem);
+        }
+
+        // when & then
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/problems/review-due"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.dueCount").value(problemList.size()))
+                .andExpect(jsonPath("$.data.overdueCount").value(2));
     }
 
     @Test

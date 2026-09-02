@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.problem.repository;
 
 import com.aisip.OnO.backend.admin.dto.AdminProblemResponseDto;
+import com.aisip.OnO.backend.problem.dto.ReviewDueResponseDto;
 import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.QProblem;
@@ -80,6 +81,25 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
                 .leftJoin(QProblem.problem.folder).fetchJoin()
                 .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
                 .orderBy(problem.id.asc())
+                .fetch();
+    }
+
+    @Override
+    public List<ReviewDueResponseDto.ReviewDueProblemDto> findReviewDueProblemDtos(Long userId, LocalDate today) {
+        return queryFactory
+                .select(Projections.constructor(
+                        ReviewDueResponseDto.ReviewDueProblemDto.class,
+                        problem.id,
+                        problem.memo,
+                        problem.reference,
+                        problem.nextReviewAt,
+                        problem.reviewInterval,
+                        problem.consecutiveCorrectCount
+                ))
+                .from(problem)
+                .where(problem.userId.eq(userId)
+                        .and(problem.nextReviewAt.loe(today)))
+                .orderBy(problem.nextReviewAt.asc())
                 .fetch();
     }
 
