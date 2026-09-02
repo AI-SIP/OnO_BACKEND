@@ -120,10 +120,17 @@ jacoco {
 }
 
 // 커버리지 집계에서 제외할 대상: 실행 진입점, 설정 클래스, QueryDSL 생성 코드
+//
+// 주의: 여기 패턴은 Ant 스타일이라 '[A-Z]' 같은 문자 클래스를 지원하지 않는다.
+// 처음에 '**/Q[A-Z]*' 로 적었더니 아무것도 걸러지지 않아 QueryDSL 생성 클래스 32개가
+// 그대로 집계에 들어갔고, 그 탓에 studyroom/entity 커버리지가 실제 100% 인데 45% 로 보였다.
+//
+// 'Q*' 로 시작하는 main 클래스 중 QueryDSL 생성물이 아닌 것은 QuartzConfig 하나뿐이다.
+// 이것도 함께 빠지지만 Spring @Configuration 클래스라 이미 제외 중인 '**/config/**' 과 같은 성격이다.
 def coverageExcludes = [
 		'**/BackendApplication*',
 		'**/config/**',
-		'**/Q[A-Z]*',
+		'**/Q*.class',
 ]
 
 tasks.named('jacocoTestReport') {
@@ -142,13 +149,20 @@ tasks.named('jacocoTestReport') {
 }
 
 tasks.named('jacocoTestCoverageVerification') {
+	// 현재 수치(라인 94.6%, 분기 77.2%)보다 낮게 잡아 정상적인 변동은 통과시키되,
+	// 테스트 없이 코드가 늘어나면 걸리도록 한다. 커버리지가 오르면 함께 올린다.
 	violationRules {
 		rule {
 			element = 'BUNDLE'
 			limit {
 				counter = 'LINE'
 				value = 'COVEREDRATIO'
-				minimum = 0.00  // 개선 진행에 따라 단계적으로 상향한다
+				minimum = 0.85
+			}
+			limit {
+				counter = 'BRANCH'
+				value = 'COVEREDRATIO'
+				minimum = 0.70
 			}
 		}
 	}

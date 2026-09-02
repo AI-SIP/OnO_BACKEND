@@ -66,6 +66,12 @@ jobs:
       - name: Run tests
         run: ./gradlew test jacocoTestReport --no-daemon
 
+      # 커버리지 하한선(라인 85% / 분기 70%) 검사. 테스트 없이 코드만 늘면 여기서 걸린다.
+      # 테스트가 실패해도 커버리지 요약은 보이도록 always() 로 둔다.
+      - name: Verify coverage floor
+        if: always()
+        run: ./gradlew jacocoTestCoverageVerification --no-daemon
+
       - name: Summarize results
         if: always()
         run: |

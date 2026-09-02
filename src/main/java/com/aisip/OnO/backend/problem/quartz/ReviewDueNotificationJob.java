@@ -75,11 +75,12 @@ public class ReviewDueNotificationJob extends QuartzJobBean {
             }
 
             long dueCount = dueCountByUserId.get(user.getId());
-            fcmService.sendNotificationToAllUserDevice(user.getId(),
+            if (sendSafely(user.getId(),
                     new NotificationRequestDto("", "오늘의 복습 알림",
                             "오늘 복습할 문제가 " + dueCount + "개 있어요!",
-                            Map.of("type", "review_due")));
-            notifiedUserIds.add(user.getId());
+                            Map.of("type", "review_due")))) {
+                notifiedUserIds.add(user.getId());
+            }
         }
 
         if (!notifiedUserIds.isEmpty()) {
@@ -101,11 +102,12 @@ public class ReviewDueNotificationJob extends QuartzJobBean {
 
         for (User user : inactiveUsers) {
             if (!user.isNotificationEnabled()) continue;
-            fcmService.sendNotificationToAllUserDevice(user.getId(),
+            if (sendSafely(user.getId(),
                     new NotificationRequestDto("", "오랜만이에요!",
                             "오답노트를 펼칠 시간이에요. 복습하러 돌아와보세요!",
-                            Map.of("type", "reengagement")));
-            notifiedUserIds.add(user.getId());
+                            Map.of("type", "reengagement")))) {
+                notifiedUserIds.add(user.getId());
+            }
         }
 
         if (!notifiedUserIds.isEmpty()) {
@@ -127,16 +129,35 @@ public class ReviewDueNotificationJob extends QuartzJobBean {
 
         for (User user : longInactiveUsers) {
             if (!user.isNotificationEnabled()) continue;
-            fcmService.sendNotificationToAllUserDevice(user.getId(),
+            if (sendSafely(user.getId(),
                     new NotificationRequestDto("", "오답노트가 기다리고 있어요",
                             "한동안 자리를 비우셨네요. 다시 시작하기 딱 좋은 날이에요!",
-                            Map.of("type", "reengagement_monthly")));
-            notifiedUserIds.add(user.getId());
+                            Map.of("type", "reengagement_monthly")))) {
+                notifiedUserIds.add(user.getId());
+            }
         }
 
         if (!notifiedUserIds.isEmpty()) {
             userRepository.bulkUpdateLastNotifiedAt(notifiedUserIds, today);
         }
         log.info("[ReviewDue] 장기 미접속 알림 발송: {}명", notifiedUserIds.size());
+    }
+
+    /**
+     * 한 사용자에게 보내다 실패해도 배치 전체를 멈추면 안 된다.
+     * 예전에는 발송 예외가 그대로 올라와 뒤에 남은 사용자들이 그날 알림을 통째로 놓쳤다.
+     *
+     * @return 발송을 시도해 예외 없이 끝났으면 true. 실패한 사용자는 발송 이력을 남기지 않아
+     * 다음 실행에서 다시 대상이 된다.
+     */
+    private boolean sendSafely(Long userId, NotificationRequestDto request) {
+        try {
+            fcmService.sendNotificationToAllUserDevice(userId, request);
+            return true;
+        } catch (Exception e) {
+            log.warn("[ReviewDue] 알림 발송 실패 - userId: {}, type: {}, reason: {}",
+                    userId, request.data().get("type"), e.getMessage());
+            return false;
+        }
     }
 }

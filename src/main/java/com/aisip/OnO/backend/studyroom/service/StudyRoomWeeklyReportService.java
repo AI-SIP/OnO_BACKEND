@@ -84,13 +84,6 @@ public class StudyRoomWeeklyReportService {
         }
     }
 
-    void createReportIfAbsent(StudyRoom room, LocalDate weekStart, LocalDate weekEnd, LocalDateTime start, LocalDateTime end) {
-        List<StudyRoomMember> members = memberRepository.findAllWithUserByRoomId(room.getId());
-        List<Long> userIds = members.stream().map(member -> member.getUser().getId()).toList();
-        Map<Long, StudyRoomStats> stats = statsService.getStats(userIds, start, end, weekEnd);
-        createReportIfAbsent(room, members, stats, weekStart, weekEnd, 0);
-    }
-
     private void createReportsForBatch(List<StudyRoom> rooms, LocalDate weekStart, LocalDate weekEnd,
                                        LocalDateTime start, LocalDateTime end) {
         List<Long> roomIds = rooms.stream().map(StudyRoom::getId).toList();
@@ -167,7 +160,7 @@ public class StudyRoomWeeklyReportService {
                     ? statsService.attendanceDayCounts(userIds, challenge.getStartAt(), challenge.getEndAt())
                     : Map.of();
             if (isChallengeCompleted(challenge, members, stats, attendanceDays)) {
-                challenge.updateStatus(StudyRoomChallengeStatus.COMPLETED);
+                challenge.markCompleted(LocalDateTime.now());
                 continue;
             }
             if (challenge.getEndAt().isBefore(LocalDateTime.now())) {

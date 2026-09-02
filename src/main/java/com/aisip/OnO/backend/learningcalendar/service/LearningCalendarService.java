@@ -16,7 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,13 +31,25 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class LearningCalendarService {
 
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
+    /**
+     * 하루의 마지막 순간. 집계 쿼리가 {@code BETWEEN start AND end} 로 도는데
+     * {@code 23:59:59} 로 끊으면 {@code datetime(6)} 컬럼에 저장된
+     * 23:59:59.000001 ~ 23:59:59.999999 구간의 기록이 통째로 빠진다.
+     * 마이크로초 단위까지 포함하도록 경계를 잡는다.
+     */
+    private static final LocalTime END_OF_DAY = LocalTime.of(23, 59, 59, 999_999_000);
+
     private final LearningCalendarQueryRepository calendarRepository;
     private final StreakCacheService streakCacheService;
     private final LearningCalendarMoodRepository moodRepository;
     private final CustomEmojiValidator customEmojiValidator;
 
     public LearningCalendarResponseDto getLearningCalendar(Long userId, int year, int month) {
-        return getLearningCalendar(userId, year, month, LocalDate.now());
+        // 서비스 대상이 국내 사용자이고 problem/studyroom 등 다른 도메인도 KST 기준으로 하루를 가른다.
+        // JVM 기본 시간대를 쓰면 배포 환경에 따라 스트릭의 "오늘"이 하루 어긋난다.
+        return getLearningCalendar(userId, year, month, LocalDate.now(KST));
     }
 
     LearningCalendarResponseDto getLearningCalendar(Long userId, int year, int month, LocalDate today) {
@@ -43,7 +57,7 @@ public class LearningCalendarService {
         LocalDate startDate = yearMonth.atDay(1);
         LocalDate endDate = yearMonth.atEndOfMonth();
         LocalDateTime start = startDate.atStartOfDay();
-        LocalDateTime end = endDate.atTime(23, 59, 59);
+        LocalDateTime end = endDate.atTime(END_OF_DAY);
 
         Map<LocalDate, LearningCalendarQueryRepository.DailyReviewStat> reviewStats = toReviewStatMap(
                 calendarRepository.findDailyReviewStats(userId, start, end)

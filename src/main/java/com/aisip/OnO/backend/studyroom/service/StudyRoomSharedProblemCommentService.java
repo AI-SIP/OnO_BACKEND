@@ -155,10 +155,6 @@ public class StudyRoomSharedProblemCommentService {
         return content.trim();
     }
 
-    private SharedProblemCommentResponse toResponse(StudyRoomSharedProblemComment comment, Long userId) {
-        return toResponse(comment, List.of(), userId, false);
-    }
-
     private SharedProblemCommentResponse toResponse(StudyRoomSharedProblemComment comment,
                                                     List<StudyRoomSharedProblemCommentReaction> reactions,
                                                     Long userId) {
