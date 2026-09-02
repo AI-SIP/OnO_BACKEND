@@ -56,14 +56,27 @@ public class ProblemReviewReminder extends BaseEntity {
     @Builder.Default
     private int retryCount = 0;
 
+    /**
+     * 스냅샷 컬럼은 varchar(255)(V21)인데 memo 는 1000자까지 들어온다(V24).
+     * 알림 문구용 사본이라 잘라 담는다. 넘치면 insert 자체가 truncation 으로 실패한다.
+     */
+    private static final int SNAPSHOT_MAX_LENGTH = 255;
+
+    public static String truncateSnapshot(String value) {
+        if (value == null || value.length() <= SNAPSHOT_MAX_LENGTH) {
+            return value;
+        }
+        return value.substring(0, SNAPSHOT_MAX_LENGTH);
+    }
+
     public static ProblemReviewReminder create(
             Long userId, Long problemId, String memo, String reference,
             int sequence, int intervalDays, LocalDateTime scheduledAt) {
         return ProblemReviewReminder.builder()
                 .userId(userId)
                 .problemId(problemId)
-                .problemMemoSnapshot(memo)
-                .problemReferenceSnapshot(reference)
+                .problemMemoSnapshot(truncateSnapshot(memo))
+                .problemReferenceSnapshot(truncateSnapshot(reference))
                 .sequence(sequence)
                 .intervalDays(intervalDays)
                 .scheduledAt(scheduledAt)

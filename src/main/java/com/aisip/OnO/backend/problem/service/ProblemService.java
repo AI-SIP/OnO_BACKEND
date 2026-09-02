@@ -70,6 +70,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class ProblemService {
     private static final String AI_ANALYSIS_RATE_LIMIT_KEY = "ai_analysis";
     private static final int AI_ANALYSIS_LIMIT_PER_DAY = 20;
+    private static final int MEMO_MAX_LENGTH = 1000;
 
     private final ProblemRepository problemRepository;
 
@@ -209,6 +210,7 @@ public class ProblemService {
 
     @Transactional
     public Long registerProblem(ProblemRegisterDto problemRegisterDto, Long userId) {
+        validateMemoLength(problemRegisterDto.memo());
 
         Folder folder = folderRepository.findById(problemRegisterDto.folderId())
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
@@ -240,6 +242,8 @@ public class ProblemService {
      */
     @Transactional
     public Long registerProblemV2(ProblemRegisterV2Dto problemRegisterV2Dto, Long userId) {
+        validateMemoLength(problemRegisterV2Dto.memo());
+
         Folder folder = resolveRegisterFolder(problemRegisterV2Dto.folderId(), userId);
 
         ProblemRegisterDto baseDto = new ProblemRegisterDto(
@@ -306,6 +310,7 @@ public class ProblemService {
         if (registerDtos == null || registerDtos.isEmpty()) {
             return List.of();
         }
+        registerDtos.forEach(dto -> validateMemoLength(dto.memo()));
 
         Map<Long, Folder> foldersById = resolveRegisterFolders(registerDtos, userId);
         Folder rootFolder = registerDtos.stream().anyMatch(dto -> dto.folderId() == null)
@@ -592,6 +597,7 @@ public class ProblemService {
 
     @Transactional
     public void updateProblemInfo(ProblemRegisterDto problemRegisterDto, Long userId) {
+        validateMemoLength(problemRegisterDto.memo());
 
         Problem problem = findProblemEntity(problemRegisterDto.problemId(), userId);
 
@@ -938,6 +944,16 @@ public class ProblemService {
     private void validateFolderOwner(Folder folder, Long userId) {
         if (!Objects.equals(folder.getUserId(), userId)) {
             throw new ApplicationException(FolderErrorCase.FOLDER_USER_UNMATCHED);
+        }
+    }
+
+    /**
+     * memo 컬럼 상한(V24, varchar(1000))을 넘으면 DB 가 truncation 으로 거절해 500 이 됐다.
+     * 저장 전에 걸러서 400 으로 돌려준다.
+     */
+    private void validateMemoLength(String memo) {
+        if (memo != null && memo.length() > MEMO_MAX_LENGTH) {
+            throw new ApplicationException(ProblemErrorCase.PROBLEM_MEMO_TOO_LONG);
         }
     }
 

@@ -16,7 +16,9 @@ public enum ProblemErrorCase implements ErrorCase {
 
     PROBLEM_ANALYSIS_NOT_FOUND(404, 4004, "문제 분석 결과를 찾을 수 없습니다."),
 
-    ANALYSIS_RATE_LIMIT_EXCEEDED(429, 4005, "AI 분석 일일 요청 횟수를 초과했습니다.");
+    ANALYSIS_RATE_LIMIT_EXCEEDED(429, 4005, "AI 분석 일일 요청 횟수를 초과했습니다."),
+
+    PROBLEM_MEMO_TOO_LONG(400, 4006, "메모는 1000자를 넘을 수 없습니다.");
 
     private final Integer httpStatusCode;
     private final Integer errorCode;

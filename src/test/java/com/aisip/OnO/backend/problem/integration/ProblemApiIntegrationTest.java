@@ -308,6 +308,60 @@ class ProblemApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("문제 등록 - memo 1000자는 저장되고 reminder 스냅샷은 255자로 잘린다")
+    @WithMockCustomUser()
+    void registerProblemWithLongMemo() throws Exception {
+        // given
+        String longMemo = "가".repeat(1000);
+        ProblemRegisterDto problemRegisterDto = new ProblemRegisterDto(
+                null,
+                longMemo,
+                "reference",
+                folderRepository.findAllByUserId(userId).get(0).getId(),
+                LocalDateTime.now()
+        );
+
+        // when
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/problems")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(problemRegisterDto)))
+                .andExpect(status().isOk());
+
+        // then
+        Problem problem = problemRepository.findAllByUserId(userId)
+                .get((int) (problemRepository.countByUserId(userId) - 1));
+        assertThat(problem.getMemo()).isEqualTo(longMemo);
+
+        List<ProblemReviewReminder> reminders = reminderRepository.findAll().stream()
+                .filter(reminder -> reminder.getProblemId().equals(problem.getId()))
+                .toList();
+        assertThat(reminders).isNotEmpty();
+        assertThat(reminders).allSatisfy(reminder ->
+                assertThat(reminder.getProblemMemoSnapshot()).hasSize(255));
+    }
+
+    @Test
+    @DisplayName("문제 등록 - memo 가 1000자를 넘으면 500 이 아니라 400 으로 거절한다")
+    @WithMockCustomUser()
+    void registerProblemWithTooLongMemo() throws Exception {
+        // given
+        ProblemRegisterDto problemRegisterDto = new ProblemRegisterDto(
+                null,
+                "가".repeat(1001),
+                "reference",
+                folderRepository.findAllByUserId(userId).get(0).getId(),
+                LocalDateTime.now()
+        );
+
+        // when & then
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/problems")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(problemRegisterDto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(4006));
+    }
+
+    @Test
     @DisplayName("문제 이미지 등록 API 테스트")
     @WithMockCustomUser()
     void registerProblemImageData() throws Exception {
@@ -634,6 +688,36 @@ class ProblemApiIntegrationTest {
                 newMemo.equals(r.getProblemMemoSnapshot()) &&
                 newRef.equals(r.getProblemReferenceSnapshot())
         );
+    }
+
+    @Test
+    @DisplayName("PATCH /api/problems/info - memo 가 길어도 snapshot 갱신이 truncation 으로 실패하지 않는다")
+    void updateProblemInfo_truncatesLongMemoSnapshot() throws Exception {
+        // given
+        authenticateAsFixtureUser();
+        Long problemId = problemList.get(0).getId();
+        reminderRepository.save(ProblemReviewReminder.create(
+                userId, problemId, "old memo", "old ref", 1, 1, LocalDateTime.now().plusDays(1)
+        ));
+
+        String longMemo = "나".repeat(1000);
+        ProblemRegisterDto updateDto = new ProblemRegisterDto(problemId, longMemo, "ref", null, null);
+
+        // when
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problems/info")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateDto)))
+                .andExpect(status().isOk());
+
+        // then - 문제 본문에는 전문이, 알림 스냅샷에는 255자만 남는다
+        assertThat(problemRepository.findById(problemId).orElseThrow().getMemo()).isEqualTo(longMemo);
+
+        List<ProblemReviewReminder> scheduledRows = reminderRepository.findAll().stream()
+                .filter(r -> r.getProblemId().equals(problemId)
+                        && r.getStatus() == ProblemReviewReminderStatus.SCHEDULED)
+                .toList();
+        assertThat(scheduledRows).hasSize(1);
+        assertThat(scheduledRows.get(0).getProblemMemoSnapshot()).hasSize(255);
     }
 
     @Test

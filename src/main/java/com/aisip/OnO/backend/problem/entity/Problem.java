@@ -38,6 +38,8 @@ public class Problem extends BaseEntity {
     @JoinColumn(name = "folder_id")
     private Folder folder;
 
+    // 실제 컬럼 정의는 V24 에 있다 (ddl-auto 가 validate 라 여기 선언은 문서 역할)
+    @Column(length = 1000)
     private String memo;
 
     private String reference;
