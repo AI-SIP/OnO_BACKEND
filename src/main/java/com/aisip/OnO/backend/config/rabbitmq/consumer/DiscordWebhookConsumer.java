@@ -38,7 +38,10 @@ public class DiscordWebhookConsumer {
             restTemplate.postForEntity(webhookUrl, new HttpEntity<>(payload, headers), String.class);
             log.info("Discord webhook 전송 완료: {}", payload.embeds().get(0).title());
         } catch (Exception e) {
-            log.error("Discord webhook 전송 실패: {}", e.getMessage(), e);
+            // 일시적 실패(read timeout 등)는 RabbitMQ 가 재시도하고, 최종 실패는 DLQ 에서 error 로 남는다.
+            // 여기서 error 로 올리면 재시도로 성공한 건까지 Sentry 에 쌓인다 (Sentry JAVA-SPRING-BOOT-5C).
+            // 예외 메시지에 웹훅 URL(토큰 포함)이 그대로 들어 있어 메시지 대신 예외 타입만 남긴다.
+            log.warn("Discord webhook 전송 실패, 재시도 예정 - exceptionType: {}", e.getClass().getSimpleName());
             throw new RuntimeException("Discord webhook 전송 실패", e);
         }
     }
