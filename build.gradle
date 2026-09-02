@@ -1,6 +1,7 @@
 
 plugins {
 	id 'java'
+	id 'jacoco'
 	id 'org.springframework.boot' version '3.3.1'
 	id 'io.spring.dependency-management' version '1.1.5'
 	id "io.sentry.jvm.gradle" version "4.11.0"
@@ -82,6 +83,29 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 	systemProperty 'spring.profiles.active', 'test'
+	// @SpringBootTest 클래스마다 컨텍스트가 캐시에 쌓여 기본 힙(512m)으로는 OOM 이 났다.
+	// 워커 JVM 이 죽으면서 40개 클래스 중 3개만 돌고 빌드가 끝나고 있었다.
+	maxHeapSize = '3g'
+	// 실패한 테스트가 있어도 커버리지 리포트는 나오도록 finalizedBy 사용
+	finalizedBy tasks.named('jacocoTestReport')
+}
+
+jacoco {
+	toolVersion = '0.8.12'
+}
+
+tasks.named('jacocoTestReport') {
+	reports {
+		xml.required = true
+		html.required = true
+	}
+	// QueryDSL 이 만든 Q 클래스와 부트 진입점은 측정 대상이 아니다
+	classDirectories.setFrom(files(classDirectories.files.collect {
+		fileTree(dir: it, exclude: [
+				'**/Q*.class',
+				'**/BackendApplication.class',
+		])
+	}))
 }
 
 tasks.withType(JavaCompile) {
