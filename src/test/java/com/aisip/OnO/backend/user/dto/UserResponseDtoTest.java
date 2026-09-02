@@ -37,6 +37,27 @@ class UserResponseDtoTest {
         assertThat(response.notePracticePoint()).isEqualTo(150L);
         assertThat(response.totalStudyLevel()).isEqualTo(15L);
         assertThat(response.totalStudyCurrentPoint()).isEqualTo(600L);
-        assertThat(response.totalStudyNextLevelThreshold()).isZero();
+        // 만렙에서는 현재치와 임계값이 같아야 게이지가 가득 찬다.
+        // 0 을 내려주면 프론트가 현재치/임계값을 계산할 때 0 으로 나누게 된다
+        assertThat(response.totalStudyNextLevelThreshold()).isEqualTo(600L);
+    }
+
+    @Test
+    @DisplayName("알림 설정 값이 응답에 그대로 실린다")
+    void fromIncludesNotificationEnabled() {
+        User user = User.from(new UserRegisterDto(
+                "test@example.com",
+                "testUser",
+                "testIdentifier",
+                "MEMBER",
+                null
+        ));
+
+        // 기본값
+        assertThat(UserResponseDto.from(user).notificationEnabled()).isTrue();
+
+        // 꺼둔 상태가 응답에 반영되지 않으면 프론트가 true 로 복원해 스위치가 다시 켜져 보인다
+        user.updateNotificationEnabled(false);
+        assertThat(UserResponseDto.from(user).notificationEnabled()).isFalse();
     }
 }

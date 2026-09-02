@@ -78,9 +78,14 @@ public class JwtTokenizer {
     public void validateAccessToken(String token) {
         try{
             Jwts.parserBuilder().setSigningKey(accessKey).build().parseClaimsJws(token);
-        } catch (Exception e) {
-            log.warn("엑세스 토큰 검증 실패: {}", e.getMessage());
+        } catch (ExpiredJwtException e) {
+            log.warn("엑세스 토큰 만료: {}", e.getMessage());
             throw new ApplicationException(AuthErrorCase.ACCESS_TOKEN_EXPIRED);
+        } catch (Exception e) {
+            // 만료가 아닌 실패(서명 불일치·형식 오류)까지 ACCESS_TOKEN_EXPIRED 로 뭉뚱그리면
+            // 프론트가 갱신을 시도할 이유가 없는 토큰에도 갱신을 건다.
+            log.warn("엑세스 토큰 검증 실패: {}", e.getMessage());
+            throw new ApplicationException(AuthErrorCase.INVALID_ACCESS_TOKEN);
         }
     }
 

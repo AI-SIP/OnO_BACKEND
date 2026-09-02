@@ -24,6 +24,9 @@ public record UserResponseDto (
     Long totalStudyLevel,
     Long totalStudyCurrentPoint,
     Long totalStudyNextLevelThreshold,
+    // 응답에 없으면 프론트(UserInfoModel.dart)가 기본값 true 로 복원해,
+    // 알림을 꺼도 앱을 다시 켜면 스위치가 켜진 것처럼 보였다
+    boolean notificationEnabled,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {
@@ -49,6 +52,7 @@ public record UserResponseDto (
                 .totalStudyLevel(getResponseLevel(missionStatus.getTotalStudyLevel()))
                 .totalStudyCurrentPoint(getTotalStudyResponsePoint(missionStatus.getTotalStudyLevel(), missionStatus.getTotalStudyPoint()))
                 .totalStudyNextLevelThreshold(getTotalStudyNextLevelThreshold(missionStatus))
+                .notificationEnabled(user.isNotificationEnabled())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();

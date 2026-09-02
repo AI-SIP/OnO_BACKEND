@@ -83,7 +83,12 @@ public class ProblemReviewReminderService {
 
     @Transactional
     public void refreshSnapshot(Long problemId, String memo, String reference) {
-        repository.refreshSnapshot(problemId, memo, reference, SCHEDULED);
+        repository.refreshSnapshot(
+                problemId,
+                ProblemReviewReminder.truncateSnapshot(memo),
+                ProblemReviewReminder.truncateSnapshot(reference),
+                SCHEDULED
+        );
     }
 
     @Transactional

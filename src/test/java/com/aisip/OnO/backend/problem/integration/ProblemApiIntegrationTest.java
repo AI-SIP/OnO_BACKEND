@@ -25,6 +25,9 @@ import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.EntityManagerFactory;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,6 +46,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -82,6 +86,9 @@ class ProblemApiIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private EntityManagerFactory entityManagerFactory;
 
     @MockBean
     private FileUploadService fileUploadService;
@@ -305,6 +312,108 @@ class ProblemApiIntegrationTest {
         assertThat(problem.getMemo()).isEqualTo(problemRegisterDto.memo());
         assertThat(problem.getReference()).isEqualTo(problemRegisterDto.reference());
         assertThat(problem.getProblemImageDataList()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("복습 예정 조회 - 문제 6개를 조회해도 쿼리는 1번만 나간다 (problem_analysis N+1 회귀 방지)")
+    @WithMockCustomUser()
+    void getReviewDueProblemsDoesNotTriggerNPlusOne() throws Exception {
+        // given - 픽스처 문제 6개를 모두 오늘 복습 대상으로 만든다. 각 문제에는 ProblemAnalysis 가 붙어 있다.
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        problemList.forEach(problem -> {
+            problem.updateReviewSchedule(today, 1, 0);
+            problemRepository.save(problem);
+        });
+
+        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        statistics.setStatisticsEnabled(true);
+        statistics.clear();
+
+        // when
+        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/api/problems/review-due"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        // then
+        JsonNode data = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8)).get("data");
+        assertThat(data.get("dueCount").asInt()).isEqualTo(problemList.size());
+        assertThat(data.get("problems")).hasSize(problemList.size());
+
+        // 엔티티로 읽던 시절에는 문제 수만큼 problem_analysis 조회가 더 나갔다
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("복습 예정 조회 - overdueCount 는 오늘 이전 예정 건만 센다")
+    @WithMockCustomUser()
+    void getReviewDueProblemsCountsOverdueOnly() throws Exception {
+        // given
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        for (int i = 0; i < problemList.size(); i++) {
+            Problem problem = problemList.get(i);
+            problem.updateReviewSchedule(i < 2 ? today.minusDays(3) : today, 1, 0);
+            problemRepository.save(problem);
+        }
+
+        // when & then
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/problems/review-due"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.dueCount").value(problemList.size()))
+                .andExpect(jsonPath("$.data.overdueCount").value(2));
+    }
+
+    @Test
+    @DisplayName("문제 등록 - memo 1000자는 저장되고 reminder 스냅샷은 255자로 잘린다")
+    @WithMockCustomUser()
+    void registerProblemWithLongMemo() throws Exception {
+        // given
+        String longMemo = "가".repeat(1000);
+        ProblemRegisterDto problemRegisterDto = new ProblemRegisterDto(
+                null,
+                longMemo,
+                "reference",
+                folderRepository.findAllByUserId(userId).get(0).getId(),
+                LocalDateTime.now()
+        );
+
+        // when
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/problems")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(problemRegisterDto)))
+                .andExpect(status().isOk());
+
+        // then
+        Problem problem = problemRepository.findAllByUserId(userId)
+                .get((int) (problemRepository.countByUserId(userId) - 1));
+        assertThat(problem.getMemo()).isEqualTo(longMemo);
+
+        List<ProblemReviewReminder> reminders = reminderRepository.findAll().stream()
+                .filter(reminder -> reminder.getProblemId().equals(problem.getId()))
+                .toList();
+        assertThat(reminders).isNotEmpty();
+        assertThat(reminders).allSatisfy(reminder ->
+                assertThat(reminder.getProblemMemoSnapshot()).hasSize(255));
+    }
+
+    @Test
+    @DisplayName("문제 등록 - memo 가 1000자를 넘으면 500 이 아니라 400 으로 거절한다")
+    @WithMockCustomUser()
+    void registerProblemWithTooLongMemo() throws Exception {
+        // given
+        ProblemRegisterDto problemRegisterDto = new ProblemRegisterDto(
+                null,
+                "가".repeat(1001),
+                "reference",
+                folderRepository.findAllByUserId(userId).get(0).getId(),
+                LocalDateTime.now()
+        );
+
+        // when & then
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/problems")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(problemRegisterDto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(4006));
     }
 
     @Test
@@ -634,6 +743,36 @@ class ProblemApiIntegrationTest {
                 newMemo.equals(r.getProblemMemoSnapshot()) &&
                 newRef.equals(r.getProblemReferenceSnapshot())
         );
+    }
+
+    @Test
+    @DisplayName("PATCH /api/problems/info - memo 가 길어도 snapshot 갱신이 truncation 으로 실패하지 않는다")
+    void updateProblemInfo_truncatesLongMemoSnapshot() throws Exception {
+        // given
+        authenticateAsFixtureUser();
+        Long problemId = problemList.get(0).getId();
+        reminderRepository.save(ProblemReviewReminder.create(
+                userId, problemId, "old memo", "old ref", 1, 1, LocalDateTime.now().plusDays(1)
+        ));
+
+        String longMemo = "나".repeat(1000);
+        ProblemRegisterDto updateDto = new ProblemRegisterDto(problemId, longMemo, "ref", null, null);
+
+        // when
+        mockMvc.perform(MockMvcRequestBuilders.patch("/api/problems/info")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateDto)))
+                .andExpect(status().isOk());
+
+        // then - 문제 본문에는 전문이, 알림 스냅샷에는 255자만 남는다
+        assertThat(problemRepository.findById(problemId).orElseThrow().getMemo()).isEqualTo(longMemo);
+
+        List<ProblemReviewReminder> scheduledRows = reminderRepository.findAll().stream()
+                .filter(r -> r.getProblemId().equals(problemId)
+                        && r.getStatus() == ProblemReviewReminderStatus.SCHEDULED)
+                .toList();
+        assertThat(scheduledRows).hasSize(1);
+        assertThat(scheduledRows.get(0).getProblemMemoSnapshot()).hasSize(255);
     }
 
     @Test

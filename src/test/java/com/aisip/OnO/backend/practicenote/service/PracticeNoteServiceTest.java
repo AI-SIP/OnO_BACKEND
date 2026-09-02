@@ -30,6 +30,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.time.LocalDateTime;
@@ -61,6 +62,11 @@ class PracticeNoteServiceTest {
 
     @Autowired
     private FolderRepository folderRepository;
+
+    // 테스트 컨텍스트에는 Quartz 스케줄러가 없어 알림 등록/삭제가 SchedulerException 으로 터졌다.
+    // 알림 스케줄링은 이 테스트의 관심사가 아니라 목으로 대체한다
+    @MockBean
+    private PracticeNotificationScheduler practiceNotificationScheduler;
 
     private final Long userId = 1L;
 

@@ -1,6 +1,5 @@
 package com.aisip.OnO.backend.problem.dto;
 
-import com.aisip.OnO.backend.problem.entity.Problem;
 import lombok.Builder;
 
 import java.time.LocalDate;
@@ -21,15 +20,5 @@ public record ReviewDueResponseDto(
             int reviewInterval,
             int consecutiveCorrectCount
     ) {
-        public static ReviewDueProblemDto from(Problem problem) {
-            return ReviewDueProblemDto.builder()
-                    .problemId(problem.getId())
-                    .memo(problem.getMemo())
-                    .reference(problem.getReference())
-                    .nextReviewAt(problem.getNextReviewAt())
-                    .reviewInterval(problem.getReviewInterval())
-                    .consecutiveCorrectCount(problem.getConsecutiveCorrectCount())
-                    .build();
-        }
     }
 }
