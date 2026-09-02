@@ -80,6 +80,8 @@ class UserServiceTest {
     private S3DeleteProducer s3DeleteProducer;
     @Mock
     private DiscordWebhookNotificationService discordWebhookNotificationService;
+    @Mock
+    private UserRegistrationWriter registrationWriter;
 
     @InjectMocks
     private UserService userService;
@@ -122,19 +124,23 @@ class UserServiceTest {
             verify(practiceNoteService, org.mockito.Mockito.times(2)).registerDefaultPractice(any());
         }
 
+        /**
+         * 계정 생성과 초기 데이터 적재는 {@link UserRegistrationWriter} 의 독립 트랜잭션으로 옮겨졌다.
+         * 동시 최초 로그인이 유니크 인덱스에 걸려 500 이 나던 것을, 진 요청이 새 스냅샷으로
+         * 재조회해 복구하도록 바꾸면서다. 여기서는 "없으면 생성에 위임한다"까지만 고정하고,
+         * 실제로 기본 폴더·복습노트가 생기는지는 {@code UserServiceIntegrationTest} 가 확인한다.
+         */
         @Test
-        @DisplayName("신규 멤버는 저장하고 기본 폴더·복습노트를 만들어 준다")
+        @DisplayName("신규 멤버는 계정 생성에 위임하고 그 결과를 돌려준다")
         void registersNewMember() {
-            given(userRepository.findByIdentifier("testIdentifier")).willReturn(Optional.empty());
-            given(userRepository.save(any(User.class))).willAnswer(invocation -> invocation.getArgument(0));
+            given(registrationWriter.findByIdentifier("testIdentifier")).willReturn(Optional.empty());
+            given(registrationWriter.create(registerDto)).willReturn(User.from(registerDto));
 
             UserResponseDto response = userService.registerMemberUser(registerDto);
 
             assertThat(response.name()).isEqualTo("testUser");
             assertThat(response.email()).isEqualTo("test@example.com");
-            verify(userRepository).save(any(User.class));
-            verify(folderService).initializeDefaultFoldersIfAbsent(any());
-            verify(practiceNoteService).registerDefaultPractice(any());
+            verify(registrationWriter).create(registerDto);
         }
 
         @ParameterizedTest(name = "identifier 가 [{0}] 인 소셜 로그인은 3002 로 거절한다")
@@ -148,7 +154,7 @@ class UserServiceTest {
                     .isInstanceOf(ApplicationException.class)
                     .extracting(e -> ((ApplicationException) e).getErrorCase())
                     .isEqualTo(UserErrorCase.INVALID_USER_IDENTIFIER);
-            verify(userRepository, never()).save(any(User.class));
+            verify(registrationWriter, never()).create(any(UserRegisterDto.class));
         }
 
         @Test
@@ -161,19 +167,20 @@ class UserServiceTest {
                     .isInstanceOf(ApplicationException.class)
                     .extracting(e -> ((ApplicationException) e).getErrorCase())
                     .isEqualTo(UserErrorCase.INVALID_USER_IDENTIFIER);
-            verify(userRepository, never()).save(any(User.class));
+            verify(registrationWriter, never()).create(any(UserRegisterDto.class));
         }
 
         @Test
         @DisplayName("컬럼 한계 직전 길이의 identifier 는 통과시킨다")
         void acceptsIdentifierAtLengthLimit() {
             String limit = "x".repeat(175);
-            given(userRepository.findByIdentifier(limit)).willReturn(Optional.empty());
-            given(userRepository.save(any(User.class))).willAnswer(invocation -> invocation.getArgument(0));
+            UserRegisterDto atLimit = new UserRegisterDto("a@test.ono", "이름", limit, "GOOGLE", null);
+            given(registrationWriter.findByIdentifier(limit)).willReturn(Optional.empty());
+            given(registrationWriter.create(atLimit)).willReturn(User.from(atLimit));
 
-            userService.registerMemberUser(new UserRegisterDto("a@test.ono", "이름", limit, "GOOGLE", null));
+            userService.registerMemberUser(atLimit);
 
-            verify(userRepository).save(any(User.class));
+            verify(registrationWriter).create(atLimit);
         }
 
         @Test
@@ -181,16 +188,14 @@ class UserServiceTest {
         void reusesExistingMemberOnRelogin() {
             User existing = User.from(registerDto);
             setField(existing, "id", 99L);
-            given(userRepository.findByIdentifier("testIdentifier")).willReturn(Optional.of(existing));
+            given(registrationWriter.findByIdentifier("testIdentifier")).willReturn(Optional.of(existing));
 
             UserResponseDto response = userService.registerMemberUser(registerDto);
 
             assertThat(response.userId())
                     .as("소셜 재로그인은 신규 가입이 아니라 기존 계정 복귀다")
                     .isEqualTo(99L);
-            verify(userRepository, never()).save(any(User.class));
-            verify(folderService, never()).initializeDefaultFoldersIfAbsent(anyLong());
-            verify(practiceNoteService, never()).registerDefaultPractice(anyLong());
+            verify(registrationWriter, never()).create(any(UserRegisterDto.class));
             verify(discordWebhookNotificationService, never()).sendMessage(anyString(), anyString());
         }
     }

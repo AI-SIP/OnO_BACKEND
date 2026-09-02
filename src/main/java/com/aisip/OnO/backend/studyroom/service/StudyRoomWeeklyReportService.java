@@ -12,6 +12,7 @@ import com.aisip.OnO.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
@@ -53,14 +54,26 @@ public class StudyRoomWeeklyReportService {
         return reports.stream().map(report -> toResponse(report, readReportIds.contains(report.getId()))).toList();
     }
 
-    @Transactional
+    /**
+     * 주간 리포트를 읽음으로 표시한다.
+     *
+     * <p>읽음 기록을 찾아보고 없으면 넣는 check-then-act 이고, 테이블에는
+     * {@code (report_id, user_id)} 유니크 제약이 있다. 리포트를 여는 순간 요청이 겹쳐 들어오면
+     * 두 트랜잭션이 모두 "안 읽음"을 읽고 INSERT 해 뒤엣것이 유니크 제약에 걸렸고,
+     * 그 예외가 잡히지 않고 올라가 500 이 나갔다.
+     *
+     * <p>충돌은 같은 사용자끼리만 일어나므로 사용자 행을 잠가 그 사용자의 요청만 직렬화한다.
+     * REPEATABLE READ 에서는 잠금 이전 조회가 이미 스냅샷을 고정해 버려 잠근 뒤의 확인도
+     * 앞 요청의 기록을 못 보므로, 격리 수준을 READ COMMITTED 로 함께 내린다.
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public WeeklyReportReadResponse markRead(Long roomId, Long reportId, Long userId) {
         accessService.validateMember(roomId, userId);
         StudyRoomWeeklyReport report = reportRepository.findByIdAndRoomId(reportId, roomId)
                 .orElseThrow(() -> new ApplicationException(StudyRoomErrorCase.REPORT_NOT_FOUND));
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
         if (readRepository.findByReportIdAndUserId(reportId, userId).isEmpty()) {
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
             readRepository.save(StudyRoomWeeklyReportRead.create(report, user, LocalDateTime.now()));
         }
         return new WeeklyReportReadResponse(reportId, true);

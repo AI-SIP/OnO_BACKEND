@@ -37,6 +37,14 @@ public class ProblemAnalysisConsumer {
         log.info("RabbitMQ message received - queue: {}, operation: {}, problemId: {}, messageRetryCount: {}",
                 RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", message.getProblemId(), message.getRetryCount());
 
+        // problemId 없는 메시지는 재시도해도 조회 자체가 불가능하다. 재시도/DLQ 알림 없이 종료(ACK).
+        if (message.getProblemId() == null) {
+            log.warn("RabbitMQ message skipped - queue: {}, operation: {}, outcome: {}, messageRetryCount: {}",
+                    RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", "problem_id_missing",
+                    message.getRetryCount());
+            return;
+        }
+
         try {
             // 실제 GPT 분석 수행
             analysisService.analyzeProblemSync(message.getProblemId());
