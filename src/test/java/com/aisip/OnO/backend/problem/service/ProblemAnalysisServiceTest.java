@@ -6,6 +6,7 @@ import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.problem.dto.ProblemAnalysisResponseDto;
 import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.Problem;
+import java.util.Optional;
 import com.aisip.OnO.backend.problem.entity.ProblemAnalysis;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
@@ -370,9 +371,13 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
                     .isEqualTo(ProblemErrorCase.PROBLEM_NOT_FOUND);
 
             verify(openAIClient, never()).analyzeImages(anyList());
-            assertThat(problemAnalysisRepository.findByProblemId(problemId).orElseThrow().getStatus())
+
+            // Problem 은 소프트 삭제(@SQLDelete)지만 ProblemAnalysis 는 cascade = ALL 이라
+            // 실제로 행이 삭제된다. 따라서 "행이 남아 NOT_STARTED 다"로 단정할 수 없다.
+            // 검증하려는 것은 "FAILED 로 덮어쓰지 않는다" 이므로 그것만 확인한다.
+            assertThat(problemAnalysisRepository.findByProblemId(problemId).map(ProblemAnalysis::getStatus))
                     .as("삭제된 문제의 분석을 FAILED 로 바꿔 봐야 의미가 없다")
-                    .isEqualTo(AnalysisStatus.NOT_STARTED);
+                    .isNotEqualTo(Optional.of(AnalysisStatus.FAILED));
         }
 
         @Test

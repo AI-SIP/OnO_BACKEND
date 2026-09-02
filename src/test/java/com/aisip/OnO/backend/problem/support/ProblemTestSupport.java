@@ -102,11 +102,20 @@ public abstract class ProblemTestSupport extends IntegrationTestSupport {
         return problemRepository.saveAndFlush(problem);
     }
 
+    /**
+     * ProblemImageData.updateProblem 은 연관관계 반대편인 Problem.problemImageDataList 를 함께 건드린다.
+     * 이 컬렉션은 지연 로딩이라 트랜잭션 밖에서 detached 인 Problem 에 대고 호출하면
+     * LazyInitializationException 이 난다. 프로덕션 코드는 @Transactional 안에서 호출하므로
+     * 문제가 없고, 테스트 헬퍼도 같은 조건을 만들어 준다.
+     */
     protected ProblemImageData saveImageData(Problem problem, String imageUrl, ProblemImageType imageType) {
-        ProblemImageData imageData = ProblemImageData.from(
-                new ProblemImageDataRegisterDto(problem.getId(), imageUrl, imageType));
-        imageData.updateProblem(problem);
-        return problemImageDataRepository.save(imageData);
+        return transactionTemplate.execute(status -> {
+            Problem managed = problemRepository.findById(problem.getId()).orElseThrow();
+            ProblemImageData imageData = ProblemImageData.from(
+                    new ProblemImageDataRegisterDto(managed.getId(), imageUrl, imageType));
+            imageData.updateProblem(managed);
+            return problemImageDataRepository.saveAndFlush(imageData);
+        });
     }
 
     protected ProblemAnalysis saveSkippedAnalysis(Problem problem) {
