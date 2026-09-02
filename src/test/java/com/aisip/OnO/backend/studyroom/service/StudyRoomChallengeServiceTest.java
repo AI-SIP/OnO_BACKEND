@@ -7,7 +7,7 @@ import com.aisip.OnO.backend.studyroom.quartz.ChallengeNotificationScheduler;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomChallengeRepository;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomMemberRepository;
 import com.aisip.OnO.backend.user.entity.User;
-import com.aisip.OnO.backend.util.RandomUserGenerator;
+import com.aisip.OnO.backend.support.TestUsers;
 import com.aisip.OnO.backend.util.fcm.service.FcmService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -364,7 +364,7 @@ class StudyRoomChallengeServiceTest {
     }
 
     private User user(Long id, String name) {
-        User user = RandomUserGenerator.createRandomUser("GOOGLE", name, "study-room-service-test");
+        User user = TestUsers.create("GOOGLE", name, "study-room-service-test");
         setField(user, "id", id);
         return user;
     }

@@ -15,7 +15,7 @@ import com.aisip.OnO.backend.studyroom.service.StudyRoomInviteService;
 import com.aisip.OnO.backend.studyroom.service.StudyRoomService;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
-import com.aisip.OnO.backend.util.RandomUserGenerator;
+import com.aisip.OnO.backend.support.TestUsers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,9 +76,9 @@ class StudyRoomChallengeApiIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "challenge-host"));
-        member = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "멤버", "challenge-member"));
-        outsider = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "외부", "challenge-outsider"));
+        host = userRepository.save(TestUsers.create("GOOGLE", "방장", "challenge-host"));
+        member = userRepository.save(TestUsers.create("GOOGLE", "멤버", "challenge-member"));
+        outsider = userRepository.save(TestUsers.create("GOOGLE", "외부", "challenge-outsider"));
 
         authenticate(host.getId());
         StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("챌린지 테스트방"), host.getId());

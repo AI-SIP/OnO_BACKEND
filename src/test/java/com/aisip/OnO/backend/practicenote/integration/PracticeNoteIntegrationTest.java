@@ -15,7 +15,7 @@ import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.util.RandomPracticeNoteGenerator;
 import com.aisip.OnO.backend.util.RandomProblemGenerator;
-import com.aisip.OnO.backend.util.RandomUserGenerator;
+import com.aisip.OnO.backend.support.TestUsers;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -85,7 +85,7 @@ public class PracticeNoteIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        User user = RandomUserGenerator.createRandomUser();
+        User user = TestUsers.create();
         userRepository.save(user);
         userId = user.getId();
 

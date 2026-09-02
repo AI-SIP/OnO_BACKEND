@@ -4,7 +4,7 @@ import com.aisip.OnO.backend.common.ratelimit.RateLimitService;
 import com.aisip.OnO.backend.config.rabbitmq.producer.FcmNotificationProducer;
 import com.aisip.OnO.backend.config.rabbitmq.producer.ProblemAnalysisProducer;
 import com.aisip.OnO.backend.problem.event.ProblemCreatedEvent;
-import com.aisip.OnO.backend.util.RandomUserGenerator;
+import com.aisip.OnO.backend.support.TestUsers;
 import com.aisip.OnO.backend.util.fcm.dto.FcmTokenRequestDto;
 import com.aisip.OnO.backend.util.fcm.dto.NotificationRequestDto;
 import com.aisip.OnO.backend.util.fcm.entity.FcmToken;
@@ -77,7 +77,7 @@ class ProblemReviewReminderServiceTest {
 
     @BeforeEach
     void setUp() {
-        User user = RandomUserGenerator.createRandomUser();
+        User user = TestUsers.create();
         savedUser = userRepository.save(user);
         userId = savedUser.getId();
     }
@@ -379,7 +379,7 @@ class ProblemReviewReminderServiceTest {
     @DisplayName("user1의 SENT row가 있어도 user2의 due row는 독립적으로 발송된다")
     void sendDueReminders_userIsolation_eachUserIndependent() {
         // user2 생성
-        User user2 = RandomUserGenerator.createRandomUser();
+        User user2 = TestUsers.create();
         userRepository.save(user2);
         Long userId2 = user2.getId();
 

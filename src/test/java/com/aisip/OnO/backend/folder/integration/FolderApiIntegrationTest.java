@@ -5,7 +5,7 @@ import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.util.RandomFolderGenerator;
 import com.aisip.OnO.backend.util.RandomProblemGenerator;
-import com.aisip.OnO.backend.util.RandomUserGenerator;
+import com.aisip.OnO.backend.support.TestUsers;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
@@ -79,7 +79,7 @@ public class FolderApiIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        User user = RandomUserGenerator.createRandomUser();
+        User user = TestUsers.create();
         userRepository.save(user);
         userId = user.getId();
 

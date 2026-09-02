@@ -1,6 +1,7 @@
 
 plugins {
 	id 'java'
+	id 'jacoco'
 	id 'org.springframework.boot' version '3.3.1'
 	id 'io.spring.dependency-management' version '1.1.5'
 	id "io.sentry.jvm.gradle" version "4.11.0"
@@ -67,8 +68,14 @@ dependencies {
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.security:spring-security-test'
-	testRuntimeOnly 'com.h2database:h2'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+	// Spring Boot 3.3.1 이 관리하는 1.19.8 은 docker-java 3.3.x 를 쓰는데,
+	// Docker Engine 29 의 /info 응답에 400 을 내며 컨테이너를 띄우지 못한다. 버전을 고정해 올린다.
+	testImplementation platform('org.testcontainers:testcontainers-bom:1.21.3')
+	testImplementation 'org.testcontainers:junit-jupiter'
+	testImplementation 'org.testcontainers:mysql'
+	testImplementation 'org.testcontainers:rabbitmq'
 	testCompileOnly 'org.projectlombok:lombok'
 	testAnnotationProcessor 'org.projectlombok:lombok'
 
@@ -82,6 +89,68 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 	systemProperty 'spring.profiles.active', 'test'
+	// 기존 스위트는 힙 부족으로 OOM 종료됐다. 컨텍스트 캐시 + 컨테이너 구동분을 감안해 상향한다.
+	maxHeapSize = '2g'
+
+	// macOS Docker Desktop 은 소켓을 ~/.docker/run/docker.sock 에 두기 때문에
+	// Testcontainers 의 기본 탐색(/var/run/docker.sock)이 실패한다. 환경별로 찾아서 넘긴다.
+	def userSocket = file("${System.getProperty('user.home')}/.docker/run/docker.sock")
+	def dockerHost = System.getenv('DOCKER_HOST')
+			?: (userSocket.exists() ? "unix://${userSocket.absolutePath}" : 'unix:///var/run/docker.sock')
+	environment 'DOCKER_HOST', dockerHost
+	// docker-java 는 기본으로 API v1.32 를 쓰는데 Docker Engine 29 의 MinAPIVersion 은 1.40 이라
+	// /v1.32/info 가 400 으로 거부된다("Could not find a valid Docker environment"의 실제 원인).
+	// docker-java 는 이 값을 환경변수가 아니라 'api.version' 시스템 프로퍼티에서 읽는다.
+	systemProperty 'api.version', System.getenv('DOCKER_API_VERSION') ?: '1.44'
+	environment 'DOCKER_API_VERSION', System.getenv('DOCKER_API_VERSION') ?: '1.44'
+	environment 'TESTCONTAINERS_CHECKS_DISABLE', 'true'
+	testLogging {
+		events 'failed'
+		exceptionFormat 'short'
+	}
+	finalizedBy jacocoTestReport
+}
+
+jacoco {
+	toolVersion = '0.8.12'
+}
+
+// 커버리지 집계에서 제외할 대상: 실행 진입점, 설정 클래스, QueryDSL 생성 코드
+def coverageExcludes = [
+		'**/BackendApplication*',
+		'**/config/**',
+		'**/Q[A-Z]*',
+]
+
+tasks.named('jacocoTestReport') {
+	dependsOn tasks.named('test')
+	reports {
+		xml.required = true
+		html.required = true
+	}
+	classDirectories.setFrom(
+			files(classDirectories.files.collect {
+				fileTree(dir: it, exclude: coverageExcludes)
+			})
+	)
+}
+
+tasks.named('jacocoTestCoverageVerification') {
+	violationRules {
+		rule {
+			element = 'BUNDLE'
+			limit {
+				counter = 'LINE'
+				value = 'COVEREDRATIO'
+				minimum = 0.00  // 개선 진행에 따라 단계적으로 상향한다
+			}
+		}
+	}
+	classDirectories.setFrom(
+			files(classDirectories.files.collect {
+				fileTree(dir: it, exclude: coverageExcludes)
+			})
+	)
 }
 
 tasks.withType(JavaCompile) {

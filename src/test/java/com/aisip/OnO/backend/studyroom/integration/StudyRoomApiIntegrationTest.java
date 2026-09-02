@@ -14,7 +14,7 @@ import com.aisip.OnO.backend.studyroom.repository.StudyRoomFeedRepository;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomRepository;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
-import com.aisip.OnO.backend.util.RandomUserGenerator;
+import com.aisip.OnO.backend.support.TestUsers;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -371,7 +371,7 @@ class StudyRoomApiIntegrationTest {
     }
 
     private User saveUser(String name, String emailPrefix) {
-        return userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", name, emailPrefix));
+        return userRepository.save(TestUsers.create("GOOGLE", name, emailPrefix));
     }
 
     private void authenticate(Long userId) {

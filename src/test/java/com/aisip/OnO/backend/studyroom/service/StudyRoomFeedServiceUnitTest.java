@@ -7,7 +7,7 @@ import com.aisip.OnO.backend.studyroom.repository.StudyRoomFeedRepository;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomMemberRepository;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
-import com.aisip.OnO.backend.util.RandomUserGenerator;
+import com.aisip.OnO.backend.support.TestUsers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,7 +62,7 @@ class StudyRoomFeedServiceUnitTest {
 
     @BeforeEach
     void setUp() {
-        user = RandomUserGenerator.createRandomUser("GOOGLE", "테스트", "feed-unit-test");
+        user = TestUsers.create("GOOGLE", "테스트", "feed-unit-test");
         setField(user, "id", 1L);
 
         room = StudyRoom.create("테스트방", 1L);

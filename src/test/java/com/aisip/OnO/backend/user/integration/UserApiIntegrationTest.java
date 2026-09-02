@@ -7,7 +7,7 @@ import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.exception.UserErrorCase;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.user.service.UserService;
-import com.aisip.OnO.backend.util.RandomUserGenerator;
+import com.aisip.OnO.backend.support.TestUsers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,7 +54,7 @@ public class UserApiIntegrationTest {
     @BeforeEach
     void setUp() {
         // 유저 등록 (식별자 중복 피하려고 시간 기반 추가)
-        User user = RandomUserGenerator.createRandomUser();
+        User user = TestUsers.create();
         userRepository.save(user);
         userId = user.getId();
         targetUser = user;

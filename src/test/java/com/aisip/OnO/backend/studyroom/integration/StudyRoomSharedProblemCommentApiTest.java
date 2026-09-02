@@ -6,7 +6,7 @@ import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomDtos.*;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
-import com.aisip.OnO.backend.util.RandomUserGenerator;
+import com.aisip.OnO.backend.support.TestUsers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.AfterEach;
@@ -257,7 +257,7 @@ class StudyRoomSharedProblemCommentApiTest {
     }
 
     private User saveUser(String name, String emailPrefix) {
-        return userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", name, emailPrefix));
+        return userRepository.save(TestUsers.create("GOOGLE", name, emailPrefix));
     }
 
     private void authenticate(Long userId) {

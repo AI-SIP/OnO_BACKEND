@@ -25,7 +25,7 @@ import com.aisip.OnO.backend.studyroom.repository.StudyRoomRepository;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomMemberRepository;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
-import com.aisip.OnO.backend.util.RandomUserGenerator;
+import com.aisip.OnO.backend.support.TestUsers;
 import com.aisip.OnO.backend.util.fileupload.exception.FileUploadErrorCase;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import org.junit.jupiter.api.Test;
@@ -81,7 +81,7 @@ class StudyRoomServiceIntegrationTest {
 
     @Test
     void createRoomCreatesHostMember() {
-        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
+        User host = userRepository.save(TestUsers.create("GOOGLE", "방장", "host"));
 
         StudyRoomDetailResponse response = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
 
@@ -93,8 +93,8 @@ class StudyRoomServiceIntegrationTest {
 
     @Test
     void joinWithInviteCodeAddsMember() {
-        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
-        User member = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "멤버", "member"));
+        User host = userRepository.save(TestUsers.create("GOOGLE", "방장", "host"));
+        User member = userRepository.save(TestUsers.create("GOOGLE", "멤버", "member"));
         StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
         InviteCodeResponse invite = inviteService.issueInviteCode(room.roomId(), host.getId());
 
@@ -106,8 +106,8 @@ class StudyRoomServiceIntegrationTest {
 
     @Test
     void memberCanRejoinAfterLeavingRoom() {
-        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
-        User member = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "멤버", "member"));
+        User host = userRepository.save(TestUsers.create("GOOGLE", "방장", "host"));
+        User member = userRepository.save(TestUsers.create("GOOGLE", "멤버", "member"));
         StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
         InviteCodeResponse invite = inviteService.issueInviteCode(room.roomId(), host.getId());
         inviteService.join(new StudyRoomJoinRequest(invite.code()), member.getId());
@@ -121,7 +121,7 @@ class StudyRoomServiceIntegrationTest {
 
     @Test
     void feedReactionCanBeRecreatedAfterDelete() {
-        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
+        User host = userRepository.save(TestUsers.create("GOOGLE", "방장", "host"));
         StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
         StudyRoomFeed feed = feedRepository.save(StudyRoomFeed.create(
                 roomRepository.findById(room.roomId()).orElseThrow(),
@@ -141,8 +141,8 @@ class StudyRoomServiceIntegrationTest {
 
     @Test
     void nonMemberCannotReadRoom() {
-        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
-        User outsider = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "외부", "outsider"));
+        User host = userRepository.save(TestUsers.create("GOOGLE", "방장", "host"));
+        User outsider = userRepository.save(TestUsers.create("GOOGLE", "외부", "outsider"));
         StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
 
         assertThatThrownBy(() -> studyRoomService.getRoom(room.roomId(), outsider.getId()))
@@ -153,8 +153,8 @@ class StudyRoomServiceIntegrationTest {
 
     @Test
     void getMyRoomsIncludesTodayPracticeSummary() {
-        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
-        User member = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "멤버", "member"));
+        User host = userRepository.save(TestUsers.create("GOOGLE", "방장", "host"));
+        User member = userRepository.save(TestUsers.create("GOOGLE", "멤버", "member"));
         StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
         InviteCodeResponse invite = inviteService.issueInviteCode(room.roomId(), host.getId());
         inviteService.join(new StudyRoomJoinRequest(invite.code()), member.getId());
@@ -174,8 +174,8 @@ class StudyRoomServiceIntegrationTest {
 
     @Test
     void getRoomIncludesMemberTodayPracticeCount() {
-        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
-        User member = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "멤버", "member"));
+        User host = userRepository.save(TestUsers.create("GOOGLE", "방장", "host"));
+        User member = userRepository.save(TestUsers.create("GOOGLE", "멤버", "member"));
         StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
         InviteCodeResponse invite = inviteService.issueInviteCode(room.roomId(), host.getId());
         inviteService.join(new StudyRoomJoinRequest(invite.code()), member.getId());
@@ -196,7 +196,7 @@ class StudyRoomServiceIntegrationTest {
 
     @Test
     void updateThumbnailUploadsAndStoresThumbnailUrl() {
-        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
+        User host = userRepository.save(TestUsers.create("GOOGLE", "방장", "host"));
         StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
         MockMultipartFile firstThumbnail = new MockMultipartFile("thumbnail", "first.png", "image/png", pngBytes());
         MockMultipartFile secondThumbnail = new MockMultipartFile("thumbnail", "second.png", "image/png", pngBytes());
@@ -215,8 +215,8 @@ class StudyRoomServiceIntegrationTest {
 
     @Test
     void nonHostCannotUpdateThumbnail() {
-        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
-        User member = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "멤버", "member"));
+        User host = userRepository.save(TestUsers.create("GOOGLE", "방장", "host"));
+        User member = userRepository.save(TestUsers.create("GOOGLE", "멤버", "member"));
         StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
         InviteCodeResponse invite = inviteService.issueInviteCode(room.roomId(), host.getId());
         inviteService.join(new StudyRoomJoinRequest(invite.code()), member.getId());
@@ -230,7 +230,7 @@ class StudyRoomServiceIntegrationTest {
 
     @Test
     void updateThumbnailRejectsInvalidMimeAndSignature() {
-        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
+        User host = userRepository.save(TestUsers.create("GOOGLE", "방장", "host"));
         StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
         MockMultipartFile thumbnail = new MockMultipartFile("thumbnail", "first.png", "image/png", "not-image".getBytes());
 
@@ -243,7 +243,7 @@ class StudyRoomServiceIntegrationTest {
 
     @Test
     void updateThumbnailRejectsOversizedImage() {
-        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
+        User host = userRepository.save(TestUsers.create("GOOGLE", "방장", "host"));
         StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
         MockMultipartFile thumbnail = new MockMultipartFile("thumbnail", "large.png", "image/png", largePngBytes());
 
@@ -256,8 +256,8 @@ class StudyRoomServiceIntegrationTest {
 
     @Test
     void hostLeaveTransfersHostToNextMember() {
-        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
-        User member = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "멤버", "member"));
+        User host = userRepository.save(TestUsers.create("GOOGLE", "방장", "host"));
+        User member = userRepository.save(TestUsers.create("GOOGLE", "멤버", "member"));
         StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
         InviteCodeResponse invite = inviteService.issueInviteCode(room.roomId(), host.getId());
         inviteService.join(new StudyRoomJoinRequest(invite.code()), member.getId());
@@ -272,7 +272,7 @@ class StudyRoomServiceIntegrationTest {
 
     @Test
     void hostLeaveDeletesRoomWhenNoOtherMemberExists() {
-        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
+        User host = userRepository.save(TestUsers.create("GOOGLE", "방장", "host"));
         StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
 
         studyRoomService.leaveRoom(room.roomId(), host.getId());
@@ -282,7 +282,7 @@ class StudyRoomServiceIntegrationTest {
 
     @Test
     void updateGoalCanSetAndClearWeeklyGoal() {
-        User host = userRepository.save(RandomUserGenerator.createRandomUser("GOOGLE", "방장", "host"));
+        User host = userRepository.save(TestUsers.create("GOOGLE", "방장", "host"));
         StudyRoomDetailResponse room = studyRoomService.createRoom(new StudyRoomCreateRequest("수능 준비방"), host.getId());
 
         assertThat(studyRoomService.updateGoal(room.roomId(), host.getId(), new StudyRoomGoalUpdateRequest(20)).weeklyGoal())
