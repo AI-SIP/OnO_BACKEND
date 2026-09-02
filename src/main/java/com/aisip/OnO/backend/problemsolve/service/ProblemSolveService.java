@@ -105,6 +105,12 @@ public class ProblemSolveService {
 
     @Transactional
     public Long createProblemSolve(ProblemSolveRegisterDto dto, Long userId) {
+        // problemId 가 없으면 findById(null) 이 InvalidDataAccessApiUsageException 으로 터져 500 이 나간다.
+        // answerStatus 가 없으면 복습 주기 계산에서 NPE, 저장 시 not-null 위반으로 역시 500 이다.
+        if (dto == null || dto.problemId() == null || dto.answerStatus() == null) {
+            throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_INVALID_INPUT);
+        }
+
         Problem problem = problemRepository.findById(dto.problemId())
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
@@ -123,10 +129,15 @@ public class ProblemSolveService {
             }
         }
 
+        // practicedAt 은 not-null 컬럼이다. 앱이 값을 안 보내면 "지금 푼 것"으로 본다.
+        LocalDateTime practicedAt = dto.practicedAt() != null
+                ? dto.practicedAt()
+                : LocalDateTime.now(ZoneId.of("Asia/Seoul"));
+
         ProblemSolve problemSolve = ProblemSolve.create(
                 problem,
                 userId,
-                dto.practicedAt(),
+                practicedAt,
                 dto.answerStatus(),
                 dto.reflection(),
                 improvementsJson,
@@ -146,9 +157,6 @@ public class ProblemSolveService {
         eventPublisher.publishEvent(new StudyRoomActivityEvent(
                 userId, StudyRoomFeedEventType.PRACTICE_COMPLETED, java.util.Map.of()));
 
-        LocalDateTime practicedAt = dto.practicedAt() != null
-                ? dto.practicedAt()
-                : LocalDateTime.now(ZoneId.of("Asia/Seoul"));
         reminderService.skipDuePendingByProblemSolve(userId, dto.problemId(), practicedAt);
 
         log.info("userId: {} created problem solve: {}, nextReviewAt: {}, mastered: {}",
@@ -159,6 +167,10 @@ public class ProblemSolveService {
 
     @Transactional
     public void uploadProblemSolveImages(Long problemSolveId, Long userId, List<MultipartFile> images) {
+        if (images == null) {
+            throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_INVALID_INPUT);
+        }
+
         ProblemSolve problemSolve = problemSolveRepository.findById(problemSolveId)
                 .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND));
 
@@ -191,6 +203,10 @@ public class ProblemSolveService {
 
     @Transactional
     public void addImageUrls(Long problemSolveId, Long userId, List<String> imageUrls) {
+        if (imageUrls == null) {
+            throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_INVALID_INPUT);
+        }
+
         ProblemSolve problemSolve = problemSolveRepository.findById(problemSolveId)
                 .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND));
         if (!Objects.equals(problemSolve.getUserId(), userId)) {
@@ -209,6 +225,12 @@ public class ProblemSolveService {
 
     @Transactional
     public void updateProblemSolve(ProblemSolveUpdateDto dto, Long userId) {
+        // problemSolveId 가 없으면 findById(null) 이 500 으로, answerStatus 가 없으면
+        // not-null 컬럼 위반으로 500 이 난다. 둘 다 클라이언트 입력 오류다.
+        if (dto == null || dto.problemSolveId() == null || dto.answerStatus() == null) {
+            throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_INVALID_INPUT);
+        }
+
         ProblemSolve problemSolve = problemSolveRepository.findById(dto.problemSolveId())
                 .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND));
 

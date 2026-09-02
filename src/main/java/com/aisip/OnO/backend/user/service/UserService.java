@@ -46,6 +46,12 @@ import java.util.stream.Collectors;
 public class UserService {
     private static final long MAX_PROFILE_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 
+    /**
+     * identifier 는 CryptoConverter 로 암호화(Base64)돼 varchar(255) 컬럼에 저장된다.
+     * 평문 176자부터 암호문이 256자가 되어 저장 자체가 실패하므로 그 앞에서 400 으로 끊는다.
+     */
+    private static final int MAX_IDENTIFIER_LENGTH = 175;
+
     private final UserRepository userRepository;
 
     private final FolderService folderService;
@@ -103,6 +109,8 @@ public class UserService {
 
     @Transactional
     public UserResponseDto registerMemberUser(UserRegisterDto userRegisterDto) {
+        validateIdentifier(userRegisterDto.identifier());
+
         return userRepository.findByIdentifier(userRegisterDto.identifier())
                 .map(UserResponseDto::from)
                 .orElseGet(() -> {
@@ -113,6 +121,18 @@ public class UserService {
                     discordWebhookNotificationService.sendMessage("새로운 멤버 유저가 가입했습니다!", "Username: "  + userRegisterDto.name());
                     return UserResponseDto.from(user);
                 });
+    }
+
+    /**
+     * 소셜 로그인 식별자 검증.
+     *
+     * <p>identifier 가 비어 있으면 findByIdentifier 가 항상 빈 결과라 로그인할 때마다
+     * 새 계정이 생기고, 사용자는 이전 오답노트로 돌아갈 수 없다.
+     */
+    private void validateIdentifier(String identifier) {
+        if (identifier == null || identifier.isBlank() || identifier.length() > MAX_IDENTIFIER_LENGTH) {
+            throw new ApplicationException(UserErrorCase.INVALID_USER_IDENTIFIER);
+        }
     }
 
     @Transactional(readOnly = true)

@@ -14,9 +14,8 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.test.context.TestSecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -38,10 +37,9 @@ import java.util.List;
 @ActiveProfiles("test")
 public abstract class IntegrationTestSupport {
 
-    @DynamicPropertySource
-    static void registerContainerProperties(DynamicPropertyRegistry registry) {
-        TestContainers.registerProperties(registry);
-    }
+    // 컨테이너 접속 정보는 TestContainersContextCustomizerFactory 가 모든 테스트에 주입한다.
+    // 여기서 @DynamicPropertySource 를 따로 두면 이 베이스를 상속한 테스트와 그렇지 않은 테스트의
+    // 컨텍스트 캐시 키가 갈라져 스프링 컨텍스트가 불필요하게 두 번 뜬다.
 
     @Autowired
     protected MockMvc mockMvc;
@@ -74,6 +72,7 @@ public abstract class IntegrationTestSupport {
     @BeforeEach
     void resetDatabaseAndSecurityContext() {
         databaseCleaner.clean();
+        TestSecurityContextHolder.clearContext();
         SecurityContextHolder.clearContext();
     }
 
@@ -88,8 +87,28 @@ public abstract class IntegrationTestSupport {
         authenticateAs(userId, "ROLE_MEMBER");
     }
 
+    /**
+     * 인증되지 않은 요청을 검증할 때 쓴다.
+     *
+     * <p>{@code SecurityContextHolder} 만 지우면 안 된다. MockMvc 요청은
+     * {@code TestSecurityContextHolder} 에 담긴 값을 읽으므로 그쪽이 남아 있으면
+     * 인증된 상태로 요청이 나간다.
+     */
+    protected void clearAuthentication() {
+        TestSecurityContextHolder.clearContext();
+        SecurityContextHolder.clearContext();
+    }
+
     protected void authenticateAs(Long userId, String role) {
-        SecurityContextHolder.getContext().setAuthentication(
+        // SecurityContextHolder 를 직접 세우면 MockMvc 요청에는 반영되지 않는다.
+        // 시큐리티 필터 체인이 요청마다 SecurityContextRepository 에서 컨텍스트를 새로 읽어
+        // 스레드에 올려둔 값을 덮어쓰기 때문이다. 실제로 이 때문에 인증이 필요한 요청이
+        // 전부 401 로 떨어졌다.
+        //
+        // TestSecurityContextHolder 에 넣으면 spring-security-test 의 리포지토리가
+        // 요청 시점에 이 값을 꺼내 쓰고, 동시에 SecurityContextHolder 에도 반영되므로
+        // MockMvc 를 타지 않는 서비스 단위 테스트에서도 그대로 동작한다.
+        TestSecurityContextHolder.setAuthentication(
                 new UsernamePasswordAuthenticationToken(
                         userId,
                         null,

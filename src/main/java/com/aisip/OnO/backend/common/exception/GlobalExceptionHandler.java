@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.MDC;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.*;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
@@ -43,11 +45,21 @@ public class GlobalExceptionHandler {
                 .body(commonResponse);
     }
 
+    /**
+     * 요청 본문 검증 실패 처리.
+     *
+     * <p>이전 시그니처는 첫 인자로 {@link BindingResult} 를 받고 있었다. @ExceptionHandler 는
+     * BindingResult 를 인자로 지원하지 않아 핸들러 자체가 해석되지 못했고, 그 결과 모든
+     * @Valid 검증 실패가 400 이 아니라 마지막 Exception 핸들러로 떨어져 500 으로 나갔다.
+     * 검증 실패는 클라이언트 입력 오류이므로 400 이어야 한다.
+     */
     @ExceptionHandler(value = MethodArgumentNotValidException.class)
-    public ResponseEntity<CommonResponse> handleValidException(BindingResult bindingResult,
-                                                               MethodArgumentNotValidException ex,
+    public ResponseEntity<CommonResponse> handleValidException(MethodArgumentNotValidException ex,
                                                                WebRequest request) {
-        String message = bindingResult.getAllErrors().get(0).getDefaultMessage();
+        BindingResult bindingResult = ex.getBindingResult();
+        String message = bindingResult.getAllErrors().isEmpty()
+                ? "잘못된 요청입니다."
+                : bindingResult.getAllErrors().get(0).getDefaultMessage();
         CommonResponse commonResponse = CommonResponse.error(400, message);
 
         putErrorMdc(400, ex);
@@ -78,6 +90,61 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<CommonResponse> handleBadRequestException(Exception ex, WebRequest request) {
         return handleSpringStatusException(ex, request, HttpStatus.BAD_REQUEST, "잘못된 요청입니다.");
+    }
+
+    /**
+     * DB 제약 조건 위반은 서버 결함이 아니라 클라이언트 입력 문제다.
+     *
+     * <p>핸들러가 없던 시절에는 태그 중복 생성({@code Duplicate entry ... for key 'tag.idx_tag_user_normalized'})과
+     * 컬럼 길이 초과({@code Data truncation: Data too long for column})가 전부 500으로 나가면서
+     * Discord 에러 알림까지 발송됐다. 원인별로 4xx로 분류해 응답한다.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<CommonResponse> handleDataIntegrityViolationException(DataIntegrityViolationException ex,
+                                                                               WebRequest request) {
+        HttpStatus status = resolveDataIntegrityStatus(ex);
+        String message = resolveDataIntegrityMessage(ex, status);
+        CommonResponse commonResponse = CommonResponse.error(status.value(), message);
+
+        putErrorMdc(status.value(), ex);
+        logByStatus(status, "Data integrity exception handled", rootCauseMessage(ex), ex);
+
+        return ResponseEntity
+                .status(status)
+                .body(commonResponse);
+    }
+
+    private HttpStatus resolveDataIntegrityStatus(DataIntegrityViolationException ex) {
+        if (ex instanceof DuplicateKeyException || isDuplicateEntry(ex)) {
+            return HttpStatus.CONFLICT;
+        }
+        return HttpStatus.BAD_REQUEST;
+    }
+
+    private String resolveDataIntegrityMessage(DataIntegrityViolationException ex, HttpStatus status) {
+        if (status == HttpStatus.CONFLICT) {
+            return "이미 존재하는 데이터입니다.";
+        }
+
+        String cause = rootCauseMessage(ex).toLowerCase();
+        if (cause.contains("data too long") || cause.contains("data truncation")) {
+            return "입력값이 허용된 길이를 초과했습니다.";
+        }
+        if (cause.contains("cannot be null") || cause.contains("not-null")) {
+            return "필수 입력값이 누락되었습니다.";
+        }
+        return "요청 데이터가 저장 조건을 만족하지 않습니다.";
+    }
+
+    private boolean isDuplicateEntry(DataIntegrityViolationException ex) {
+        String cause = rootCauseMessage(ex).toLowerCase();
+        return cause.contains("duplicate entry") || cause.contains("unique constraint");
+    }
+
+    private String rootCauseMessage(DataIntegrityViolationException ex) {
+        Throwable cause = ex.getMostSpecificCause();
+        String message = cause == null ? ex.getMessage() : cause.getMessage();
+        return message == null ? "" : message;
     }
 
     @ExceptionHandler(Exception.class)

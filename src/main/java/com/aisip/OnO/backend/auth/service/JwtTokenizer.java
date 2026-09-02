@@ -75,12 +75,24 @@ public class JwtTokenizer {
                 .compact();
     }
 
+    /**
+     * 액세스 토큰을 검증한다.
+     *
+     * <p>만료만은 {@link ExpiredJwtException} 을 그대로 올려보낸다.
+     * JwtTokenFilter 가 이 예외를 잡아 {@code ACCESS_TOKEN_EXPIRED(1005)} 로 응답하고,
+     * 프론트는 1005 를 받아야 토큰 갱신을 시도한다.
+     * 만료를 ApplicationException 으로 감싸면 필터가 만료를 구분하지 못해
+     * {@code AUTHENTICATION_FAILED(1007)} 로 나가고, 프론트는 갱신 없이 인증 실패로 처리한다.
+     */
     public void validateAccessToken(String token) {
         try{
             Jwts.parserBuilder().setSigningKey(accessKey).build().parseClaimsJws(token);
+        } catch (ExpiredJwtException e) {
+            log.warn("엑세스 토큰 만료: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.warn("엑세스 토큰 검증 실패: {}", e.getMessage());
-            throw new ApplicationException(AuthErrorCase.ACCESS_TOKEN_EXPIRED);
+            throw new ApplicationException(AuthErrorCase.INVALID_ACCESS_TOKEN);
         }
     }
 

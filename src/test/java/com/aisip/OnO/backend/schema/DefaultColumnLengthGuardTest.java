@@ -37,6 +37,8 @@ class DefaultColumnLengthGuardTest extends IntegrationTestSupport {
             "practice_note.title",
             "practice_note.repeat_type",
             "problem.reference",
+            // 원본 problem.reference 가 varchar(255) 이므로 스냅샷도 255 면 충분하다.
+            "problem_review_reminder.problem_reference_snapshot",
             "problem_analysis.problem_type",
             "problem_analysis.subject",
             "study_room_weekly_report.cheer_message",
@@ -52,7 +54,6 @@ class DefaultColumnLengthGuardTest extends IntegrationTestSupport {
             "fcm_token.token",
             "image_data.image_url",
             "problem_solve_image_data.image_url",
-            "refresh_token.refresh_token",
             "study_room.thumbnail_url",
             "user.identifier",
             "user.profile_image_url"

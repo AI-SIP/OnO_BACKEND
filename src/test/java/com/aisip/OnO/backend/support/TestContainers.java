@@ -48,6 +48,25 @@ public final class TestContainers {
     private TestContainers() {
     }
 
+    /**
+     * 컨텍스트 커스터마이저가 주입할 인라인 프로퍼티.
+     * 상속 구조와 무관하게 모든 스프링 테스트에 동일하게 적용된다.
+     */
+    public static String[] asInlinedProperties() {
+        return new String[]{
+                "spring.datasource.url=" + jdbcUrl(),
+                "spring.datasource.username=" + MYSQL.getUsername(),
+                "spring.datasource.password=" + MYSQL.getPassword(),
+                "spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver",
+                "spring.data.redis.host=" + REDIS.getHost(),
+                "spring.data.redis.port=" + REDIS.getMappedPort(6379),
+                "spring.rabbitmq.host=" + RABBITMQ.getHost(),
+                "spring.rabbitmq.port=" + RABBITMQ.getAmqpPort(),
+                "spring.rabbitmq.username=" + RABBITMQ.getAdminUsername(),
+                "spring.rabbitmq.password=" + RABBITMQ.getAdminPassword(),
+        };
+    }
+
     public static void registerProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", TestContainers::jdbcUrl);
         registry.add("spring.datasource.username", MYSQL::getUsername);

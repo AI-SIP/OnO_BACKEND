@@ -28,6 +28,7 @@ import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.dto.ReviewDueResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
+import com.aisip.OnO.backend.problem.repository.ReviewDueProblemProjection;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
 import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveRepository;
 import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveSummary;
@@ -209,6 +210,13 @@ public class ProblemService {
 
     @Transactional
     public Long registerProblem(ProblemRegisterDto problemRegisterDto, Long userId) {
+        validateProblemContent(problemRegisterDto.memo(), problemRegisterDto.reference());
+
+        // folderId 가 null 이면 findById(null) 이 InvalidDataAccessApiUsageException 을 던져 500 이 나간다.
+        // 입력 누락은 서버 오류가 아니므로 400 으로 거절한다.
+        if (problemRegisterDto.folderId() == null) {
+            throw new ApplicationException(ProblemErrorCase.PROBLEM_FOLDER_ID_REQUIRED);
+        }
 
         Folder folder = folderRepository.findById(problemRegisterDto.folderId())
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
@@ -240,6 +248,7 @@ public class ProblemService {
      */
     @Transactional
     public Long registerProblemV2(ProblemRegisterV2Dto problemRegisterV2Dto, Long userId) {
+        validateProblemContent(problemRegisterV2Dto.memo(), problemRegisterV2Dto.reference());
         Folder folder = resolveRegisterFolder(problemRegisterV2Dto.folderId(), userId);
 
         ProblemRegisterDto baseDto = new ProblemRegisterDto(
@@ -306,6 +315,8 @@ public class ProblemService {
         if (registerDtos == null || registerDtos.isEmpty()) {
             return List.of();
         }
+
+        registerDtos.forEach(dto -> validateProblemContent(dto.memo(), dto.reference()));
 
         Map<Long, Folder> foldersById = resolveRegisterFolders(registerDtos, userId);
         Folder rootFolder = registerDtos.stream().anyMatch(dto -> dto.folderId() == null)
@@ -592,6 +603,7 @@ public class ProblemService {
 
     @Transactional
     public void updateProblemInfo(ProblemRegisterDto problemRegisterDto, Long userId) {
+        validateProblemContent(problemRegisterDto.memo(), problemRegisterDto.reference());
 
         Problem problem = findProblemEntity(problemRegisterDto.problemId(), userId);
 
@@ -929,6 +941,19 @@ public class ProblemService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 컬럼 길이를 넘는 입력은 DB에서 Data truncation 으로 500 이 나므로 저장 전에 400 으로 거절한다.
+     */
+    private void validateProblemContent(String memo, String reference) {
+        if (memo != null && memo.length() > Problem.MEMO_MAX_LENGTH) {
+            throw new ApplicationException(ProblemErrorCase.PROBLEM_MEMO_TOO_LONG);
+        }
+
+        if (reference != null && reference.length() > Problem.REFERENCE_MAX_LENGTH) {
+            throw new ApplicationException(ProblemErrorCase.PROBLEM_REFERENCE_TOO_LONG);
+        }
+    }
+
     private void validateFolderOwner(Long folderId, Long userId) {
         Folder folder = folderRepository.findById(folderId)
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
@@ -941,13 +966,20 @@ public class ProblemService {
         }
     }
 
+    /**
+     * 오늘 복습 대상 문제 조회.
+     *
+     * <p>엔티티를 그대로 조회하면 {@code Problem.problemAnalysis} 가 mappedBy OneToOne 이라
+     * 행마다 존재 여부 확인 쿼리가 한 번씩 더 나간다(N+1). 응답에 필요한 값은 스칼라뿐이므로
+     * 프로젝션으로 한 번에 읽는다.
+     */
     @Transactional(readOnly = true)
     public ReviewDueResponseDto getReviewDueProblems(Long userId) {
         LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
-        List<Problem> dueProblems = problemRepository.findReviewDueProblems(userId, today);
+        List<ReviewDueProblemProjection> dueProblems = problemRepository.findReviewDueProblems(userId, today);
 
         long overdueCount = dueProblems.stream()
-                .filter(p -> p.getNextReviewAt().isBefore(today))
+                .filter(p -> p.nextReviewAt().isBefore(today))
                 .count();
 
         List<ReviewDueResponseDto.ReviewDueProblemDto> problemDtos = dueProblems.stream()

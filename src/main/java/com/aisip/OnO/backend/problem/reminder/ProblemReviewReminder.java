@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.problem.reminder;
 
 import com.aisip.OnO.backend.common.entity.BaseEntity;
+import com.aisip.OnO.backend.problem.entity.Problem;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -30,8 +31,11 @@ public class ProblemReviewReminder extends BaseEntity {
     @Column(nullable = false)
     private Long problemId;
 
+    /** Problem.memo 를 그대로 복사하므로 길이 제약도 같이 맞춰야 한다. */
+    @Column(length = Problem.MEMO_MAX_LENGTH)
     private String problemMemoSnapshot;
 
+    @Column(length = Problem.REFERENCE_MAX_LENGTH)
     private String problemReferenceSnapshot;
 
     @Column(nullable = false)

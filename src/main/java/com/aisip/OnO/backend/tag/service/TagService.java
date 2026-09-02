@@ -15,7 +15,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
@@ -40,19 +42,41 @@ public class TagService {
 
     private final TagRepository tagRepository;
     private final ProblemTagMappingRepository problemTagMappingRepository;
+    private final TagWriter tagWriter;
     private final RedisSingleDataService redisSingleDataService;
     private final ObjectMapper objectMapper;
 
+    /**
+     * 태그를 만들거나, 이미 같은 이름이 있으면 그 태그를 그대로 돌려준다.
+     *
+     * <p>여기서 트랜잭션을 열지 않는 이유가 있다. 삽입은 (user_id, normalized_name)
+     * 유니크 인덱스와 경쟁하는데, 실패한 트랜잭션 안에서는 재조회로 복구할 수 없다.
+     * 조회/삽입을 각각 독립 트랜잭션으로 수행하는 {@link TagWriter} 에 맡기고,
+     * 여기서는 실패 시 재조회 판단만 한다.
+     */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public TagResponseDto createTag(Long userId, TagCreateRequestDto requestDto) {
-        String tagName = normalizeDisplayName(requestDto.name());
+        String tagName = normalizeDisplayName(requestDto == null ? null : requestDto.name());
         String normalizedName = tagName.toLowerCase(Locale.ROOT);
 
-        Tag tag = tagRepository.findByUserIdAndNormalizedName(userId, normalizedName)
-                .orElseGet(() -> tagRepository.save(Tag.from(userId, tagName, normalizedName)));
+        Tag tag = tagWriter.findOrRestore(userId, tagName, normalizedName)
+                .orElseGet(() -> insertOrFindConcurrentlyCreated(userId, tagName, normalizedName));
 
         evictTagCache(userId);
         log.info("userId: {} create tag: {}", userId, tag.getName());
         return TagResponseDto.from(tag);
+    }
+
+    private Tag insertOrFindConcurrentlyCreated(Long userId, String tagName, String normalizedName) {
+        try {
+            return tagWriter.insert(userId, tagName, normalizedName);
+        } catch (DataIntegrityViolationException e) {
+            // 같은 이름을 동시에 보낸 다른 요청이 먼저 커밋했다는 뜻이다.
+            // 삽입 트랜잭션은 이미 롤백됐으므로, 새 트랜잭션에서 그 태그를 찾아 돌려준다.
+            log.info("userId: {} tag insert lost the race, re-reading: {}", userId, tagName);
+            return tagWriter.findOrRestore(userId, tagName, normalizedName)
+                    .orElseThrow(() -> e);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -78,7 +102,7 @@ public class TagService {
     }
 
     public void deleteTags(Long userId, TagDeleteRequestDto requestDto) {
-        Set<Long> tagIds = toDistinctIds(requestDto.deleteTagIdList());
+        Set<Long> tagIds = toDistinctIds(requestDto == null ? null : requestDto.deleteTagIdList());
         if (tagIds.isEmpty()) {
             throw new ApplicationException(TagErrorCase.TAG_NOT_FOUND);
         }
@@ -165,8 +189,16 @@ public class TagService {
         }
     }
 
+    /**
+     * 캐시 무효화 실패가 태그 생성/삭제 자체를 실패시키면 안 된다.
+     * Redis 가 죽어도 DB 반영은 이미 끝났고, 조회는 캐시 미스로 DB 를 타면 된다.
+     */
     private void evictTagCache(Long userId) {
-        redisSingleDataService.deleteSingleData(TAG_LIST_CACHE_PREFIX + userId);
+        try {
+            redisSingleDataService.deleteSingleData(TAG_LIST_CACHE_PREFIX + userId);
+        } catch (Exception e) {
+            log.warn("Failed to evict tag list cache. userId={}, reason={}", userId, e.getMessage());
+        }
     }
 
     private String normalizeDisplayName(String rawTagName) {

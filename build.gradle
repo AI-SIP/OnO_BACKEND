@@ -34,6 +34,10 @@ jar {
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa:3.1.0'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
+	// Bean Validation 구현체. 이게 없으면 jakarta.validation-api 만 클래스패스에 있어서
+	// 코드에 붙은 @NotNull/@Valid/@Validated 가 전부 무시되고, 잘못된 요청이 검증 없이
+	// 서비스로 들어가 500 이 된다.
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'net.logstash.logback:logstash-logback-encoder:7.4'
 	implementation 'org.springframework.cloud:spring-cloud-starter-aws:2.2.6.RELEASE'
 	implementation 'com.github.gavlyukovskiy:p6spy-spring-boot-starter:1.9.0'
@@ -123,7 +127,9 @@ def coverageExcludes = [
 ]
 
 tasks.named('jacocoTestReport') {
-	dependsOn tasks.named('test')
+	// dependsOn test 를 걸면 안 된다. 테스트가 하나라도 실패하면 의존 태스크가 실패로 간주되어
+	// 리포트 태스크가 통째로 건너뛰어지고, 직전 실행의 낡은 리포트가 그대로 남는다.
+	// test 의 finalizedBy 로 이미 순서가 보장되며, 실패한 실행에서도 커버리지는 나와야 한다.
 	reports {
 		xml.required = true
 		html.required = true
