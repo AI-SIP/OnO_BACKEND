@@ -62,6 +62,7 @@ class UserControllerTest {
                 1L,
                 0L,
                 40L,
+                true,  // notificationEnabled
                 LocalDateTime.now(),  // createdAt
                 LocalDateTime.now()  // updatedAt,
 
@@ -77,7 +78,8 @@ class UserControllerTest {
     @WithMockCustomUser()
     void getUserInfo() throws Exception {
         // Given
-        given(userService.findUser(1L)).willReturn(mockUserResponse);
+        // 컨트롤러가 touchAndFindUser 로 바뀐 뒤에도 findUser 를 스텁하고 있어 null 이 응답됐다
+        given(userService.touchAndFindUser(1L)).willReturn(mockUserResponse);
 
         // When & Then
         mockMvc.perform(get("/api/users")
