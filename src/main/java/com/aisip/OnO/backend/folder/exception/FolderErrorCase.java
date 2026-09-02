@@ -16,7 +16,9 @@ public enum FolderErrorCase implements ErrorCase {
 
     ROOT_FOLDER_CANNOT_REMOVE(400, 5004, "루트 폴더는 삭제할 수 없습니다."),
 
-    ROOT_FOLDER_CANNOT_UPDATE(400, 5005, "루트 폴더는 수정할 수 없습니다.");
+    ROOT_FOLDER_CANNOT_UPDATE(400, 5005, "루트 폴더는 수정할 수 없습니다."),
+
+    INVALID_PARENT_FOLDER(400, 5006, "폴더를 자기 자신이나 하위 폴더로 옮길 수 없습니다.");
 
     private final Integer httpStatusCode;
     private final Integer errorCode;

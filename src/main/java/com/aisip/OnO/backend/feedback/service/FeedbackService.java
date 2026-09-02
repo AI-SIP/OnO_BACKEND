@@ -1,8 +1,10 @@
 package com.aisip.OnO.backend.feedback.service;
 
+import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.feedback.dto.FeedbackRequestDto;
 import com.aisip.OnO.backend.feedback.dto.FeedbackResponseDto;
 import com.aisip.OnO.backend.feedback.entity.UserFeedback;
+import com.aisip.OnO.backend.feedback.exception.FeedbackErrorCase;
 import com.aisip.OnO.backend.feedback.repository.UserFeedbackRepository;
 import com.aisip.OnO.backend.util.webhook.DiscordWebhookNotificationService;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +24,9 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class FeedbackService {
+
+    /** {@code UserFeedback.ipAddress} 컬럼 길이(varchar(50))와 맞춘다. */
+    private static final int IP_ADDRESS_MAX_LENGTH = 50;
 
     private final UserFeedbackRepository feedbackRepository;
     private final DiscordWebhookNotificationService discordWebhookNotificationService;
@@ -48,7 +53,7 @@ public class FeedbackService {
                 .mostUsedFeature(dto.getMostUsedFeature())
                 .painPoints(nullIfBlank(dto.getPainPoints()))
                 .desiredFeatures(nullIfBlank(dto.getDesiredFeatures()))
-                .ipAddress(ipAddress)
+                .ipAddress(truncate(ipAddress, IP_ADDRESS_MAX_LENGTH))
                 .submittedAt(LocalDateTime.now())
                 .build();
 
@@ -56,16 +61,23 @@ public class FeedbackService {
         notifyDiscord(feedback);
     }
 
+    /**
+     * 관리자 화면의 페이지네이션 입력은 그대로 신뢰할 수 없다.
+     * page 가 음수이거나 size 가 0 이하이면 {@link PageRequest#of}가 IllegalArgumentException 을 던져
+     * 관리자 화면이 통째로 500 이 됐다. 잘못된 파라미터는 유효한 범위로 보정한다.
+     */
     public Page<FeedbackResponseDto> findAll(int page, int size) {
         return feedbackRepository
-                .findAllByOrderBySubmittedAtDesc(PageRequest.of(page, size))
+                .findAllByOrderBySubmittedAtDesc(PageRequest.of(Math.max(page, 0), Math.max(size, 1)))
                 .map(FeedbackResponseDto::from);
     }
 
     public FeedbackResponseDto findById(Long id) {
         return feedbackRepository.findById(id)
                 .map(FeedbackResponseDto::from)
-                .orElseThrow(() -> new IllegalArgumentException("피드백을 찾을 수 없습니다: " + id));
+                // IllegalArgumentException 은 GlobalExceptionHandler 의 마지막 Exception 핸들러로 떨어져
+                // 500 + Discord 에러 알림이 됐다. 없는 리소스 조회는 404 다.
+                .orElseThrow(() -> new ApplicationException(FeedbackErrorCase.FEEDBACK_NOT_FOUND));
     }
 
     public long count() {
@@ -115,5 +127,17 @@ public class FeedbackService {
 
     private String nullIfBlank(String s) {
         return (s == null || s.isBlank()) ? null : s.trim();
+    }
+
+    /**
+     * IP 는 사용자가 {@code X-Forwarded-For} 헤더로 얼마든지 길게 조작할 수 있는 값이다.
+     * {@code ip_address} 컬럼은 varchar(50) 이므로 그대로 넣으면 Data too long 으로 저장이 실패하고,
+     * 설문 응답 자체가 버려진다. 응답 내용과 달리 IP 는 부가 정보이므로 잘라서 담는다.
+     */
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
     }
 }

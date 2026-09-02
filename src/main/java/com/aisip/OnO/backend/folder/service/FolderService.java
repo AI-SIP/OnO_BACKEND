@@ -130,6 +130,13 @@ public class FolderService {
     }
 
     public Long createFolder(FolderRegisterDto folderRegisterDto, Long userId) {
+        // parentFolderId 가 없으면 findById(null) 이 IllegalArgumentException 을 던져 500 으로 나갔다.
+        // 루트 폴더는 initializeDefaultFoldersIfAbsent 만 만들 수 있으므로, 부모 없는 생성 요청은
+        // 잘못된 요청으로 보고 다른 "부모 폴더를 찾을 수 없음"과 같은 응답을 준다.
+        if (folderRegisterDto.parentFolderId() == null) {
+            throw new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND);
+        }
+
         Folder folder = Folder.from(folderRegisterDto, userId);
         Folder parentFolder = findFolderEntity(folderRegisterDto.parentFolderId(), userId);
 
@@ -151,6 +158,7 @@ public class FolderService {
 
         if (folderRegisterDto.parentFolderId() != null && folder.getParentFolder() != null) {
             Folder newParentFolder = findFolderEntity(folderRegisterDto.parentFolderId(), userId);
+            validateNotCyclic(folder, newParentFolder);
 
             folder.updateParentFolder(newParentFolder);
         }
@@ -192,18 +200,48 @@ public class FolderService {
 
     private Set<Long> getSubFolderIdsRecursive(Folder folder) {
         Set<Long> subFolderIds = new HashSet<>();
-
-        for (Folder subFolder : folder.getSubFolderList()) {
-            subFolderIds.add(subFolder.getId());
-            subFolderIds.addAll(getSubFolderIdsRecursive(subFolder));
-        }
-
+        collectSubFolderIds(folder, subFolderIds);
         return subFolderIds;
     }
 
+    /**
+     * 이미 방문한 폴더는 다시 타고 들어가지 않는다.
+     *
+     * <p>부모-자식 관계에 순환이 남아 있으면(과거 데이터 등) 단순 재귀는 StackOverflowError 로
+     * 삭제 요청 전체를 500 으로 떨어뜨린다. 방문 집합으로 한 번만 훑는다.
+     */
+    private void collectSubFolderIds(Folder folder, Set<Long> collectedIds) {
+        for (Folder subFolder : folder.getSubFolderList()) {
+            if (collectedIds.add(subFolder.getId())) {
+                collectSubFolderIds(subFolder, collectedIds);
+            }
+        }
+    }
+
+    /**
+     * 폴더를 자기 자신이나 자기 하위 폴더 아래로 옮기려는 요청을 막는다.
+     *
+     * <p>막지 않으면 트리에 순환이 생겨 폴더 삭제(하위 폴더 재귀 수집)와 앱의 폴더 탐색이
+     * 무한 루프에 빠진다. 새 부모에서 루트 방향으로 거슬러 올라가며 자기 자신이 나오는지 본다.
+     */
+    private void validateNotCyclic(Folder folder, Folder newParentFolder) {
+        Set<Long> visitedFolderIds = new HashSet<>();
+        Folder ancestor = newParentFolder;
+
+        while (ancestor != null && visitedFolderIds.add(ancestor.getId())) {
+            if (Objects.equals(ancestor.getId(), folder.getId())) {
+                throw new ApplicationException(FolderErrorCase.INVALID_PARENT_FOLDER);
+            }
+            ancestor = ancestor.getParentFolder();
+        }
+    }
+
     private void deleteAllByFolderIds(Collection<Long> folderIds) {
-        List<Folder> foldersToDelete = folderRepository.findAllById(folderIds);
-        folderRepository.deleteAll(foldersToDelete);
+        if (folderIds.isEmpty()) {
+            return;
+        }
+
+        folderRepository.softDeleteAllByIdIn(folderIds);
     }
 
     public void deleteAllUserFolders(Long userId) {

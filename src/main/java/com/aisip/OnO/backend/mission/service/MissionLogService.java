@@ -46,8 +46,15 @@ public class MissionLogService {
     public Long registerMissionLog(@NotNull MissionRegisterDto missionRegisterDto) {
 
         Long userId = missionRegisterDto.userId();
-        boolean canNotRegister = true;
-        canNotRegister = switch (missionRegisterDto.missionType()) {
+
+        // switch 가 MissionType 의 네 상수를 모두 다루고 있어 default 분기는 도달할 수 없었고,
+        // missionType 이 null 이면 switch 자체가 NPE 를 던져 400 이어야 할 입력 오류가 500 으로 나갔다.
+        // 잘못된 미션 종류는 MISSION_TYPE_NOT_FOUND(400) 로 거절한다.
+        if (missionRegisterDto.missionType() == null) {
+            throw new ApplicationException(MissionErrorCase.MISSION_TYPE_NOT_FOUND);
+        }
+
+        boolean canNotRegister = switch (missionRegisterDto.missionType()) {
             case USER_LOGIN -> missionLogRepository.alreadyLogin(userId);
             case PROBLEM_WRITE -> missionLogRepository.alreadyWriteProblemsTodayMoreThan3(userId);
             case PROBLEM_PRACTICE -> missionLogRepository.alreadyPracticeProblem(missionRegisterDto.referenceId());

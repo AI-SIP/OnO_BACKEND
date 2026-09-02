@@ -1,509 +1,478 @@
 package com.aisip.OnO.backend.folder.integration;
 
 import com.aisip.OnO.backend.folder.dto.FolderDeleteRequestDto;
-import com.aisip.OnO.backend.user.entity.User;
-import com.aisip.OnO.backend.user.repository.UserRepository;
-import com.aisip.OnO.backend.util.RandomFolderGenerator;
-import com.aisip.OnO.backend.util.RandomProblemGenerator;
-import com.aisip.OnO.backend.support.TestUsers;
-import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
-import com.aisip.OnO.backend.folder.repository.FolderRepository;
+import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
+import com.aisip.OnO.backend.folder.support.FolderTestSupport;
 import com.aisip.OnO.backend.problem.entity.Problem;
-import com.aisip.OnO.backend.problem.entity.ProblemImageData;
-import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
-import com.aisip.OnO.backend.problem.repository.ProblemRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jayway.jsonpath.JsonPath;
-import org.junit.jupiter.api.AfterEach;
+import com.aisip.OnO.backend.user.entity.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.test.web.servlet.ResultActions;
 
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doNothing;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT) // 랜덤 포트로 애플리케이션 실행
-@AutoConfigureMockMvc
-@ActiveProfiles("test")
-public class FolderApiIntegrationTest {
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private ProblemRepository problemRepository;
-
-    @Autowired
-    private ProblemImageDataRepository problemImageDataRepository;
-
-    @Autowired
-    private FolderRepository folderRepository;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @MockBean
-    private FileUploadService fileUploadService;
+@DisplayName("폴더 API")
+class FolderApiIntegrationTest extends FolderTestSupport {
 
     private Long userId;
-
-    private List<Folder> folderList;
-
-    private List<Problem> problemList;
-
-    private List<ProblemImageData> problemImageDataList;
+    private Long otherUserId;
+    private FolderTree tree;
 
     @BeforeEach
-    void setUp() {
-        User user = TestUsers.create();
-        userRepository.save(user);
+    void setUpFolders() {
+        User user = fixtures.createUser();
+        User otherUser = fixtures.createOtherUser();
         userId = user.getId();
+        otherUserId = otherUser.getId();
+        tree = createFolderTree(userId);
+        authenticateAs(userId);
+    }
 
-        // 인증 설정
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(
-                        userId, null, List.of(new SimpleGrantedAuthority("ROLE_MEMBER"))
-                )
-        );
+    @Nested
+    @DisplayName("GET /api/folders/root")
+    class GetRootFolder {
 
-        folderList = new ArrayList<>();
-        problemList = new ArrayList<>();
-        problemImageDataList = new ArrayList<>();
+        @Test
+        @DisplayName("루트 폴더와 하위 폴더 썸네일을 돌려준다")
+        void returnsRootFolder() throws Exception {
+            saveProblems(userId, tree.root(), 2);
+            saveProblems(userId, tree.notebookA(), 1);
 
-         /*
-         root
-        /    \
-        0     1
-        | \   |
-        2  3  4
-         */
-        Folder rootFolder = RandomFolderGenerator.createRandomFolder(userId);
-        rootFolder = folderRepository.save(rootFolder);
-        folderList.add(rootFolder);
-
-        for (int i = 0; i < 5; i++) {
-            Folder folder = RandomFolderGenerator.createRandomSubFolder(folderList.get(i / 2), userId);
-            folder = folderRepository.save(folder);
-            folderList.add(folder);
-            folderList.get(i / 2).addSubFolder(folder);
+            mockMvc.perform(get("/api/folders/root"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.folderId").value(tree.root().getId()))
+                    .andExpect(jsonPath("$.data.folderName").value(tree.root().getName()))
+                    .andExpect(jsonPath("$.data.parentFolder").isEmpty())
+                    .andExpect(jsonPath("$.data.subFolderList.length()").value(2))
+                    .andExpect(jsonPath("$.data.problemIdList.length()").value(2))
+                    .andExpect(jsonPath("$.data.subFolderList[?(@.folderId == " + tree.notebookA().getId() + ")].problemCount")
+                            .value(1));
         }
 
-        for (int i = 0; i < 12; i++) {
-            Folder targetFolder = folderList.get(i / 2);
+        @Test
+        @DisplayName("루트 폴더가 없으면 404 와 폴더 없음 코드를 준다")
+        void returns404WhenRootFolderMissing() throws Exception {
+            authenticateAs(otherUserId);
 
-            Problem problem = RandomProblemGenerator.createRandomProblemWithFolder(targetFolder, userId);
-            problem.updateFolder(targetFolder);
-            problemRepository.save(problem);
+            mockMvc.perform(get("/api/folders/root"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errorCode").value(FolderErrorCase.FOLDER_NOT_FOUND.getErrorCode()));
+        }
 
-            List<ProblemImageData> imageDataList = RandomProblemGenerator.createDefaultProblemImageDataList(problem.getId());
-            imageDataList.forEach(imageData -> {
-                imageData.updateProblem(problem);
-                ProblemImageData saveImageData = problemImageDataRepository.save(imageData);
-                problemImageDataList.add(saveImageData);
-            });
-            problemList.add(problem);
+        @Test
+        @DisplayName("인증 없이 요청하면 401")
+        void returns401WithoutAuthentication() throws Exception {
+            clearAuthentication();
+
+            mockMvc.perform(get("/api/folders/root"))
+                    .andExpect(status().isUnauthorized());
         }
     }
 
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
+    @Nested
+    @DisplayName("GET /api/folders/{folderId}")
+    class GetFolder {
 
-        problemImageDataRepository.deleteAll(problemImageDataList);
-        problemRepository.deleteAll(problemList);
-        folderRepository.deleteAll(folderList);
-        userRepository.deleteById(userId);
+        @Test
+        @DisplayName("본인 폴더는 부모·하위 폴더·문제 목록과 함께 조회된다")
+        void returnsOwnFolder() throws Exception {
+            List<Problem> problems = saveProblems(userId, tree.notebookA(), 2);
 
-        problemImageDataList.clear();
-        problemList.clear();
-        folderList.clear();
-    }
-
-    @Test
-    @DisplayName("getFolder() api 테스트 - root folder")
-    public void getFolderTest_Root() throws Exception {
-        //given
-        Folder folder = folderList.get(0);
-
-        // when & then - 해당 폴더를 조회하는 API 호출
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/folders/%d", folder.getId())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.folderId").value(folder.getId()))
-                .andExpect(jsonPath("$.data.folderName").value(folder.getName()))
-                .andExpect(jsonPath("$.data.parentFolder").isEmpty())
-                .andExpect(jsonPath("$.data.subFolderList.length()").value(folder.getSubFolderList().size()))
-                .andExpect(jsonPath("$.data.subFolderList[0].folderId").value(folder.getSubFolderList().get(0).getId()))
-                .andExpect(jsonPath("$.data.subFolderList[0].folderName").value(folder.getSubFolderList().get(0).getName()))
-                .andExpect(jsonPath("$.data.subFolderList[0].problemCount").value(folder.getSubFolderList().get(0).getProblemList().size()))
-                .andExpect(jsonPath("$.data.subFolderList[1].folderId").value(folder.getSubFolderList().get(1).getId()))
-                .andExpect(jsonPath("$.data.subFolderList[1].folderName").value(folder.getSubFolderList().get(1).getName()))
-                .andExpect(jsonPath("$.data.subFolderList[1].problemCount").value(folder.getSubFolderList().get(1).getProblemList().size()))
-                .andExpect(jsonPath("$.data.problemIdList.length()").value(folder.getProblemList().size()))
-                .andExpect(jsonPath("$.data.problemIdList[0]").value(folder.getProblemList().get(0).getId()))
-                .andReturn();
-
-        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        System.out.println("==== 응답 결과 ====");
-        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
-    }
-
-    @Test
-    @DisplayName("getFolder() api 테스트 - internal folder")
-    public void getFolderTest_Internal() throws Exception {
-        //given
-        Folder folder = folderList.get(1);
-
-        // when & then - 해당 폴더를 조회하는 API 호출
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/folders/%d", folder.getId())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.folderId").value(folder.getId()))
-                .andExpect(jsonPath("$.data.folderName").value(folder.getName()))
-                .andExpect(jsonPath("$.data.parentFolder.folderId").value(folder.getParentFolder().getId()))
-                .andExpect(jsonPath("$.data.parentFolder.problemCount").value(folder.getParentFolder().getProblemList().size()))
-                .andExpect(jsonPath("$.data.subFolderList.length()").value(folder.getSubFolderList().size()))
-                .andExpect(jsonPath("$.data.subFolderList[0].folderId").value(folder.getSubFolderList().get(0).getId()))
-                .andExpect(jsonPath("$.data.subFolderList[0].folderName").value(folder.getSubFolderList().get(0).getName()))
-                .andExpect(jsonPath("$.data.subFolderList[0].problemCount").value(folder.getSubFolderList().get(0).getProblemList().size()))
-                .andExpect(jsonPath("$.data.subFolderList[1].folderId").value(folder.getSubFolderList().get(1).getId()))
-                .andExpect(jsonPath("$.data.subFolderList[1].folderName").value(folder.getSubFolderList().get(1).getName()))
-                .andExpect(jsonPath("$.data.subFolderList[1].problemCount").value(folder.getSubFolderList().get(1).getProblemList().size()))
-                .andExpect(jsonPath("$.data.problemIdList.length()").value(folder.getProblemList().size()))
-                .andExpect(jsonPath("$.data.problemIdList[0]").value(folder.getProblemList().get(0).getId()))
-                .andReturn();
-
-        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        System.out.println("==== 응답 결과 ====");
-        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
-    }
-
-    @Test
-    @DisplayName("getFolder() api 테스트 - external folder")
-    public void getFolderTest_External() throws Exception {
-        //given
-        Folder folder = folderList.get(folderList.size() - 1);
-
-        // when & then - 해당 폴더를 조회하는 API 호출
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get(String.format("/api/folders/%d", folder.getId())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.folderId").value(folder.getId()))
-                .andExpect(jsonPath("$.data.folderName").value(folder.getName()))
-                .andExpect(jsonPath("$.data.parentFolder.folderId").value(folder.getParentFolder().getId()))
-                .andExpect(jsonPath("$.data.parentFolder.problemCount").value(folder.getParentFolder().getProblemList().size()))
-                .andExpect(jsonPath("$.data.subFolderList.length()").value(0))
-                .andExpect(jsonPath("$.data.problemIdList.length()").value(folder.getProblemList().size()))
-                .andExpect(jsonPath("$.data.problemIdList[0]").value(folder.getProblemList().get(0).getId()))
-                .andReturn();
-
-        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        System.out.println("==== 응답 결과 ====");
-        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
-    }
-
-    @Test
-    @DisplayName("getRootFolder() api 테스트 - 루트 폴더가 존재할 경우")
-    public void getRootFolderTest_Exist() throws Exception {
-        //given
-        Folder rootFolder = folderList.get(0);
-
-        // when & then - 해당 폴더를 조회하는 API 호출
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/api/folders/root"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.folderId").value(rootFolder.getId()))
-                .andExpect(jsonPath("$.data.folderName").value(rootFolder.getName()))
-                .andExpect(jsonPath("$.data.parentFolder").isEmpty())
-                .andExpect(jsonPath("$.data.subFolderList.length()").value(rootFolder.getSubFolderList().size()))
-                .andExpect(jsonPath("$.data.problemIdList.length()").value(rootFolder.getProblemList().size()))
-                .andExpect(jsonPath("$.data.subFolderList[0].folderId").value(rootFolder.getSubFolderList().get(0).getId()))
-                .andExpect(jsonPath("$.data.subFolderList[0].folderName").value(rootFolder.getSubFolderList().get(0).getName()))
-                .andExpect(jsonPath("$.data.subFolderList[0].problemCount").value(rootFolder.getSubFolderList().get(0).getProblemList().size()))
-                .andExpect(jsonPath("$.data.subFolderList[1].folderId").value(rootFolder.getSubFolderList().get(1).getId()))
-                .andExpect(jsonPath("$.data.subFolderList[1].folderName").value(rootFolder.getSubFolderList().get(1).getName()))
-                .andExpect(jsonPath("$.data.subFolderList[1].problemCount").value(rootFolder.getSubFolderList().get(1).getProblemList().size()))
-                .andExpect(jsonPath("$.data.problemIdList[0]").value(rootFolder.getProblemList().get(0).getId()))
-                .andReturn();
-
-        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        System.out.println("==== 응답 결과 ====");
-        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
-    }
-
-    @Test
-    @DisplayName("getRootFolder() api 테스트 - 루트 폴더가 존재하지 않을 경우")
-    public void getRootFolderTest_NotExist() throws Exception {
-        //given
-        folderRepository.deleteAll();
-
-        // when & then - 해당 폴더를 조회하는 API 호출
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/api/folders/root"))
-                .andExpect(status().is4xxClientError())
-                .andReturn();
-
-        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        System.out.println("==== 응답 결과 ====");
-        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
-    }
-
-    @Test
-    @DisplayName("getAllUserFolderThumbnails() api 테스트")
-    public void getAllUserFolderThumbnails_Test() throws Exception {
-        //given
-
-        // when
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/api/folders/thumbnails"))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        // then
-        String content = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-
-        for (int i = 0; i < folderList.size(); i++) {
-            Folder folder = folderList.get(i);
-            assertThat(folder.getId().intValue()).isEqualTo( JsonPath.read(content, "$.data[" + i + "].folderId"));
-            assertThat(folder.getName()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].folderName"));
-            assertThat(folder.getProblemList().size()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].problemCount"));
+            mockMvc.perform(get("/api/folders/{folderId}", tree.notebookA().getId()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.folderId").value(tree.notebookA().getId()))
+                    .andExpect(jsonPath("$.data.parentFolder.folderId").value(tree.root().getId()))
+                    .andExpect(jsonPath("$.data.subFolderList.length()").value(2))
+                    .andExpect(jsonPath("$.data.problemIdList.length()").value(problems.size()));
         }
 
-        System.out.println("==== 응답 결과 ====");
-        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(content)));
-    }
+        @Test
+        @DisplayName("다른 사용자의 폴더를 조회하면 403")
+        void returns403ForOtherUserFolder() throws Exception {
+            authenticateAs(otherUserId);
 
-    @Test
-    @DisplayName("getAllUserFolderDetails() api 테스트")
-    public void getAllUserFolderDetails_Test() throws Exception {
-        //given
-
-        // when
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.get("/api/folders"))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        // then
-        String content = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-
-        for (int i = 0; i < folderList.size(); i++) {
-            Folder folder = folderList.get(i);
-            assertThat(folder.getId().intValue()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].folderId"));
-            assertThat(folder.getName()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].folderName"));
-            if (folder.getParentFolder() != null) {
-                assertThat(folder.getParentFolder().getId().intValue()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].parentFolder.folderId"));
-            } else{
-                assertThat(folder.getParentFolder()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].parentFolder"));
-            }
-            assertThat(folder.getSubFolderList().size()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].subFolderList.length()"));
-            assertThat(folder.getProblemList().size()).isEqualTo(JsonPath.read(content, "$.data[" + i + "].problemIdList.length()"));
-            for (int j = 0; j < folder.getSubFolderList().size(); j++) {
-                assertThat(folder.getSubFolderList().get(j).getProblemList().size())
-                        .isEqualTo(JsonPath.read(content, "$.data[" + i + "].subFolderList[" + j + "].problemCount"));
-            }
+            mockMvc.perform(get("/api/folders/{folderId}", tree.notebookA().getId()))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode").value(FolderErrorCase.FOLDER_USER_UNMATCHED.getErrorCode()));
         }
 
-        System.out.println("==== 응답 결과 ====");
-        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(content)));
+        @Test
+        @DisplayName("존재하지 않는 폴더를 조회하면 404")
+        void returns404ForMissingFolder() throws Exception {
+            mockMvc.perform(get("/api/folders/{folderId}", nonExistentFolderId()))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errorCode").value(FolderErrorCase.FOLDER_NOT_FOUND.getErrorCode()));
+        }
+
+        @Test
+        @DisplayName("인증 없이 요청하면 401")
+        void returns401WithoutAuthentication() throws Exception {
+            clearAuthentication();
+
+            mockMvc.perform(get("/api/folders/{folderId}", tree.notebookA().getId()))
+                    .andExpect(status().isUnauthorized());
+        }
     }
 
-    @Test
-    @DisplayName("createFolder() api 테스트")
-    public void createFolderTest() throws Exception {
-        //given
-        String folderName = "new Folder";
-        FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
-                folderName,
-                null,
-                folderList.get(0).getId()
-        );
+    @Nested
+    @DisplayName("폴더 목록 조회")
+    class GetFolderList {
 
-        // when
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.post("/api/folders")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(folderRegisterDto)))
-                .andExpect(status().isOk())
-                .andReturn();
+        @Test
+        @DisplayName("썸네일 목록에는 본인 폴더만 담긴다")
+        void thumbnailsContainOnlyOwnFolders() throws Exception {
+            Folder otherUserFolder = fixtures.createRootFolder(otherUserId);
 
-        // then
-        List<Folder> folders = folderRepository.findAll();
-        Folder folder = folders.get(folders.size() - 1);
-        assertThat(folder.getName()).isEqualTo(folderName);
-        assertThat(folder.getParentFolder().getId()).isEqualTo(folderList.get(0).getId());
+            mockMvc.perform(get("/api/folders/thumbnails"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.length()").value(tree.all().size()))
+                    .andExpect(jsonPath("$.data[?(@.folderId == " + otherUserFolder.getId() + ")]").isEmpty());
+        }
 
-        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        System.out.println("==== 응답 결과 ====");
-        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
+        @Test
+        @DisplayName("상세 목록은 부모·하위 폴더 정보를 함께 준다")
+        void detailsContainParentAndSubFolders() throws Exception {
+            mockMvc.perform(get("/api/folders"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.length()").value(tree.all().size()))
+                    .andExpect(jsonPath("$.data[0].folderId").value(tree.root().getId()))
+                    .andExpect(jsonPath("$.data[0].parentFolder").isEmpty())
+                    .andExpect(jsonPath("$.data[0].subFolderList.length()").value(2));
+        }
+
+        @Test
+        @DisplayName("커서 기반 썸네일 조회는 다음 커서를 함께 준다")
+        void thumbnailsWithCursor() throws Exception {
+            ResultActions firstPage = mockMvc.perform(get("/api/folders/thumbnails/V2")
+                            .param("size", "4"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.content.length()").value(4))
+                    .andExpect(jsonPath("$.data.hasNext").value(true));
+
+            Number nextCursor = (Number) com.jayway.jsonpath.JsonPath.read(
+                    firstPage.andReturn().getResponse().getContentAsString(), "$.data.nextCursor");
+
+            mockMvc.perform(get("/api/folders/thumbnails/V2")
+                            .param("cursor", String.valueOf(nextCursor.longValue()))
+                            .param("size", "4"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.content.length()").value(2))
+                    .andExpect(jsonPath("$.data.hasNext").value(false))
+                    .andExpect(jsonPath("$.data.nextCursor").isEmpty());
+        }
+
+        @Test
+        @DisplayName("커서 기반 하위 폴더 조회는 소유자가 아니면 403")
+        void subFoldersWithCursorRejectsOtherUser() throws Exception {
+            authenticateAs(otherUserId);
+
+            mockMvc.perform(get("/api/folders/{folderId}/subfolders/V2", tree.notebookA().getId()))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode").value(FolderErrorCase.FOLDER_USER_UNMATCHED.getErrorCode()));
+        }
+
+        @Test
+        @DisplayName("커서 기반 하위 폴더 조회는 하위 폴더만 담는다")
+        void subFoldersWithCursor() throws Exception {
+            mockMvc.perform(get("/api/folders/{folderId}/subfolders/V2", tree.notebookA().getId())
+                            .param("size", "10"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.content.length()").value(2))
+                    .andExpect(jsonPath("$.data.hasNext").value(false));
+        }
+
+        @Test
+        @DisplayName("인증 없이 목록을 요청하면 401")
+        void returns401WithoutAuthentication() throws Exception {
+            clearAuthentication();
+
+            mockMvc.perform(get("/api/folders/thumbnails")).andExpect(status().isUnauthorized());
+            mockMvc.perform(get("/api/folders")).andExpect(status().isUnauthorized());
+        }
     }
 
-    @Test
-    @DisplayName("updateFolder() api 테스트 - 이름 변경")
-    public void updateFolderTest_FolderName() throws Exception {
-        //given
-        Long folderId = folderList.get(0).getId();
-        String folderName = "new FolderName";
-        FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
-                folderName,
-                folderId,
-                null
-        );
+    @Nested
+    @DisplayName("POST /api/folders")
+    class CreateFolder {
 
-        // when
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.patch("/api/folders")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(folderRegisterDto)))
-                .andExpect(status().isOk())
-                .andReturn();
+        @Test
+        @DisplayName("폴더를 만들고 생성된 id 를 돌려준다")
+        void createsFolder() throws Exception {
+            String body = objectMapper.writeValueAsString(
+                    new FolderRegisterDto("새 공책", null, tree.root().getId()));
 
-        // then
-        Folder folder = folderRepository.findById(folderId).get();
-        assertThat(folder.getName()).isEqualTo(folderName);
+            String response = mockMvc.perform(post("/api/folders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data").isNumber())
+                    .andReturn().getResponse().getContentAsString();
 
-        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        System.out.println("==== 응답 결과 ====");
-        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
+            Number createdId = com.jayway.jsonpath.JsonPath.read(response, "$.data");
+            Folder created = folderRepository.findById(createdId.longValue()).orElseThrow();
+            assertThat(created.getName()).isEqualTo("새 공책");
+            assertThat(created.getUserId()).isEqualTo(userId);
+        }
+
+        @Test
+        @DisplayName("다른 사용자의 폴더 아래에는 만들 수 없다")
+        void rejectsOtherUserParentFolder() throws Exception {
+            Folder otherUserFolder = fixtures.createRootFolder(otherUserId);
+            String body = objectMapper.writeValueAsString(
+                    new FolderRegisterDto("침입", null, otherUserFolder.getId()));
+
+            mockMvc.perform(post("/api/folders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode").value(FolderErrorCase.FOLDER_USER_UNMATCHED.getErrorCode()));
+
+            assertThat(folderRepository.findAllByUserId(otherUserId)).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("부모 폴더 id 가 없으면 404 로 응답한다")
+        void rejectsMissingParentFolderId() throws Exception {
+            String body = objectMapper.writeValueAsString(new FolderRegisterDto("부모 없음", null, null));
+
+            mockMvc.perform(post("/api/folders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errorCode").value(FolderErrorCase.FOLDER_NOT_FOUND.getErrorCode()));
+        }
+
+        @Test
+        @DisplayName("인증 없이 요청하면 401")
+        void returns401WithoutAuthentication() throws Exception {
+            clearAuthentication();
+            String body = objectMapper.writeValueAsString(
+                    new FolderRegisterDto("새 공책", null, tree.root().getId()));
+
+            mockMvc.perform(post("/api/folders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isUnauthorized());
+        }
     }
 
-    @Test
-    @DisplayName("updateFolder() api 테스트 - 부모 폴더 변경")
-    public void updateFolderTest_ParentFolder() throws Exception {
-        //given
-        Long oldParentFolderId = folderList.get(0).getId();
-        Long folderId = folderList.get(1).getId();
-        Long newParentFolderId = folderList.get(2).getId();
-        FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
-                null,
-                folderId,
-                newParentFolderId
-        );
+    @Nested
+    @DisplayName("PATCH /api/folders")
+    class UpdateFolder {
 
-        // when
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.patch("/api/folders")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(folderRegisterDto)))
-                .andExpect(status().isOk())
-                .andReturn();
+        @Test
+        @DisplayName("폴더 이름을 바꾼다")
+        void updatesFolderName() throws Exception {
+            String body = objectMapper.writeValueAsString(
+                    new FolderRegisterDto("바뀐 이름", tree.notebookA().getId(), null));
 
-        // then
-        Folder folder = folderRepository.findById(folderId).get();
+            mockMvc.perform(patch("/api/folders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk());
 
-        assertThat(folder.getParentFolder().getId()).isEqualTo(newParentFolderId);
+            assertThat(folderRepository.findById(tree.notebookA().getId()).orElseThrow().getName())
+                    .isEqualTo("바뀐 이름");
+        }
 
-        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        System.out.println("==== 응답 결과 ====");
-        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
+        @Test
+        @DisplayName("루트 폴더 수정 요청은 400 으로 막는다")
+        void rejectsRootFolderUpdate() throws Exception {
+            String body = objectMapper.writeValueAsString(
+                    new FolderRegisterDto("루트 이름", tree.root().getId(), null));
+
+            mockMvc.perform(patch("/api/folders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode").value(FolderErrorCase.ROOT_FOLDER_CANNOT_UPDATE.getErrorCode()));
+        }
+
+        @Test
+        @DisplayName("폴더를 다른 폴더 아래로 옮긴다")
+        void movesFolder() throws Exception {
+            String body = objectMapper.writeValueAsString(
+                    new FolderRegisterDto(null, tree.leafA1().getId(), tree.notebookB().getId()));
+
+            mockMvc.perform(patch("/api/folders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk());
+
+            assertThat(folderRepository.findFolderWithDetailsByFolderId(tree.leafA1().getId()).orElseThrow()
+                    .getParentFolder().getId())
+                    .isEqualTo(tree.notebookB().getId());
+        }
+
+        @Test
+        @DisplayName("자기 자신을 부모로 지정하면 400")
+        void rejectsSelfParent() throws Exception {
+            Long folderId = tree.notebookA().getId();
+            String body = objectMapper.writeValueAsString(new FolderRegisterDto(null, folderId, folderId));
+
+            mockMvc.perform(patch("/api/folders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode").value(FolderErrorCase.INVALID_PARENT_FOLDER.getErrorCode()));
+        }
+
+        @Test
+        @DisplayName("다른 사용자의 폴더는 수정할 수 없다")
+        void rejectsOtherUserFolder() throws Exception {
+            authenticateAs(otherUserId);
+            String body = objectMapper.writeValueAsString(
+                    new FolderRegisterDto("남의 폴더", tree.notebookA().getId(), null));
+
+            mockMvc.perform(patch("/api/folders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode").value(FolderErrorCase.FOLDER_USER_UNMATCHED.getErrorCode()));
+
+            assertThat(folderRepository.findById(tree.notebookA().getId()).orElseThrow().getName())
+                    .as("이름이 바뀌지 않아야 한다")
+                    .isEqualTo("공책 A");
+        }
+
+        @Test
+        @DisplayName("인증 없이 요청하면 401")
+        void returns401WithoutAuthentication() throws Exception {
+            clearAuthentication();
+            String body = objectMapper.writeValueAsString(
+                    new FolderRegisterDto("바뀐 이름", tree.notebookA().getId(), null));
+
+            mockMvc.perform(patch("/api/folders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isUnauthorized());
+        }
     }
 
+    @Nested
+    @DisplayName("DELETE /api/folders")
+    class DeleteFolders {
 
-    @Test
-    @DisplayName("deleteFolderWithProblems() api 테스트 - 중간 폴더 단일 삭제")
-    public void deleteFolderWithProblemsTest_SingleFolder() throws Exception {
-        //given
-        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
-                List.of(folderList.get(1).getId())
-        );
-        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+        @Test
+        @DisplayName("폴더 하나를 지우면 하위 폴더까지 사라진다")
+        void deletesSingleFolderWithSubTree() throws Exception {
+            saveProblems(userId, tree.leafA1(), 2);
+            String body = objectMapper.writeValueAsString(
+                    new FolderDeleteRequestDto(List.of(tree.notebookA().getId())));
 
-        // when
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.delete("/api/folders")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(folderDeleteRequestDto)))
-                .andExpect(status().isOk())
-                .andReturn();
+            mockMvc.perform(delete("/api/folders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk());
 
-        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        System.out.println("==== 응답 결과 ====");
-        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
+            assertThat(folderRepository.findAllByUserId(userId))
+                    .extracting(Folder::getId)
+                    .containsExactlyInAnyOrder(tree.root().getId(), tree.notebookB().getId(), tree.leafB1().getId());
+            assertThat(problemRepository.findAllByUserId(userId))
+                    .as("폴더와 함께 문제도 지워진다")
+                    .isEmpty();
+        }
 
-        // then
-        assertThat(folderRepository.findAllByUserId(userId).size()).isEqualTo(3);
-    }
+        @Test
+        @DisplayName("최상위 폴더를 모두 지우면 루트만 남는다")
+        void deletesAllTopLevelFolders() throws Exception {
+            String body = objectMapper.writeValueAsString(new FolderDeleteRequestDto(
+                    List.of(tree.notebookA().getId(), tree.notebookB().getId())));
 
+            mockMvc.perform(delete("/api/folders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk());
 
-    @Test
-    @DisplayName("deleteFolderWithProblems() api 테스트 - 중간 폴더 모두 삭제")
-    public void deleteFolderWithProblemsTest_MultipleFolder() throws Exception {
-        //given
-        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
-                List.of(folderList.get(1).getId(), folderList.get(2).getId())
-        );
-        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+            assertThat(folderRepository.findAllByUserId(userId))
+                    .extracting(Folder::getId)
+                    .containsExactly(tree.root().getId());
+        }
 
-        // when
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.delete("/api/folders")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(folderDeleteRequestDto)))
-                .andExpect(status().isOk())
-                .andReturn();
+        @Test
+        @DisplayName("루트 폴더 삭제 요청은 400 으로 막는다")
+        void rejectsRootFolderDelete() throws Exception {
+            String body = objectMapper.writeValueAsString(
+                    new FolderDeleteRequestDto(List.of(tree.root().getId())));
 
-        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        System.out.println("==== 응답 결과 ====");
-        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
+            mockMvc.perform(delete("/api/folders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode").value(FolderErrorCase.ROOT_FOLDER_CANNOT_REMOVE.getErrorCode()));
 
-        // then
-        assertThat(folderRepository.findAllByUserId(userId).size()).isEqualTo(1);
-    }
+            assertThat(folderRepository.findAllByUserId(userId)).hasSize(6);
+        }
 
-    @Test
-    @DisplayName("deleteFolderWithProblems() api 테스트 - 유저 폴더 모두 삭제")
-    public void deleteFolderWithProblemsTest_UserFolders() throws Exception {
-        //given
-        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
-                null
-        );
-        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+        @Test
+        @DisplayName("존재하지 않는 폴더 삭제 요청은 404")
+        void rejectsMissingFolder() throws Exception {
+            String body = objectMapper.writeValueAsString(
+                    new FolderDeleteRequestDto(List.of(nonExistentFolderId())));
 
-        // when
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.delete("/api/folders/all")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(folderDeleteRequestDto)))
-                .andExpect(status().isOk())
-                .andReturn();
+            mockMvc.perform(delete("/api/folders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errorCode").value(FolderErrorCase.FOLDER_NOT_FOUND.getErrorCode()));
+        }
 
-        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        System.out.println("==== 응답 결과 ====");
-        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
+        @Test
+        @DisplayName("다른 사용자의 폴더는 삭제할 수 없다")
+        void rejectsOtherUserFolder() throws Exception {
+            authenticateAs(otherUserId);
+            String body = objectMapper.writeValueAsString(
+                    new FolderDeleteRequestDto(List.of(tree.notebookA().getId())));
 
-        // then
-        assertThat(folderRepository.findAllByUserId(userId)).isEmpty();
-    }
+            mockMvc.perform(delete("/api/folders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode").value(FolderErrorCase.FOLDER_USER_UNMATCHED.getErrorCode()));
 
-    @Test
-    @DisplayName("deleteFolderWithProblems() api 테스트 - 존재하지 않는 폴더를 제거할 떄")
-    public void deleteFolderWithProblemsTest_FolderNotExist() throws Exception {
+            assertThat(folderRepository.findAllByUserId(userId)).hasSize(6);
+        }
 
-        FolderDeleteRequestDto folderDeleteRequestDto = new FolderDeleteRequestDto(
-                List.of(999L)
-        );
-        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
+        @Test
+        @DisplayName("전체 삭제는 본인 폴더만 지운다")
+        void deletesAllUserFolders() throws Exception {
+            Folder otherUserFolder = fixtures.createRootFolder(otherUserId);
 
-        // when & then
-        MvcResult result = mockMvc.perform(MockMvcRequestBuilders.delete("/api/folders")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(folderDeleteRequestDto)))
-                .andExpect(status().is4xxClientError())
-                .andReturn();
+            mockMvc.perform(delete("/api/folders/all"))
+                    .andExpect(status().isOk());
 
-        String json = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
-        System.out.println("==== 응답 결과 ====");
-        System.out.println(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(objectMapper.readTree(json)));
+            assertThat(folderRepository.findAllByUserId(userId)).isEmpty();
+            assertThat(folderRepository.findAllByUserId(otherUserId))
+                    .extracting(Folder::getId)
+                    .containsExactly(otherUserFolder.getId());
+        }
+
+        @Test
+        @DisplayName("인증 없이 요청하면 401")
+        void returns401WithoutAuthentication() throws Exception {
+            clearAuthentication();
+            String body = objectMapper.writeValueAsString(
+                    new FolderDeleteRequestDto(List.of(tree.notebookA().getId())));
+
+            mockMvc.perform(delete("/api/folders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isUnauthorized());
+            mockMvc.perform(delete("/api/folders/all"))
+                    .andExpect(status().isUnauthorized());
+        }
     }
 }
