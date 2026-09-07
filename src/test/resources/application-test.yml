@@ -1,0 +1,133 @@
+spring:
+  application:
+    name: backend-test
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+  # 접속 정보(datasource / redis / rabbitmq)는 TestContainers.registerProperties 가
+  # @DynamicPropertySource 로 주입한다. 여기에 호스트를 고정하지 않는다.
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.MySQLDialect
+        default_batch_fetch_size: 50
+        # QueryCounter 가 실행된 SQL 문 개수를 읽으려면 통계 수집이 켜져 있어야 한다.
+        # N+1 은 기능 단언으로는 잡히지 않아 쿼리 수를 직접 세는 수밖에 없다.
+        generate_statistics: true
+        session:
+          events:
+            log:
+              # 통계를 켜면 세션마다 요약 로그가 남아 출력이 시끄러워진다. 그것만 끈다.
+              LOG_QUERIES_SLOWER_THAN_MS: -1
+    hibernate:
+      # 프로덕션 스키마 자체가 Hibernate 생성분이고 Flyway V1은 no-op 마커다.
+      # 따라서 엔티티 정의 그대로 만드는 것이 프로덕션 스키마에 가장 가깝다.
+      # 엔티티에 길이 제약이 없는 컬럼은 여기서도 varchar(255)로 생성되므로,
+      # 프로덕션에서 나던 Data truncation 오류가 테스트에서 그대로 재현된다.
+      ddl-auto: update
+
+  flyway:
+    # 테스트는 Hibernate 가 만든 스키마를 쓴다.
+    #
+    # 주의: 마이그레이션(V2~V25)은 어떤 테스트에서도 실행되지 않는다. 검증 공백이다.
+    # V1__baseline_existing_schema.sql 이 3줄짜리 no-op 마커라서, 빈 DB 에 처음부터
+    # 마이그레이션을 돌리면 V2 의 ALTER TABLE 이 대상 테이블 없이 실패한다.
+    # 실제 프로덕션 스키마에 해당하는 베이스라인 DDL 이 커밋되기 전까지는
+    # 마이그레이션의 적용 가능 여부가 dev 서버 기동 시점에 처음 드러난다.
+    enabled: false
+
+  rabbitmq:
+    dynamic: false
+    listener:
+      simple:
+        auto-startup: false
+
+  site:
+    url: http://localhost:8080
+
+  web:
+    resources:
+      static-locations: classpath:/static/
+
+  thymeleaf:
+    cache: false
+    prefix: classpath:/templates/
+
+  quartz:
+    auto-startup: false
+    job-store-type: memory
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-name: google
+            client-id:
+              android: test-android-client-id
+              ios: test-ios-client-id
+            client-secret: test-client-secret
+
+  crypto:
+    # 테스트 전용 키. 프로덕션 키와 절대 같은 값을 쓰지 않는다.
+    secretKey: c7lUIkSGxnN1CBRK+alsWPQkm5dZqVoJUHau6R2t/GY=
+
+logging:
+  level:
+    org:
+      springframework:
+        security: WARN
+      quartz: OFF
+    p6spy: WARN
+    com.aisip.OnO.backend: INFO
+
+discord:
+  webhook-url: https://example.com/test-discord-webhook
+
+cloud:
+  aws:
+    s3:
+      bucket: test-ono-bucket
+    region:
+      static: ap-northeast-2
+    stack:
+      auto: false
+    credentials:
+      access-key: test-access-key
+      secret-key: test-secret-key
+
+jwt:
+  accessToken:
+    secret: dGVzdC1hY2Nlc3MtdG9rZW4tc2VjcmV0LXRlc3QtYWNjZXNzLXRva2VuLXNlY3JldC0zMmJ5dGVz
+    expiration: 1800000
+  refreshToken:
+    secret: dGVzdC1yZWZyZXNoLXRva2VuLXNlY3JldC10ZXN0LXJlZnJlc2gtdG9rZW4tc2VjcmV0LTMyYnl0ZXM=
+    expiration: 604800000
+
+admin:
+  identifier: ono_admin
+  password: ono_admin_test
+
+fcm:
+  file-path: FirebaseAdminKey.json
+  project-id: aisip-ono-test
+
+openai:
+  model: gpt-4o
+  api:
+    key: test-openai-api-key
+    url: https://api.openai.com/v1/chat/completions
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
