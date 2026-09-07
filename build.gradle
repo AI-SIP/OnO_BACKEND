@@ -115,7 +115,11 @@ tasks.named('test') {
 	environment 'TESTCONTAINERS_CHECKS_DISABLE', 'true'
 	testLogging {
 		events 'failed'
-		exceptionFormat 'short'
+		// short 는 예외 체인의 클래스명만 남기고 메시지를 버린다.
+		// CI 에서 Flyway 가 어떤 SQL 로 실패했는지 확인할 수 없어 full 로 둔다.
+		exceptionFormat 'full'
+		showStackTraces = true
+		showCauses = true
 	}
 	finalizedBy jacocoTestReport
 }
