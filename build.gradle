@@ -116,7 +116,9 @@ tasks.named('test') {
 	testLogging {
 		events 'failed'
 		// short 는 예외 체인의 클래스명만 남기고 메시지를 버린다.
-		// CI 에서 Flyway 가 어떤 SQL 로 실패했는지 확인할 수 없어 full 로 둔다.
+		// application-test.yml 이 커밋되지 않아 CI 가 전멸했을 때, 이 설정 탓에
+		// "Flyway 가 실패했다"까지만 보이고 어떤 SQL 인지 알 수 없어 진단이 크게 늦어졌다.
+		// 실패 원인이 로그만으로 드러나도록 full 을 유지한다.
 		exceptionFormat 'full'
 		showStackTraces = true
 		showCauses = true
