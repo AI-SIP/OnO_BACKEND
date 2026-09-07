@@ -71,6 +71,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class ProblemService {
     private static final String AI_ANALYSIS_RATE_LIMIT_KEY = "ai_analysis";
     private static final int AI_ANALYSIS_LIMIT_PER_DAY = 20;
+    private static final int MEMO_MAX_LENGTH = 1000;
 
     private final ProblemRepository problemRepository;
 
@@ -315,7 +316,6 @@ public class ProblemService {
         if (registerDtos == null || registerDtos.isEmpty()) {
             return List.of();
         }
-
         registerDtos.forEach(dto -> validateProblemContent(dto.memo(), dto.reference()));
 
         Map<Long, Folder> foldersById = resolveRegisterFolders(registerDtos, userId);
@@ -983,14 +983,12 @@ public class ProblemService {
                 .filter(p -> p.nextReviewAt().isBefore(today))
                 .count();
 
-        List<ReviewDueResponseDto.ReviewDueProblemDto> problemDtos = dueProblems.stream()
-                .map(ReviewDueResponseDto.ReviewDueProblemDto::from)
-                .collect(Collectors.toList());
-
         return ReviewDueResponseDto.builder()
                 .dueCount(dueProblems.size())
                 .overdueCount(overdueCount)
-                .problems(problemDtos)
+                .problems(dueProblems.stream()
+                        .map(ReviewDueResponseDto.ReviewDueProblemDto::from)
+                        .toList())
                 .build();
     }
 }

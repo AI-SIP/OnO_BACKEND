@@ -50,6 +50,7 @@ class UserAuthServiceTest {
         return new UserResponseDto(
                 userId, "홍길동", "user@test.ono", null,
                 1L, 0L, 1L, 0L, 1L, 0L, 1L, 0L, 1L, 0L, 40L,
+                true,
                 LocalDateTime.now(), LocalDateTime.now()
         );
     }

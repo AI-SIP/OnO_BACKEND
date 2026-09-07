@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.common.ratelimit;
 import com.aisip.OnO.backend.auth.exception.AuthErrorCase;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
+import com.aisip.OnO.backend.util.fileupload.exception.FileUploadErrorCase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -90,7 +91,9 @@ class RateLimitAspectTest {
             assertThatThrownBy(() -> aspect.checkRateLimit(rateLimit))
                     .isInstanceOf(ApplicationException.class)
                     .extracting(exception -> ((ApplicationException) exception).getErrorCase())
-                    .isEqualTo(ProblemErrorCase.ANALYSIS_RATE_LIMIT_EXCEEDED);
+                    // 한도 종류와 무관하게 AI 분석 오류를 던지던 것이 버그였다.
+                    // 이제 @RateLimit 의 scope 가 정하고, 이 목은 FILE_UPLOAD 다
+                    .isEqualTo(FileUploadErrorCase.UPLOAD_RATE_LIMIT_EXCEEDED);
         }
 
         @Test
@@ -153,7 +156,7 @@ class RateLimitAspectTest {
 
     static class RateLimitedTarget {
 
-        @RateLimit(key = "presigned_url", limitPerDay = 200)
+        @RateLimit(key = "presigned_url", limitPerDay = 200, scope = RateLimitScope.FILE_UPLOAD)
         void annotated() {
         }
     }

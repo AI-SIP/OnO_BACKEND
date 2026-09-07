@@ -75,6 +75,22 @@ class UserResponseDtoTest {
                     .as("1레벨의 다음 레벨 기준치는 개별 능력치 기준의 4배다")
                     .isEqualTo(40L);
         }
+
+        @Test
+        @DisplayName("알림 설정 값을 응답에 그대로 담는다")
+        void carriesNotificationEnabled() {
+            User user = user();
+
+            assertThat(UserResponseDto.from(user).notificationEnabled())
+                    .as("기본값은 켜짐이다")
+                    .isTrue();
+
+            user.updateNotificationEnabled(false);
+
+            assertThat(UserResponseDto.from(user).notificationEnabled())
+                    .as("응답에서 빠지면 앱이 true 로 복원해, 알림을 꺼도 다시 켜진 것처럼 보인다")
+                    .isFalse();
+        }
     }
 
     @Nested

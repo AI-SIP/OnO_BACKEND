@@ -3,9 +3,9 @@ package com.aisip.OnO.backend.common.auth;
 import com.aisip.OnO.backend.auth.entity.Authority;
 import com.aisip.OnO.backend.auth.exception.AuthErrorCase;
 import com.aisip.OnO.backend.auth.service.JwtTokenizer;
+import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.util.redis.RedisTokenService;
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -89,8 +89,11 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(authentication);
                 MDC.put("userId", String.valueOf(userId));
                 MDC.put("authority", authority.name());
-            } catch (ExpiredJwtException e) {
-                request.setAttribute(AUTH_ERROR_CASE_ATTRIBUTE, AuthErrorCase.ACCESS_TOKEN_EXPIRED);
+            } catch (ApplicationException e) {
+                // JwtTokenizer 가 ExpiredJwtException 을 ApplicationException 으로 바꿔 던지므로
+                // 여기서 ExpiredJwtException 을 잡으면 영영 걸리지 않는다(과거 만료 토큰이 1005 대신
+                // 1007 로 나가 프론트의 토큰 갱신 대신 강제 로그아웃이 발동하던 원인).
+                request.setAttribute(AUTH_ERROR_CASE_ATTRIBUTE, e.getErrorCase());
             } catch (Exception e) {
                 request.setAttribute(AUTH_ERROR_CASE_ATTRIBUTE, AuthErrorCase.AUTHENTICATION_FAILED);
             }

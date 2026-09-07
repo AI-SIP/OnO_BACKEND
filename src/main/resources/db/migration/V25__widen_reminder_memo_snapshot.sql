@@ -43,7 +43,7 @@
 -- 배포 파이프라인이 막히므로 아래로 이력을 정리한 뒤 재배포한다.
 --   SELECT installed_rank, version, description, success
 --     FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 5;
---   DELETE FROM flyway_schema_history WHERE version = '24' AND success = 0;
+--   DELETE FROM flyway_schema_history WHERE version = '25' AND success = 0;
 -- 이 ALTER 는 목표 정의로 수렴하는 문장이라 이미 적용된 상태에서 재실행해도 안전하다.
 --
 -- [롤백]

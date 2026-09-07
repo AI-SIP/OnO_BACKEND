@@ -1,11 +1,13 @@
 package com.aisip.OnO.backend.problem.repository;
 
 import com.aisip.OnO.backend.admin.dto.AdminProblemResponseDto;
+import com.aisip.OnO.backend.problem.dto.ReviewDueResponseDto;
 import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.QProblem;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.DateExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -87,6 +89,25 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
                 .leftJoin(QProblem.problem.folder).fetchJoin()
                 .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
                 .orderBy(problem.id.asc())
+                .fetch();
+    }
+
+    @Override
+    public List<ReviewDueResponseDto.ReviewDueProblemDto> findReviewDueProblemDtos(Long userId, LocalDate today) {
+        return queryFactory
+                .select(Projections.constructor(
+                        ReviewDueResponseDto.ReviewDueProblemDto.class,
+                        problem.id,
+                        problem.memo,
+                        problem.reference,
+                        problem.nextReviewAt,
+                        problem.reviewInterval,
+                        problem.consecutiveCorrectCount
+                ))
+                .from(problem)
+                .where(problem.userId.eq(userId)
+                        .and(problem.nextReviewAt.loe(today)))
+                .orderBy(problem.nextReviewAt.asc())
                 .fetch();
     }
 
@@ -202,66 +223,80 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
                 .fetch();
     }
 
-    @Override
-    public List<Problem> findProblemsByFolderWithCursor(Long folderId, Long cursor, int size) {
-        var query = queryFactory
-                .selectFrom(problem)
-                .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
-                .where(problem.folder.id.eq(folderId));
+    /**
+     * 커서 페이징 + 컬렉션 fetch join 을 한 쿼리에 같이 쓰면 조인으로 행이 뻥튀기돼
+     * Hibernate 가 SQL 에 LIMIT 을 걸지 못하고 조건에 맞는 행을 전부 메모리로 읽은 뒤
+     * 자바에서 잘라낸다 (경고 HHH90003004). size 를 보내도 폴더의 모든 문제가 올라왔다.
+     *
+     * 그래서 1단계에서 id 만 limit 으로 뽑고, 2단계에서 그 id 로 fetch join 한다.
+     */
+    private BooleanExpression cursorAfter(Long cursor) {
+        return cursor == null ? null : problem.id.gt(cursor);
+    }
 
-        // 커서가 있으면 해당 ID 이후부터 조회
-        if (cursor != null) {
-            query.where(problem.id.gt(cursor));
+    private List<Problem> fetchProblemsWithImages(List<Long> problemIds) {
+        if (problemIds.isEmpty()) {
+            return List.of();
         }
 
-        return query
+        return queryFactory
+                .selectDistinct(problem)
+                .from(problem)
+                .leftJoin(problem.folder).fetchJoin()
+                .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
+                .where(problem.id.in(problemIds))
+                .orderBy(problem.id.asc())
+                .fetch();
+    }
+
+    @Override
+    public List<Problem> findProblemsByFolderWithCursor(Long folderId, Long cursor, int size) {
+        List<Long> problemIds = queryFactory
+                .select(problem.id)
+                .from(problem)
+                .where(
+                        problem.folder.id.eq(folderId),
+                        cursorAfter(cursor)
+                )
                 .orderBy(problem.id.asc())
                 .limit(size + 1)  // hasNext 판단을 위해 +1개 조회
                 .fetch();
+
+        return fetchProblemsWithImages(problemIds);
     }
 
     @Override
     public List<Problem> findProblemsByTagWithCursor(Long tagId, Long userId, Long cursor, int size) {
-        var query = queryFactory
-                .selectDistinct(problem)
+        List<Long> problemIds = queryFactory
+                .selectDistinct(problem.id)
                 .from(problem)
                 .join(problemTagMapping).on(problemTagMapping.problem.id.eq(problem.id))
-                .leftJoin(problem.folder).fetchJoin()
-                .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
                 .where(
                         problemTagMapping.tag.id.eq(tagId),
-                        problem.userId.eq(userId)
-                );
-
-        if (cursor != null) {
-            query.where(problem.id.gt(cursor));
-        }
-
-        return query
+                        problem.userId.eq(userId),
+                        cursorAfter(cursor)
+                )
                 .orderBy(problem.id.asc())
                 .limit(size + 1)
                 .fetch();
+
+        return fetchProblemsWithImages(problemIds);
     }
 
     @Override
     public List<Problem> findProblemsByTitleWithCursor(String titleQuery, Long userId, Long cursor, int size) {
-        var query = queryFactory
-                .selectDistinct(problem)
+        List<Long> problemIds = queryFactory
+                .select(problem.id)
                 .from(problem)
-                .leftJoin(problem.folder).fetchJoin()
-                .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
                 .where(
                         problem.userId.eq(userId),
-                        problem.reference.containsIgnoreCase(titleQuery)
-                );
-
-        if (cursor != null) {
-            query.where(problem.id.gt(cursor));
-        }
-
-        return query
+                        problem.reference.containsIgnoreCase(titleQuery),
+                        cursorAfter(cursor)
+                )
                 .orderBy(problem.id.asc())
                 .limit(size + 1)
                 .fetch();
+
+        return fetchProblemsWithImages(problemIds);
     }
 }

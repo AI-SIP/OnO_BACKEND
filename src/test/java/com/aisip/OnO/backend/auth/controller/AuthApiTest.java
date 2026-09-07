@@ -273,16 +273,29 @@ class AuthApiTest extends IntegrationTestSupport {
                     .andExpect(jsonPath("$.errorCode").value(AuthErrorCase.AUTHENTICATION_FAILED.getErrorCode()));
         }
 
-        @ParameterizedTest(name = "형식이 깨진 헤더 [{0}] 는 401 + 1007 로 응답한다")
-        @ValueSource(strings = {"Bearer ", "Bearer not-a-jwt", "Bearer a.b.c", "Basic dXNlcjpwYXNz"})
-        void malformedHeaderReturnsAuthenticationFailed(String header) throws Exception {
+        /**
+         * Bearer 로 시작하면 토큰 파싱까지 가므로 "유효하지 않은 토큰"(1009)이고,
+         * 프리픽스 자체가 없으면 토큰을 꺼내지도 못해 진입점 기본값(1007)이다.
+         * 둘 다 1000~1999 라 앱 동작(강제 로그아웃)은 같다.
+         */
+        @ParameterizedTest(name = "형식이 깨진 Bearer 헤더 [{0}] 는 401 + 1009 로 응답한다")
+        @ValueSource(strings = {"Bearer ", "Bearer not-a-jwt", "Bearer a.b.c"})
+        void malformedBearerReturnsInvalidAccessToken(String header) throws Exception {
             callProtectedApi(header)
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.errorCode").value(AuthErrorCase.INVALID_ACCESS_TOKEN.getErrorCode()));
+        }
+
+        @Test
+        @DisplayName("Bearer 프리픽스가 아예 없는 헤더는 401 + 1007 로 응답한다")
+        void nonBearerHeaderReturnsAuthenticationFailed() throws Exception {
+            callProtectedApi("Basic dXNlcjpwYXNz")
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.errorCode").value(AuthErrorCase.AUTHENTICATION_FAILED.getErrorCode()));
         }
 
         @Test
-        @DisplayName("다른 키로 서명한 위조 토큰은 401 + 1007 로 거절한다")
+        @DisplayName("다른 키로 서명한 위조 토큰은 401 + 1009 로 거절한다")
         void forgedTokenReturnsAuthenticationFailed() throws Exception {
             String forged = "Bearer " + Jwts.builder()
                     .setClaims(Map.of("authority", Authority.ROLE_ADMIN))
@@ -293,17 +306,17 @@ class AuthApiTest extends IntegrationTestSupport {
 
             callProtectedApi(forged)
                     .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.errorCode").value(AuthErrorCase.AUTHENTICATION_FAILED.getErrorCode()));
+                    .andExpect(jsonPath("$.errorCode").value(AuthErrorCase.INVALID_ACCESS_TOKEN.getErrorCode()));
         }
 
         @Test
-        @DisplayName("리프레시 토큰으로는 보호된 API 를 호출할 수 없다")
+        @DisplayName("리프레시 토큰으로는 보호된 API 를 호출할 수 없다 (401 + 1009)")
         void refreshTokenCannotAccessApi() throws Exception {
             String refreshToken = signUpGuest().path("refreshToken").asText();
 
             callProtectedApi("Bearer " + refreshToken)
                     .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.errorCode").value(AuthErrorCase.AUTHENTICATION_FAILED.getErrorCode()));
+                    .andExpect(jsonPath("$.errorCode").value(AuthErrorCase.INVALID_ACCESS_TOKEN.getErrorCode()));
         }
 
         @Test

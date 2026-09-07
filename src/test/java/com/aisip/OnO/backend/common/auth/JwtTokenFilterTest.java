@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.common.auth;
 
 import com.aisip.OnO.backend.auth.entity.Authority;
 import com.aisip.OnO.backend.auth.exception.AuthErrorCase;
+import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.auth.service.JwtTokenizer;
 import com.aisip.OnO.backend.util.redis.RedisTokenService;
 import io.jsonwebtoken.Claims;
@@ -277,7 +278,9 @@ class JwtTokenFilterTest {
         @Test
         @DisplayName("만료된 토큰은 ACCESS_TOKEN_EXPIRED 다 - 프론트의 갱신 트리거")
         void marksExpiredToken() throws Exception {
-            willThrow(new ExpiredJwtException(null, null, "expired"))
+            // JwtTokenizer 는 만료를 ApplicationException(ACCESS_TOKEN_EXPIRED) 로 감싸 던진다.
+            // 필터는 그 errorCase 를 그대로 전달한다.
+            willThrow(new ApplicationException(AuthErrorCase.ACCESS_TOKEN_EXPIRED))
                     .given(jwtTokenizer).validateAccessToken(VALID_TOKEN);
             MockHttpServletRequest request = requestWith("Bearer " + VALID_TOKEN);
 
@@ -291,15 +294,32 @@ class JwtTokenFilterTest {
         }
 
         @Test
-        @DisplayName("서명이 깨진 토큰은 AUTHENTICATION_FAILED 다")
+        @DisplayName("서명이 깨진 토큰은 INVALID_ACCESS_TOKEN 이다")
         void marksMalformedToken() throws Exception {
+            // 만료가 아닌 검증 실패는 INVALID_ACCESS_TOKEN 이다.
+            // 만료(1005)와 갈라놔야 프론트가 갱신할 이유 없는 토큰에 갱신을 걸지 않는다.
+            willThrow(new ApplicationException(AuthErrorCase.INVALID_ACCESS_TOKEN))
+                    .given(jwtTokenizer).validateAccessToken(VALID_TOKEN);
+            MockHttpServletRequest request = requestWith("Bearer " + VALID_TOKEN);
+
+            doFilter(request);
+
+            assertThat(errorAttribute(request)).isEqualTo(AuthErrorCase.INVALID_ACCESS_TOKEN);
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        }
+
+        @Test
+        @DisplayName("예상 못 한 예외는 AUTHENTICATION_FAILED 로 떨어뜨린다")
+        void marksUnexpectedFailure() throws Exception {
             willThrow(new JwtException("signature mismatch"))
                     .given(jwtTokenizer).validateAccessToken(VALID_TOKEN);
             MockHttpServletRequest request = requestWith("Bearer " + VALID_TOKEN);
 
             doFilter(request);
 
-            assertThat(errorAttribute(request)).isEqualTo(AuthErrorCase.AUTHENTICATION_FAILED);
+            assertThat(errorAttribute(request))
+                    .as("ErrorCase 를 못 정하는 예외까지 500 으로 새면 안 된다")
+                    .isEqualTo(AuthErrorCase.AUTHENTICATION_FAILED);
             assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         }
 

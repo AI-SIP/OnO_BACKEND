@@ -43,7 +43,13 @@ public class DiscordWebhookConsumer {
             headers.setContentType(MediaType.APPLICATION_JSON);
             restTemplate.postForEntity(webhookUrl, new HttpEntity<>(payload, headers), String.class);
         } catch (Exception e) {
-            log.error("Discord webhook 전송 실패: {}", e.getMessage(), e);
+            // 일시적 실패(read timeout 등)까지 error 로 올리면 재시도로 성공한 건도 Sentry 에 쌓인다
+            // (Sentry JAVA-SPRING-BOOT-5C). 예외 메시지에는 웹훅 URL(토큰 포함)이 그대로 들어 있어
+            // 메시지 대신 예외 타입만 남긴다.
+            //
+            // 주의: 현재 listener 재시도 설정이 없어 예외를 던지면 백오프 없이 무한 재큐된다.
+            // DLQ 로는 큐 TTL(5분) 만료로만 빠진다. 이 구조 자체는 이슈 #229 에서 따로 다룬다
+            log.warn("Discord webhook 전송 실패 - exceptionType: {}", e.getClass().getSimpleName());
             throw new RuntimeException("Discord webhook 전송 실패", e);
         }
 

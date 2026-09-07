@@ -60,6 +60,13 @@ public class ProblemReviewReminder extends BaseEntity {
     @Builder.Default
     private int retryCount = 0;
 
+    /**
+     * 스냅샷은 잘라 담지 않는다.
+     *
+     * <p>memo 스냅샷 컬럼은 V25 에서 varchar(1000) 으로 넓혀 {@code Problem.MEMO_MAX_LENGTH} 와 같고,
+     * reference 스냅샷은 varchar(255) 로 {@code Problem.REFERENCE_MAX_LENGTH} 와 같다.
+     * 입력 길이는 저장 전에 ProblemService 에서 걸러지므로 여기서 자르면 알림 문구만 손실된다.
+     */
     public static ProblemReviewReminder create(
             Long userId, Long problemId, String memo, String reference,
             int sequence, int intervalDays, LocalDateTime scheduledAt) {

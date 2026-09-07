@@ -173,14 +173,16 @@ class JwtTokenizerTest {
          * 프론트는 1005 를 보고 토큰 갱신을 시도하기 때문이다.
          */
         @Test
-        @DisplayName("만료된 토큰은 ExpiredJwtException 으로 구분되어 올라간다")
+        @DisplayName("만료된 토큰은 ACCESS_TOKEN_EXPIRED 로 구분되어 올라간다")
         void distinguishesExpiredToken() {
             String expired = stripBearer(
                     expiredTokenizer.createAccessToken("1", Map.of("authority", Authority.ROLE_MEMBER)));
 
             assertThatThrownBy(() -> tokenizer.validateAccessToken(expired))
                     .as("만료가 다른 실패와 섞이면 프론트가 갱신 기회를 잃는다")
-                    .isInstanceOf(ExpiredJwtException.class);
+                    .isInstanceOf(ApplicationException.class)
+                    .extracting(e -> ((ApplicationException) e).getErrorCase())
+                    .isEqualTo(AuthErrorCase.ACCESS_TOKEN_EXPIRED);
         }
 
         @Test

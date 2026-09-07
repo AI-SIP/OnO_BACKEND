@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.problem.repository;
 
 import com.aisip.OnO.backend.admin.dto.AdminProblemResponseDto;
+import com.aisip.OnO.backend.problem.dto.ReviewDueResponseDto;
 import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import org.springframework.data.domain.Page;
@@ -20,6 +21,13 @@ public interface ProblemRepositoryCustom {
     List<Problem> findAllByFolderId(Long folderId);
 
     List<Problem> findAll();
+
+    /**
+     * 복습 예정 문제를 DTO 로 바로 조회한다.
+     * Problem 엔티티로 읽으면 @OneToOne(mappedBy) problemAnalysis 때문에
+     * 행마다 problem_analysis 조회가 한 번씩 더 나간다 (Sentry JAVA-SPRING-BOOT-59).
+     */
+    List<ReviewDueResponseDto.ReviewDueProblemDto> findReviewDueProblemDtos(Long userId, LocalDate today);
 
     Page<AdminProblemResponseDto> findAdminProblems(Pageable pageable);
 
