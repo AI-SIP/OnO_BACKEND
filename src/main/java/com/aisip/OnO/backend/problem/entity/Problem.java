@@ -28,6 +28,15 @@ import java.util.List;
 })
 public class Problem extends BaseEntity {
 
+    /**
+     * 앱이 입력 필드에서 허용하는 메모 길이와 동일하다.
+     * 길이 제약을 명시하지 않으면 MySQL에서 varchar(255)로 생성돼
+     * 256자 이상 입력 시 Data truncation 으로 500이 난다.
+     */
+    public static final int MEMO_MAX_LENGTH = 1000;
+
+    public static final int REFERENCE_MAX_LENGTH = 255;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -38,10 +47,10 @@ public class Problem extends BaseEntity {
     @JoinColumn(name = "folder_id")
     private Folder folder;
 
-    // 실제 컬럼 정의는 V24 에 있다 (ddl-auto 가 validate 라 여기 선언은 문서 역할)
-    @Column(length = 1000)
+    @Column(length = MEMO_MAX_LENGTH)
     private String memo;
 
+    @Column(length = REFERENCE_MAX_LENGTH)
     private String reference;
 
     private LocalDateTime solvedAt;

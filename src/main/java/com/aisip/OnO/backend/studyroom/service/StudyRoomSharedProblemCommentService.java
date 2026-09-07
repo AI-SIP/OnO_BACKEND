@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -109,13 +110,27 @@ public class StudyRoomSharedProblemCommentService {
         return toResponse(comment, commentReactionRepository.findAllByCommentId(commentId), userId, true);
     }
 
-    @Transactional
+    /**
+     * 리액션 토글.
+     *
+     * <p>"이미 눌렀는지 찾아보고 없으면 넣는" check-then-act 인데 테이블에는
+     * {@code (대상, 사용자, 이모지)} 유니크 제약이 걸려 있다. 이모지를 연타해 같은 요청이 겹치면
+     * 두 요청이 모두 "없음"을 읽고 INSERT 해 뒤엣것이 유니크 제약에 걸렸고,
+     * {@code DataIntegrityViolationException} 이 잡히지 않고 올라가 500 이 나갔다.
+     *
+     * <p>충돌은 같은 사용자끼리만 일어나므로(유니크 키에 user_id 가 들어간다) 사용자 행을 잠가
+     * 그 사용자의 토글만 직렬화한다. 다른 사용자의 리액션은 서로 막지 않는다.
+     * 격리 수준을 READ COMMITTED 로 내리는 것도 함께 필요하다. REPEATABLE READ 에서는
+     * 잠금을 얻기 전 조회들이 이미 스냅샷을 고정해, 잠금을 잡은 뒤의 중복 확인이
+     * 앞 요청이 커밋한 리액션을 못 보기 때문이다.
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public SharedProblemCommentReactionToggleResponse toggleReaction(Long roomId, Long sharedProblemId, Long commentId,
                                                                      Long userId, ReactionToggleRequest request) {
         accessService.validateMember(roomId, userId);
         customEmojiValidator.validate(request.emoji());
         StudyRoomSharedProblemComment comment = getCommentOrThrow(roomId, sharedProblemId, commentId);
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
         commentReactionRepository.findByCommentIdAndUserIdAndEmoji(commentId, userId, request.emoji())
                 .ifPresentOrElse(commentReactionRepository::delete,
@@ -153,10 +168,6 @@ public class StudyRoomSharedProblemCommentService {
             throw new ApplicationException(StudyRoomErrorCase.INVALID_SHARED_PROBLEM_COMMENT);
         }
         return content.trim();
-    }
-
-    private SharedProblemCommentResponse toResponse(StudyRoomSharedProblemComment comment, Long userId) {
-        return toResponse(comment, List.of(), userId, false);
     }
 
     private SharedProblemCommentResponse toResponse(StudyRoomSharedProblemComment comment,

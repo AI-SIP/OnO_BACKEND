@@ -123,9 +123,12 @@ public class StudyRoomChallengeService {
         if (persistStatus && challenge.getStatus() != status) {
             if (status == StudyRoomChallengeStatus.COMPLETED) {
                 // 원자적 UPDATE WHERE status = 'IN_PROGRESS' — 단 하나의 스레드만 1을 반환해 FCM 중복 발송 방지
-                int updated = challengeRepository.tryTransitionFromInProgress(challenge.getId(), status, LocalDateTime.now());
+                LocalDateTime completedAt = LocalDateTime.now();
+                int updated = challengeRepository.tryTransitionFromInProgress(challenge.getId(), status, completedAt);
                 if (updated > 0) {
-                    challenge.updateStatus(status);
+                    // 벌크 UPDATE 가 채운 completedAt 을 엔티티에도 반영해야 한다.
+                    // updateStatus 만 부르면 커밋 시 더티 체킹이 completedAt = null 로 되돌린다.
+                    challenge.markCompleted(completedAt);
                     // 트랜잭션 커밋 후 FCM 발송 — 롤백 시 중복 발송 방지
                     final StudyRoomChallenge committedChallenge = challenge;
                     final List<StudyRoomMember> committedMembers = members;
@@ -311,9 +314,10 @@ public class StudyRoomChallengeService {
 
         if (challenge.getStatus() != status) {
             if (status == StudyRoomChallengeStatus.COMPLETED) {
-                int updated = challengeRepository.tryTransitionFromInProgress(challenge.getId(), status, LocalDateTime.now());
+                LocalDateTime completedAt = LocalDateTime.now();
+                int updated = challengeRepository.tryTransitionFromInProgress(challenge.getId(), status, completedAt);
                 if (updated > 0) {
-                    challenge.updateStatus(status);
+                    challenge.markCompleted(completedAt);
                     final StudyRoomChallenge committedChallenge = challenge;
                     final List<StudyRoomMember> committedMembers = members;
                     TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {

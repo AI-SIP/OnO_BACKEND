@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.util.fcm.dto.FcmTokenRequestDto;
 import com.aisip.OnO.backend.util.fcm.dto.NotificationRequestDto;
 import com.aisip.OnO.backend.util.fcm.service.FcmService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -23,10 +24,11 @@ public class FcmController {
     private final FcmService fcmService;
 
     @PostMapping("/token")
-    public CommonResponse<String> registerFcmToken(@RequestBody FcmTokenRequestDto fcmTokenRequestDto) {
+    public CommonResponse<String> registerFcmToken(@Valid @RequestBody FcmTokenRequestDto fcmTokenRequestDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        // token 은 @NotBlank 로 이미 걸러졌으므로 null 방어가 필요 없다.
         log.info("FCM token registration requested - userId: {}, tokenLength: {}",
-                userId, fcmTokenRequestDto.token() == null ? 0 : fcmTokenRequestDto.token().length());
+                userId, fcmTokenRequestDto.token().length());
 
         fcmService.registerToken(fcmTokenRequestDto, userId);
         return CommonResponse.success("문제가 등록되었습니다.");

@@ -1,0 +1,2 @@
+org.springframework.test.context.ContextCustomizerFactory=\
+  com.aisip.OnO.backend.support.TestContainersContextCustomizerFactory

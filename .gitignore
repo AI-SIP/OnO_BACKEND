@@ -47,7 +47,11 @@ application-prod.properties
 application-local.yml
 application-dev.yml
 application-prod.yml
-application-test.yml
+# application-test.yml 은 무시하지 않는다.
+# 시크릿이 없고(접속 정보는 Testcontainers 주입, 키는 테스트 전용 더미),
+# 이 파일이 빠지면 CI 에 test 프로필이 없어 Flyway 가 켜진 채로 돌다
+# 빈 DB 에서 V2 ALTER TABLE 이 실패한다.
+!application-test.yml
 FirebaseAdminKey.json
 
 **/db/migration/*

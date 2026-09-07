@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.mission.repository;
 import com.aisip.OnO.backend.mission.entity.MissionType;
 import com.aisip.OnO.backend.user.entity.User;
 import com.querydsl.core.Tuple;
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.DateExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberExpression;
@@ -13,7 +14,6 @@ import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -39,7 +39,7 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
                 .from(missionLog)
                 .where(missionLog.missionType.eq(MissionType.PROBLEM_WRITE)
                         .and(missionLog.user.id.eq(userId))
-                        .and(missionLog.createdAt.between(getStartOfToday(), getEndOfToday()))
+                        .and(createdToday())
                 )
                 .fetchOne();
 
@@ -54,7 +54,7 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
                 .from(missionLog)
                 .where(missionLog.missionType.eq(MissionType.PROBLEM_PRACTICE)
                         .and(missionLog.referenceId.eq(problemId))
-                        .and(missionLog.createdAt.between(getStartOfToday(), getEndOfToday()))
+                        .and(createdToday())
                 )
                 .fetchFirst() != null;
     }
@@ -66,7 +66,7 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
                 .from(missionLog)
                 .where(missionLog.missionType.eq(MissionType.NOTE_PRACTICE)
                         .and(missionLog.referenceId.eq(practiceNoteId))
-                        .and(missionLog.createdAt.between(getStartOfToday(), getEndOfToday()))
+                        .and(createdToday())
                 )
                 .fetchFirst() != null;
     }
@@ -78,7 +78,7 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
                 .from(missionLog)
                 .where(missionLog.missionType.eq(MissionType.USER_LOGIN)
                         .and(missionLog.user.id.eq(userId))
-                        .and(missionLog.createdAt.between(getStartOfToday(), getEndOfToday()))
+                        .and(createdToday())
                 )
                 .fetchFirst() != null;
     }
@@ -88,7 +88,7 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
         Long result = queryFactory
                 .select(missionLog.point.sum())
                 .from(missionLog)
-                .where(missionLog.createdAt.between(getStartOfToday(), getEndOfToday())
+                .where(createdToday()
                         .and(missionLog.user.id.eq(userId)))
                 .fetchOne();
 
@@ -116,7 +116,7 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
                 .select(createdDate, activeUserCount)
                 .from(missionLog)
                 .where(missionLog.missionType.eq(MissionType.USER_LOGIN)
-                        .and(missionLog.createdAt.between(startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX)))
+                        .and(createdBetweenDates(startDate, endDate))
                 )
                 .groupBy(createdDate)
                 .fetch();
@@ -139,25 +139,33 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
 
     @Override
     public java.util.List<User> getActiveUsersByDate(LocalDate date) {
-        LocalDateTime startOfDay = date.atStartOfDay();
-        LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
-
         return queryFactory
                 .select(missionLog.user)
                 .distinct()
                 .from(missionLog)
                 .where(missionLog.missionType.eq(MissionType.USER_LOGIN)
-                        .and(missionLog.createdAt.between(startOfDay, endOfDay))
+                        .and(createdBetweenDates(date, date))
                 )
                 .fetch();
     }
 
-    private LocalDateTime getStartOfToday() {
-        return LocalDate.now().atStartOfDay();
+    /**
+     * "오늘 안에 만들어졌는가" 조건.
+     *
+     * <p>예전에는 {@code between(오늘 00:00, 오늘 23:59:59.999999999)} 를 썼는데,
+     * MySQL DATETIME(6) 은 마이크로초까지만 저장하므로 끝값이 반올림되어 <b>다음 날 00:00:00 이 되고</b>
+     * BETWEEN 은 양끝을 포함하므로 자정 정각에 만들어진 기록이 전날에도 오늘로 잡혔다.
+     * 그 경우 자정에 로그인한 사용자는 전날 출석이 이미 있는 것으로 판정돼 보상을 잃는다.
+     * 반열림 구간 {@code [오늘 00:00, 내일 00:00)} 으로 바꿔 경계를 한 번만 세도록 한다.
+     */
+    private BooleanExpression createdToday() {
+        return createdBetweenDates(LocalDate.now(), LocalDate.now());
     }
 
-    private LocalDateTime getEndOfToday() {
-        return LocalDate.now().atTime(LocalTime.MAX);
+    /** {@code [startDate 00:00, endDate+1일 00:00)} 반열림 구간. */
+    private BooleanExpression createdBetweenDates(LocalDate startDate, LocalDate endDate) {
+        return missionLog.createdAt.goe(startDate.atStartOfDay())
+                .and(missionLog.createdAt.lt(endDate.plusDays(1).atStartOfDay()));
     }
 
     private LocalDate toLocalDate(Object value) {

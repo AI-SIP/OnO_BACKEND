@@ -2,6 +2,9 @@
 plugins {
 	id 'java'
 	id 'jacoco'
+	// 뮤테이션 테스트. 커버리지는 "그 줄이 실행됐다"만 말하지만
+	// 뮤테이션 점수는 "코드가 틀렸을 때 테스트가 실제로 실패하는가"를 측정한다.
+	id 'info.solidsoft.pitest' version '1.15.0'
 	id 'org.springframework.boot' version '3.3.1'
 	id 'io.spring.dependency-management' version '1.1.5'
 	id "io.sentry.jvm.gradle" version "4.11.0"
@@ -34,6 +37,10 @@ jar {
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa:3.1.0'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
+	// Bean Validation 구현체. 이게 없으면 jakarta.validation-api 만 클래스패스에 있어서
+	// 코드에 붙은 @NotNull/@Valid/@Validated 가 전부 무시되고, 잘못된 요청이 검증 없이
+	// 서비스로 들어가 500 이 된다.
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'net.logstash.logback:logstash-logback-encoder:7.4'
 	implementation 'org.springframework.cloud:spring-cloud-starter-aws:2.2.6.RELEASE'
 	implementation 'com.github.gavlyukovskiy:p6spy-spring-boot-starter:1.9.0'
@@ -68,8 +75,16 @@ dependencies {
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.security:spring-security-test'
-	testRuntimeOnly 'com.h2database:h2'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+	// Spring Boot 3.3.1 이 관리하는 1.19.8 은 docker-java 3.3.x 를 쓰는데,
+	// Docker Engine 29 의 /info 응답에 400 을 내며 컨테이너를 띄우지 못한다. 버전을 고정해 올린다.
+	testImplementation platform('org.testcontainers:testcontainers-bom:1.21.3')
+	testImplementation 'org.testcontainers:junit-jupiter'
+	testImplementation 'org.testcontainers:mysql'
+	testImplementation 'org.testcontainers:rabbitmq'
+	// 아키텍처 규칙을 테스트로 강제한다. 오늘 고친 결함들이 같은 형태로 재발하지 않도록 막는다.
+	testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
 	testCompileOnly 'org.projectlombok:lombok'
 	testAnnotationProcessor 'org.projectlombok:lombok'
 
@@ -83,29 +98,90 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 	systemProperty 'spring.profiles.active', 'test'
-	// @SpringBootTest 클래스마다 컨텍스트가 캐시에 쌓여 기본 힙(512m)으로는 OOM 이 났다.
-	// 워커 JVM 이 죽으면서 40개 클래스 중 3개만 돌고 빌드가 끝나고 있었다.
-	maxHeapSize = '3g'
-	// 실패한 테스트가 있어도 커버리지 리포트는 나오도록 finalizedBy 사용
-	finalizedBy tasks.named('jacocoTestReport')
+	// 기존 스위트는 힙 부족으로 OOM 종료됐다. 컨텍스트 캐시 + 컨테이너 구동분을 감안해 상향한다.
+	maxHeapSize = '2g'
+
+	// macOS Docker Desktop 은 소켓을 ~/.docker/run/docker.sock 에 두기 때문에
+	// Testcontainers 의 기본 탐색(/var/run/docker.sock)이 실패한다. 환경별로 찾아서 넘긴다.
+	def userSocket = file("${System.getProperty('user.home')}/.docker/run/docker.sock")
+	def dockerHost = System.getenv('DOCKER_HOST')
+			?: (userSocket.exists() ? "unix://${userSocket.absolutePath}" : 'unix:///var/run/docker.sock')
+	environment 'DOCKER_HOST', dockerHost
+	// docker-java 는 기본으로 API v1.32 를 쓰는데 Docker Engine 29 의 MinAPIVersion 은 1.40 이라
+	// /v1.32/info 가 400 으로 거부된다("Could not find a valid Docker environment"의 실제 원인).
+	// docker-java 는 이 값을 환경변수가 아니라 'api.version' 시스템 프로퍼티에서 읽는다.
+	systemProperty 'api.version', System.getenv('DOCKER_API_VERSION') ?: '1.44'
+	environment 'DOCKER_API_VERSION', System.getenv('DOCKER_API_VERSION') ?: '1.44'
+	environment 'TESTCONTAINERS_CHECKS_DISABLE', 'true'
+	testLogging {
+		events 'failed'
+		// short 는 예외 체인의 클래스명만 남기고 메시지를 버린다.
+		// application-test.yml 이 커밋되지 않아 CI 가 전멸했을 때, 이 설정 탓에
+		// "Flyway 가 실패했다"까지만 보이고 어떤 SQL 인지 알 수 없어 진단이 크게 늦어졌다.
+		// 실패 원인이 로그만으로 드러나도록 full 을 유지한다.
+		exceptionFormat 'full'
+		showStackTraces = true
+		showCauses = true
+	}
+	finalizedBy jacocoTestReport
 }
 
 jacoco {
 	toolVersion = '0.8.12'
 }
 
+// 커버리지 집계에서 제외할 대상: 실행 진입점, 설정 클래스, QueryDSL 생성 코드
+//
+// 주의: 여기 패턴은 Ant 스타일이라 '[A-Z]' 같은 문자 클래스를 지원하지 않는다.
+// 처음에 '**/Q[A-Z]*' 로 적었더니 아무것도 걸러지지 않아 QueryDSL 생성 클래스 32개가
+// 그대로 집계에 들어갔고, 그 탓에 studyroom/entity 커버리지가 실제 100% 인데 45% 로 보였다.
+//
+// 'Q*' 로 시작하는 main 클래스 중 QueryDSL 생성물이 아닌 것은 QuartzConfig 하나뿐이다.
+// 이것도 함께 빠지지만 Spring @Configuration 클래스라 이미 제외 중인 '**/config/**' 과 같은 성격이다.
+def coverageExcludes = [
+		'**/BackendApplication*',
+		'**/config/**',
+		'**/Q*.class',
+]
+
 tasks.named('jacocoTestReport') {
+	// dependsOn test 를 걸면 안 된다. 테스트가 하나라도 실패하면 의존 태스크가 실패로 간주되어
+	// 리포트 태스크가 통째로 건너뛰어지고, 직전 실행의 낡은 리포트가 그대로 남는다.
+	// test 의 finalizedBy 로 이미 순서가 보장되며, 실패한 실행에서도 커버리지는 나와야 한다.
 	reports {
 		xml.required = true
 		html.required = true
 	}
-	// QueryDSL 이 만든 Q 클래스와 부트 진입점은 측정 대상이 아니다
-	classDirectories.setFrom(files(classDirectories.files.collect {
-		fileTree(dir: it, exclude: [
-				'**/Q*.class',
-				'**/BackendApplication.class',
-		])
-	}))
+	classDirectories.setFrom(
+			files(classDirectories.files.collect {
+				fileTree(dir: it, exclude: coverageExcludes)
+			})
+	)
+}
+
+tasks.named('jacocoTestCoverageVerification') {
+	// 현재 수치(라인 94.6%, 분기 77.2%)보다 낮게 잡아 정상적인 변동은 통과시키되,
+	// 테스트 없이 코드가 늘어나면 걸리도록 한다. 커버리지가 오르면 함께 올린다.
+	violationRules {
+		rule {
+			element = 'BUNDLE'
+			limit {
+				counter = 'LINE'
+				value = 'COVEREDRATIO'
+				minimum = 0.85
+			}
+			limit {
+				counter = 'BRANCH'
+				value = 'COVEREDRATIO'
+				minimum = 0.70
+			}
+		}
+	}
+	classDirectories.setFrom(
+			files(classDirectories.files.collect {
+				fileTree(dir: it, exclude: coverageExcludes)
+			})
+	)
 }
 
 tasks.withType(JavaCompile) {
@@ -114,4 +190,47 @@ tasks.withType(JavaCompile) {
 
 clean {
 	delete file('src/main/generated')
+}
+
+// ── 뮤테이션 테스트 ────────────────────────────────────────────────────────────
+// 프로덕션 코드를 일부러 변형(조건 반전, 반환값 치환, 호출 제거)한 뒤
+// 테스트가 그 변형을 잡아내는지 본다. 잡아내지 못한 변형(survived)은
+// "그 줄은 실행되지만 결과를 검증하는 단언이 없다"는 뜻이다.
+//
+// 전체를 돌리면 매우 오래 걸리므로 비즈니스 규칙이 몰린 패키지만 대상으로 한다.
+// 실행: ./gradlew pitest   (리포트: build/reports/pitest/index.html)
+pitest {
+	junit5PluginVersion = '1.2.1'
+	// 순수 도메인 로직에 한정한다.
+	//
+	// 서비스 계층 전체를 대상으로 돌려 보면 뮤테이션 점수가 25% 로 나오는데, 이 숫자는
+	// 테스트 품질이 아니라 측정 실패를 뜻한다. PIT 는 뮤테이션마다 어떤 테스트를 돌릴지
+	// 고르려고 테스트별 라인 커버리지를 수집하는데, 우리 스위트는 대부분 @SpringBootTest
+	// 통합 테스트라 그 매핑이 잘 되지 않아 2899개 중 2041개가 "커버리지 없음" 으로 빠졌다.
+	// (같은 실행의 test strength 는 83% 였다. 테스트가 실제로 닿은 곳은 잘 잡고 있다는 뜻이다.)
+	//
+	// 스프링 컨텍스트 없이 도는 단위 테스트가 붙어 있는 엔티티·정책 클래스로 좁히면
+	// 숫자가 실제 검출력을 가리킨다. 통합 테스트 영역은 쿼리 수 회귀 테스트와
+	// 아키텍처 규칙이 따로 지킨다.
+	targetClasses = [
+			'com.aisip.OnO.backend.*.entity.*',
+			'com.aisip.OnO.backend.problem.reminder.*Policy*',
+			'com.aisip.OnO.backend.problem.reminder.*Calculator*',
+			'com.aisip.OnO.backend.common.emoji.*',
+			'com.aisip.OnO.backend.common.exception.*',
+	]
+	excludedClasses = [
+			'com.aisip.OnO.backend.**.Q*',
+			'com.aisip.OnO.backend.**.*Dto',
+			'com.aisip.OnO.backend.**.*Config',
+	]
+	// 기본 뮤테이터에 더해 경계 조건과 널 반환을 다룬다.
+	// 오늘 찾은 결함 다수가 경계값(255/256, 자정 경계)에서 나왔다.
+	mutators = ['DEFAULTS', 'CONDITIONALS_BOUNDARY', 'NULL_RETURNS', 'REMOVE_CONDITIONALS']
+	threads = 4
+	timestampedReports = false
+	outputFormats = ['HTML', 'XML']
+	// 처음부터 높게 잡으면 통과 자체가 불가능하다. 실측 후 단계적으로 올린다.
+	mutationThreshold = 0
+	timeoutConstInMillis = 10000
 }

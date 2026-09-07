@@ -118,8 +118,13 @@ public class SecurityConfig {
                         .successHandler((request, response, authentication) -> {
                             CustomAdminService userDetails = (CustomAdminService) authentication.getPrincipal();
                             Long adminId = userDetails.getUserId();
+                            // createAccessToken 은 이미 "Bearer " 접두사를 포함해 반환한다
+                            // (JwtTokenizer.BEARER_PREFIX). 여기서 한 번 더 붙이면
+                            // "Bearer Bearer eyJ..." 가 되어 JwtTokenFilter 가 앞 7글자만 떼고
+                            // 파싱에 실패해 401 이 난다. 프론트에 내려가는 토큰 형식이 이미
+                            // 접두사를 포함한 계약이므로 createAccessToken 쪽은 그대로 둔다.
                             String token = jwtTokenizer.createAccessToken(String.valueOf(adminId), Map.of("authority", Authority.ROLE_ADMIN));
-                            response.setHeader("Authorization", "Bearer " + token);
+                            response.setHeader("Authorization", token);
                             response.sendRedirect(siteUrl + "/admin/main"); // 성공 후 관리자 페이지로 이동
                         })
                         .failureHandler((request, response, exception) -> {

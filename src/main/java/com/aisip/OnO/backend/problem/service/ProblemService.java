@@ -28,6 +28,7 @@ import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.dto.ReviewDueResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
+import com.aisip.OnO.backend.problem.repository.ReviewDueProblemProjection;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
 import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveRepository;
 import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveSummary;
@@ -210,7 +211,13 @@ public class ProblemService {
 
     @Transactional
     public Long registerProblem(ProblemRegisterDto problemRegisterDto, Long userId) {
-        validateMemoLength(problemRegisterDto.memo());
+        validateProblemContent(problemRegisterDto.memo(), problemRegisterDto.reference());
+
+        // folderId 가 null 이면 findById(null) 이 InvalidDataAccessApiUsageException 을 던져 500 이 나간다.
+        // 입력 누락은 서버 오류가 아니므로 400 으로 거절한다.
+        if (problemRegisterDto.folderId() == null) {
+            throw new ApplicationException(ProblemErrorCase.PROBLEM_FOLDER_ID_REQUIRED);
+        }
 
         Folder folder = folderRepository.findById(problemRegisterDto.folderId())
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
@@ -242,8 +249,7 @@ public class ProblemService {
      */
     @Transactional
     public Long registerProblemV2(ProblemRegisterV2Dto problemRegisterV2Dto, Long userId) {
-        validateMemoLength(problemRegisterV2Dto.memo());
-
+        validateProblemContent(problemRegisterV2Dto.memo(), problemRegisterV2Dto.reference());
         Folder folder = resolveRegisterFolder(problemRegisterV2Dto.folderId(), userId);
 
         ProblemRegisterDto baseDto = new ProblemRegisterDto(
@@ -310,7 +316,7 @@ public class ProblemService {
         if (registerDtos == null || registerDtos.isEmpty()) {
             return List.of();
         }
-        registerDtos.forEach(dto -> validateMemoLength(dto.memo()));
+        registerDtos.forEach(dto -> validateProblemContent(dto.memo(), dto.reference()));
 
         Map<Long, Folder> foldersById = resolveRegisterFolders(registerDtos, userId);
         Folder rootFolder = registerDtos.stream().anyMatch(dto -> dto.folderId() == null)
@@ -554,7 +560,8 @@ public class ProblemService {
         analysisProblemWithoutOwnerCheck(problemId, userId);
     }
 
-    @Transactional
+    // 호출자(analysisProblem)의 트랜잭션 안에서 실행된다.
+    // private 메서드에 @Transactional 을 붙여도 Spring 프록시가 가로채지 못해 아무 효과가 없다.
     private void analysisProblemWithoutOwnerCheck(Long problemId, Long userId) {
         // 이미 분석이 완료된 문제는 재요청하지 않음
         if (problemAnalysisRepository.findByProblemId(problemId)
@@ -597,7 +604,7 @@ public class ProblemService {
 
     @Transactional
     public void updateProblemInfo(ProblemRegisterDto problemRegisterDto, Long userId) {
-        validateMemoLength(problemRegisterDto.memo());
+        validateProblemContent(problemRegisterDto.memo(), problemRegisterDto.reference());
 
         Problem problem = findProblemEntity(problemRegisterDto.problemId(), userId);
 
@@ -728,7 +735,7 @@ public class ProblemService {
      * - S3 파일 삭제: 비동기 (RabbitMQ Producer로 전송)
      * - PracticeNote 매핑 삭제: 동기 (데이터 정합성)
      */
-    @Transactional
+    // 호출자(deleteProblem / deleteFolderProblems / deleteAllUserProblems)의 트랜잭션 안에서 실행된다.
     private void deleteProblemWithoutOwnerCheck(Long problemId) {
         // 1. 이미지 데이터 조회
         List<ProblemImageData> imageDataList = problemImageDataRepository.findAllByProblemId(problemId);
@@ -791,7 +798,7 @@ public class ProblemService {
         problemIdList.forEach(problemId -> deleteProblem(problemId, userId));
     }
 
-    @Transactional
+    // 호출자(deleteAllByFolderIds)의 트랜잭션 안에서 실행된다.
     private void deleteFolderProblems(Long folderId) {
         problemRepository.findAllByFolderId(folderId)
                 .forEach(problem -> {
@@ -935,6 +942,19 @@ public class ProblemService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 컬럼 길이를 넘는 입력은 DB에서 Data truncation 으로 500 이 나므로 저장 전에 400 으로 거절한다.
+     */
+    private void validateProblemContent(String memo, String reference) {
+        if (memo != null && memo.length() > Problem.MEMO_MAX_LENGTH) {
+            throw new ApplicationException(ProblemErrorCase.PROBLEM_MEMO_TOO_LONG);
+        }
+
+        if (reference != null && reference.length() > Problem.REFERENCE_MAX_LENGTH) {
+            throw new ApplicationException(ProblemErrorCase.PROBLEM_REFERENCE_TOO_LONG);
+        }
+    }
+
     private void validateFolderOwner(Long folderId, Long userId) {
         Folder folder = folderRepository.findById(folderId)
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
@@ -948,29 +968,27 @@ public class ProblemService {
     }
 
     /**
-     * memo 컬럼 상한(V24, varchar(1000))을 넘으면 DB 가 truncation 으로 거절해 500 이 됐다.
-     * 저장 전에 걸러서 400 으로 돌려준다.
+     * 오늘 복습 대상 문제 조회.
+     *
+     * <p>엔티티를 그대로 조회하면 {@code Problem.problemAnalysis} 가 mappedBy OneToOne 이라
+     * 행마다 존재 여부 확인 쿼리가 한 번씩 더 나간다(N+1). 응답에 필요한 값은 스칼라뿐이므로
+     * 프로젝션으로 한 번에 읽는다.
      */
-    private void validateMemoLength(String memo) {
-        if (memo != null && memo.length() > MEMO_MAX_LENGTH) {
-            throw new ApplicationException(ProblemErrorCase.PROBLEM_MEMO_TOO_LONG);
-        }
-    }
-
     @Transactional(readOnly = true)
     public ReviewDueResponseDto getReviewDueProblems(Long userId) {
         LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
-        List<ReviewDueResponseDto.ReviewDueProblemDto> problemDtos =
-                problemRepository.findReviewDueProblemDtos(userId, today);
+        List<ReviewDueProblemProjection> dueProblems = problemRepository.findReviewDueProblems(userId, today);
 
-        long overdueCount = problemDtos.stream()
-                .filter(dto -> dto.nextReviewAt().isBefore(today))
+        long overdueCount = dueProblems.stream()
+                .filter(p -> p.nextReviewAt().isBefore(today))
                 .count();
 
         return ReviewDueResponseDto.builder()
-                .dueCount(problemDtos.size())
+                .dueCount(dueProblems.size())
                 .overdueCount(overdueCount)
-                .problems(problemDtos)
+                .problems(dueProblems.stream()
+                        .map(ReviewDueResponseDto.ReviewDueProblemDto::from)
+                        .toList())
                 .build();
     }
 }

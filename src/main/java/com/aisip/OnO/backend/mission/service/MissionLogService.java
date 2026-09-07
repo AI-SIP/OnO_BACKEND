@@ -43,11 +43,41 @@ public class MissionLogService {
 
     private static final Long DAILY_MISSION_POINT_LIMIT = 200L;
 
+    /**
+     * 미션 적립 전에 사용자 행을 먼저 잠근다.
+     *
+     * <p>두 가지를 동시에 막는다.
+     *
+     * <p>첫째, <b>교착</b>. mission_log 는 user 를 참조하므로 INSERT 시 InnoDB 가 부모 행에 공유 잠금을 건다.
+     * 그 뒤 적립 포인트를 반영하려고 같은 행을 UPDATE 하면 공유 잠금을 배타 잠금으로 승격해야 하는데,
+     * 같은 사용자의 요청이 동시에 들어오면 서로 상대의 공유 잠금 때문에 승격하지 못해 교착이 난다.
+     * 실제로 같은 사용자가 미션을 동시에 8번 적립하면
+     * {@code Deadlock found when trying to get lock} 이 그대로 500 으로 나갔다.
+     * 처음부터 배타 잠금을 잡으면 승격 자체가 없어 교착이 생기지 않는다.
+     *
+     * <p>둘째, <b>중복 적립</b>. "오늘 이미 했는가"를 확인한 뒤 적립하는 check-then-act 구조라,
+     * 잠금이 없으면 동시 요청이 모두 "아직 안 했다"를 읽고 각자 적립한다.
+     * 사용자 단위로 직렬화하면 뒤에 온 요청은 앞선 적립을 보고 건너뛴다.
+     */
+    private User lockUser(Long userId) {
+        return userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new ApplicationException(MissionErrorCase.USER_NOT_FOUND));
+    }
+
     public Long registerMissionLog(@NotNull MissionRegisterDto missionRegisterDto) {
 
         Long userId = missionRegisterDto.userId();
-        boolean canNotRegister = true;
-        canNotRegister = switch (missionRegisterDto.missionType()) {
+
+        // switch 가 MissionType 의 네 상수를 모두 다루고 있어 default 분기는 도달할 수 없었고,
+        // missionType 이 null 이면 switch 자체가 NPE 를 던져 400 이어야 할 입력 오류가 500 으로 나갔다.
+        // 잘못된 미션 종류는 MISSION_TYPE_NOT_FOUND(400) 로 거절한다.
+        if (missionRegisterDto.missionType() == null) {
+            throw new ApplicationException(MissionErrorCase.MISSION_TYPE_NOT_FOUND);
+        }
+
+        User user = lockUser(userId);
+
+        boolean canNotRegister = switch (missionRegisterDto.missionType()) {
             case USER_LOGIN -> missionLogRepository.alreadyLogin(userId);
             case PROBLEM_WRITE -> missionLogRepository.alreadyWriteProblemsTodayMoreThan3(userId);
             case PROBLEM_PRACTICE -> missionLogRepository.alreadyPracticeProblem(missionRegisterDto.referenceId());
@@ -56,8 +86,6 @@ public class MissionLogService {
         };
 
         if(!canNotRegister) {
-            User user = userRepository.findById(userId).orElseThrow(() -> new ApplicationException(MissionErrorCase.USER_NOT_FOUND));
-
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
             missionLogRepository.save(missionLog);
 
@@ -68,6 +96,7 @@ public class MissionLogService {
     }
 
     public void registerLoginMission(Long userId) {
+        User user = lockUser(userId);
         boolean alreadyLogin = missionLogRepository.alreadyLogin(userId);
 
         if(!alreadyLogin) {
@@ -77,7 +106,6 @@ public class MissionLogService {
                     .missionType(MissionType.USER_LOGIN)
                     .build();
 
-            User user = userRepository.findById(userId).orElseThrow(() -> new ApplicationException(MissionErrorCase.USER_NOT_FOUND));
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
             missionLogRepository.save(missionLog);
 
@@ -86,6 +114,7 @@ public class MissionLogService {
     }
 
     public void registerProblemWriteMission(Long userId) {
+        User user = lockUser(userId);
         boolean alreadyWriteMoreThanThreeProblems = missionLogRepository.alreadyWriteProblemsTodayMoreThan3(userId);
 
         if(!alreadyWriteMoreThanThreeProblems) {
@@ -95,7 +124,6 @@ public class MissionLogService {
                     .missionType(MissionType.PROBLEM_WRITE)
                     .build();
 
-            User user = userRepository.findById(userId).orElseThrow(() -> new ApplicationException(MissionErrorCase.USER_NOT_FOUND));
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
             missionLogRepository.save(missionLog);
 
@@ -104,12 +132,10 @@ public class MissionLogService {
     }
 
     public void registerProblemWriteMissionBatch(Long userId, int count) {
+        User user = lockUser(userId);
         long todayCount = missionLogRepository.countProblemWritesToday(userId);
         int toCreate = (int) Math.min(count, Math.max(0, 3 - todayCount));
         if (toCreate == 0) return;
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ApplicationException(MissionErrorCase.USER_NOT_FOUND));
 
         MissionRegisterDto dto = MissionRegisterDto.builder()
                 .userId(userId)
@@ -124,6 +150,7 @@ public class MissionLogService {
     }
 
     public void registerProblemPracticeMission(Long userId, Long problemId) {
+        User user = lockUser(userId);
         boolean alreadyPracticeProblem = missionLogRepository.alreadyPracticeProblem(problemId);
 
         if(!alreadyPracticeProblem) {
@@ -134,7 +161,6 @@ public class MissionLogService {
                     .referenceId(problemId)
                     .build();
 
-            User user = userRepository.findById(userId).orElseThrow(() -> new ApplicationException(MissionErrorCase.USER_NOT_FOUND));
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
             missionLogRepository.save(missionLog);
 
@@ -143,6 +169,7 @@ public class MissionLogService {
     }
 
     public void registerNotePracticeMission(Long userId, Long practiceNoteId) {
+        User user = lockUser(userId);
         boolean alreadyPracticeNote = missionLogRepository.alreadyPracticeNote(practiceNoteId);
 
         if(!alreadyPracticeNote) {
@@ -153,7 +180,6 @@ public class MissionLogService {
                     .referenceId(practiceNoteId)
                     .build();
 
-            User user = userRepository.findById(userId).orElseThrow(() -> new ApplicationException(MissionErrorCase.USER_NOT_FOUND));
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
             missionLogRepository.save(missionLog);
 

@@ -79,4 +79,18 @@ public class StudyRoomChallenge extends BaseEntity {
     public void updateStatus(StudyRoomChallengeStatus status) {
         this.status = status;
     }
+
+    /**
+     * 완료 상태로 전이하면서 완료 시각까지 함께 채운다.
+     *
+     * <p>완료 전이는 중복 알림을 막으려고 {@code tryTransitionFromInProgress} 벌크 UPDATE 로
+     * 먼저 DB 를 바꾼다. 벌크 UPDATE 는 영속성 컨텍스트를 우회하므로, 이어서
+     * {@code updateStatus} 만 호출하면 커밋 시점의 더티 체킹 UPDATE 가 메모리에 남아 있던
+     * {@code completedAt = null} 을 그대로 덮어써 완료 시각이 사라진다.
+     * 두 필드를 함께 맞춰 두어야 벌크 UPDATE 결과가 유지된다.
+     */
+    public void markCompleted(LocalDateTime completedAt) {
+        this.status = StudyRoomChallengeStatus.COMPLETED;
+        this.completedAt = completedAt;
+    }
 }

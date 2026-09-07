@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 import static com.aisip.OnO.backend.problem.entity.QProblem.problem;
@@ -18,6 +19,14 @@ import static com.aisip.OnO.backend.problemsolve.entity.QProblemSolve.problemSol
 
 @Repository
 public class LearningCalendarQueryRepository {
+
+    /**
+     * 하루의 마지막 순간. 집계 쿼리가 {@code BETWEEN start AND end} 로 도는데
+     * {@code 23:59:59} 로 끊으면 {@code datetime(6)} 컬럼에 저장된
+     * 23:59:59.000001 ~ 23:59:59.999999 구간의 기록이 통째로 빠진다.
+     * 마이크로초 단위까지 포함하도록 경계를 잡는다.
+     */
+    private static final LocalTime END_OF_DAY = LocalTime.of(23, 59, 59, 999_999_000);
 
     private final JPAQueryFactory queryFactory;
 
@@ -130,7 +139,7 @@ public class LearningCalendarQueryRepository {
 
     public boolean existsStudyRecord(Long userId, LocalDate date) {
         LocalDateTime start = date.atStartOfDay();
-        LocalDateTime end = date.atTime(23, 59, 59);
+        LocalDateTime end = date.atTime(END_OF_DAY);
         Integer reviewExists = queryFactory
                 .selectOne()
                 .from(problemSolve)

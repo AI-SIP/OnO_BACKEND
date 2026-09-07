@@ -163,17 +163,13 @@ public class PracticeNoteService {
 
         practiceNote.updateNotification(PracticeNotification.from(practiceNoteUpdateDto.practiceNotification()));
 
-        if (!practiceNoteUpdateDto.addProblemIdList().isEmpty()) {
-            practiceNoteUpdateDto.addProblemIdList().forEach(problemId -> {
-                addProblemToPractice(practiceNote, problemId, userId);
-            });
-        }
+        // 요청 본문에 두 리스트가 아예 없으면 null 이 들어온다. 예전에는 isEmpty() 를 바로 불러
+        // NullPointerException 이 나면서 수정 요청이 500 으로 떨어졌다.
+        nullSafe(practiceNoteUpdateDto.addProblemIdList())
+                .forEach(problemId -> addProblemToPractice(practiceNote, problemId, userId));
 
-        if (!practiceNoteUpdateDto.removeProblemIdList().isEmpty()) {
-            practiceNoteUpdateDto.removeProblemIdList().forEach(problemId -> {
-                deletePracticeNoteMapping(practiceNote, problemId);
-            });
-        }
+        nullSafe(practiceNoteUpdateDto.removeProblemIdList())
+                .forEach(problemId -> deletePracticeNoteMapping(practiceNote, problemId));
 
         if (practiceNoteUpdateDto.practiceNotification() != null) {
             practiceNotificationScheduler.updateNotification(userId, practiceId, practiceNote.getTitle(), practiceNoteUpdateDto.practiceNotification());
@@ -200,7 +196,20 @@ public class PracticeNoteService {
         problemPracticeNoteMappingList.forEach(ProblemPracticeNoteMapping::removeMappingFromProblemAndPractice);
 
         practiceNoteRepository.deleteById(practiceId);
+
+        // 복습노트가 사라졌는데 Quartz 잡이 남아 있으면, 지운 복습노트 이름으로 복습 알림이 계속 발송된다.
+        // 다만 스케줄러 문제로 복습노트 삭제(회원 탈퇴 포함) 자체가 실패하면 안 되므로 삭제 실패는 로그로만 남긴다.
+        try {
+            practiceNotificationScheduler.deleteNotification(practiceId);
+        } catch (RuntimeException e) {
+            log.error("practiceId: {} 복습 알림 스케줄 삭제 실패", practiceId, e);
+        }
+
         log.info("practiceId: {} has deleted", practiceId);
+    }
+
+    private <T> List<T> nullSafe(List<T> values) {
+        return values == null ? List.of() : values;
     }
 
     public void deletePractices(Long userId, List<Long> practiceIdList) {

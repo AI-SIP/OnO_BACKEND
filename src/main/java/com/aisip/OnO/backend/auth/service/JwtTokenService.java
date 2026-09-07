@@ -65,8 +65,11 @@ public class JwtTokenService {
      * ✅ 로그아웃 처리 (Redis에서 RefreshToken 삭제 및 AccessToken 블랙리스트 추가)
      */
     public void logout(String accessToken, Long userId, String refreshToken) {
+        // 자신의 세션만 지울 수 있다. 토큰 문자열만 알면 남의 세션을 끊을 수 있으면 안 된다.
         if (refreshToken != null && !refreshToken.isBlank()) {
-            refreshTokenRepository.deleteByRefreshToken(refreshToken);
+            refreshTokenRepository.findByRefreshToken(refreshToken)
+                    .filter(session -> session.getUserId().equals(userId))
+                    .ifPresent(refreshTokenRepository::delete);
         }
         // AccessToken을 블랙리스트에 추가 (만료된 토큰이면 블랙리스트 추가 안 함)
         try {

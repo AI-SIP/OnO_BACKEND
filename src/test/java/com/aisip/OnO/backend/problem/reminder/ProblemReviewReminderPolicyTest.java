@@ -91,6 +91,20 @@ class ProblemReviewReminderPolicyTest {
     }
 
     @Test
+    @DisplayName("memo/reference가 공백뿐이어도 fallback body가 사용된다")
+    void buildNotification_blankContent_usesFallbackBody() {
+        ProblemReviewReminder reminder = ProblemReviewReminder.create(
+                1L, 100L, "   ", "\t", 1, 1, LocalDateTime.now().plusDays(1)
+        );
+
+        NotificationRequestDto dto = policy.buildNotification(reminder);
+
+        assertThat(dto.body())
+                .as("공백만 담긴 스냅샷으로 '그때 남긴 오답' 문구를 쓰면 보여줄 내용이 없다")
+                .isEqualTo("이전에 남긴 오답노트를 다시 풀어보세요");
+    }
+
+    @Test
     @DisplayName("memo가 있으면 default body가 사용된다")
     void buildNotification_memoPresent_usesDefaultBody() {
         ProblemReviewReminder reminder = ProblemReviewReminder.create(

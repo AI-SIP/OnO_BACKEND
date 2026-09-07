@@ -105,14 +105,20 @@ public class FcmNotificationConsumer {
      */
     private void sendToDevice(String token, FcmNotificationMessage message) throws FirebaseMessagingException {
         Timer.Sample sample = Timer.start(meterRegistry);
-        Message fcmMessage = Message.builder()
+        Message.Builder builder = Message.builder()
                 .setToken(token)
                 .setNotification(Notification.builder()
                         .setTitle(message.getTitle())
                         .setBody(message.getBody())
-                        .build())
-                .putAllData(message.getData())
-                .build();
+                        .build());
+
+        // putAllData 는 null 을 그대로 putAll 해서 NPE 를 낸다. data 없는 메시지도 알림 자체는 나가야 하므로
+        // null 이면 데이터 없이 보낸다. (없으면 모든 디바이스 전송이 실패 처리되어 무의미한 재시도 후 DLQ 로 간다)
+        if (message.getData() != null) {
+            builder.putAllData(message.getData());
+        }
+
+        Message fcmMessage = builder.build();
 
         try {
             String messageId = firebaseMessaging.send(fcmMessage);

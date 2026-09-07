@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
@@ -39,6 +40,14 @@ public class LearningReportService {
     private static final int MONTHLY_REVIEW_GOAL = 30;
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
+    /**
+     * 하루의 마지막 순간. 집계 쿼리가 {@code BETWEEN start AND end} 로 도는데
+     * {@code 23:59:59} 로 끊으면 {@code datetime(6)} 컬럼에 저장된
+     * 23:59:59.000001 ~ 23:59:59.999999 구간의 기록이 통째로 빠진다.
+     * 마이크로초 단위까지 포함하도록 경계를 잡는다.
+     */
+    private static final LocalTime END_OF_DAY = LocalTime.of(23, 59, 59, 999_999_000);
+
     private final LearningReportQueryRepository reportRepository;
     private final OpenAIClient openAIClient;
     private final RedisSingleDataService redisSingleDataService;
@@ -46,7 +55,7 @@ public class LearningReportService {
 
     public LearningReportResponseDto getLearningReport(Long userId, LocalDate baseDate) {
         LocalDate targetDate = resolveTargetDate(baseDate);
-        String cacheKey = buildCacheKey(userId, LocalDate.now(), targetDate);
+        String cacheKey = buildCacheKey(userId, LocalDate.now(KST), targetDate);
 
         LearningReportResponseDto cached = readCache(cacheKey);
         if (cached != null) {
@@ -95,9 +104,9 @@ public class LearningReportService {
         YearMonth previousMonth = currentMonth.minusMonths(1);
 
         LocalDateTime currentStart = currentMonth.atDay(1).atStartOfDay();
-        LocalDateTime currentEnd = currentMonth.atEndOfMonth().atTime(23, 59, 59);
+        LocalDateTime currentEnd = currentMonth.atEndOfMonth().atTime(END_OF_DAY);
         LocalDateTime previousStart = previousMonth.atDay(1).atStartOfDay();
-        LocalDateTime previousEnd = previousMonth.atEndOfMonth().atTime(23, 59, 59);
+        LocalDateTime previousEnd = previousMonth.atEndOfMonth().atTime(END_OF_DAY);
 
         long monthlyReviewCount = defaultLong(reportRepository.countReviewsInPeriod(userId, currentStart, currentEnd));
         long previousMonthlyReviewCount = defaultLong(reportRepository.countReviewsInPeriod(userId, previousStart, previousEnd));
@@ -178,7 +187,7 @@ public class LearningReportService {
             Long userId, String label, DateRange range, TrendType trendType
     ) {
         LocalDateTime start = range.start().atStartOfDay();
-        LocalDateTime end = range.end().atTime(23, 59, 59);
+        LocalDateTime end = range.end().atTime(END_OF_DAY);
 
         Long reviewCount = defaultLong(reportRepository.countReviewsInPeriod(userId, start, end));
         Long noteWriteCount = defaultLong(reportRepository.countNoteWritesInPeriod(userId, start, end));
@@ -249,7 +258,7 @@ public class LearningReportService {
 
     private List<LearningTrendPoint> buildTrend(Long userId, LocalDate startDate, LocalDate endDate, TrendType trendType) {
         LocalDateTime start = startDate.atStartOfDay();
-        LocalDateTime end = endDate.atTime(23, 59, 59);
+        LocalDateTime end = endDate.atTime(END_OF_DAY);
 
         Map<String, Long> bucket = initializeTrendBuckets(startDate, endDate, trendType);
 
@@ -400,9 +409,16 @@ public class LearningReportService {
         summaryPayload.put("monthlyComparison", monthlyComparison);
         summaryPayload.put("ruleBasedRecommendations", fallback);
 
-        return openAIClient.recommendLearningReport(summaryPayload)
-                .map(ai -> mergeRecommendations(fallback, ai))
-                .orElse(fallback);
+        // AI 추천은 리포트의 부가 정보다. 외부 호출이 어떤 이유로 실패하더라도
+        // 집계 결과 자체는 그대로 내려가야 하므로 룰 기반 결과로 대체한다.
+        try {
+            return openAIClient.recommendLearningReport(summaryPayload)
+                    .map(ai -> mergeRecommendations(fallback, ai))
+                    .orElse(fallback);
+        } catch (Exception e) {
+            log.warn("Failed to build AI learning recommendations. userId={}, reason={}", userId, e.getMessage());
+            return fallback;
+        }
     }
 
     private LearningRecommendations mergeRecommendations(LearningRecommendations fallback, LearningRecommendations ai) {
@@ -521,7 +537,9 @@ public class LearningReportService {
     }
 
     private LocalDate resolveTargetDate(LocalDate baseDate) {
-        return baseDate == null ? LocalDate.now().minusDays(1) : baseDate;
+        // 요약 조회(getLearningReportSummary)와 마찬가지로 KST 기준 날짜를 쓴다.
+        // JVM 기본 시간대를 쓰면 배포 환경에 따라 기준일이 하루 어긋난다.
+        return baseDate == null ? LocalDate.now(KST).minusDays(1) : baseDate;
     }
 
     private String buildCacheKey(Long userId, LocalDate requestDate, LocalDate targetDate) {

@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.config.rabbitmq;
 
 import org.springframework.amqp.core.*;
+import org.springframework.amqp.rabbit.config.RetryInterceptorBuilder;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -75,6 +76,28 @@ public class RabbitMQConfig {
         factory.setConcurrentConsumers(3); // 동시 처리 스레드 수
         factory.setMaxConcurrentConsumers(10); // 최대 동시 처리 스레드 수
         factory.setPrefetchCount(1); // 한 번에 가져올 메시지 수
+
+        // 재시도를 모두 소진한 메시지는 큐로 돌려보내지 않고 DLQ 로 보낸다.
+        //
+        // 이 팩토리는 직접 만든 빈이라 spring.rabbitmq.listener.simple.retry.* 설정이 적용되지 않는다.
+        // 그런데 defaultRequeueRejected 의 기본값이 true 라, 컨슈머가 예외를 던지면 메시지가
+        // 곧바로 큐 맨 앞으로 돌아가 즉시 다시 전달됐다. 백오프도 최대 횟수도 없어서
+        // 큐의 x-message-ttl(FCM·Discord 5분 / S3 10분 / GPT 30분)이 다 될 때까지
+        // 같은 메시지를 쉬지 않고 반복 처리했다.
+        //
+        // 실제로 Discord 웹훅에서 이 조합이 장애로 이어졌다. 전송에 성공한 뒤 로깅에서 터진
+        // 예외가 "전송 실패"로 잡히면서, 이미 나간 웹훅이 5분 동안 계속 재발송돼
+        // 컨테이너 아웃바운드 네트워크를 고갈시켰다. GPT 분석은 같은 상황에서 30분 동안
+        // OpenAI 를 다시 호출한다(비용·레이트리밋 직결).
+        factory.setDefaultRequeueRejected(false);
+        factory.setAdviceChain(RetryInterceptorBuilder.stateless()
+                .maxAttempts(3)
+                // 1초 → 2초 → 4초. 네트워크 순단이나 일시적 5xx 는 이 사이에 회복되고,
+                // 영구적 실패(잘못된 입력, 4xx)는 4초 안에 포기하고 DLQ 로 넘어간다.
+                .backOffOptions(1000, 2.0, 4000)
+                .recoverer(new org.springframework.amqp.rabbit.retry.RejectAndDontRequeueRecoverer())
+                .build());
+
         return factory;
     }
 

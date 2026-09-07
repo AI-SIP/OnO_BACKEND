@@ -32,6 +32,15 @@ public class S3DeleteConsumer {
         log.info("RabbitMQ message received - queue: {}, operation: {}, problemId: {}, messageRetryCount: {}",
                 RabbitMQConfig.S3_DELETE_QUEUE, "s3_delete", message.getProblemId(), message.getRetryCount());
 
+        // 삭제 대상 URL 이 없으면 재시도해도 영원히 실패한다(FileUploadService 가 NPE).
+        // 재시도 소진 후 DLQ 알림까지 울리는 것을 막기 위해 여기서 정상 종료(ACK)한다.
+        if (message.getImageUrl() == null || message.getImageUrl().isBlank()) {
+            log.warn("RabbitMQ message skipped - queue: {}, operation: {}, outcome: {}, problemId: {}, messageRetryCount: {}",
+                    RabbitMQConfig.S3_DELETE_QUEUE, "s3_delete", "image_url_missing",
+                    message.getProblemId(), message.getRetryCount());
+            return;
+        }
+
         try {
             // S3 파일 삭제 실행
             fileUploadService.deleteImageFileFromS3(message.getImageUrl());
