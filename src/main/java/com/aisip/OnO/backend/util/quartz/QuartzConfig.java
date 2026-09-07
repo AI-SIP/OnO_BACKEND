@@ -58,6 +58,14 @@ public class QuartzConfig {
         // 스케줄 표현식(cron)을 한국 시간으로 해석한다.
         properties.setProperty("org.quartz.scheduler.timeZone", "Asia/Seoul");
         properties.putAll(quartzProperties.getProperties());
+
+        // jobStore.class 는 SchedulerFactoryBean 이 스스로 정하게 둔다.
+        //
+        // local/dev/prod 프로필이 org.quartz.jobStore.class = JobStoreTX 를 직접 지정하고 있는데,
+        // 이 값이 그대로 넘어가면 setDataSource 로 붙인 LocalDataSourceJobStore 를 덮어써
+        // DataSource 를 모르는 순수 JobStoreTX 가 남고 기동이 "DataSource name not set." 로 실패한다.
+        // setDataSource 를 무조건 호출하던 시절에는 드러나지 않던 충돌이다.
+        properties.remove("org.quartz.jobStore.class");
         factory.setQuartzProperties(properties);
 
         return factory;
