@@ -69,7 +69,7 @@ public abstract class ProblemSolveTestSupport extends IntegrationTestSupport {
 
     protected ProblemSolve saveSolve(Problem problem, Long userId, LocalDateTime practicedAt, AnswerStatus status) {
         return problemSolveRepository.save(
-                ProblemSolve.create(problem, userId, practicedAt, status, "회고", null, 120));
+                ProblemSolve.create(problem, userId, practicedAt, status, "회고", null, 120, null));
     }
 
     protected ProblemSolveImageData saveImage(ProblemSolve problemSolve, String imageUrl, int order) {

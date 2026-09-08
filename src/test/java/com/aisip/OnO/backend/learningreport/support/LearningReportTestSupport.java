@@ -82,7 +82,7 @@ public abstract class LearningReportTestSupport extends IntegrationTestSupport {
             Long userId, Problem problem, LocalDateTime practicedAt, AnswerStatus answerStatus, Integer seconds
     ) {
         return problemSolveRepository.save(
-                ProblemSolve.create(problem, userId, practicedAt, answerStatus, null, null, seconds)
+                ProblemSolve.create(problem, userId, practicedAt, answerStatus, null, null, seconds, null)
         );
     }
 

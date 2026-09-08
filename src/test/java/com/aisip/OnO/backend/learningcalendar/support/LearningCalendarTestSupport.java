@@ -68,7 +68,7 @@ public abstract class LearningCalendarTestSupport extends IntegrationTestSupport
             Long userId, Problem problem, LocalDateTime practicedAt, Integer seconds, AnswerStatus answerStatus
     ) {
         return problemSolveRepository.save(
-                ProblemSolve.create(problem, userId, practicedAt, answerStatus, null, null, seconds)
+                ProblemSolve.create(problem, userId, practicedAt, answerStatus, null, null, seconds, null)
         );
     }
 

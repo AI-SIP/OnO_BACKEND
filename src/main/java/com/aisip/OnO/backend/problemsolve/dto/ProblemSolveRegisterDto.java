@@ -12,6 +12,7 @@ public record ProblemSolveRegisterDto(
         AnswerStatus answerStatus,
         String reflection,
         List<ImprovementType> improvements,
-        Integer timeSpentSeconds
+        Integer timeSpentSeconds,
+        String moodEmojiKey
 ) {
 }

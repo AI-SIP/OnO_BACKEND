@@ -24,6 +24,7 @@ public record ProblemSolveResponseDto(
         String reflection,
         List<ImprovementType> improvements,
         Integer timeSpentSeconds,
+        String moodEmojiKey,
         Boolean migratedFromLegacy,
         List<String> imageUrls,
         @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
@@ -56,6 +57,7 @@ public record ProblemSolveResponseDto(
                 .reflection(problemSolve.getReflection())
                 .improvements(improvementList)
                 .timeSpentSeconds(problemSolve.getTimeSpentSeconds())
+                .moodEmojiKey(problemSolve.getMoodEmojiKey())
                 .migratedFromLegacy(problemSolve.getMigratedFromLegacy())
                 .imageUrls(problemSolve.getImages().stream()
                         .sorted((i1, i2) -> i1.getImageOrder().compareTo(i2.getImageOrder()))
