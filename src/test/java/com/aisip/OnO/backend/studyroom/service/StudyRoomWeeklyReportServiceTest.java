@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 
@@ -302,9 +303,12 @@ class StudyRoomWeeklyReportServiceTest extends StudyRoomTestSupport {
         void expiredChallengesAreRefreshed() {
             User host = fixtures.createUser("host");
             StudyRoom room = createRoom(host, "정리 방");
+            // 배치는 endAt 이 지금보다 앞선 IN_PROGRESS 챌린지를 EXPIRED 로 바꾼다.
+            // endAt 을 lastWeekStart 기준 상대 시각으로 두면 오늘 요일에 따라 미래가 된다.
+            // 화요일에는 lastWeekStart 가 어제라 plusDays(1) 이 오늘이 되어 12시 전에는 만료가 아니었다.
             StudyRoomChallenge expired = saveChallenge(room, "만료됨", StudyRoomChallengeType.INDIVIDUAL,
                     StudyRoomChallengeMetric.PROBLEM_COUNT, null, null, 1_000,
-                    lastWeekStart.minusDays(3).atStartOfDay(), lastWeekStart.plusDays(1).atTime(12, 0));
+                    lastWeekStart.minusDays(3).atStartOfDay(), LocalDateTime.now().minusHours(1));
 
             reportService.createPreviousWeekReports();
 

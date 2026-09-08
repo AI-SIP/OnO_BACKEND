@@ -60,9 +60,14 @@ class JwtTokenizerValidationTest {
     @DisplayName("서명이 틀린 액세스 토큰은 만료가 아니라 INVALID_ACCESS_TOKEN(1009) 로 판정된다")
     void tamperedAccessTokenMapsTo1009() {
         String token = issueAccessToken(validTokenizer);
-        // 서명부 한 글자를 바꿔 검증에 실패하게 만든다
-        String tampered = token.substring(0, token.length() - 1)
-                + (token.endsWith("A") ? "B" : "A");
+        // 서명부 한 글자를 바꿔 검증에 실패하게 만든다.
+        // 마지막 글자는 32바이트를 base64url 43글자로 담고 남은 비트라 바꿔도 같은 바이트로 디코딩될 수 있다.
+        // (HS256 서명이 'A' 로 끝나면 'B' 로 바꿔도 서명이 그대로여서 검증을 통과해 버렸다)
+        // 첫 글자는 6비트가 모두 쓰이므로 다른 글자로 바꾸면 서명이 반드시 달라진다.
+        int signatureStart = token.lastIndexOf('.') + 1;
+        String tampered = token.substring(0, signatureStart)
+                + (token.charAt(signatureStart) == 'A' ? 'B' : 'A')
+                + token.substring(signatureStart + 1);
 
         assertThatThrownBy(() -> validTokenizer.validateAccessToken(tampered))
                 .isInstanceOf(ApplicationException.class)
