@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.problemsolve.service;
 
+import com.aisip.OnO.backend.common.emoji.CustomEmojiErrorCase;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.exception.ErrorCase;
 import com.aisip.OnO.backend.problem.entity.Problem;
@@ -60,7 +61,7 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
     }
 
     private ProblemSolveRegisterDto registerDto(Long problemId, AnswerStatus status) {
-        return new ProblemSolveRegisterDto(problemId, PRACTICED_AT, status, "회고", List.of(), 90);
+        return new ProblemSolveRegisterDto(problemId, PRACTICED_AT, status, "회고", List.of(), 90, null);
     }
 
     @Nested
@@ -72,7 +73,7 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
         void createsSolveWithGivenValues() {
             Long solveId = problemSolveService.createProblemSolve(
                     new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT, AnswerStatus.PARTIAL, "계산에서 막혔다",
-                            List.of(ImprovementType.FASTER_SOLVING, ImprovementType.BETTER_UNDERSTANDING), 300),
+                            List.of(ImprovementType.FASTER_SOLVING, ImprovementType.BETTER_UNDERSTANDING), 300, null),
                     user.getId());
 
             ProblemSolveResponseDto saved = problemSolveService.getProblemSolve(solveId, user.getId());
@@ -92,10 +93,10 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
         @DisplayName("개선 사항이 null 이거나 비어 있으면 빈 목록으로 돌려준다")
         void handlesEmptyImprovements() {
             Long withNull = problemSolveService.createProblemSolve(
-                    new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT, AnswerStatus.WRONG, null, null, null),
+                    new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT, AnswerStatus.WRONG, null, null, null, null),
                     user.getId());
             Long withEmpty = problemSolveService.createProblemSolve(
-                    new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT.plusHours(1), AnswerStatus.WRONG, null, List.of(), null),
+                    new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT.plusHours(1), AnswerStatus.WRONG, null, List.of(), null, null),
                     user.getId());
 
             assertThat(problemSolveService.getProblemSolve(withNull, user.getId()).improvements()).isEmpty();
@@ -108,7 +109,7 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
             String longReflection = "가".repeat(3000);
 
             Long solveId = problemSolveService.createProblemSolve(
-                    new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT, AnswerStatus.WRONG, longReflection, List.of(), 60),
+                    new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT, AnswerStatus.WRONG, longReflection, List.of(), 60, null),
                     user.getId());
 
             assertThat(problemSolveService.getProblemSolve(solveId, user.getId()).reflection())
@@ -159,7 +160,7 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
         @DisplayName("practicedAt 을 안 보내면 지금 푼 것으로 저장한다 - not-null 컬럼이라 예전에는 500이었다")
         void defaultsPracticedAtToNow() {
             Long solveId = problemSolveService.createProblemSolve(
-                    new ProblemSolveRegisterDto(problem.getId(), null, AnswerStatus.CORRECT, null, List.of(), null),
+                    new ProblemSolveRegisterDto(problem.getId(), null, AnswerStatus.CORRECT, null, List.of(), null, null),
                     user.getId());
 
             assertThat(problemSolveService.getProblemSolve(solveId, user.getId()).practicedAt())
@@ -183,7 +184,7 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
         void marksProblemAsMasteredAfterThreeCorrectAnswers() {
             for (int i = 0; i < 3; i++) {
                 problemSolveService.createProblemSolve(
-                        new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT.plusDays(i), AnswerStatus.CORRECT, null, List.of(), null),
+                        new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT.plusDays(i), AnswerStatus.CORRECT, null, List.of(), null, null),
                         user.getId());
             }
 
@@ -341,7 +342,7 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
 
             problemSolveService.updateProblemSolve(
                     new ProblemSolveUpdateDto(solve.getId(), AnswerStatus.CORRECT, "이제 이해했다",
-                            List.of(ImprovementType.NO_REPEAT_MISTAKE), 45),
+                            List.of(ImprovementType.NO_REPEAT_MISTAKE), 45, null),
                     user.getId());
 
             ProblemSolveResponseDto updated = problemSolveService.getProblemSolve(solve.getId(), user.getId());
@@ -357,11 +358,11 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
             ProblemSolve solve = saveSolve(problem, user.getId(), PRACTICED_AT);
             problemSolveService.updateProblemSolve(
                     new ProblemSolveUpdateDto(solve.getId(), AnswerStatus.CORRECT, null,
-                            List.of(ImprovementType.FASTER_SOLVING), null),
+                            List.of(ImprovementType.FASTER_SOLVING), null, null),
                     user.getId());
 
             problemSolveService.updateProblemSolve(
-                    new ProblemSolveUpdateDto(solve.getId(), AnswerStatus.CORRECT, null, List.of(), null),
+                    new ProblemSolveUpdateDto(solve.getId(), AnswerStatus.CORRECT, null, List.of(), null, null),
                     user.getId());
 
             assertThat(problemSolveService.getProblemSolve(solve.getId(), user.getId()).improvements()).isEmpty();
@@ -374,7 +375,7 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
 
             assertErrorCase(ProblemSolveErrorCase.PROBLEM_SOLVE_USER_UNMATCHED,
                     () -> problemSolveService.updateProblemSolve(
-                            new ProblemSolveUpdateDto(othersSolve.getId(), AnswerStatus.CORRECT, "남의 기록 조작", List.of(), 1),
+                            new ProblemSolveUpdateDto(othersSolve.getId(), AnswerStatus.CORRECT, "남의 기록 조작", List.of(), 1, null),
                             user.getId()));
 
             assertThat(problemSolveService.getProblemSolve(othersSolve.getId(), other.getId()).answerStatus())
@@ -386,7 +387,7 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
         void rejectsUnknownSolve() {
             assertErrorCase(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND,
                     () -> problemSolveService.updateProblemSolve(
-                            new ProblemSolveUpdateDto(999_999L, AnswerStatus.CORRECT, null, List.of(), null),
+                            new ProblemSolveUpdateDto(999_999L, AnswerStatus.CORRECT, null, List.of(), null, null),
                             user.getId()));
         }
 
@@ -395,12 +396,12 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
         void rejectsNullInput() {
             assertErrorCase(ProblemSolveErrorCase.PROBLEM_SOLVE_INVALID_INPUT,
                     () -> problemSolveService.updateProblemSolve(
-                            new ProblemSolveUpdateDto(null, AnswerStatus.CORRECT, null, List.of(), null), user.getId()));
+                            new ProblemSolveUpdateDto(null, AnswerStatus.CORRECT, null, List.of(), null, null), user.getId()));
 
             ProblemSolve solve = saveSolve(problem, user.getId(), PRACTICED_AT);
             assertErrorCase(ProblemSolveErrorCase.PROBLEM_SOLVE_INVALID_INPUT,
                     () -> problemSolveService.updateProblemSolve(
-                            new ProblemSolveUpdateDto(solve.getId(), null, null, List.of(), null), user.getId()));
+                            new ProblemSolveUpdateDto(solve.getId(), null, null, List.of(), null, null), user.getId()));
             assertErrorCase(ProblemSolveErrorCase.PROBLEM_SOLVE_INVALID_INPUT,
                     () -> problemSolveService.updateProblemSolve(null, user.getId()));
         }
@@ -600,8 +601,100 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
                     () -> problemSolveService.deleteProblemSolve(mine.getId(), other.getId()));
             assertErrorCase(ProblemSolveErrorCase.PROBLEM_SOLVE_USER_UNMATCHED,
                     () -> problemSolveService.updateProblemSolve(
-                            new ProblemSolveUpdateDto(mine.getId(), AnswerStatus.CORRECT, null, List.of(), null),
+                            new ProblemSolveUpdateDto(mine.getId(), AnswerStatus.CORRECT, null, List.of(), null, null),
                             other.getId()));
+        }
+    }
+
+    @Nested
+    @DisplayName("복습 기분 이모지")
+    class MoodEmoji {
+
+        private static final String HAPPY = "excited_happy";
+        private static final String STRESSED = "stressed_bomb";
+
+        @Test
+        @DisplayName("등록할 때 고른 이모지가 저장되고 조회에도 그대로 나온다")
+        void savesMoodEmojiOnCreate() {
+            Long solveId = problemSolveService.createProblemSolve(
+                    new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT, AnswerStatus.WRONG, null, List.of(), 60, HAPPY),
+                    user.getId());
+
+            assertThat(problemSolveService.getProblemSolve(solveId, user.getId()).moodEmojiKey())
+                    .isEqualTo(HAPPY);
+        }
+
+        @Test
+        @DisplayName("이모지를 안 고르면 null 로 남는다")
+        void allowsNullMoodEmoji() {
+            Long solveId = problemSolveService.createProblemSolve(
+                    new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT, AnswerStatus.WRONG, null, List.of(), 60, null),
+                    user.getId());
+
+            assertThat(problemSolveService.getProblemSolve(solveId, user.getId()).moodEmojiKey()).isNull();
+        }
+
+        @Test
+        @DisplayName("화이트리스트에 없는 키는 400 으로 거절하고 기록도 남기지 않는다")
+        void rejectsUnknownEmojiKey() {
+            assertErrorCase(CustomEmojiErrorCase.INVALID_EMOJI_KEY,
+                    () -> problemSolveService.createProblemSolve(
+                            new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT, AnswerStatus.WRONG, null, List.of(), 60, "🙂"),
+                            user.getId()));
+
+            assertThat(problemSolveService.getProblemSolvesByProblemId(problem.getId(), user.getId()))
+                    .as("검증이 저장보다 앞서야 잘못된 값이 DB 에 닿지 않는다")
+                    .isEmpty();
+        }
+
+        @Test
+        @DisplayName("수정으로 이모지를 바꾸거나 지울 수 있다")
+        void updatesAndClearsMoodEmoji() {
+            Long solveId = problemSolveService.createProblemSolve(
+                    new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT, AnswerStatus.WRONG, null, List.of(), 60, STRESSED),
+                    user.getId());
+
+            problemSolveService.updateProblemSolve(
+                    new ProblemSolveUpdateDto(solveId, AnswerStatus.CORRECT, null, List.of(), 60, HAPPY), user.getId());
+            assertThat(problemSolveService.getProblemSolve(solveId, user.getId()).moodEmojiKey()).isEqualTo(HAPPY);
+
+            problemSolveService.updateProblemSolve(
+                    new ProblemSolveUpdateDto(solveId, AnswerStatus.CORRECT, null, List.of(), 60, null), user.getId());
+            assertThat(problemSolveService.getProblemSolve(solveId, user.getId()).moodEmojiKey()).isNull();
+        }
+
+        @Test
+        @DisplayName("수정할 때도 화이트리스트에 없는 키는 거절하고 원래 이모지를 지킨다")
+        void rejectsUnknownEmojiKeyOnUpdate() {
+            Long solveId = problemSolveService.createProblemSolve(
+                    new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT, AnswerStatus.WRONG, null, List.of(), 60, STRESSED),
+                    user.getId());
+
+            assertErrorCase(CustomEmojiErrorCase.INVALID_EMOJI_KEY,
+                    () -> problemSolveService.updateProblemSolve(
+                            new ProblemSolveUpdateDto(solveId, AnswerStatus.CORRECT, null, List.of(), 60, "not_an_emoji"),
+                            user.getId()));
+
+            assertThat(problemSolveService.getProblemSolve(solveId, user.getId()).moodEmojiKey()).isEqualTo(STRESSED);
+        }
+
+        @Test
+        @DisplayName("같은 문제라도 복습 회차마다 이모지가 따로 남는다")
+        void keepsMoodEmojiPerSolve() {
+            problemSolveService.createProblemSolve(
+                    new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT, AnswerStatus.WRONG, null, List.of(), 60, STRESSED),
+                    user.getId());
+            problemSolveService.createProblemSolve(
+                    new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT.plusDays(1), AnswerStatus.CORRECT, null, List.of(), 60, HAPPY),
+                    user.getId());
+            problemSolveService.createProblemSolve(
+                    new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT.plusDays(2), AnswerStatus.CORRECT, null, List.of(), 60, null),
+                    user.getId());
+
+            // 목록은 practicedAt 내림차순이다.
+            assertThat(problemSolveService.getProblemSolvesByProblemId(problem.getId(), user.getId()))
+                    .extracting(ProblemSolveResponseDto::moodEmojiKey)
+                    .containsExactly(null, HAPPY, STRESSED);
         }
     }
 }

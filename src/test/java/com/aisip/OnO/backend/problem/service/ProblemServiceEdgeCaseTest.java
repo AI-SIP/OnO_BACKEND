@@ -410,9 +410,9 @@ class ProblemServiceEdgeCaseTest extends ProblemTestSupport {
             LocalDateTime firstSolvedAt = LocalDateTime.now().minusDays(2).withNano(0);
             LocalDateTime lastSolvedAt = LocalDateTime.now().minusDays(1).withNano(0);
             problemSolveRepository.save(ProblemSolve.create(solved, owner.getId(), firstSolvedAt,
-                    AnswerStatus.CORRECT, null, null, 60));
+                    AnswerStatus.CORRECT, null, null, 60, null));
             problemSolveRepository.saveAndFlush(ProblemSolve.create(solved, owner.getId(), lastSolvedAt,
-                    AnswerStatus.WRONG, null, null, 90));
+                    AnswerStatus.WRONG, null, null, 90, null));
 
             List<ProblemResponseDto> problems = problemService.findUserProblems(owner.getId());
 
@@ -438,7 +438,7 @@ class ProblemServiceEdgeCaseTest extends ProblemTestSupport {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
             LocalDateTime solvedAt = LocalDateTime.now().minusHours(3).withNano(0);
             problemSolveRepository.saveAndFlush(ProblemSolve.create(problem, owner.getId(), solvedAt,
-                    AnswerStatus.CORRECT, null, null, 30));
+                    AnswerStatus.CORRECT, null, null, 30, null));
 
             ProblemResponseDto dto = problemService.findProblem(problem.getId(), owner.getId());
 

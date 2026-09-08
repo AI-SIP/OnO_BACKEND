@@ -232,7 +232,7 @@ public abstract class StudyRoomTestSupport extends IntegrationTestSupport {
     protected void savePracticesOnly(Long userId, Problem problem, LocalDateTime practicedAt, int count) {
         for (int i = 0; i < count; i++) {
             problemSolveRepository.save(ProblemSolve.create(
-                    problem, userId, practicedAt.plusSeconds(i), AnswerStatus.CORRECT, null, null, 60));
+                    problem, userId, practicedAt.plusSeconds(i), AnswerStatus.CORRECT, null, null, 60, null));
         }
         problemSolveRepository.flush();
     }

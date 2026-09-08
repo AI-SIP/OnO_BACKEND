@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.problemsolve.service;
 
+import com.aisip.OnO.backend.common.emoji.CustomEmojiValidator;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderService;
@@ -54,6 +55,7 @@ public class ProblemSolveService {
     private final StreakCacheService streakCacheService;
     private final ApplicationEventPublisher eventPublisher;
     private final ProblemReviewReminderService reminderService;
+    private final CustomEmojiValidator customEmojiValidator;
     @Qualifier("s3UploadExecutor")
     private final Executor s3UploadExecutor;
 
@@ -118,6 +120,9 @@ public class ProblemSolveService {
             throw new ApplicationException(ProblemErrorCase.PROBLEM_USER_UNMATCHED);
         }
 
+        // 이모지는 선택 사항이라 null 은 허용하고, 값이 있으면 화이트리스트에 있는 키인지만 본다.
+        customEmojiValidator.validateNullable(dto.moodEmojiKey());
+
         // improvements를 JSON 문자열로 변환
         String improvementsJson = null;
         if (dto.improvements() != null && !dto.improvements().isEmpty()) {
@@ -141,7 +146,8 @@ public class ProblemSolveService {
                 dto.answerStatus(),
                 dto.reflection(),
                 improvementsJson,
-                dto.timeSpentSeconds()
+                dto.timeSpentSeconds(),
+                dto.moodEmojiKey()
         );
 
         problemSolveRepository.save(problemSolve);
@@ -238,6 +244,8 @@ public class ProblemSolveService {
             throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_USER_UNMATCHED);
         }
 
+        customEmojiValidator.validateNullable(dto.moodEmojiKey());
+
         // improvements를 JSON 문자열로 변환
         String improvementsJson = null;
         if (dto.improvements() != null && !dto.improvements().isEmpty()) {
@@ -253,7 +261,8 @@ public class ProblemSolveService {
                 dto.answerStatus(),
                 dto.reflection(),
                 improvementsJson,
-                dto.timeSpentSeconds()
+                dto.timeSpentSeconds(),
+                dto.moodEmojiKey()
         );
 
         log.info("userId: {} updated problem solve: {}", userId, problemSolve.getId());
