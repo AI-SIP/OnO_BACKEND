@@ -2,13 +2,16 @@ package com.aisip.OnO.backend.problemsolve.service;
 
 import com.aisip.OnO.backend.common.emoji.CustomEmojiValidator;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.mission.entity.MissionMetric;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
+import com.aisip.OnO.backend.mission.service.MissionProgressUpdater;
 import com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderService;
 import com.aisip.OnO.backend.util.redis.StreakCacheService;
 import com.aisip.OnO.backend.problem.service.ReviewIntervalCalculator;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveRegisterDto;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveResponseDto;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveUpdateDto;
+import com.aisip.OnO.backend.problemsolve.entity.AnswerStatus;
 import com.aisip.OnO.backend.problemsolve.entity.ProblemSolve;
 import com.aisip.OnO.backend.problemsolve.entity.ProblemSolveImageData;
 import com.aisip.OnO.backend.problemsolve.exception.ProblemSolveErrorCase;
@@ -49,6 +52,7 @@ public class ProblemSolveService {
     private final ProblemSolveImageDataRepository problemSolveImageDataRepository;
     private final ProblemRepository problemRepository;
     private final MissionLogService missionLogService;
+    private final MissionProgressUpdater missionProgressUpdater;
     private final FileUploadService fileUploadService;
     private final S3DeleteProducer s3DeleteProducer;
     private final ObjectMapper objectMapper;
@@ -153,6 +157,10 @@ public class ProblemSolveService {
         problemSolveRepository.save(problemSolve);
         streakCacheService.evict(userId);
         missionLogService.registerProblemPracticeMission(userId, problem.getId());
+        missionProgressUpdater.increase(userId, MissionMetric.SOLVE_RECORDED);
+        if (dto.answerStatus() == AnswerStatus.CORRECT) {
+            missionProgressUpdater.increase(userId, MissionMetric.SOLVE_CORRECT);
+        }
 
         ReviewIntervalCalculator.ReviewSchedule schedule = ReviewIntervalCalculator.calculate(
                 dto.answerStatus(),

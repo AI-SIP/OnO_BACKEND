@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.admin.dto.AdminPracticeLogResponseDto;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.mission.dto.MissionRegisterDto;
 import com.aisip.OnO.backend.mission.entity.MissionLog;
+import com.aisip.OnO.backend.mission.entity.MissionMetric;
 import com.aisip.OnO.backend.mission.entity.MissionType;
 import com.aisip.OnO.backend.mission.exception.MissionErrorCase;
 import com.aisip.OnO.backend.mission.repository.MissionLogRepository;
@@ -40,6 +41,8 @@ public class MissionLogService {
     private final UserRepository userRepository;
 
     private final PracticeNoteRepository practiceNoteRepository;
+
+    private final MissionProgressUpdater missionProgressUpdater;
 
     private static final Long DAILY_MISSION_POINT_LIMIT = 200L;
 
@@ -110,6 +113,10 @@ public class MissionLogService {
             missionLogRepository.save(missionLog);
 
             addPointToUser(user, missionLog);
+
+            // 출석 미션 진행도. 기존 적립 규칙은 그대로 두고, "오늘 첫 로그인" 판정만 그대로 빌려 쓴다.
+            // 이 분기 밖에서 올리면 앱을 열 때마다 주간 출석 미션이 하루에 5까지 차 버린다.
+            missionProgressUpdater.increase(userId, MissionMetric.LOGIN_DAY);
         }
     }
 

@@ -9,6 +9,8 @@ import com.aisip.OnO.backend.learningcalendar.entity.LearningCalendarMood;
 import com.aisip.OnO.backend.learningcalendar.exception.LearningCalendarErrorCase;
 import com.aisip.OnO.backend.learningcalendar.repository.LearningCalendarMoodRepository;
 import com.aisip.OnO.backend.learningcalendar.repository.LearningCalendarQueryRepository;
+import com.aisip.OnO.backend.mission.entity.MissionMetric;
+import com.aisip.OnO.backend.mission.service.MissionProgressUpdater;
 import com.aisip.OnO.backend.util.redis.StreakCacheService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
@@ -45,6 +48,7 @@ public class LearningCalendarService {
     private final StreakCacheService streakCacheService;
     private final LearningCalendarMoodRepository moodRepository;
     private final CustomEmojiValidator customEmojiValidator;
+    private final MissionProgressUpdater missionProgressUpdater;
 
     public LearningCalendarResponseDto getLearningCalendar(Long userId, int year, int month) {
         // 서비스 대상이 국내 사용자이고 problem/studyroom 등 다른 도메인도 KST 기준으로 하루를 가른다.
@@ -107,9 +111,17 @@ public class LearningCalendarService {
         if (!calendarRepository.existsStudyRecord(userId, request.date())) {
             throw new ApplicationException(LearningCalendarErrorCase.CALENDAR_RECORD_NOT_FOUND);
         }
-        LearningCalendarMood mood = moodRepository.findByUserIdAndStudyDate(userId, request.date())
+        Optional<LearningCalendarMood> existingMood = moodRepository.findByUserIdAndStudyDate(userId, request.date());
+        LearningCalendarMood mood = existingMood
                 .orElseGet(() -> moodRepository.save(LearningCalendarMood.create(userId, request.date(), request.emojiKey())));
         mood.updateEmojiKey(request.emojiKey());
+
+        // 기분 미션은 "그 날짜에 처음 기분을 남겼을 때"만 오른다. 이모지를 바꿀 때마다 오르면
+        // 버튼 한 번으로 주간 미션까지 채울 수 있다.
+        if (existingMood.isEmpty()) {
+            missionProgressUpdater.increase(userId, MissionMetric.MOOD_LOGGED);
+        }
+
         return new LearningCalendarMoodResponseDto(mood.getStudyDate(), mood.getEmojiKey());
     }
 

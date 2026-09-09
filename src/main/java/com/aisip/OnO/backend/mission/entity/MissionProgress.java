@@ -1,0 +1,77 @@
+package com.aisip.OnO.backend.mission.entity;
+
+import com.aisip.OnO.backend.common.entity.BaseEntity;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+/**
+ * 사용자별 미션 진행도. (userId, missionId, periodKey) 하나당 한 행이다.
+ *
+ * <p>진행도 증가는 이 엔티티를 통하지 않는다. 읽고 나서 쓰면 같은 사용자의 요청이 겹칠 때
+ * 증가분이 사라지므로, {@code MissionProgressRepository} 의 upsert 한 문장으로만 올린다.
+ * 이 클래스는 조회와 받기 판정에서만 쓴다.
+ *
+ * <p>user 와 mission_definition 에 연관관계를 걸지 않고 식별자만 들고 있다. 외래키를 걸면
+ * INSERT 마다 부모 행에 공유 잠금이 붙어, 이미 사용자 행을 배타 잠금으로 잡고 있는
+ * 기존 미션 적립 경로와 잠금 순서가 엇갈릴 수 있다.
+ */
+@Entity
+@Getter
+@AllArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(name = "mission_progress",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_mission_progress",
+                columnNames = {"user_id", "mission_id", "period_key"}),
+        indexes = @Index(name = "idx_mission_progress_lookup", columnList = "user_id, period_key"))
+public class MissionProgress extends BaseEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
+
+    @Column(name = "mission_id", nullable = false)
+    private Long missionId;
+
+    @Column(name = "period_key", nullable = false, length = 20)
+    private String periodKey;
+
+    @Column(name = "current_value", nullable = false)
+    private int currentValue;
+
+    @Column(name = "target_snapshot", nullable = false)
+    private int targetSnapshot;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
+    @Column(name = "claimed_at")
+    private LocalDateTime claimedAt;
+
+    public boolean isOwnedBy(Long userId) {
+        return this.userId != null && this.userId.equals(userId);
+    }
+
+    public boolean isCompleted() {
+        return completedAt != null;
+    }
+
+    public boolean isClaimed() {
+        return claimedAt != null;
+    }
+}

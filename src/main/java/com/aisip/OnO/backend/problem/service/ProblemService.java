@@ -6,7 +6,9 @@ import com.aisip.OnO.backend.common.ratelimit.RateLimitService;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import com.aisip.OnO.backend.config.rabbitmq.producer.ProblemAnalysisProducer;
+import com.aisip.OnO.backend.mission.entity.MissionMetric;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
+import com.aisip.OnO.backend.mission.service.MissionProgressUpdater;
 import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.ProblemAnalysis;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
@@ -83,6 +85,8 @@ public class ProblemService {
     private final FileUploadService fileUploadService;
 
     private final MissionLogService missionLogService;
+
+    private final MissionProgressUpdater missionProgressUpdater;
 
     private final ProblemAnalysisService analysisService;
 
@@ -232,6 +236,7 @@ public class ProblemService {
         analysisService.createSkippedAnalysis(problem.getId());
         streakCacheService.evict(userId);
         missionLogService.registerProblemWriteMission(userId);
+        missionProgressUpdater.increase(userId, MissionMetric.PROBLEM_CREATED);
         eventPublisher.publishEvent(new StudyRoomActivityEvent(
                 userId, StudyRoomFeedEventType.PROBLEM_REGISTERED, Map.of("count", 1)));
         eventPublisher.publishEvent(new ProblemCreatedEvent(userId, List.of(
@@ -295,6 +300,7 @@ public class ProblemService {
         analysisService.createSkippedAnalysis(problem.getId());
         streakCacheService.evict(userId);
         missionLogService.registerProblemWriteMission(userId);
+        missionProgressUpdater.increase(userId, MissionMetric.PROBLEM_CREATED);
         eventPublisher.publishEvent(new StudyRoomActivityEvent(
                 userId, StudyRoomFeedEventType.PROBLEM_REGISTERED, Map.of("count", 1)));
         eventPublisher.publishEvent(new ProblemCreatedEvent(userId, List.of(
@@ -363,6 +369,8 @@ public class ProblemService {
 
         streakCacheService.evict(userId);
         missionLogService.registerProblemWriteMissionBatch(userId, problems.size());
+        // 여러 장을 한 번에 등록하면 장수만큼 오른다. 기존 적립은 하루 3건에서 멈추지만 미션 진행도는 별개다.
+        missionProgressUpdater.increase(userId, MissionMetric.PROBLEM_CREATED, problems.size());
         eventPublisher.publishEvent(new StudyRoomActivityEvent(
                 userId, StudyRoomFeedEventType.PROBLEM_REGISTERED, Map.of("count", problems.size())));
 

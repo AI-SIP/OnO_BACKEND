@@ -4,7 +4,9 @@ import com.aisip.OnO.backend.admin.dto.AdminPracticeNoteResponseDto;
 import com.aisip.OnO.backend.common.emoji.CustomEmojiValidator;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
+import com.aisip.OnO.backend.mission.entity.MissionMetric;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
+import com.aisip.OnO.backend.mission.service.MissionProgressUpdater;
 import com.aisip.OnO.backend.practicenote.dto.*;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNotification;
@@ -55,6 +57,8 @@ public class PracticeNoteService {
     private final PracticeNotificationScheduler practiceNotificationScheduler;
 
     private final MissionLogService missionLogService;
+
+    private final MissionProgressUpdater missionProgressUpdater;
 
     private final UserRepository userRepository;
 
@@ -151,6 +155,7 @@ public class PracticeNoteService {
 
         // 복습노트 사용 미션 등록
         missionLogService.registerNotePracticeMission(userId, practiceId);
+        missionProgressUpdater.increase(userId, MissionMetric.PRACTICE_NOTE_COMPLETED);
 
         log.info("practiceId: {} count has updated", practiceId);
     }
