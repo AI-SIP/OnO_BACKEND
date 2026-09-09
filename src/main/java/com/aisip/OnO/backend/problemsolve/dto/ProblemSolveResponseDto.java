@@ -3,7 +3,6 @@ package com.aisip.OnO.backend.problemsolve.dto;
 import com.aisip.OnO.backend.problemsolve.entity.AnswerStatus;
 import com.aisip.OnO.backend.problemsolve.entity.ImprovementType;
 import com.aisip.OnO.backend.problemsolve.entity.ProblemSolve;
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Builder;
@@ -18,7 +17,6 @@ public record ProblemSolveResponseDto(
         Long problemSolveId,
         Long problemId,
         Long userId,
-        @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
         LocalDateTime practicedAt,
         AnswerStatus answerStatus,
         String reflection,
@@ -27,9 +25,7 @@ public record ProblemSolveResponseDto(
         String moodEmojiKey,
         Boolean migratedFromLegacy,
         List<String> imageUrls,
-        @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
         LocalDateTime createdAt,
-        @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
         LocalDateTime updatedAt
 ) {
     private static final ObjectMapper objectMapper = new ObjectMapper();

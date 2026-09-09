@@ -160,7 +160,9 @@ class ProblemSolveControllerTest extends ProblemSolveTestSupport {
                     .andExpect(jsonPath("$.data.problemSolveId").value(solve.getId()))
                     .andExpect(jsonPath("$.data.problemId").value(problem.getId()))
                     .andExpect(jsonPath("$.data.answerStatus").value("PARTIAL"))
-                    .andExpect(jsonPath("$.data.practicedAt").value("2026-01-10 09:30:00"));
+                    // 요청으로 받은 형식 그대로 ISO-8601 로 내려간다.
+                    // 이 도메인만 "yyyy-MM-dd HH:mm:ss" 로 나가서 요청과 응답 형식이 어긋나 있었다.
+                    .andExpect(jsonPath("$.data.practicedAt").value("2026-01-10T09:30:00"));
         }
 
         @Test
@@ -217,7 +219,7 @@ class ProblemSolveControllerTest extends ProblemSolveTestSupport {
                             .with(asUser(user.getId())))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.length()").value(2))
-                    .andExpect(jsonPath("$.data[0].practicedAt").value("2026-01-11 09:30:00"));
+                    .andExpect(jsonPath("$.data[0].practicedAt").value("2026-01-11T09:30:00"));
         }
 
         @Test
