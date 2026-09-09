@@ -4,9 +4,7 @@ import com.aisip.OnO.backend.admin.dto.AdminPracticeNoteResponseDto;
 import com.aisip.OnO.backend.common.emoji.CustomEmojiValidator;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
-import com.aisip.OnO.backend.mission.entity.MissionMetric;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
-import com.aisip.OnO.backend.mission.service.MissionProgressUpdater;
 import com.aisip.OnO.backend.practicenote.dto.*;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNotification;
@@ -57,8 +55,6 @@ public class PracticeNoteService {
     private final PracticeNotificationScheduler practiceNotificationScheduler;
 
     private final MissionLogService missionLogService;
-
-    private final MissionProgressUpdater missionProgressUpdater;
 
     private final UserRepository userRepository;
 
@@ -153,9 +149,9 @@ public class PracticeNoteService {
         customEmojiValidator.validateNullable(moodEmojiKey);
         practiceNote.updatePracticeNoteCount(moodEmojiKey);
 
-        // 복습노트 사용 미션 등록
+        // 복습노트 사용 미션 등록. 세트 완료 미션 진행도도 이 안에서 함께 오른다.
+        // 여기서 따로 올리면 같은 세트를 반복 완료하는 것만으로 주간 세트 미션이 채워진다.
         missionLogService.registerNotePracticeMission(userId, practiceId);
-        missionProgressUpdater.increase(userId, MissionMetric.PRACTICE_NOTE_COMPLETED);
 
         log.info("practiceId: {} count has updated", practiceId);
     }

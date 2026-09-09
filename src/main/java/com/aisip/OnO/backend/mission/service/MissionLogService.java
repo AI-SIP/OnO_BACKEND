@@ -191,6 +191,10 @@ public class MissionLogService {
             missionLogRepository.save(missionLog);
 
             addPointToUser(user, missionLog);
+
+            // 세트 완료 미션 진행도. 출석과 같은 이유로 기존 중복 방지 가드 안에 둔다.
+            // 밖에서 올리면 같은 세트에 완료 요청을 세 번 보내는 것만으로 주간 세트 미션이 채워진다.
+            missionProgressUpdater.increase(userId, MissionMetric.PRACTICE_NOTE_COMPLETED);
         }
     }
 
