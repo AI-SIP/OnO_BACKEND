@@ -22,7 +22,7 @@ import java.util.Locale;
  * 저절로 실행되지 않는데, 미션 조회·진행도는 정의가 없으면 아무것도 하지 않으므로
  * 시드가 없으면 이 도메인 테스트는 전부 무의미해진다.
  *
- * <p>시드 내용을 테스트에 다시 적지 않고 <b>마이그레이션 파일의 INSERT 문을 그대로 읽어</b> 실행한다.
+ * <p>시드 내용을 테스트에 다시 적지 않고 <b>시드 마이그레이션(V30)의 INSERT 문을 그대로 읽어</b> 실행한다.
  * 같은 값을 두 곳에 적으면 한쪽만 고쳐질 때 테스트가 프로덕션 시드와 다른 것을 검증하게 된다.
  *
  * <p>{@code DatabaseCleaner} 가 테스트마다 모든 테이블을 비우므로 매 테스트 시작 시 다시 넣어야 한다.
@@ -30,7 +30,7 @@ import java.util.Locale;
 @Component
 public class MissionDefinitionSeeder {
 
-    private static final String MIGRATION_PATH = "db/migration/V29__create_mission_system.sql";
+    private static final String MIGRATION_PATH = "db/migration/V30__seed_mission_definitions.sql";
 
     @PersistenceContext
     private EntityManager entityManager;
