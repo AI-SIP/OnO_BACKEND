@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.mission.service;
 import com.aisip.OnO.backend.mission.entity.MissionCategory;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.IsoFields;
 
@@ -25,6 +26,16 @@ public final class MissionPeriodKey {
 
     public static LocalDate today() {
         return LocalDate.now(KST);
+    }
+
+    /**
+     * 지금 시각(KST).
+     *
+     * <p>인자 없는 {@code LocalDateTime.now()} 는 JVM 기본 시간대를 쓴다. 서비스 기준은 KST 이고,
+     * 배포 환경의 시간대에 따라 기준이 흔들리면 안 된다.
+     */
+    public static LocalDateTime now() {
+        return LocalDateTime.now(KST);
     }
 
     public static String of(MissionCategory category, LocalDate date) {

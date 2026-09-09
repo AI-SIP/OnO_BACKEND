@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -15,6 +16,28 @@ public interface MissionProgressRepository extends JpaRepository<MissionProgress
     List<MissionProgress> findAllByUserIdAndPeriodKeyIn(Long userId, Collection<String> periodKeys);
 
     Optional<MissionProgress> findByUserIdAndMissionIdAndPeriodKey(Long userId, Long missionId, String periodKey);
+
+    /**
+     * 지난 기간에 완료했지만 아직 받지 않은 진행도.
+     *
+     * <p>기간 키로만 조회하면 일요일 밤에 주간 미션을 끝내고 받지 않은 사용자는 월요일부터
+     * 그 보상을 받을 방법이 없어진다. 복습 30회를 채운 사용자가 보상을 못 받는 것은 그대로 CS 다.
+     *
+     * <p>{@code completedAfter} 로 상한을 둔다. 상한이 없으면 몇 년치 미수령이 매 조회마다 딸려 온다.
+     */
+    @Query("""
+            SELECT p FROM MissionProgress p
+            WHERE p.userId = :userId
+              AND p.completedAt IS NOT NULL
+              AND p.claimedAt IS NULL
+              AND p.completedAt >= :completedAfter
+              AND p.periodKey NOT IN :currentPeriodKeys
+            """)
+    List<MissionProgress> findUnclaimedFromPastPeriods(
+            @Param("userId") Long userId,
+            @Param("currentPeriodKeys") Collection<String> currentPeriodKeys,
+            @Param("completedAfter") LocalDateTime completedAfter
+    );
 
     /**
      * 진행도를 한 문장으로 만들거나 올린다.

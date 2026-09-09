@@ -17,9 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 미션 조회와 보상 받기.
@@ -29,6 +31,14 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class MissionService {
+
+    /**
+     * 지난 기간 미수령 보상을 얼마나 거슬러 보여줄지.
+     *
+     * <p>상한이 없으면 오래 쓴 사용자일수록 매 조회에 몇 년치 미수령이 딸려 온다.
+     * 한 달이면 "지난 주에 받는 걸 깜빡했다"는 실제 상황은 모두 덮는다.
+     */
+    private static final int EXPIRED_LOOKBACK_DAYS = 30;
 
     private final MissionDefinitionRepository missionDefinitionRepository;
     private final MissionProgressRepository missionProgressRepository;
@@ -58,7 +68,7 @@ public class MissionService {
             boolean isWeekly = definition.getCategory() == MissionCategory.WEEKLY;
             String periodKey = isWeekly ? weeklyKey : dailyKey;
             MissionResponseDto dto = MissionResponseDto.from(
-                    definition, progressByKey.get(cacheKey(definition.getId(), periodKey)));
+                    definition, progressByKey.get(cacheKey(definition.getId(), periodKey)), periodKey);
             if (isWeekly) {
                 weekly.add(dto);
             } else {
@@ -68,8 +78,42 @@ public class MissionService {
 
         return new MissionListResponseDto(
                 new MissionListResponseDto.MissionSectionDto(dailyKey, List.copyOf(daily)),
-                new MissionListResponseDto.MissionSectionDto(weeklyKey, List.copyOf(weekly))
+                new MissionListResponseDto.MissionSectionDto(weeklyKey, List.copyOf(weekly)),
+                // 여러 기간이 섞이므로 묶음 단위의 기간 키가 없다. 기간은 항목마다 실려 간다.
+                new MissionListResponseDto.MissionSectionDto(null, expiredMissions(userId, dailyKey, weeklyKey))
         );
+    }
+
+    /**
+     * 지난 기간에 완료했지만 받지 않은 보상.
+     *
+     * <p>정의가 그 사이 비활성화됐어도 이미 완료한 보상은 받을 수 있어야 하므로 active 조건을 걸지 않는다.
+     * 정의 자체가 사라진 경우에만 건너뛴다.
+     */
+    private List<MissionResponseDto> expiredMissions(Long userId, String dailyKey, String weeklyKey) {
+        List<MissionProgress> expired = missionProgressRepository.findUnclaimedFromPastPeriods(
+                userId,
+                List.of(dailyKey, weeklyKey),
+                MissionPeriodKey.now().minusDays(EXPIRED_LOOKBACK_DAYS)
+        );
+        if (expired.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, MissionDefinition> definitionsById = missionDefinitionRepository
+                .findAllById(expired.stream().map(MissionProgress::getMissionId).distinct().toList())
+                .stream()
+                .collect(Collectors.toMap(MissionDefinition::getId, definition -> definition));
+
+        return expired.stream()
+                .filter(progress -> definitionsById.containsKey(progress.getMissionId()))
+                // 최근에 놓친 것을 먼저 보여주고, 같은 기간 안에서는 목록과 같은 순서를 쓴다.
+                .sorted(Comparator
+                        .comparing(MissionProgress::getPeriodKey, Comparator.reverseOrder())
+                        .thenComparing(progress -> definitionsById.get(progress.getMissionId()).getSortOrder()))
+                .map(progress -> MissionResponseDto.from(
+                        definitionsById.get(progress.getMissionId()), progress, progress.getPeriodKey()))
+                .toList();
     }
 
     /**
