@@ -159,13 +159,41 @@ class MissionProgressHookTest extends MissionSystemTestSupport {
         @Test
         @DisplayName("복습 세트를 끝내면 세트 미션이 오른다")
         void countsCompletion() {
-            PracticeNote practiceNote = practiceNoteRepository.save(PracticeNote.from(
-                    new PracticeNoteRegisterDto(null, "복습 세트", List.of(), null), user.getId()));
+            PracticeNote practiceNote = savePracticeNote();
 
             practiceNoteService.addPracticeNoteCount(user.getId(), practiceNote.getId());
 
             assertThat(currentOf(user.getId(), DAILY_PRACTICE_SET)).isEqualTo(1);
             assertThat(currentOf(user.getId(), WEEKLY_SET_3)).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("같은 세트를 세 번 끝내도 한 번만 오른다")
+        void doesNotCountRepeatedCompletionOfSameNote() {
+            PracticeNote practiceNote = savePracticeNote();
+
+            practiceNoteService.addPracticeNoteCount(user.getId(), practiceNote.getId());
+            practiceNoteService.addPracticeNoteCount(user.getId(), practiceNote.getId());
+            practiceNoteService.addPracticeNoteCount(user.getId(), practiceNote.getId());
+
+            assertThat(currentOf(user.getId(), WEEKLY_SET_3))
+                    .as("같은 세트를 반복 완료하는 것만으로 주간 세트 미션 80 XP 가 채워지면 안 된다")
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("서로 다른 세트를 끝내면 각각 오른다")
+        void countsEachDistinctNote() {
+            practiceNoteService.addPracticeNoteCount(user.getId(), savePracticeNote().getId());
+            practiceNoteService.addPracticeNoteCount(user.getId(), savePracticeNote().getId());
+            practiceNoteService.addPracticeNoteCount(user.getId(), savePracticeNote().getId());
+
+            assertThat(currentOf(user.getId(), WEEKLY_SET_3)).isEqualTo(3);
+        }
+
+        private PracticeNote savePracticeNote() {
+            return practiceNoteRepository.save(PracticeNote.from(
+                    new PracticeNoteRegisterDto(null, "복습 세트", List.of(), null), user.getId()));
         }
     }
 
@@ -174,9 +202,10 @@ class MissionProgressHookTest extends MissionSystemTestSupport {
     class MoodLogged {
 
         @Test
-        @DisplayName("기분을 처음 남기면 기분 미션이 오른다")
+        @DisplayName("오늘 기분을 처음 남기면 기분 미션이 오른다")
         void countsFirstMood() {
-            LocalDate today = studyDay();
+            LocalDate today = MissionPeriodKey.today();
+            makeStudyDay(today);
 
             learningCalendarService.updateMood(
                     user.getId(), new LearningCalendarMoodRequestDto(today, "cool_sunglasses"));
@@ -187,7 +216,8 @@ class MissionProgressHookTest extends MissionSystemTestSupport {
         @Test
         @DisplayName("같은 날 기분을 바꿔도 두 번 오르지 않는다")
         void doesNotCountMoodChange() {
-            LocalDate today = studyDay();
+            LocalDate today = MissionPeriodKey.today();
+            makeStudyDay(today);
             learningCalendarService.updateMood(
                     user.getId(), new LearningCalendarMoodRequestDto(today, "cool_sunglasses"));
 
@@ -199,14 +229,36 @@ class MissionProgressHookTest extends MissionSystemTestSupport {
                     .isEqualTo(1);
         }
 
-        /** 기분은 학습 기록이 있는 날에만 남길 수 있다. 오늘 작성한 오답노트로 그 조건을 만든다. */
-        private LocalDate studyDay() {
+        @Test
+        @DisplayName("과거 날짜에 기분을 남기면 오늘 미션은 오르지 않는다")
+        void doesNotCountPastDates() {
+            LocalDate today = MissionPeriodKey.today();
+            for (int daysAgo = 1; daysAgo <= 3; daysAgo++) {
+                LocalDate pastDate = today.minusDays(daysAgo);
+                makeStudyDay(pastDate);
+                learningCalendarService.updateMood(
+                        user.getId(), new LearningCalendarMoodRequestDto(pastDate, "cool_sunglasses"));
+            }
+
+            assertThat(currentOf(user.getId(), DAILY_MOOD))
+                    .as("중복 판정은 요청 날짜 기준인데 진행도가 오늘 키로 들어가면 지난 날짜 수만큼 오늘이 오른다")
+                    .isZero();
+        }
+
+        /**
+         * 기분은 학습 기록이 있는 날에만 남길 수 있다. 그 날짜에 작성한 오답노트로 조건을 만든다.
+         *
+         * <p>{@code created_at} 은 JPA Auditing 이 JVM 시간대로 채우는데 미션의 오늘은 KST 라,
+         * 두 시간대가 다른 환경에서는 하루가 어긋난다. 원하는 날짜를 직접 박아 그 흔들림을 없앤다.
+         */
+        private void makeStudyDay(LocalDate date) {
             Problem problem = Problem.from(
                     new ProblemRegisterDto(null, "메모", "출처", folder.getId(), LocalDateTime.now()),
                     user.getId());
             problem.updateFolder(folder);
             problemRepository.saveAndFlush(problem);
-            return problemRepository.findById(problem.getId()).orElseThrow().getCreatedAt().toLocalDate();
+            jdbcTemplate.update("UPDATE problem SET created_at = ? WHERE id = ?",
+                    date.atTime(12, 0), problem.getId());
         }
     }
 

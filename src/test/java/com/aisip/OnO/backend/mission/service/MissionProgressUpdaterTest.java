@@ -144,14 +144,42 @@ class MissionProgressUpdaterTest extends MissionSystemTestSupport {
         @Test
         @DisplayName("행동이 롤백되면 진행도도 남지 않는다")
         void rollsBackWithTheAction() {
-            // 진행도를 별도 트랜잭션(REQUIRES_NEW)이나 이벤트 리스너로 떼어내면 이 단언이 깨진다.
-            // 하지도 않은 행동으로 보상을 받게 되므로 호출자의 트랜잭션 안에서 돌아야 한다.
+            // 커밋 후에 올리므로 롤백된 행동에는 이벤트 자체가 발행되지 않는다.
+            // 하지도 않은 행동으로 보상을 받는 일이 없어야 한다.
             assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status -> {
                 missionProgressUpdater.increase(user.getId(), MissionMetric.PROBLEM_CREATED);
                 throw new IllegalStateException("행동이 실패했다");
             })).isInstanceOf(IllegalStateException.class);
 
             assertThat(missionProgressRepository.findAll()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("진행도는 본 작업이 커밋된 뒤에 반영된다")
+        void appliesAfterCommit() {
+            transactionTemplate.executeWithoutResult(status -> {
+                missionProgressUpdater.increase(user.getId(), MissionMetric.PROBLEM_CREATED);
+
+                Integer rows = jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM mission_progress WHERE user_id = ?", Integer.class, user.getId());
+                assertThat(rows)
+                        .as("본 작업과 같은 트랜잭션에서 올리면 진행도 실패가 본 작업까지 되돌린다. "
+                                + "커밋 전에는 아직 아무것도 쓰지 않아야 한다")
+                        .isZero();
+            });
+
+            assertThat(currentOf(user.getId(), DAILY_NOTE_WRITE))
+                    .as("커밋된 뒤에는 반영돼야 한다")
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("트랜잭션 없이 불려도 진행도는 반영된다")
+        void appliesWithoutOuterTransaction() {
+            // 운영 경로는 모두 트랜잭션 안이지만, 없을 때 조용히 사라지면 원인을 찾기 어렵다.
+            missionProgressUpdater.increase(user.getId(), MissionMetric.PROBLEM_CREATED);
+
+            assertThat(currentOf(user.getId(), DAILY_NOTE_WRITE)).isEqualTo(1);
         }
     }
 

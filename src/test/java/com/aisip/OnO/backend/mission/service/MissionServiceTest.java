@@ -18,6 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -77,6 +78,31 @@ class MissionServiceTest extends MissionSystemTestSupport {
         }
 
         @Test
+        @DisplayName("미션마다 자기 기간 키가 실린다")
+        void carriesPeriodKeyOnEveryMission() {
+            MissionListResponseDto response = missionService.getMissions(user.getId());
+
+            assertThat(response.daily().missions())
+                    .extracting(MissionResponseDto::periodKey)
+                    .containsOnly(MissionPeriodKey.daily(MissionPeriodKey.today()));
+            assertThat(response.weekly().missions())
+                    .extracting(MissionResponseDto::periodKey)
+                    .containsOnly(MissionPeriodKey.weekly(MissionPeriodKey.today()));
+        }
+
+        @Test
+        @DisplayName("진행도 행이 없는 미션에도 현재 기간 키가 실린다")
+        void carriesCurrentPeriodKeyWhenProgressIsMissing() {
+            MissionListResponseDto response = missionService.getMissions(user.getId());
+
+            MissionResponseDto untouched = findByCode(response.weekly().missions(), WEEKLY_NOTE_10);
+            assertThat(untouched.progressId()).isNull();
+            assertThat(untouched.periodKey())
+                    .as("진행도가 없어도 어느 기간의 미션인지는 알 수 있어야 한다")
+                    .isEqualTo(MissionPeriodKey.weekly(MissionPeriodKey.today()));
+        }
+
+        @Test
         @DisplayName("아직 손대지 않은 미션도 0 으로 내려간다")
         void showsUntouchedMissionsAsZero() {
             MissionListResponseDto response = missionService.getMissions(user.getId());
@@ -129,6 +155,103 @@ class MissionServiceTest extends MissionSystemTestSupport {
                     .filter(mission -> mission.code().equals(code))
                     .findFirst()
                     .orElseThrow(() -> new IllegalStateException("목록에 없다: " + code));
+        }
+    }
+
+    @Nested
+    @DisplayName("지난 기간 미수령 보상")
+    class ExpiredMissions {
+
+        @Test
+        @DisplayName("지난 주에 완료하고 안 받은 보상이 expired 로 내려온다")
+        void showsUnclaimedFromPastPeriod() {
+            Long progressId = insertCompletedProgress(
+                    user.getId(), WEEKLY_REVIEW_30, lastWeekKey(), LocalDateTime.now().minusDays(1));
+
+            MissionListResponseDto response = missionService.getMissions(user.getId());
+
+            assertThat(response.expired().missions())
+                    .as("복습 30회를 채우고 못 받은 보상이 사라지면 그대로 CS 다")
+                    .hasSize(1);
+            MissionResponseDto expired = response.expired().missions().get(0);
+            assertThat(expired.code()).isEqualTo(WEEKLY_REVIEW_30);
+            assertThat(expired.progressId()).isEqualTo(progressId);
+            assertThat(expired.completed()).isTrue();
+            assertThat(expired.claimed()).isFalse();
+            assertThat(expired.periodKey())
+                    .as("기간 키는 그 진행도의 원래 키를 그대로 준다")
+                    .isEqualTo(lastWeekKey());
+        }
+
+        @Test
+        @DisplayName("expired 묶음에는 여러 기간이 섞이므로 묶음 기간 키가 없다")
+        void expiredSectionHasNoSinglePeriodKey() {
+            insertCompletedProgress(user.getId(), WEEKLY_REVIEW_30, lastWeekKey(), LocalDateTime.now().minusDays(1));
+            insertCompletedProgress(user.getId(), DAILY_REVIEW_3, yesterdayKey(), LocalDateTime.now().minusDays(1));
+
+            MissionListResponseDto response = missionService.getMissions(user.getId());
+
+            assertThat(response.expired().periodKey()).isNull();
+            assertThat(response.expired().missions())
+                    .extracting(MissionResponseDto::periodKey)
+                    .containsExactlyInAnyOrder(lastWeekKey(), yesterdayKey());
+        }
+
+        @Test
+        @DisplayName("기간이 지나도 받을 수 있다")
+        void canBeClaimed() {
+            Long progressId = insertCompletedProgress(
+                    user.getId(), WEEKLY_REVIEW_30, lastWeekKey(), LocalDateTime.now().minusDays(1));
+
+            MissionClaimResponseDto response = missionService.claim(user.getId(), progressId);
+
+            assertThat(response.rewardValue()).isEqualTo(100);
+            assertThat(missionService.getMissions(user.getId()).expired().missions())
+                    .as("받고 나면 목록에서 빠진다")
+                    .isEmpty();
+        }
+
+        @Test
+        @DisplayName("이번 기간의 완료 미수령은 expired 가 아니다")
+        void currentPeriodIsNotExpired() {
+            completeMission(user.getId(), DAILY_NOTE_WRITE);
+
+            MissionListResponseDto response = missionService.getMissions(user.getId());
+
+            assertThat(response.expired().missions()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("완료하지 않은 지난 기간 진행도는 내려가지 않는다")
+        void ignoresIncompletePastProgress() {
+            jdbcTemplate.update("""
+                    INSERT INTO mission_progress
+                        (user_id, mission_id, period_key, current_value, target_snapshot, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, NOW(6), NOW(6))
+                    """,
+                    user.getId(), definitionOf(WEEKLY_REVIEW_30).getId(), lastWeekKey(), 12, 30);
+
+            assertThat(missionService.getMissions(user.getId()).expired().missions()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("조회 상한보다 오래된 것은 내려가지 않는다")
+        void ignoresTooOldProgress() {
+            insertCompletedProgress(
+                    user.getId(), WEEKLY_REVIEW_30, "2020-W10", LocalDateTime.now().minusDays(40));
+
+            assertThat(missionService.getMissions(user.getId()).expired().missions())
+                    .as("상한이 없으면 몇 년치 미수령이 매 조회마다 딸려 온다")
+                    .isEmpty();
+        }
+
+        @Test
+        @DisplayName("남의 미수령 보상은 내 목록에 섞이지 않는다")
+        void doesNotLeakOtherUsers() {
+            User other = fixtures.createOtherUser();
+            insertCompletedProgress(other.getId(), WEEKLY_REVIEW_30, lastWeekKey(), LocalDateTime.now().minusDays(1));
+
+            assertThat(missionService.getMissions(user.getId()).expired().missions()).isEmpty();
         }
     }
 

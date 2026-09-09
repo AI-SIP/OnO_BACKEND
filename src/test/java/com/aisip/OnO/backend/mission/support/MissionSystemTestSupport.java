@@ -12,6 +12,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.LocalDateTime;
+
 /**
  * 미션 시스템(정의/진행도/보상) 테스트의 공통 베이스.
  *
@@ -84,5 +86,37 @@ public abstract class MissionSystemTestSupport extends MissionTestSupport {
         MissionDefinition definition = definitionOf(code);
         missionProgressUpdater.increase(userId, definition.getMetric(), definition.getTarget());
         return progressOf(userId, code);
+    }
+
+    /**
+     * 지난 기간에 완료했지만 받지 않은 진행도를 직접 만든다.
+     *
+     * <p>기간이 지난 상황은 서비스로 만들 수 없다. 진행도는 언제나 오늘 키로만 쌓이기 때문이다.
+     * 어제·지난 주 행은 이렇게 박아 넣어야 재현된다.
+     */
+    protected Long insertCompletedProgress(Long userId, String code, String periodKey, LocalDateTime completedAt) {
+        MissionDefinition definition = definitionOf(code);
+        jdbcTemplate.update("""
+                INSERT INTO mission_progress
+                    (user_id, mission_id, period_key, current_value, target_snapshot, completed_at, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                userId, definition.getId(), periodKey,
+                definition.getTarget(), definition.getTarget(),
+                completedAt, completedAt, completedAt);
+
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM mission_progress WHERE user_id = ? AND mission_id = ? AND period_key = ?",
+                Long.class, userId, definition.getId(), periodKey);
+    }
+
+    /** 지난 주 주간 키. */
+    protected String lastWeekKey() {
+        return MissionPeriodKey.weekly(MissionPeriodKey.today().minusWeeks(1));
+    }
+
+    /** 어제 일일 키. */
+    protected String yesterdayKey() {
+        return MissionPeriodKey.daily(MissionPeriodKey.today().minusDays(1));
     }
 }

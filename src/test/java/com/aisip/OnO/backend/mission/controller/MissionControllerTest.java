@@ -7,6 +7,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -48,7 +50,40 @@ class MissionControllerTest extends MissionSystemTestSupport {
                 .andExpect(jsonPath("$.data.daily.missions[1].claimed").value(false))
                 .andExpect(jsonPath("$.data.daily.missions[1].rewardType").value("XP"))
                 .andExpect(jsonPath("$.data.daily.missions[1].rewardValue").value(10))
-                .andExpect(jsonPath("$.data.daily.missions[1].progressId").isNumber());
+                .andExpect(jsonPath("$.data.daily.missions[1].progressId").isNumber())
+                .andExpect(jsonPath("$.data.daily.missions[1].periodKey").value(periodKeyOf(DAILY_NOTE_WRITE)))
+                .andExpect(jsonPath("$.data.weekly.missions[0].periodKey").value(periodKeyOf(WEEKLY_ATTEND_5)))
+                .andExpect(jsonPath("$.data.weekly.missions[0].progressId").doesNotExist())
+                .andExpect(jsonPath("$.data.expired.periodKey").doesNotExist())
+                .andExpect(jsonPath("$.data.expired.missions").isArray())
+                .andExpect(jsonPath("$.data.expired.missions.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("GET /api/missions - 기간이 지난 미수령 보상이 expired 로 내려온다")
+    void getMissionsIncludesExpired() throws Exception {
+        Long progressId = insertCompletedProgress(
+                user.getId(), WEEKLY_REVIEW_30, lastWeekKey(), LocalDateTime.now().minusDays(1));
+
+        mockMvc.perform(get("/api/missions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.expired.missions.length()").value(1))
+                .andExpect(jsonPath("$.data.expired.missions[0].progressId").value(progressId))
+                .andExpect(jsonPath("$.data.expired.missions[0].code").value(WEEKLY_REVIEW_30))
+                .andExpect(jsonPath("$.data.expired.missions[0].periodKey").value(lastWeekKey()))
+                .andExpect(jsonPath("$.data.expired.missions[0].completed").value(true))
+                .andExpect(jsonPath("$.data.expired.missions[0].claimed").value(false));
+    }
+
+    @Test
+    @DisplayName("POST /api/missions/{progressId}/claim - 기간이 지난 미수령 보상도 받을 수 있다")
+    void claimExpired() throws Exception {
+        Long progressId = insertCompletedProgress(
+                user.getId(), WEEKLY_REVIEW_30, lastWeekKey(), LocalDateTime.now().minusDays(1));
+
+        mockMvc.perform(post("/api/missions/{progressId}/claim", progressId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.rewardValue").value(100));
     }
 
     @Test
