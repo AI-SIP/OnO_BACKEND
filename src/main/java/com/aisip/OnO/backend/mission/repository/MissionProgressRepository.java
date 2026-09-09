@@ -78,6 +78,10 @@ public interface MissionProgressRepository extends JpaRepository<MissionProgress
      * <p>조회로 "아직 안 받았다"를 확인하고 지급하면, 버튼을 두 번 빠르게 누른 두 요청이
      * 모두 통과해 XP 가 두 번 들어간다. {@code claimed_at IS NULL} 을 UPDATE 조건에 넣으면
      * 뒤에 온 요청은 0행을 갱신하고 거절된다.
+     *
+     * <p>{@code user_id} 조건은 호출부의 소유권 검사와 중복이지만 일부러 남겨 둔다.
+     * 검사를 서비스에만 두면 이 메서드를 다른 곳에서 부르는 순간 소유권 검증이 통째로 빠진다.
+     * "모든 데이터 접근은 userId 기준"이라는 불변식은 쿼리 자체에 박혀 있어야 한다.
      */
     @Modifying(flushAutomatically = true)
     @Query(value = """
@@ -85,7 +89,8 @@ public interface MissionProgressRepository extends JpaRepository<MissionProgress
             SET claimed_at = NOW(6),
                 updated_at = NOW(6)
             WHERE id = :progressId
+              AND user_id = :userId
               AND claimed_at IS NULL
             """, nativeQuery = true)
-    int markClaimed(@Param("progressId") Long progressId);
+    int markClaimed(@Param("progressId") Long progressId, @Param("userId") Long userId);
 }

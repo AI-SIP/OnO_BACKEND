@@ -10,6 +10,7 @@ import com.aisip.OnO.backend.learningcalendar.exception.LearningCalendarErrorCas
 import com.aisip.OnO.backend.learningcalendar.repository.LearningCalendarMoodRepository;
 import com.aisip.OnO.backend.learningcalendar.repository.LearningCalendarQueryRepository;
 import com.aisip.OnO.backend.mission.entity.MissionMetric;
+import com.aisip.OnO.backend.mission.service.MissionPeriodKey;
 import com.aisip.OnO.backend.mission.service.MissionProgressUpdater;
 import com.aisip.OnO.backend.util.redis.StreakCacheService;
 import lombok.RequiredArgsConstructor;
@@ -116,9 +117,12 @@ public class LearningCalendarService {
                 .orElseGet(() -> moodRepository.save(LearningCalendarMood.create(userId, request.date(), request.emojiKey())));
         mood.updateEmojiKey(request.emojiKey());
 
-        // 기분 미션은 "그 날짜에 처음 기분을 남겼을 때"만 오른다. 이모지를 바꿀 때마다 오르면
-        // 버튼 한 번으로 주간 미션까지 채울 수 있다.
-        if (existingMood.isEmpty()) {
+        // 기분 미션은 "오늘 날짜에 처음 기분을 남겼을 때"만 오른다.
+        //
+        // 처음인지만 보고 올리면 이모지를 바꿀 때마다 올라 버튼 한 번으로 주간 미션까지 채울 수 있다.
+        // 오늘인지도 함께 봐야 한다. 중복 판정은 요청 날짜 기준인데 진행도는 서버의 오늘 키로 들어가므로,
+        // 지난 날짜 세 곳에 기분을 남기면 오늘 진행도가 3 오른다.
+        if (existingMood.isEmpty() && request.date().equals(MissionPeriodKey.today())) {
             missionProgressUpdater.increase(userId, MissionMetric.MOOD_LOGGED);
         }
 
