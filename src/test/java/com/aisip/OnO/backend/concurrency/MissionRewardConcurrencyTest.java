@@ -8,7 +8,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,13 +34,13 @@ class MissionRewardConcurrencyTest extends MissionTestSupport {
 
     private static final int THREAD_COUNT = 8;
 
-    @Autowired
-    private MissionLogService missionLogService;
-
     private User user;
 
     @BeforeEach
     void setUpUser() {
+        // 자동 적립이 켜진 상태의 동시성을 본다. 이 테스트가 지키는 것은 잠금이지 지급 규칙이 아니지만,
+        // 경험치 단언이 있어 어느 상태를 재는지 명시해 둔다.
+        setLegacyAccrual(true);
         user = fixtures.createUser();
     }
 

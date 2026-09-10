@@ -149,7 +149,8 @@ public class PracticeNoteService {
         customEmojiValidator.validateNullable(moodEmojiKey);
         practiceNote.updatePracticeNoteCount(moodEmojiKey);
 
-        // 복습노트 사용 미션 등록
+        // 복습노트 사용 미션 등록. 세트 완료 미션 진행도도 이 안에서 함께 오른다.
+        // 여기서 따로 올리면 같은 세트를 반복 완료하는 것만으로 주간 세트 미션이 채워진다.
         missionLogService.registerNotePracticeMission(userId, practiceId);
 
         log.info("practiceId: {} count has updated", practiceId);

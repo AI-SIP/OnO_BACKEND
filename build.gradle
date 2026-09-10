@@ -98,6 +98,14 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 	systemProperty 'spring.profiles.active', 'test'
+
+	// 런타임은 Dockerfile 의 ENTRYPOINT 에서 -Duser.timezone=Asia/Seoul 로 시간대를 못박는데
+	// 테스트만 빠져 있었다. GitHub Actions 는 UTC 로 돌기 때문에, 운영과 다른 시간대에서 검증하고 있었다.
+	//
+	// 이 코드에는 두 기준이 섞여 있다. MissionPeriodKey 는 KST 를 명시해서 하루를 가르는데
+	// JPA Auditing 이 채우는 created_at 은 JVM 기본 시간대를 쓴다. 둘이 다르면
+	// KST 00:00~09:00 구간에 하루가 어긋난다. 그 시각에만 깨지는 종류라 평소에는 초록으로 보인다.
+	systemProperty 'user.timezone', 'Asia/Seoul'
 	// 기존 스위트는 힙 부족으로 OOM 종료됐다. 컨텍스트 캐시 + 컨테이너 구동분을 감안해 상향한다.
 	maxHeapSize = '2g'
 
@@ -218,6 +226,23 @@ pitest {
 			'com.aisip.OnO.backend.problem.reminder.*Calculator*',
 			'com.aisip.OnO.backend.common.emoji.*',
 			'com.aisip.OnO.backend.common.exception.*',
+			// 미션 기간 키. 스프링 없이 도는 순수 정적 유틸이고 단위 테스트가 붙어 있어
+			// 위 주석이 말하는 "숫자가 실제 검출력을 가리키는" 유형에 해당한다.
+			// 나머지 미션 서비스는 통합 테스트로만 덮여 있어 넣어도 NO_COVERAGE 로 빠진다.
+			'com.aisip.OnO.backend.mission.service.MissionPeriodKey',
+	]
+	// targetTests 를 생략하면 PIT 는 targetClasses 를 테스트 패턴으로도 그대로 쓴다.
+	// 위 패턴들이 '*' 로 끝나 우연히 테스트 클래스까지 걸리고 있었을 뿐이라,
+	// 정확한 클래스명으로 대상을 추가하면 그 클래스의 테스트는 하나도 안 걸려 전부 NO_COVERAGE 가 된다
+	// (MissionPeriodKey 를 넣었더니 7개 뮤턴트가 전부 그렇게 빠졌다).
+	// 지금까지의 암묵적 동작을 그대로 적고, 새로 넣은 대상의 테스트만 덧붙인다.
+	targetTests = [
+			'com.aisip.OnO.backend.*.entity.*',
+			'com.aisip.OnO.backend.problem.reminder.*Policy*',
+			'com.aisip.OnO.backend.problem.reminder.*Calculator*',
+			'com.aisip.OnO.backend.common.emoji.*',
+			'com.aisip.OnO.backend.common.exception.*',
+			'com.aisip.OnO.backend.mission.service.MissionPeriodKeyTest',
 	]
 	excludedClasses = [
 			'com.aisip.OnO.backend.**.Q*',

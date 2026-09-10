@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Set;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.fields;
@@ -152,6 +153,19 @@ class PersistenceRulesTest {
                     .orShould().callMethod(LocalDateTime.class, "now")
                     .because("인자 없는 now() 는 JVM 기본 시간대를 쓴다. "
                             + "서비스 기준은 Asia/Seoul 이므로 now(ZoneId) 로 명시해야 한다")
+                    .check(productionClasses);
+        }
+
+        @Test
+        @DisplayName("기본 시간대를 끌어다 쓰지 않는다 - 하루 경계는 항상 명시된 시간대로")
+        void doesNotFallBackToJvmDefaultZone() {
+            // now(ZoneId.systemDefault()) 는 인자 없는 now() 와 똑같이 JVM 기본 시간대를 쓰면서
+            // 위 규칙만 피해 간다. 게다가 한 번 static final 로 잡아 두면 동작으로는 구별할 수 없어
+            // 테스트로 잡을 방법이 없다. 그래서 호출 자체를 여기서 막는다.
+            noClasses()
+                    .should().callMethod(ZoneId.class, "systemDefault")
+                    .because("서비스 기준 시간대는 Asia/Seoul 이다. "
+                            + "JVM 기본값을 끌어다 쓰면 배포 환경 설정이 빠지는 순간 하루 경계가 어긋난다")
                     .check(productionClasses);
         }
 

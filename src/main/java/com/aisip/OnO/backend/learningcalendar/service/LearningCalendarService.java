@@ -9,6 +9,8 @@ import com.aisip.OnO.backend.learningcalendar.entity.LearningCalendarMood;
 import com.aisip.OnO.backend.learningcalendar.exception.LearningCalendarErrorCase;
 import com.aisip.OnO.backend.learningcalendar.repository.LearningCalendarMoodRepository;
 import com.aisip.OnO.backend.learningcalendar.repository.LearningCalendarQueryRepository;
+import com.aisip.OnO.backend.mission.entity.MissionMetric;
+import com.aisip.OnO.backend.mission.service.MissionProgressUpdater;
 import com.aisip.OnO.backend.util.redis.StreakCacheService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
@@ -45,6 +48,7 @@ public class LearningCalendarService {
     private final StreakCacheService streakCacheService;
     private final LearningCalendarMoodRepository moodRepository;
     private final CustomEmojiValidator customEmojiValidator;
+    private final MissionProgressUpdater missionProgressUpdater;
 
     public LearningCalendarResponseDto getLearningCalendar(Long userId, int year, int month) {
         // 서비스 대상이 국내 사용자이고 problem/studyroom 등 다른 도메인도 KST 기준으로 하루를 가른다.
@@ -107,9 +111,29 @@ public class LearningCalendarService {
         if (!calendarRepository.existsStudyRecord(userId, request.date())) {
             throw new ApplicationException(LearningCalendarErrorCase.CALENDAR_RECORD_NOT_FOUND);
         }
-        LearningCalendarMood mood = moodRepository.findByUserIdAndStudyDate(userId, request.date())
+        Optional<LearningCalendarMood> existingMood = moodRepository.findByUserIdAndStudyDate(userId, request.date());
+
+        // 기분 미션은 "오늘 처음 기분을 남겼을 때" 한 번만 오른다.
+        //
+        // 판정 기준이 요청의 date() 가 아니라 <b>기록이 만들어진 시각</b>인 데는 이유가 있다.
+        // 예전에는 date() 가 서버의 오늘(KST)과 같은지를 봤는데, 그러면 기기 시간대가 KST 가 아닌
+        // 해외 사용자는 자기 기준 오늘을 보내도 서버 기준으로는 어제라서 미션이 영영 오르지 않는다.
+        // 그렇다고 date() 검사를 빼면 지난 날짜 세 곳에 기분을 남기는 것만으로 오늘 진행도가 3 오른다.
+        //
+        // "오늘 만들어진 기분 기록이 이미 있는가"로 보면 둘 다 해결된다. 사용자가 어느 날짜에 남기든
+        // 하루에 한 번만 오르고, 기기 시간대와 무관하다. 이모지만 바꾸는 경우도 새 기록이 아니라 오르지 않는다.
+        LocalDate today = LocalDate.now(KST);
+        boolean firstMoodOfToday = existingMood.isEmpty() && !moodRepository.existsByUserIdAndCreatedAtBetween(
+                userId, today.atStartOfDay(), today.atTime(END_OF_DAY));
+
+        LearningCalendarMood mood = existingMood
                 .orElseGet(() -> moodRepository.save(LearningCalendarMood.create(userId, request.date(), request.emojiKey())));
         mood.updateEmojiKey(request.emojiKey());
+
+        if (firstMoodOfToday) {
+            missionProgressUpdater.increase(userId, MissionMetric.MOOD_LOGGED);
+        }
+
         return new LearningCalendarMoodResponseDto(mood.getStudyDate(), mood.getEmojiKey());
     }
 

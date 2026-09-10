@@ -106,6 +106,61 @@ class UserMissionStatusTest {
         }
 
         @Test
+        @DisplayName("나머지 세 능력치도 필요 경험치와 정확히 같은 점수에서 레벨이 오른다")
+        void everyAbilityLevelsUpOnExactThreshold() {
+            // 출석에만 임계치 경계 테스트가 있어서, 나머지 셋은 >= 를 > 로 바꿔도 아무도 못 잡았다.
+            // 미션 보상이 바로 이 메서드들로 XP 를 넣는다.
+            UserMissionStatus noteWrite = newcomer();
+            noteWrite.gainNoteWritePoint(9L);
+            assertThat(noteWrite.getNoteWriteLevel()).as("1점 모자라면 오르지 않는다").isEqualTo(1L);
+            noteWrite.gainNoteWritePoint(1L);
+            assertThat(noteWrite.getNoteWriteLevel()).as("딱 10점이면 오른다").isEqualTo(2L);
+            assertThat(noteWrite.getNoteWritePoint()).isZero();
+
+            UserMissionStatus problemPractice = newcomer();
+            problemPractice.gainProblemPracticePoint(9L);
+            assertThat(problemPractice.getProblemPracticeLevel()).isEqualTo(1L);
+            problemPractice.gainProblemPracticePoint(1L);
+            assertThat(problemPractice.getProblemPracticeLevel()).isEqualTo(2L);
+            assertThat(problemPractice.getProblemPracticePoint()).isZero();
+
+            UserMissionStatus notePractice = newcomer();
+            notePractice.gainNotePracticePoint(9L);
+            assertThat(notePractice.getNotePracticeLevel()).isEqualTo(1L);
+            notePractice.gainNotePracticePoint(1L);
+            assertThat(notePractice.getNotePracticeLevel()).isEqualTo(2L);
+            assertThat(notePractice.getNotePracticePoint()).isZero();
+        }
+
+        @Test
+        @DisplayName("두 번째 임계치도 정확히 같은 점수에서 오른다")
+        void levelsUpOnExactSecondThreshold() {
+            // 레벨 2→3 은 20점이다. 첫 임계치만 재면 공식의 (level - 1) * 10 이 흔들려도 안 잡힌다.
+            UserMissionStatus noteWrite = newcomer();
+            noteWrite.gainNoteWritePoint(10L);
+
+            noteWrite.gainNoteWritePoint(19L);
+            assertThat(noteWrite.getNoteWriteLevel()).as("1점 모자라면 레벨 2 그대로").isEqualTo(2L);
+
+            noteWrite.gainNoteWritePoint(1L);
+            assertThat(noteWrite.getNoteWriteLevel()).as("딱 20점이면 레벨 3").isEqualTo(3L);
+            assertThat(noteWrite.getNoteWritePoint()).isZero();
+        }
+
+        @Test
+        @DisplayName("총 학습 레벨도 필요 경험치와 정확히 같은 점수에서 오른다")
+        void totalStudyLevelsUpOnExactThreshold() {
+            // 총 학습 레벨 1→2 는 40점이다. 미션 보상 응답의 leveledUp 이 이 값으로 갈린다.
+            UserMissionStatus status = newcomer();
+
+            status.gainNoteWritePoint(39L);
+            assertThat(status.getTotalStudyLevel()).as("1점 모자라면 오르지 않는다").isEqualTo(1L);
+
+            status.gainNoteWritePoint(1L);
+            assertThat(status.getTotalStudyLevel()).as("딱 40점이면 오른다").isEqualTo(2L);
+        }
+
+        @Test
         @DisplayName("네 능력치 모두 같은 공식을 쓴다")
         void everyAbilityUsesSameFormula() {
             UserMissionStatus attendance = newcomer();
