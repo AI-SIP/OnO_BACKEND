@@ -7,7 +7,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -35,7 +37,10 @@ class MissionControllerTest extends MissionSystemTestSupport {
 
         mockMvc.perform(get("/api/missions"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.daily.periodKey").value(periodKeyOf(DAILY_NOTE_WRITE)))
+                // 프로덕션 계산기를 부르지 않고 직접 만든 키와 비교한다.
+                // periodKeyOf 를 쓰면 "서비스가 같은 계산을 위임했다"만 확인하게 된다.
+                .andExpect(jsonPath("$.data.daily.periodKey")
+                        .value(LocalDate.now(ZoneId.of("Asia/Seoul")).toString()))
                 .andExpect(jsonPath("$.data.weekly.periodKey").value(periodKeyOf(WEEKLY_NOTE_10)))
                 .andExpect(jsonPath("$.data.daily.missions.length()").value(6))
                 .andExpect(jsonPath("$.data.weekly.missions.length()").value(4))
@@ -105,8 +110,23 @@ class MissionControllerTest extends MissionSystemTestSupport {
                 .andExpect(jsonPath("$.data.progressId").value(progress.getId()))
                 .andExpect(jsonPath("$.data.rewardType").value("XP"))
                 .andExpect(jsonPath("$.data.rewardValue").value(10))
-                .andExpect(jsonPath("$.data.totalStudyLevel").isNumber())
-                .andExpect(jsonPath("$.data.leveledUp").isBoolean());
+                .andExpect(jsonPath("$.data.totalStudyLevel").value(1))
+                .andExpect(jsonPath("$.data.leveledUp")
+                        // 10 XP 로는 총 학습 레벨 1→2 에 필요한 40점에 못 미친다.
+                        .value(false));
+    }
+
+    @Test
+    @DisplayName("POST /api/missions/{progressId}/claim - 레벨이 오르면 leveledUp 이 참이다")
+    void claimReportsLevelUp() throws Exception {
+        // isBoolean() 만 보면 leveledUp 이 영영 false 여도 통과한다. 양쪽 값을 모두 고정한다.
+        MissionProgress progress = completeMission(user.getId(), WEEKLY_REVIEW_30);
+
+        mockMvc.perform(post("/api/missions/{progressId}/claim", progress.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.rewardValue").value(100))
+                .andExpect(jsonPath("$.data.totalStudyLevel").value(2))
+                .andExpect(jsonPath("$.data.leveledUp").value(true));
     }
 
     @Test

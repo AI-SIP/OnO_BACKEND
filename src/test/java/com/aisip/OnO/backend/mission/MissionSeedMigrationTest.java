@@ -13,6 +13,7 @@ import org.springframework.util.StreamUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -88,7 +89,36 @@ class MissionSeedMigrationTest extends MissionSystemTestSupport {
             runMigration(REWARD_SNAPSHOT_MIGRATION);
         }
 
-        assertThat(missionProgressRepository.findAll()).isEmpty();
+        // 예외가 안 났다는 것만으로는 약하다. 다시 돌린 뒤에도 스키마가 온전한지 확인한다.
+        assertThat(countIndex("mission_progress", "idx_mission_progress_claimed"))
+                .as("인덱스가 사라지지도 중복으로 생기지도 않아야 한다")
+                .isEqualTo(1);
+        assertThat(countColumn("mission_progress", "reward_type_snapshot")).isEqualTo(1);
+        assertThat(countColumn("mission_progress", "reward_value_snapshot")).isEqualTo(1);
+
+        // 스키마가 실제로 쓸 수 있는 상태인지까지 본다.
+        var user = fixtures.createUser();
+        insertClaimedProgress(user.getId(), DAILY_NOTE_WRITE, "2020-09-01", LocalDateTime.of(2020, 9, 1, 10, 0));
+        assertThat(missionService.getClaimHistory(user.getId(), null, 20).content()).hasSize(1);
+    }
+
+    /** 같은 이름의 인덱스가 몇 개인지. 복합 인덱스는 컬럼 수만큼 행이 나오므로 DISTINCT 로 센다. */
+    private int countIndex(String table, String indexName) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(DISTINCT index_name)
+                FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?
+                """, Integer.class, table, indexName);
+        return count == null ? 0 : count;
+    }
+
+    private int countColumn(String table, String columnName) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?
+                """, Integer.class, table, columnName);
+        return count == null ? 0 : count;
     }
 
     @Test
