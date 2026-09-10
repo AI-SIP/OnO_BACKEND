@@ -4,6 +4,8 @@ import com.aisip.OnO.backend.mission.support.MissionDefinitionSeeder;
 import com.aisip.OnO.backend.mission.support.MissionSystemTestSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.util.StreamUtils;
@@ -12,6 +14,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
@@ -29,9 +32,15 @@ class MissionSeedMigrationTest extends MissionSystemTestSupport {
 
     private static final String DDL_MIGRATION = "db/migration/V29__create_mission_system.sql";
     private static final String SEED_MIGRATION = "db/migration/V30__seed_mission_definitions.sql";
+    private static final String CLAIMED_INDEX_MIGRATION = "db/migration/V31__add_mission_progress_claimed_index.sql";
+    private static final String REWARD_SNAPSHOT_MIGRATION = "db/migration/V32__add_mission_progress_reward_snapshot.sql";
+    private static final String WORDING_MIGRATION = "db/migration/V33__refine_mission_definition_wording.sql";
 
     @Autowired
     private MissionDefinitionSeeder missionDefinitionSeeder;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Test
     @DisplayName("DDL 파일에는 시드가 섞여 있지 않다")
@@ -59,6 +68,60 @@ class MissionSeedMigrationTest extends MissionSystemTestSupport {
     }
 
     @Test
+    @DisplayName("인덱스와 컬럼 추가도 다시 돌려도 안전하게 쓰여 있다")
+    void schemaChangeMigrationsAreRerunnable() {
+        // MySQL 에는 CREATE INDEX IF NOT EXISTS 도 ADD COLUMN IF NOT EXISTS 도 없다.
+        // DDL 이 커밋된 뒤 Flyway 가 이력을 남기기 전에 끊기면 재기동 때 Duplicate 로 앱이 뜨지 않는다.
+        for (String migration : List.of(CLAIMED_INDEX_MIGRATION, REWARD_SNAPSHOT_MIGRATION)) {
+            assertThat(statementsOf(migration))
+                    .as("%s 가 existence 검사 없이 DDL 을 바로 실행한다", migration)
+                    .contains("INFORMATION_SCHEMA");
+        }
+    }
+
+    @Test
+    @DisplayName("이미 적용된 스키마에 인덱스·컬럼 마이그레이션을 다시 돌려도 터지지 않는다")
+    void rerunningSchemaMigrationsDoesNotFail() {
+        // 테스트 DB 에는 이 인덱스와 컬럼이 이미 있다. 그 위에 두 번 더 돌려 본다.
+        for (int attempt = 0; attempt < 2; attempt++) {
+            runMigration(CLAIMED_INDEX_MIGRATION);
+            runMigration(REWARD_SNAPSHOT_MIGRATION);
+        }
+
+        assertThat(missionProgressRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("문구 수정은 V30 을 고치지 않고 새 마이그레이션의 UPDATE 로 얹는다")
+    void wordingIsAppliedAsUpdate() {
+        // V30 을 고치면 이미 적용된 환경에서 Flyway 체크섬이 어긋나 앱이 뜨지 않는다.
+        String wording = statementsOf(WORDING_MIGRATION);
+
+        assertThat(wording).contains("UPDATE MISSION_DEFINITION");
+        assertThat(wording).doesNotContain("INSERT INTO");
+    }
+
+    @Test
+    @DisplayName("정리한 문구가 그대로 내려간다")
+    void appliesRefinedWording() {
+        assertThat(definitionOf("DAILY_ATTEND").getDescription()).isEqualTo("앱 접속하기");
+        assertThat(definitionOf("DAILY_NOTE_WRITE").getDescription()).isEqualTo("오답노트 1개 쓰기");
+        assertThat(definitionOf("DAILY_REVIEW_3").getDescription()).isEqualTo("오답 3문제 복습하기");
+        assertThat(definitionOf("DAILY_CORRECT_3").getDescription()).isEqualTo("복습에서 3문제 맞히기");
+        assertThat(definitionOf("DAILY_PRACTICE_SET").getDescription()).isEqualTo("복습 세트 1개 끝내기");
+        assertThat(definitionOf("DAILY_MOOD").getDescription()).isEqualTo("오늘 기분 남기기");
+        assertThat(definitionOf("WEEKLY_ATTEND_5").getDescription()).isEqualTo("이번 주 5일 접속하기");
+        assertThat(definitionOf("WEEKLY_NOTE_10").getDescription()).isEqualTo("오답노트 10개 쓰기");
+        assertThat(definitionOf("WEEKLY_REVIEW_30").getDescription()).isEqualTo("오답 30문제 복습하기");
+        assertThat(definitionOf("WEEKLY_SET_3").getDescription()).isEqualTo("복습 세트 3개 끝내기");
+
+        assertThat(definitionOf("DAILY_CORRECT_3").getTitle()).isEqualTo("세 문제 맞히기");
+        assertThat(definitionOf("DAILY_PRACTICE_SET").getTitle()).isEqualTo("복습 세트 완주");
+        assertThat(definitionOf("WEEKLY_ATTEND_5").getTitle()).isEqualTo("닷새 접속하기");
+        assertThat(definitionOf("WEEKLY_REVIEW_30").getTitle()).isEqualTo("서른 문제 복습");
+    }
+
+    @Test
     @DisplayName("시드를 두 번 실행해도 정의는 10종 그대로다")
     void seedIsIdempotent() {
         // @BeforeEach 가 이미 한 번 넣었다. 같은 문장을 다시 돌리는 것이 이 테스트의 핵심이다.
@@ -72,12 +135,31 @@ class MissionSeedMigrationTest extends MissionSystemTestSupport {
                 .hasSize(6);
     }
 
-    /** 주석을 걷어낸 실행 문장만. 주석에 적힌 설명이 단언에 걸리면 안 된다. */
-    private String statementsOf(String path) {
+    /** 마이그레이션의 실행 문장을 순서대로 돌린다. */
+    private void runMigration(String path) {
+        transactionTemplate.executeWithoutResult(status -> {
+            for (String statement : executableStatements(path)) {
+                entityManager.createNativeQuery(statement).executeUpdate();
+            }
+        });
+    }
+
+    private List<String> executableStatements(String path) {
+        return Arrays.stream(withoutComments(path).split(";"))
+                .map(String::trim)
+                .filter(statement -> !statement.isEmpty())
+                .toList();
+    }
+
+    private String withoutComments(String path) {
         return Arrays.stream(read(path).split("\\R"))
                 .filter(line -> !line.trim().startsWith("--"))
-                .collect(Collectors.joining("\n"))
-                .toUpperCase(Locale.ROOT);
+                .collect(Collectors.joining("\n"));
+    }
+
+    /** 주석을 걷어낸 실행 문장만. 주석에 적힌 설명이 단언에 걸리면 안 된다. */
+    private String statementsOf(String path) {
+        return withoutComments(path).toUpperCase(Locale.ROOT);
     }
 
     private String read(String path) {

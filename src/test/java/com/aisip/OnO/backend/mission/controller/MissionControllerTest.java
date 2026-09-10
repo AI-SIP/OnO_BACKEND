@@ -41,7 +41,7 @@ class MissionControllerTest extends MissionSystemTestSupport {
                 .andExpect(jsonPath("$.data.weekly.missions.length()").value(4))
                 .andExpect(jsonPath("$.data.daily.missions[1].code").value(DAILY_NOTE_WRITE))
                 .andExpect(jsonPath("$.data.daily.missions[1].title").value("오늘의 오답"))
-                .andExpect(jsonPath("$.data.daily.missions[1].description").value("오답노트 1개 등록"))
+                .andExpect(jsonPath("$.data.daily.missions[1].description").value("오답노트 1개 쓰기"))
                 .andExpect(jsonPath("$.data.daily.missions[1].iconKey").value("note_write"))
                 .andExpect(jsonPath("$.data.daily.missions[1].category").value("DAILY"))
                 .andExpect(jsonPath("$.data.daily.missions[1].current").value(1))
