@@ -114,9 +114,13 @@ public class MissionService {
 
         return expired.stream()
                 .filter(progress -> definitionsById.containsKey(progress.getMissionId()))
-                // 최근에 놓친 것을 먼저 보여주고, 같은 기간 안에서는 목록과 같은 순서를 쓴다.
+                // 최근에 놓친 것을 먼저 보여주고, 시각이 같으면 목록과 같은 순서를 쓴다.
+                //
+                // 기간 키 문자열로 정렬하면 안 된다. "2026-W37" 과 "2026-09-09" 는 여섯 번째 글자
+                // 'W'(0x57) 대 '0'(0x30) 에서 갈려 주간이 언제나 일일보다 앞선다.
+                // 어제 놓친 일일 미션이 3주 전 주간 미션보다 아래로 밀린다.
                 .sorted(Comparator
-                        .comparing(MissionProgress::getPeriodKey, Comparator.reverseOrder())
+                        .comparing(MissionProgress::getCompletedAt, Comparator.reverseOrder())
                         .thenComparing(progress -> definitionsById.get(progress.getMissionId()).getSortOrder()))
                 .map(progress -> MissionResponseDto.from(
                         definitionsById.get(progress.getMissionId()), progress, progress.getPeriodKey()))

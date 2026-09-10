@@ -198,6 +198,24 @@ class MissionServiceTest extends MissionSystemTestSupport {
         }
 
         @Test
+        @DisplayName("일일과 주간이 섞여도 최근에 놓친 것이 위로 온다")
+        void sortsByCompletedAtNotByPeriodKeyString() {
+            // 기간 키 문자열로 정렬하면 "2026-W37" 과 "2026-09-09" 가 여섯 번째 글자에서 갈려
+            // 주간이 언제나 일일보다 앞선다. 3주 전 주간 미션이 어제 놓친 일일 미션보다 위로 올라간다.
+            insertCompletedProgress(
+                    user.getId(), WEEKLY_REVIEW_30, lastWeekKey(), LocalDateTime.now().minusDays(20));
+            insertCompletedProgress(
+                    user.getId(), DAILY_REVIEW_3, yesterdayKey(), LocalDateTime.now().minusDays(1));
+
+            MissionListResponseDto response = missionService.getMissions(user.getId());
+
+            assertThat(response.expired().missions())
+                    .extracting(MissionResponseDto::code)
+                    .as("어제 놓친 일일 미션이 3주 전 주간 미션보다 위에 있어야 한다")
+                    .containsExactly(DAILY_REVIEW_3, WEEKLY_REVIEW_30);
+        }
+
+        @Test
         @DisplayName("기간이 지나도 받을 수 있다")
         void canBeClaimed() {
             Long progressId = insertCompletedProgress(
