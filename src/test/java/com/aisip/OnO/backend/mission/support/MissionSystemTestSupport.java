@@ -120,6 +120,29 @@ public abstract class MissionSystemTestSupport extends MissionTestSupport {
         jdbcTemplate.update("""
                 INSERT INTO mission_progress
                     (user_id, mission_id, period_key, current_value, target_snapshot,
+                     completed_at, claimed_at, reward_type_snapshot, reward_value_snapshot, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                userId, definition.getId(), periodKey,
+                definition.getTarget(), definition.getTarget(),
+                claimedAt, claimedAt,
+                definition.getRewardType().name(), definition.getRewardValue(),
+                claimedAt, claimedAt);
+
+        return claimedProgressId(userId, definition.getId(), periodKey);
+    }
+
+    /**
+     * 보상 스냅샷이 없는 진행도. 스냅샷 컬럼이 생기기 전에 받은 행을 흉내 낸다.
+     *
+     * <p>운영에는 이런 행이 없지만(기능 배포 전에 컬럼을 넣었다) 폴백 경로가 살아 있는지는 확인해야 한다.
+     */
+    protected Long insertClaimedProgressWithoutSnapshot(
+            Long userId, String code, String periodKey, LocalDateTime claimedAt) {
+        MissionDefinition definition = definitionOf(code);
+        jdbcTemplate.update("""
+                INSERT INTO mission_progress
+                    (user_id, mission_id, period_key, current_value, target_snapshot,
                      completed_at, claimed_at, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
@@ -127,9 +150,18 @@ public abstract class MissionSystemTestSupport extends MissionTestSupport {
                 definition.getTarget(), definition.getTarget(),
                 claimedAt, claimedAt, claimedAt, claimedAt);
 
+        return claimedProgressId(userId, definition.getId(), periodKey);
+    }
+
+    /** 미션 정의의 보상 값을 바꾼다. 이미 받은 기록이 흔들리지 않는지 확인할 때 쓴다. */
+    protected void changeRewardValue(String code, int rewardValue) {
+        jdbcTemplate.update("UPDATE mission_definition SET reward_value = ? WHERE code = ?", rewardValue, code);
+    }
+
+    private Long claimedProgressId(Long userId, Long missionId, String periodKey) {
         return jdbcTemplate.queryForObject(
                 "SELECT id FROM mission_progress WHERE user_id = ? AND mission_id = ? AND period_key = ?",
-                Long.class, userId, definition.getId(), periodKey);
+                Long.class, userId, missionId, periodKey);
     }
 
     /** 미션 정의를 비활성화한다. 비활성 미션이 기록에는 남는지 확인할 때 쓴다. */

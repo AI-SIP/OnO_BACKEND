@@ -40,7 +40,7 @@ class MissionProgressRepositoryTest extends MissionSystemTestSupport {
     /** {@code @Modifying} 쿼리는 flush 를 하므로 트랜잭션 안에서 불러야 한다. */
     private Integer claim(Long progressId, Long userId) {
         return transactionTemplate.execute(
-                status -> missionProgressRepository.markClaimed(progressId, userId));
+                status -> missionProgressRepository.markClaimed(progressId, userId, "XP", 10));
     }
 
     @Test

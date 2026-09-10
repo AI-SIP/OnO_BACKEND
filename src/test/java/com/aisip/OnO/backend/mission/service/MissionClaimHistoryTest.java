@@ -127,6 +127,69 @@ class MissionClaimHistoryTest extends MissionSystemTestSupport {
     }
 
     @Nested
+    @DisplayName("보상 스냅샷")
+    class RewardSnapshot {
+
+        @Test
+        @DisplayName("받은 뒤 보상을 바꿔도 기록의 값은 그대로다")
+        void keepsRewardValueAtClaimTime() {
+            MissionProgress progress = completeMission(user.getId(), DAILY_NOTE_WRITE);
+            missionService.claim(user.getId(), progress.getId());
+
+            changeRewardValue(DAILY_NOTE_WRITE, 999);
+
+            assertThat(missionService.getClaimHistory(user.getId(), null, 20).content())
+                    .singleElement()
+                    .satisfies(item -> assertThat(item.rewardValue())
+                            .as("10 XP 를 받은 기록이 어느 날 999 XP 로 바뀌면 안 된다")
+                            .isEqualTo(10));
+        }
+
+        @Test
+        @DisplayName("합계도 받은 시점의 값으로 센다")
+        void sumsRewardValueAtClaimTime() {
+            MissionProgress progress = completeMission(user.getId(), DAILY_NOTE_WRITE);
+            missionService.claim(user.getId(), progress.getId());
+
+            changeRewardValue(DAILY_NOTE_WRITE, 999);
+
+            assertThat(missionService.getClaimHistory(user.getId(), null, 20).totalClaimedXp())
+                    .as("목록에 보이는 값과 합계가 어긋나면 안 된다")
+                    .isEqualTo(10L);
+        }
+
+        @Test
+        @DisplayName("스냅샷이 없는 옛 행은 현재 정의 값으로 보인다")
+        void fallsBackToCurrentDefinition() {
+            insertClaimedProgressWithoutSnapshot(user.getId(), WEEKLY_NOTE_10, "2020-W36", BASE);
+
+            assertThat(missionService.getClaimHistory(user.getId(), null, 20).content())
+                    .singleElement()
+                    .satisfies(item -> {
+                        assertThat(item.rewardValue()).isEqualTo(80);
+                        assertThat(item.rewardType().name()).isEqualTo("XP");
+                    });
+            assertThat(missionService.getClaimHistory(user.getId(), null, 20).totalClaimedXp())
+                    .isEqualTo(80L);
+        }
+
+        @Test
+        @DisplayName("받는 순간 스냅샷이 실제로 박힌다")
+        void stampsSnapshotOnClaim() {
+            MissionProgress progress = completeMission(user.getId(), WEEKLY_REVIEW_30);
+
+            missionService.claim(user.getId(), progress.getId());
+
+            MissionProgress claimed = missionProgressRepository.findById(progress.getId()).orElseThrow();
+            assertThat(claimed.getClaimedAt())
+                    .as("스냅샷을 쓰면서 수령 시각을 덮어쓰면 안 된다")
+                    .isNotNull();
+            assertThat(claimed.getRewardTypeSnapshot().name()).isEqualTo("XP");
+            assertThat(claimed.getRewardValueSnapshot()).isEqualTo(100);
+        }
+    }
+
+    @Nested
     @DisplayName("소유권")
     class Ownership {
 
