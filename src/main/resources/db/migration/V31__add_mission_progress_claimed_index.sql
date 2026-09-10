@@ -8,6 +8,23 @@
 -- claimed_at 이 같은 행끼리의 순서는 InnoDB 가 보조 인덱스 끝에 붙이는 기본키(id)가 갈라 주므로
 -- 커서 페이지네이션의 동점 처리까지 이 인덱스 하나로 해결된다.
 --
--- 문장이 하나라 중간에 끊길 지점이 없다. 실패하면 인덱스가 만들어지지 않은 상태 그대로다.
-CREATE INDEX idx_mission_progress_claimed
-    ON mission_progress (user_id, claimed_at);
+-- V29 가 CREATE TABLE IF NOT EXISTS 로 재실행에 대비한 것과 같은 이유로 여기도 대비한다.
+-- DDL 이 커밋된 뒤 Flyway 가 이력을 남기기 전에 커넥션이 끊기면, 재기동 때 이 파일이 다시 돌면서
+-- Duplicate key name 으로 앱이 뜨지 않는다. MySQL 에는 CREATE INDEX IF NOT EXISTS 가 없어
+-- information_schema 를 보고 없을 때만 실행한다.
+
+SET @index_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE()
+      AND table_name = 'mission_progress'
+      AND index_name = 'idx_mission_progress_claimed'
+);
+
+SET @ddl := IF(@index_exists = 0,
+    'CREATE INDEX idx_mission_progress_claimed ON mission_progress (user_id, claimed_at)',
+    'SELECT 1');
+
+PREPARE create_claimed_index FROM @ddl;
+EXECUTE create_claimed_index;
+DEALLOCATE PREPARE create_claimed_index;
