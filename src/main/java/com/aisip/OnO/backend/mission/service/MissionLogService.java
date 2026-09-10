@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -76,35 +75,6 @@ public class MissionLogService {
     private User lockUser(Long userId) {
         return userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new ApplicationException(MissionErrorCase.USER_NOT_FOUND));
-    }
-
-    public Long registerMissionLog(@NotNull MissionRegisterDto missionRegisterDto) {
-
-        Long userId = missionRegisterDto.userId();
-
-        // switch 가 MissionType 의 네 상수를 모두 다루고 있어 default 분기는 도달할 수 없었고,
-        // missionType 이 null 이면 switch 자체가 NPE 를 던져 400 이어야 할 입력 오류가 500 으로 나갔다.
-        // 잘못된 미션 종류는 MISSION_TYPE_NOT_FOUND(400) 로 거절한다.
-        if (missionRegisterDto.missionType() == null) {
-            throw new ApplicationException(MissionErrorCase.MISSION_TYPE_NOT_FOUND);
-        }
-
-        User user = lockUser(userId);
-
-        boolean canNotRegister = switch (missionRegisterDto.missionType()) {
-            case USER_LOGIN -> missionLogRepository.alreadyLogin(userId);
-            case PROBLEM_WRITE -> missionLogRepository.alreadyWriteProblemsTodayMoreThan3(userId);
-            case PROBLEM_PRACTICE -> missionLogRepository.alreadyPracticeProblem(missionRegisterDto.referenceId());
-            case NOTE_PRACTICE -> missionLogRepository.alreadyPracticeNote(missionRegisterDto.referenceId());
-            default -> throw new ApplicationException(MissionErrorCase.MISSION_TYPE_NOT_FOUND);
-        };
-
-        if(!canNotRegister) {
-            MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
-            missionLogRepository.save(missionLog);
-        }
-
-        return 0L;
     }
 
     public void registerLoginMission(Long userId) {

@@ -2,7 +2,6 @@ package com.aisip.OnO.backend.mission.service;
 
 import com.aisip.OnO.backend.admin.dto.AdminPracticeLogResponseDto;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
-import com.aisip.OnO.backend.mission.dto.MissionRegisterDto;
 import com.aisip.OnO.backend.mission.entity.MissionLog;
 import com.aisip.OnO.backend.mission.entity.MissionType;
 import com.aisip.OnO.backend.mission.entity.UserMissionStatus;
@@ -18,7 +17,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 
@@ -272,66 +270,6 @@ class MissionLogServiceTest extends MissionTestSupport {
                     () -> missionLogService.registerProblemPracticeMission(999_999L, 100L));
             assertMissionError(MissionErrorCase.USER_NOT_FOUND,
                     () -> missionLogService.registerNotePracticeMission(999_999L, 200L));
-        }
-    }
-
-    @Nested
-    @DisplayName("일반 미션 등록 진입점")
-    class RegisterMissionLog {
-
-        @ParameterizedTest
-        @EnumSource(MissionType.class)
-        @DisplayName("모든 미션 종류를 등록할 수 있고 항상 0을 돌려준다")
-        void registersEveryMissionType(MissionType missionType) {
-            Long returned = missionLogService.registerMissionLog(MissionRegisterDto.builder()
-                    .userId(user.getId())
-                    .missionType(missionType)
-                    .referenceId(300L)
-                    .build());
-
-            assertThat(returned)
-                    .as("획득 포인트를 돌려주는 것처럼 보이지만 실제로는 항상 0이다")
-                    .isEqualTo(0L);
-            assertThat(missionLogRepository.findAllByUserId(user.getId()))
-                    .singleElement()
-                    .satisfies(log -> assertThat(log.getMissionType()).isEqualTo(missionType));
-        }
-
-        @Test
-        @DisplayName("이미 수행한 미션은 다시 등록되지 않는다")
-        void skipsAlreadyDoneMission() {
-            MissionRegisterDto dto = MissionRegisterDto.builder()
-                    .userId(user.getId())
-                    .missionType(MissionType.USER_LOGIN)
-                    .build();
-
-            missionLogService.registerMissionLog(dto);
-            missionLogService.registerMissionLog(dto);
-
-            assertThat(missionLogRepository.findAllByUserId(user.getId())).hasSize(1);
-        }
-
-        @Test
-        @DisplayName("미션 종류가 없으면 MISSION_TYPE_NOT_FOUND 로 거절한다")
-        void rejectsNullMissionType() {
-            MissionRegisterDto dto = MissionRegisterDto.builder()
-                    .userId(user.getId())
-                    .build();
-
-            assertMissionError(MissionErrorCase.MISSION_TYPE_NOT_FOUND,
-                    () -> missionLogService.registerMissionLog(dto));
-        }
-
-        @Test
-        @DisplayName("없는 사용자로 등록하면 USER_NOT_FOUND 로 거절한다")
-        void rejectsUnknownUser() {
-            MissionRegisterDto dto = MissionRegisterDto.builder()
-                    .userId(999_999L)
-                    .missionType(MissionType.USER_LOGIN)
-                    .build();
-
-            assertMissionError(MissionErrorCase.USER_NOT_FOUND,
-                    () -> missionLogService.registerMissionLog(dto));
         }
     }
 
