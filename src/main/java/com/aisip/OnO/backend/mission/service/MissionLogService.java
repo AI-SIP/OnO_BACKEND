@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -33,14 +34,21 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 사용자의 행동 기록({@code mission_log})을 남긴다.
  *
- * <p><b>여기서 XP 를 주지 않는다.</b> 예전에는 행동할 때마다 자동으로 경험치가 들어갔는데,
- * 미션 보상과 합쳐져 같은 XP 가 두 경로로 들어왔다. 오답노트를 하나 쓰면 자동 적립 +10 이 조용히 들어가고
- * 미션 "오늘의 오답"을 받으면 +10 이 또 들어가, 화면의 {@code +10 XP} 와 실제 증가량 20 이 어긋났다.
- * 게다가 하루 200점 상한은 자동 적립에만 걸려 같은 이름의 XP 가 출처에 따라 다른 규칙으로 움직였다.
- * <b>XP 는 미션을 받을 때만 들어온다.</b> 지급은 {@link MissionRewardGranter} 한 곳뿐이다.
+ * <p><b>자동 적립은 설정으로 켜고 끈다.</b> {@code ono.mission.legacy-accrual.enabled} 이고 기본값은 켜짐이다.
  *
- * <p>대신 <b>기록은 그대로 남긴다.</b> DAU·순 방문자·복습 로그 같은 관리자 통계가 전부 이 테이블을 읽는다.
- * 행이 사라지면 그 지표들이 통째로 0 이 된다. 중복 방지 판정과 미션 진행도 증가도 그대로다.
+ * <p>최종 목표는 끄는 것이다. 켜져 있으면 같은 XP 가 두 경로로 들어온다. 오답노트를 하나 쓰면
+ * 자동 적립 +10 이 조용히 들어가고 미션 "오늘의 오답"을 받으면 +10 이 또 들어가,
+ * 화면의 {@code +10 XP} 와 실제 증가량 20 이 어긋난다. 하루 200점 상한도 자동 적립에만 걸려
+ * 같은 이름의 XP 가 출처에 따라 다른 규칙으로 움직인다.
+ *
+ * <p>그런데도 기본값을 켜짐으로 두는 이유는 <b>배포 순서</b> 때문이다. 백엔드가 먼저 나가고 프론트에
+ * 미션 화면이 없는 동안 자동 적립까지 꺼져 있으면 XP 유입이 통째로 멈춰 레벨도 스터디룸 랭킹도 정지한다.
+ * 켜 둔 채로 백엔드를 배포하면 사용자 입장에서는 달라지는 게 없고, 화면이 없으니 미션을 받을 수도 없어
+ * 이중 지급도 일어나지 않는다. 프론트가 나간 뒤 설정으로 끄면 흡수가 끝난다. 각 단계가 되돌릴 수 있다.
+ *
+ * <p>꺼져도 <b>기록은 그대로 남는다.</b> DAU·순 방문자·복습 로그 같은 관리자 통계가 전부 이 테이블을 읽는다.
+ * 행이 사라지면 그 지표들이 통째로 0 이 된다. 중복 방지 판정과 미션 진행도 증가도 플래그와 무관하게 돈다.
+ * <b>꺼지는 것은 포인트 지급 하나뿐이다.</b>
  */
 @Service
 @RequiredArgsConstructor
@@ -54,6 +62,17 @@ public class MissionLogService {
     private final PracticeNoteRepository practiceNoteRepository;
 
     private final MissionProgressUpdater missionProgressUpdater;
+
+    /**
+     * 행동만으로 경험치를 주던 예전 적립을 계속 쓸지.
+     *
+     * <p>기본값이 켜짐이라 설정을 건드리지 않으면 지금 운영과 똑같이 동작한다.
+     * 끄는 것은 프론트에 미션 화면이 나간 뒤의 별도 결정이다.
+     */
+    @Value("${ono.mission.legacy-accrual.enabled:true}")
+    private boolean legacyAccrualEnabled;
+
+    private static final Long DAILY_MISSION_POINT_LIMIT = 200L;
 
     /**
      * 미션 적립 전에 사용자 행을 먼저 잠근다.
@@ -91,6 +110,8 @@ public class MissionLogService {
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
             missionLogRepository.save(missionLog);
 
+            addPointToUser(user, missionLog);
+
             // 출석 미션 진행도. 기존 적립 규칙은 그대로 두고, "오늘 첫 로그인" 판정만 그대로 빌려 쓴다.
             // 이 분기 밖에서 올리면 앱을 열 때마다 주간 출석 미션이 하루에 5까지 차 버린다.
             missionProgressUpdater.increase(userId, MissionMetric.LOGIN_DAY);
@@ -110,6 +131,8 @@ public class MissionLogService {
 
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
             missionLogRepository.save(missionLog);
+
+            addPointToUser(user, missionLog);
         }
     }
 
@@ -127,6 +150,7 @@ public class MissionLogService {
         for (int i = 0; i < toCreate; i++) {
             MissionLog log = MissionLog.from(dto, user);
             missionLogRepository.save(log);
+            addPointToUser(user, log);
         }
     }
 
@@ -144,6 +168,8 @@ public class MissionLogService {
 
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
             missionLogRepository.save(missionLog);
+
+            addPointToUser(user, missionLog);
         }
     }
 
@@ -162,10 +188,43 @@ public class MissionLogService {
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
             missionLogRepository.save(missionLog);
 
+            addPointToUser(user, missionLog);
+
             // 세트 완료 미션 진행도. 출석과 같은 이유로 기존 중복 방지 가드 안에 둔다.
             // 밖에서 올리면 같은 세트에 완료 요청을 세 번 보내는 것만으로 주간 세트 미션이 채워진다.
             missionProgressUpdater.increase(userId, MissionMetric.PRACTICE_NOTE_COMPLETED);
         }
+    }
+
+    /**
+     * 행동 자체에 대한 자동 적립.
+     *
+     * <p>플래그가 꺼져 있으면 아무것도 하지 않는다. 이 메서드만 비는 것이지 호출부의 기록 저장과
+     * 중복 방지 판정, 진행도 증가는 그대로 돈다.
+     *
+     * <p>하루 200점 상한은 이 경로에만 있는 규칙이다. 미션 보상은 {@link MissionRewardGranter} 가
+     * 따로 지급하고 상한을 타지 않는다.
+     */
+    private Long addPointToUser(User user, MissionLog missionLog) {
+        if (!legacyAccrualEnabled) {
+            return 0L;
+        }
+
+        Long pointToday = missionLogRepository.getPointSumToday(user.getId());
+        if (pointToday <= DAILY_MISSION_POINT_LIMIT) {
+            Long point = Math.min(missionLog.getPoint(), DAILY_MISSION_POINT_LIMIT - pointToday);
+
+            // 미션 타입에 따라 적절한 능력치에 경험치 적용
+            switch (missionLog.getMissionType().getAbilityType()) {
+                case ATTENDANCE -> user.getUserMissionStatus().gainAttendancePoint(point);
+                case NOTE_WRITE -> user.getUserMissionStatus().gainNoteWritePoint(point);
+                case PROBLEM_PRACTICE -> user.getUserMissionStatus().gainProblemPracticePoint(point);
+                case NOTE_PRACTICE -> user.getUserMissionStatus().gainNotePracticePoint(point);
+            }
+
+            return point;
+        }
+        return 0L;
     }
 
     @Transactional(readOnly = true)
