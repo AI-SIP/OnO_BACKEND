@@ -230,19 +230,33 @@ class MissionProgressHookTest extends MissionSystemTestSupport {
         }
 
         @Test
-        @DisplayName("과거 날짜에 기분을 남기면 오늘 미션은 오르지 않는다")
-        void doesNotCountPastDates() {
+        @DisplayName("여러 날짜에 기분을 남겨도 하루에 한 번만 오른다")
+        void countsOncePerDayNoMatterHowManyDates() {
             LocalDate today = MissionPeriodKey.today();
-            for (int daysAgo = 1; daysAgo <= 3; daysAgo++) {
-                LocalDate pastDate = today.minusDays(daysAgo);
-                makeStudyDay(pastDate);
+            for (int daysAgo = 0; daysAgo <= 3; daysAgo++) {
+                LocalDate date = today.minusDays(daysAgo);
+                makeStudyDay(date);
                 learningCalendarService.updateMood(
-                        user.getId(), new LearningCalendarMoodRequestDto(pastDate, "cool_sunglasses"));
+                        user.getId(), new LearningCalendarMoodRequestDto(date, "cool_sunglasses"));
             }
 
             assertThat(currentOf(user.getId(), DAILY_MOOD))
-                    .as("중복 판정은 요청 날짜 기준인데 진행도가 오늘 키로 들어가면 지난 날짜 수만큼 오늘이 오른다")
-                    .isZero();
+                    .as("지난 날짜 네 곳에 기분을 남겼다고 오늘 진행도가 네 번 오르면 안 된다")
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("기기 시간대가 서버와 달라 어제 날짜로 와도 오른다")
+        void countsWhenClientSendsYesterdayInItsOwnTimeZone() {
+            // 기기 시간대가 KST 가 아니면 사용자 기준 오늘이 서버 기준으로는 어제다.
+            // 요청 날짜를 서버의 오늘과 비교하면 해외 사용자는 이 미션이 영영 오르지 않는다.
+            LocalDate clientToday = MissionPeriodKey.today().minusDays(1);
+            makeStudyDay(clientToday);
+
+            learningCalendarService.updateMood(
+                    user.getId(), new LearningCalendarMoodRequestDto(clientToday, "cool_sunglasses"));
+
+            assertThat(currentOf(user.getId(), DAILY_MOOD)).isEqualTo(1);
         }
 
         /**
