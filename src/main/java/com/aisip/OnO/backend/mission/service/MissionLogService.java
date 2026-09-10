@@ -31,6 +31,18 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 사용자의 행동 기록({@code mission_log})을 남긴다.
+ *
+ * <p><b>여기서 XP 를 주지 않는다.</b> 예전에는 행동할 때마다 자동으로 경험치가 들어갔는데,
+ * 미션 보상과 합쳐져 같은 XP 가 두 경로로 들어왔다. 오답노트를 하나 쓰면 자동 적립 +10 이 조용히 들어가고
+ * 미션 "오늘의 오답"을 받으면 +10 이 또 들어가, 화면의 {@code +10 XP} 와 실제 증가량 20 이 어긋났다.
+ * 게다가 하루 200점 상한은 자동 적립에만 걸려 같은 이름의 XP 가 출처에 따라 다른 규칙으로 움직였다.
+ * <b>XP 는 미션을 받을 때만 들어온다.</b> 지급은 {@link MissionRewardGranter} 한 곳뿐이다.
+ *
+ * <p>대신 <b>기록은 그대로 남긴다.</b> DAU·순 방문자·복습 로그 같은 관리자 통계가 전부 이 테이블을 읽는다.
+ * 행이 사라지면 그 지표들이 통째로 0 이 된다. 중복 방지 판정과 미션 진행도 증가도 그대로다.
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -44,8 +56,6 @@ public class MissionLogService {
 
     private final MissionProgressUpdater missionProgressUpdater;
 
-    private static final Long DAILY_MISSION_POINT_LIMIT = 200L;
-
     /**
      * 미션 적립 전에 사용자 행을 먼저 잠근다.
      *
@@ -57,6 +67,7 @@ public class MissionLogService {
      * 실제로 같은 사용자가 미션을 동시에 8번 적립하면
      * {@code Deadlock found when trying to get lock} 이 그대로 500 으로 나갔다.
      * 처음부터 배타 잠금을 잡으면 승격 자체가 없어 교착이 생기지 않는다.
+     * (자동 적립을 걷어내면서 사용자 행 UPDATE 가 없어져 이 승격 경로는 사라졌다. 기록으로 남겨 둔다.)
      *
      * <p>둘째, <b>중복 적립</b>. "오늘 이미 했는가"를 확인한 뒤 적립하는 check-then-act 구조라,
      * 잠금이 없으면 동시 요청이 모두 "아직 안 했다"를 읽고 각자 적립한다.
@@ -91,8 +102,6 @@ public class MissionLogService {
         if(!canNotRegister) {
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
             missionLogRepository.save(missionLog);
-
-            addPointToUser(user, missionLog);
         }
 
         return 0L;
@@ -111,8 +120,6 @@ public class MissionLogService {
 
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
             missionLogRepository.save(missionLog);
-
-            addPointToUser(user, missionLog);
 
             // 출석 미션 진행도. 기존 적립 규칙은 그대로 두고, "오늘 첫 로그인" 판정만 그대로 빌려 쓴다.
             // 이 분기 밖에서 올리면 앱을 열 때마다 주간 출석 미션이 하루에 5까지 차 버린다.
@@ -133,8 +140,6 @@ public class MissionLogService {
 
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
             missionLogRepository.save(missionLog);
-
-            addPointToUser(user, missionLog);
         }
     }
 
@@ -152,7 +157,6 @@ public class MissionLogService {
         for (int i = 0; i < toCreate; i++) {
             MissionLog log = MissionLog.from(dto, user);
             missionLogRepository.save(log);
-            addPointToUser(user, log);
         }
     }
 
@@ -170,8 +174,6 @@ public class MissionLogService {
 
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
             missionLogRepository.save(missionLog);
-
-            addPointToUser(user, missionLog);
         }
     }
 
@@ -190,35 +192,10 @@ public class MissionLogService {
             MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
             missionLogRepository.save(missionLog);
 
-            addPointToUser(user, missionLog);
-
             // 세트 완료 미션 진행도. 출석과 같은 이유로 기존 중복 방지 가드 안에 둔다.
             // 밖에서 올리면 같은 세트에 완료 요청을 세 번 보내는 것만으로 주간 세트 미션이 채워진다.
             missionProgressUpdater.increase(userId, MissionMetric.PRACTICE_NOTE_COMPLETED);
         }
-    }
-
-    private Long addPointToUser(User user, MissionLog missionLog) {
-        Long pointToday = missionLogRepository.getPointSumToday(user.getId());
-        if(pointToday <= DAILY_MISSION_POINT_LIMIT) {
-            Long point = getMin(missionLog.getPoint(), DAILY_MISSION_POINT_LIMIT - pointToday);
-
-            // 미션 타입에 따라 적절한 능력치에 경험치 적용
-            switch(missionLog.getMissionType().getAbilityType()) {
-                case ATTENDANCE -> user.getUserMissionStatus().gainAttendancePoint(point);
-                case NOTE_WRITE -> user.getUserMissionStatus().gainNoteWritePoint(point);
-                case PROBLEM_PRACTICE -> user.getUserMissionStatus().gainProblemPracticePoint(point);
-                case NOTE_PRACTICE -> user.getUserMissionStatus().gainNotePracticePoint(point);
-            }
-
-            return point;
-        } else {
-            return 0L;
-        }
-    }
-
-    private Long getMin(Long p1, Long p2) {
-        return p1 > p2 ? p2 : p1;
     }
 
     @Transactional(readOnly = true)
