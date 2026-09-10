@@ -72,16 +72,17 @@ public interface MissionProgressRepository extends JpaRepository<MissionProgress
     /**
      * 지금까지 받은 XP 합계.
      *
-     * <p>보상 값은 미션 정의에 있으므로 두 테이블을 함께 본다. 연관관계를 걸지 않아 식별자로 잇는다.
+     * <p>목록에 보이는 값과 합계가 어긋나면 안 되므로 여기서도 스냅샷을 먼저 본다.
+     * 스냅샷이 없는 옛 행만 현재 정의로 폴백한다. 정의는 연관관계를 걸지 않아 식별자로 잇는다.
      */
-    @Query("""
-            SELECT COALESCE(SUM(d.rewardValue), 0)
-            FROM MissionProgress p, MissionDefinition d
-            WHERE d.id = p.missionId
-              AND p.userId = :userId
-              AND p.claimedAt IS NOT NULL
-              AND d.rewardType = com.aisip.OnO.backend.mission.entity.MissionRewardType.XP
-            """)
+    @Query(value = """
+            SELECT COALESCE(SUM(COALESCE(p.reward_value_snapshot, d.reward_value)), 0)
+            FROM mission_progress p
+            JOIN mission_definition d ON d.id = p.mission_id
+            WHERE p.user_id = :userId
+              AND p.claimed_at IS NOT NULL
+              AND COALESCE(p.reward_type_snapshot, d.reward_type) = 'XP'
+            """, nativeQuery = true)
     long sumClaimedXp(@Param("userId") Long userId);
 
     /**
@@ -150,15 +151,26 @@ public interface MissionProgressRepository extends JpaRepository<MissionProgress
      * <p>{@code user_id} 조건은 호출부의 소유권 검사와 중복이지만 일부러 남겨 둔다.
      * 검사를 서비스에만 두면 이 메서드를 다른 곳에서 부르는 순간 소유권 검증이 통째로 빠진다.
      * "모든 데이터 접근은 userId 기준"이라는 불변식은 쿼리 자체에 박혀 있어야 한다.
+     *
+     * <p>보상 스냅샷도 같은 문장에서 박는다. 엔티티를 고쳐 더티 체킹에 맡기면 안 된다.
+     * 이 UPDATE 는 네이티브라 영속성 컨텍스트의 진행도 엔티티는 여전히 {@code claimedAt} 이 null 인데,
+     * 그 상태로 엔티티가 더러워지면 커밋 시점의 UPDATE 가 모든 컬럼을 쓰면서 방금 찍은 수령 시각을 지운다.
      */
     @Modifying(flushAutomatically = true)
     @Query(value = """
             UPDATE mission_progress
             SET claimed_at = NOW(6),
+                reward_type_snapshot = :rewardType,
+                reward_value_snapshot = :rewardValue,
                 updated_at = NOW(6)
             WHERE id = :progressId
               AND user_id = :userId
               AND claimed_at IS NULL
             """, nativeQuery = true)
-    int markClaimed(@Param("progressId") Long progressId, @Param("userId") Long userId);
+    int markClaimed(
+            @Param("progressId") Long progressId,
+            @Param("userId") Long userId,
+            @Param("rewardType") String rewardType,
+            @Param("rewardValue") int rewardValue
+    );
 }

@@ -208,7 +208,9 @@ public class MissionService {
         // 진행도 행을 잠그기 전에 사용자 행을 먼저 잠근다. 잠금 순서를 기존 적립 경로와 맞춰 교착을 막는다.
         missionRewardGranter.lockUser(userId);
 
-        if (missionProgressRepository.markClaimed(progressId, userId) == 0) {
+        // 보상 종류와 값을 받는 순간 박아 둔다. 나중에 정의를 바꿔도 이 기록의 값은 그대로다.
+        if (missionProgressRepository.markClaimed(
+                progressId, userId, definition.getRewardType().name(), definition.getRewardValue()) == 0) {
             throw new ApplicationException(MissionErrorCase.MISSION_ALREADY_CLAIMED);
         }
 

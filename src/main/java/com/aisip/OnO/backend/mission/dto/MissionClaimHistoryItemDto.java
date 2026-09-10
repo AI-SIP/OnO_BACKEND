@@ -12,9 +12,8 @@ import java.time.LocalDateTime;
  *
  * <p>새 테이블을 두지 않는다. {@code mission_progress.claimed_at} 이 이미 그 기록이다.
  *
- * <p>보상 종류와 값은 <b>현재</b> 미션 정의에서 읽는다. 진행도 행에 보상을 박아 두지 않기 때문에,
- * 운영 중에 보상을 바꾸면 예전에 받은 기록도 새 값으로 보인다.
- * 받은 시점의 값을 보존하려면 {@code target_snapshot} 처럼 보상 스냅샷 컬럼이 필요하다.
+ * <p>보상 종류와 값은 <b>받은 시점의 스냅샷</b>에서 읽는다. 현재 정의를 읽으면 운영 중에 보상을 바꿨을 때
+ * 예전에 받은 기록까지 새 값으로 보인다. 스냅샷이 없는 옛 행만 현재 정의로 폴백한다.
  */
 public record MissionClaimHistoryItemDto(
         Long progressId,
@@ -36,8 +35,8 @@ public record MissionClaimHistoryItemDto(
                 definition.getIconKey(),
                 definition.getCategory(),
                 progress.getPeriodKey(),
-                definition.getRewardType(),
-                definition.getRewardValue(),
+                progress.rewardTypeOr(definition.getRewardType()),
+                progress.rewardValueOr(definition.getRewardValue()),
                 progress.getClaimedAt()
         );
     }
