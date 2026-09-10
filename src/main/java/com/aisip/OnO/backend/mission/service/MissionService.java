@@ -1,6 +1,8 @@
 package com.aisip.OnO.backend.mission.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.mission.dto.MissionClaimHistoryItemDto;
+import com.aisip.OnO.backend.mission.dto.MissionClaimHistoryResponseDto;
 import com.aisip.OnO.backend.mission.dto.MissionClaimResponseDto;
 import com.aisip.OnO.backend.mission.dto.MissionListResponseDto;
 import com.aisip.OnO.backend.mission.dto.MissionResponseDto;
@@ -12,10 +14,12 @@ import com.aisip.OnO.backend.mission.repository.MissionDefinitionRepository;
 import com.aisip.OnO.backend.mission.repository.MissionProgressRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -39,6 +43,9 @@ public class MissionService {
      * 한 달이면 "지난 주에 받는 걸 깜빡했다"는 실제 상황은 모두 덮는다.
      */
     private static final int EXPIRED_LOOKBACK_DAYS = 30;
+
+    /** 기록 조회 한 페이지 최대 건수. 요청이 아무리 커도 여기서 자른다. */
+    private static final int MAX_HISTORY_SIZE = 50;
 
     private final MissionDefinitionRepository missionDefinitionRepository;
     private final MissionProgressRepository missionProgressRepository;
@@ -114,6 +121,60 @@ public class MissionService {
                 .map(progress -> MissionResponseDto.from(
                         definitionsById.get(progress.getMissionId()), progress, progress.getPeriodKey()))
                 .toList();
+    }
+
+    /**
+     * 보상 획득 기록. 받은 시각 역순, 커서 페이지네이션.
+     *
+     * <p>새 테이블을 두지 않는다. {@code claimed_at} 이 붙은 진행도 행이 곧 기록이다.
+     *
+     * <p>정의가 비활성화된 미션도 그대로 내려간다. 이미 받은 건 받은 것이다.
+     * 정의 자체가 사라진 경우에만 건너뛴다.
+     *
+     * @param cursor 앞 페이지 마지막 항목의 {@code progressId}. 첫 페이지에서는 null.
+     */
+    public MissionClaimHistoryResponseDto getClaimHistory(Long userId, Long cursor, int size) {
+        int safeSize = Math.min(Math.max(size, 1), MAX_HISTORY_SIZE);
+
+        LocalDateTime cursorClaimedAt = null;
+        if (cursor != null) {
+            // 남의 id 를 커서로 넘기면 여기서 걸린다. 못 찾은 커서는 "끝난 목록"으로 본다.
+            MissionProgress cursorProgress = missionProgressRepository.findByIdAndUserId(cursor, userId).orElse(null);
+            if (cursorProgress == null || cursorProgress.getClaimedAt() == null) {
+                return MissionClaimHistoryResponseDto.nextPage(List.of(), null, false, safeSize);
+            }
+            cursorClaimedAt = cursorProgress.getClaimedAt();
+        }
+
+        // 다음 페이지가 있는지 알려면 한 건 더 읽어 보는 수밖에 없다. 전체를 세는 것보다 싸다.
+        List<MissionProgress> claimed = missionProgressRepository.findClaimedPage(
+                userId, cursorClaimedAt, cursor, PageRequest.of(0, safeSize + 1));
+        boolean hasNext = claimed.size() > safeSize;
+        List<MissionProgress> pageContent = hasNext ? claimed.subList(0, safeSize) : claimed;
+
+        Map<Long, MissionDefinition> definitionsById = missionDefinitionRepository
+                .findAllById(pageContent.stream().map(MissionProgress::getMissionId).distinct().toList())
+                .stream()
+                .collect(Collectors.toMap(MissionDefinition::getId, definition -> definition));
+
+        List<MissionClaimHistoryItemDto> content = pageContent.stream()
+                .filter(progress -> definitionsById.containsKey(progress.getMissionId()))
+                .map(progress -> MissionClaimHistoryItemDto.from(
+                        definitionsById.get(progress.getMissionId()), progress))
+                .toList();
+
+        Long nextCursor = hasNext && !pageContent.isEmpty()
+                ? pageContent.get(pageContent.size() - 1).getId()
+                : null;
+
+        if (cursor != null) {
+            return MissionClaimHistoryResponseDto.nextPage(content, nextCursor, hasNext, safeSize);
+        }
+        return MissionClaimHistoryResponseDto.firstPage(
+                content, nextCursor, hasNext, safeSize,
+                missionProgressRepository.sumClaimedXp(userId),
+                missionProgressRepository.countByUserIdAndClaimedAtIsNotNull(userId)
+        );
     }
 
     /**

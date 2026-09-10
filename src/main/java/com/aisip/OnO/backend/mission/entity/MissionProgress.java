@@ -35,7 +35,11 @@ import java.time.LocalDateTime;
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_mission_progress",
                 columnNames = {"user_id", "mission_id", "period_key"}),
-        indexes = @Index(name = "idx_mission_progress_lookup", columnList = "user_id, period_key"))
+        indexes = {
+                @Index(name = "idx_mission_progress_lookup", columnList = "user_id, period_key"),
+                // 보상 획득 기록은 받은 시각 역순으로만 읽는다. 정렬 키를 뒤에 둬 정렬을 생략시킨다.
+                @Index(name = "idx_mission_progress_claimed", columnList = "user_id, claimed_at")
+        })
 public class MissionProgress extends BaseEntity {
 
     @Id

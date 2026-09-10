@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.mission.repository;
 
 import com.aisip.OnO.backend.mission.entity.MissionProgress;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -38,6 +39,50 @@ public interface MissionProgressRepository extends JpaRepository<MissionProgress
             @Param("currentPeriodKeys") Collection<String> currentPeriodKeys,
             @Param("completedAfter") LocalDateTime completedAfter
     );
+
+    /**
+     * 보상을 받은 기록. 받은 시각 내림차순이고, 커서보다 뒤엣것만 준다.
+     *
+     * <p>커서는 진행도 id 하나뿐인데 정렬은 {@code claimed_at} 이라 {@code id < :cursor} 로는 안 된다.
+     * 나중에 만들어진 행이 먼저 받아질 수 있어 id 순서와 받은 순서가 다르기 때문이다.
+     * 그래서 커서 행의 받은 시각을 함께 넘겨 <b>(받은 시각, id)</b> 두 값으로 자른다.
+     * 시각이 같은 행이 있어도 id 가 갈라 주므로 경계에서 빠지거나 겹치지 않는다.
+     */
+    @Query("""
+            SELECT p FROM MissionProgress p
+            WHERE p.userId = :userId
+              AND p.claimedAt IS NOT NULL
+              AND (:cursorClaimedAt IS NULL
+                   OR p.claimedAt < :cursorClaimedAt
+                   OR (p.claimedAt = :cursorClaimedAt AND p.id < :cursorId))
+            ORDER BY p.claimedAt DESC, p.id DESC
+            """)
+    List<MissionProgress> findClaimedPage(
+            @Param("userId") Long userId,
+            @Param("cursorClaimedAt") LocalDateTime cursorClaimedAt,
+            @Param("cursorId") Long cursorId,
+            Pageable pageable
+    );
+
+    /** 커서 행. 남의 id 를 커서로 넘겨도 자기 것만 잡히게 소유권을 조건에 건다. */
+    Optional<MissionProgress> findByIdAndUserId(Long id, Long userId);
+
+    long countByUserIdAndClaimedAtIsNotNull(Long userId);
+
+    /**
+     * 지금까지 받은 XP 합계.
+     *
+     * <p>보상 값은 미션 정의에 있으므로 두 테이블을 함께 본다. 연관관계를 걸지 않아 식별자로 잇는다.
+     */
+    @Query("""
+            SELECT COALESCE(SUM(d.rewardValue), 0)
+            FROM MissionProgress p, MissionDefinition d
+            WHERE d.id = p.missionId
+              AND p.userId = :userId
+              AND p.claimedAt IS NOT NULL
+              AND d.rewardType = com.aisip.OnO.backend.mission.entity.MissionRewardType.XP
+            """)
+    long sumClaimedXp(@Param("userId") Long userId);
 
     /**
      * 진행도를 한 문장으로 만들거나 올린다.
