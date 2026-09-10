@@ -144,7 +144,7 @@ class MissionProgressUpdaterTest extends MissionSystemTestSupport {
         @Test
         @DisplayName("행동이 롤백되면 진행도도 남지 않는다")
         void rollsBackWithTheAction() {
-            // 커밋 후에 올리므로 롤백된 행동에는 이벤트 자체가 발행되지 않는다.
+            // 호출자의 트랜잭션에 합류하므로 본 작업이 롤백되면 진행도도 함께 사라진다.
             // 하지도 않은 행동으로 보상을 받는 일이 없어야 한다.
             assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status -> {
                 missionProgressUpdater.increase(user.getId(), MissionMetric.PROBLEM_CREATED);
@@ -155,28 +155,27 @@ class MissionProgressUpdaterTest extends MissionSystemTestSupport {
         }
 
         @Test
-        @DisplayName("진행도는 본 작업이 커밋된 뒤에 반영된다")
-        void appliesAfterCommit() {
+        @DisplayName("진행도는 호출자의 트랜잭션 안에서 바로 쓰인다")
+        void joinsCallerTransaction() {
+            // 커밋을 기다렸다가 새 트랜잭션에서 올리면 그 순간 요청 하나가 커넥션을 두 개 잡는다.
+            // 운영 풀이 10이라 다섯 건만 겹쳐도 서비스가 멈춘다. 그래서 같은 트랜잭션에서 바로 쓴다.
             transactionTemplate.executeWithoutResult(status -> {
                 missionProgressUpdater.increase(user.getId(), MissionMetric.PROBLEM_CREATED);
 
                 Integer rows = jdbcTemplate.queryForObject(
                         "SELECT COUNT(*) FROM mission_progress WHERE user_id = ?", Integer.class, user.getId());
                 assertThat(rows)
-                        .as("본 작업과 같은 트랜잭션에서 올리면 진행도 실패가 본 작업까지 되돌린다. "
-                                + "커밋 전에는 아직 아무것도 쓰지 않아야 한다")
-                        .isZero();
+                        .as("커밋을 기다리지 않고 같은 트랜잭션 안에서 바로 반영된다")
+                        .isEqualTo(2);
             });
 
-            assertThat(currentOf(user.getId(), DAILY_NOTE_WRITE))
-                    .as("커밋된 뒤에는 반영돼야 한다")
-                    .isEqualTo(1);
+            assertThat(currentOf(user.getId(), DAILY_NOTE_WRITE)).isEqualTo(1);
         }
 
         @Test
         @DisplayName("트랜잭션 없이 불려도 진행도는 반영된다")
         void appliesWithoutOuterTransaction() {
-            // 운영 경로는 모두 트랜잭션 안이지만, 없을 때 조용히 사라지면 원인을 찾기 어렵다.
+            // 운영 경로는 모두 트랜잭션 안이지만, 없으면 스스로 하나를 연다.
             missionProgressUpdater.increase(user.getId(), MissionMetric.PROBLEM_CREATED);
 
             assertThat(currentOf(user.getId(), DAILY_NOTE_WRITE)).isEqualTo(1);
