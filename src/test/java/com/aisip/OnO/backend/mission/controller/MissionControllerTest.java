@@ -110,6 +110,65 @@ class MissionControllerTest extends MissionSystemTestSupport {
     }
 
     @Test
+    @DisplayName("GET /api/missions/history - 커서 페이지 규약을 그대로 따른다")
+    void getClaimHistory() throws Exception {
+        Long progressId = insertClaimedProgress(
+                user.getId(), WEEKLY_NOTE_10, "2020-W36", LocalDateTime.of(2020, 9, 1, 10, 0));
+
+        mockMvc.perform(get("/api/missions/history"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content.length()").value(1))
+                .andExpect(jsonPath("$.data.nextCursor").doesNotExist())
+                .andExpect(jsonPath("$.data.hasNext").value(false))
+                .andExpect(jsonPath("$.data.size").value(20))
+                .andExpect(jsonPath("$.data.totalClaimedXp").value(80))
+                .andExpect(jsonPath("$.data.totalClaimedCount").value(1))
+                .andExpect(jsonPath("$.data.content[0].progressId").value(progressId))
+                .andExpect(jsonPath("$.data.content[0].code").value(WEEKLY_NOTE_10))
+                .andExpect(jsonPath("$.data.content[0].title").value("열 권의 노트"))
+                .andExpect(jsonPath("$.data.content[0].iconKey").value("note_write"))
+                .andExpect(jsonPath("$.data.content[0].category").value("WEEKLY"))
+                .andExpect(jsonPath("$.data.content[0].periodKey").value("2020-W36"))
+                .andExpect(jsonPath("$.data.content[0].rewardType").value("XP"))
+                .andExpect(jsonPath("$.data.content[0].rewardValue").value(80))
+                .andExpect(jsonPath("$.data.content[0].claimedAt").value("2020-09-01T10:00:00"));
+    }
+
+    @Test
+    @DisplayName("GET /api/missions/history - 두 번째 페이지에는 합계가 없다")
+    void getClaimHistorySecondPage() throws Exception {
+        Long first = insertClaimedProgress(
+                user.getId(), WEEKLY_NOTE_10, "2020-W36", LocalDateTime.of(2020, 9, 2, 10, 0));
+        insertClaimedProgress(
+                user.getId(), DAILY_MOOD, "2020-09-01", LocalDateTime.of(2020, 9, 1, 10, 0));
+
+        mockMvc.perform(get("/api/missions/history").param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.hasNext").value(true))
+                .andExpect(jsonPath("$.data.nextCursor").value(first))
+                .andExpect(jsonPath("$.data.totalClaimedCount").value(2));
+
+        mockMvc.perform(get("/api/missions/history")
+                        .param("size", "1")
+                        .param("cursor", String.valueOf(first)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content.length()").value(1))
+                .andExpect(jsonPath("$.data.content[0].code").value(DAILY_MOOD))
+                .andExpect(jsonPath("$.data.hasNext").value(false))
+                .andExpect(jsonPath("$.data.totalClaimedXp").doesNotExist())
+                .andExpect(jsonPath("$.data.totalClaimedCount").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("GET /api/missions/history - 인증이 없으면 401")
+    void getClaimHistoryRequiresAuthentication() throws Exception {
+        clearAuthentication();
+
+        mockMvc.perform(get("/api/missions/history"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     @DisplayName("POST /api/missions/{progressId}/claim - 완료하지 않았으면 7011")
     void claimRejectsIncomplete() throws Exception {
         missionProgressUpdater.increase(user.getId(),

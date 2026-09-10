@@ -110,6 +110,33 @@ public abstract class MissionSystemTestSupport extends MissionTestSupport {
                 Long.class, userId, definition.getId(), periodKey);
     }
 
+    /**
+     * 보상을 받은 진행도를 직접 만든다.
+     *
+     * <p>받은 시각을 원하는 값으로 두려면 이렇게 박아 넣는 수밖에 없다. 서비스로 받으면 언제나 지금이다.
+     */
+    protected Long insertClaimedProgress(Long userId, String code, String periodKey, LocalDateTime claimedAt) {
+        MissionDefinition definition = definitionOf(code);
+        jdbcTemplate.update("""
+                INSERT INTO mission_progress
+                    (user_id, mission_id, period_key, current_value, target_snapshot,
+                     completed_at, claimed_at, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                userId, definition.getId(), periodKey,
+                definition.getTarget(), definition.getTarget(),
+                claimedAt, claimedAt, claimedAt, claimedAt);
+
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM mission_progress WHERE user_id = ? AND mission_id = ? AND period_key = ?",
+                Long.class, userId, definition.getId(), periodKey);
+    }
+
+    /** 미션 정의를 비활성화한다. 비활성 미션이 기록에는 남는지 확인할 때 쓴다. */
+    protected void deactivateDefinition(String code) {
+        jdbcTemplate.update("UPDATE mission_definition SET active = 0 WHERE code = ?", code);
+    }
+
     /** 지난 주 주간 키. */
     protected String lastWeekKey() {
         return MissionPeriodKey.weekly(MissionPeriodKey.today().minusWeeks(1));
