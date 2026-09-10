@@ -60,8 +60,8 @@ class MissionRewardConcurrencyTest extends MissionTestSupport {
                     .as("출석 기록은 하루 한 건")
                     .isEqualTo(1);
             assertThat(attendancePoints())
-                    .as("출석 경험치도 한 번치만 들어와야 한다")
-                    .isEqualTo(MissionType.USER_LOGIN.getPoint());
+                    .as("자동 적립을 걷어낸 뒤로 행동만으로는 경험치가 들어오지 않는다")
+                    .isZero();
         }
 
         @Test
@@ -105,11 +105,11 @@ class MissionRewardConcurrencyTest extends MissionTestSupport {
 
             assertThat(outcome.serverErrors()).isEmpty();
             assertThat(countLogs(MissionType.PROBLEM_WRITE))
-                    .as("하루 상한 3건까지만 적립된다")
+                    .as("하루 상한 3건까지만 기록된다")
                     .isEqualTo(3);
             assertThat(noteWritePoints())
-                    .as("경험치도 3건치까지만")
-                    .isEqualTo(3 * MissionType.PROBLEM_WRITE.getPoint());
+                    .as("경험치는 미션을 받을 때만 들어온다")
+                    .isZero();
         }
 
     }

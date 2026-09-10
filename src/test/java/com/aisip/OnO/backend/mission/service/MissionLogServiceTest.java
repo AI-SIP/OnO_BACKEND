@@ -69,27 +69,29 @@ class MissionLogServiceTest extends MissionTestSupport {
     class LoginMission {
 
         @Test
-        @DisplayName("첫 로그인이면 기록을 남기고 출석 경험치를 준다")
-        void grantsAttendancePointOnFirstLogin() {
+        @DisplayName("첫 로그인이면 기록을 남긴다 - 경험치는 주지 않는다")
+        void recordsFirstLoginWithoutGrantingPoint() {
             missionLogService.registerLoginMission(user.getId());
 
             assertThat(missionLogRepository.findAllByUserId(user.getId()))
+                    .as("DAU·순 방문자 집계가 이 행을 읽는다. 행이 사라지면 지표가 통째로 0 이 된다")
                     .singleElement()
                     .satisfies(log -> {
                         assertThat(log.getMissionType()).isEqualTo(MissionType.USER_LOGIN);
-                        assertThat(log.getPoint()).isEqualTo(15L);
+                        assertThat(log.getPoint())
+                                .as("point 컬럼은 그대로 채운다. 집계와 관리자 화면이 읽는 값이다")
+                                .isEqualTo(15L);
                     });
             assertThat(statusOf(user)).satisfies(status -> {
                 assertThat(accumulatedPoints(status.getAttendanceLevel(), status.getAttendancePoint()))
-                        .isEqualTo(15L);
-                assertThat(status.getTotalStudyPoint())
-                        .as("출석 경험치는 총 학습 포인트에도 합산된다")
-                        .isEqualTo(15L);
+                        .as("XP 는 미션을 받을 때만 들어온다")
+                        .isZero();
+                assertThat(status.getTotalStudyPoint()).isZero();
             });
         }
 
         @Test
-        @DisplayName("같은 날 다시 로그인해도 기록도 경험치도 늘지 않는다")
+        @DisplayName("같은 날 다시 로그인해도 기록이 늘지 않는다")
         void ignoresSecondLoginOfSameDay() {
             missionLogService.registerLoginMission(user.getId());
             missionLogService.registerLoginMission(user.getId());
@@ -98,7 +100,7 @@ class MissionLogServiceTest extends MissionTestSupport {
             assertThat(missionLogRepository.findAllByUserId(user.getId()))
                     .as("하루에 여러 번 로그인해도 출석은 한 번이다")
                     .hasSize(1);
-            assertThat(statusOf(user).getTotalStudyPoint()).isEqualTo(15L);
+            assertThat(statusOf(user).getTotalStudyPoint()).isZero();
         }
 
         @Test
@@ -119,8 +121,9 @@ class MissionLogServiceTest extends MissionTestSupport {
             missionLogService.registerLoginMission(user.getId());
 
             assertThat(missionLogRepository.findAllByUserId(user.getId())).hasSize(1);
-            assertThat(statusOf(user).getTotalStudyPoint()).isEqualTo(15L);
-            assertThat(statusOf(other).getTotalStudyPoint()).isEqualTo(15L);
+            assertThat(missionLogRepository.findAllByUserId(other.getId())).hasSize(1);
+            assertThat(statusOf(user).getTotalStudyPoint()).isZero();
+            assertThat(statusOf(other).getTotalStudyPoint()).isZero();
         }
 
         @Test
@@ -136,8 +139,8 @@ class MissionLogServiceTest extends MissionTestSupport {
     class ProblemWriteMission {
 
         @Test
-        @DisplayName("하루 세 번까지 보상을 준다")
-        void grantsUpToThreeTimesPerDay() {
+        @DisplayName("하루 세 번까지 기록을 남긴다")
+        void recordsUpToThreeTimesPerDay() {
             for (int i = 0; i < 5; i++) {
                 missionLogService.registerProblemWriteMission(user.getId());
             }
@@ -145,16 +148,16 @@ class MissionLogServiceTest extends MissionTestSupport {
             assertThat(missionLogRepository.findAllByUserId(user.getId()))
                     .as("네 번째부터는 기록도 남기지 않는다")
                     .hasSize(3);
-            assertThat(statusOf(user).getTotalStudyPoint()).isEqualTo(30L);
+            assertThat(statusOf(user).getTotalStudyPoint()).isZero();
         }
 
         @Test
-        @DisplayName("한 번에 여러 문제를 등록해도 하루 상한인 3건까지만 보상한다")
+        @DisplayName("한 번에 여러 문제를 등록해도 하루 상한인 3건까지만 기록한다")
         void batchStopsAtDailyLimit() {
             missionLogService.registerProblemWriteMissionBatch(user.getId(), 10);
 
             assertThat(missionLogRepository.countProblemWritesToday(user.getId())).isEqualTo(3);
-            assertThat(statusOf(user).getTotalStudyPoint()).isEqualTo(30L);
+            assertThat(statusOf(user).getTotalStudyPoint()).isZero();
         }
 
         @ParameterizedTest(name = "이미 {0}건 작성한 상태에서 {1}건 일괄 등록 → 총 {2}건")
@@ -211,38 +214,38 @@ class MissionLogServiceTest extends MissionTestSupport {
     class PracticeMission {
 
         @Test
-        @DisplayName("같은 문제는 하루에 한 번만 보상한다")
-        void grantsProblemPracticeOncePerDay() {
+        @DisplayName("같은 문제는 하루에 한 번만 기록한다")
+        void recordsProblemPracticeOncePerDay() {
             missionLogService.registerProblemPracticeMission(user.getId(), 100L);
             missionLogService.registerProblemPracticeMission(user.getId(), 100L);
 
             assertThat(missionLogRepository.findAllByUserId(user.getId())).hasSize(1);
             assertThat(statusOf(user)).satisfies(status -> {
                 assertThat(accumulatedPoints(status.getProblemPracticeLevel(), status.getProblemPracticePoint()))
-                        .isEqualTo(5L);
-                assertThat(status.getTotalStudyPoint()).isEqualTo(5L);
+                        .isZero();
+                assertThat(status.getTotalStudyPoint()).isZero();
             });
         }
 
         @Test
-        @DisplayName("다른 문제를 복습하면 각각 보상한다")
-        void grantsPerProblem() {
+        @DisplayName("다른 문제를 복습하면 각각 기록한다")
+        void recordsPerProblem() {
             missionLogService.registerProblemPracticeMission(user.getId(), 100L);
             missionLogService.registerProblemPracticeMission(user.getId(), 101L);
             missionLogService.registerProblemPracticeMission(user.getId(), 102L);
 
             assertThat(missionLogRepository.findAllByUserId(user.getId())).hasSize(3);
-            assertThat(statusOf(user).getTotalStudyPoint()).isEqualTo(15L);
+            assertThat(statusOf(user).getTotalStudyPoint()).isZero();
         }
 
         @Test
-        @DisplayName("복습노트도 하루에 한 번만 보상한다")
-        void grantsNotePracticeOncePerDay() {
+        @DisplayName("복습노트도 하루에 한 번만 기록한다")
+        void recordsNotePracticeOncePerDay() {
             missionLogService.registerNotePracticeMission(user.getId(), 200L);
             missionLogService.registerNotePracticeMission(user.getId(), 200L);
 
             assertThat(missionLogRepository.findAllByUserId(user.getId())).hasSize(1);
-            assertThat(accumulatedNotePracticePoints(user)).isEqualTo(15L);
+            assertThat(accumulatedNotePracticePoints(user)).isZero();
         }
 
         @Test
@@ -253,13 +256,13 @@ class MissionLogServiceTest extends MissionTestSupport {
             missionLogService.registerProblemPracticeMission(user.getId(), 100L);
 
             assertThat(missionLogRepository.findAllByUserId(user.getId()))
-                    .as("어제 기록 1건 + 오늘 새로 받은 1건")
+                    .as("어제 기록 1건 + 오늘 새로 남긴 1건")
                     .hasSize(2);
             assertThat(accumulatedPoints(
                     statusOf(user).getProblemPracticeLevel(),
                     statusOf(user).getProblemPracticePoint()))
-                    .as("어제 기록은 경험치를 다시 주지 않는다")
-                    .isEqualTo(5L);
+                    .as("기록을 남겨도 경험치는 들어오지 않는다")
+                    .isZero();
         }
 
         @Test
@@ -332,66 +335,65 @@ class MissionLogServiceTest extends MissionTestSupport {
         }
     }
 
+    /**
+     * 예전에는 이 자리에 "하루 200점 상한" 테스트가 있었다. 상한은 자동 적립을 막기 위한 장치였는데
+     * 자동 적립 자체가 없어져 막을 대상이 사라졌다. 같은 시나리오를 새 동작으로 옮겨 둔다.
+     * 지키려던 것("하루 만에 만렙이 되지 않는다")은 미션 설계가 대신한다. 일일 6종을 다 받아도 75 XP 다.
+     */
     @Nested
-    @DisplayName("하루 포인트 상한")
-    class DailyPointLimit {
+    @DisplayName("자동 적립 폐지")
+    class NoAutomaticPointGrant {
 
         @Test
-        @DisplayName("하루에 받을 수 있는 경험치는 200점까지다")
-        void capsDailyGainAtTwoHundred() {
+        @DisplayName("몇 번을 해도 경험치는 오르지 않는다")
+        void neverGrantsPointNoMatterHowManyTimes() {
             for (int i = 1; i <= 13; i++) {
                 missionLogService.registerNotePracticeMission(user.getId(), (long) i);
             }
 
             assertThat(accumulatedNotePracticePoints(user))
-                    .as("15점짜리 미션을 13번 하면 12번은 15점씩, 마지막은 남은 5점만 받아 185점이다")
-                    .isEqualTo(185L);
+                    .as("행동만으로 경험치가 들어오면 미션 화면의 숫자와 실제 증가량이 어긋난다")
+                    .isZero();
         }
 
         @Test
-        @DisplayName("상한을 넘긴 뒤의 미션은 기록만 남고 경험치는 0이다")
-        void grantsNothingBeyondLimit() {
-            for (int i = 1; i <= 13; i++) {
+        @DisplayName("경험치를 주지 않아도 수행 기록은 전부 남는다")
+        void keepsEveryLogWithoutPoint() {
+            for (int i = 1; i <= 14; i++) {
                 missionLogService.registerNotePracticeMission(user.getId(), (long) i);
             }
-            long beforeExtra = accumulatedNotePracticePoints(user);
-
-            missionLogService.registerNotePracticeMission(user.getId(), 14L);
 
             assertThat(missionLogRepository.findAllByUserId(user.getId()))
-                    .as("보상이 0이어도 수행 기록 자체는 남아야 한다")
+                    .as("관리자 통계가 이 행을 읽는다. 지급을 걷어내면서 기록까지 없애면 지표가 죽는다")
                     .hasSize(14);
-            assertThat(accumulatedNotePracticePoints(user))
-                    .as("상한을 넘겨 경험치가 계속 들어오면 하루 만에 만렙이 된다")
-                    .isEqualTo(beforeExtra);
+            assertThat(accumulatedNotePracticePoints(user)).isZero();
         }
 
         @Test
-        @DisplayName("상한은 사용자마다 따로 적용된다")
-        void appliesLimitPerUser() {
+        @DisplayName("사용자마다 기록은 따로 쌓이고 경험치는 둘 다 0이다")
+        void recordsPerUser() {
             for (int i = 1; i <= 14; i++) {
                 missionLogService.registerNotePracticeMission(user.getId(), (long) i);
             }
 
             missionLogService.registerNotePracticeMission(other.getId(), 100L);
 
-            assertThat(accumulatedNotePracticePoints(other))
-                    .as("남이 상한을 채웠다고 내 보상이 막히면 안 된다")
-                    .isEqualTo(15L);
+            assertThat(missionLogRepository.findAllByUserId(other.getId())).hasSize(1);
+            assertThat(accumulatedNotePracticePoints(other)).isZero();
+            assertThat(accumulatedNotePracticePoints(user)).isZero();
         }
 
         @Test
-        @DisplayName("어제 채운 상한은 오늘 다시 열린다")
-        void resetsLimitNextDay() {
+        @DisplayName("어제 기록이 많아도 오늘 기록은 그대로 남는다")
+        void stillRecordsNextDay() {
             for (int i = 1; i <= 14; i++) {
                 saveMissionLogAt(user, MissionType.NOTE_PRACTICE, (long) i, today().minusDays(1).atTime(12, 0));
             }
 
             missionLogService.registerNotePracticeMission(user.getId(), 999L);
 
-            assertThat(accumulatedNotePracticePoints(user))
-                    .as("어제 소진한 상한이 오늘까지 이어지면 보상이 영영 막힌다")
-                    .isEqualTo(15L);
+            assertThat(missionLogRepository.findAllByUserId(user.getId())).hasSize(15);
+            assertThat(accumulatedNotePracticePoints(user)).isZero();
         }
     }
 

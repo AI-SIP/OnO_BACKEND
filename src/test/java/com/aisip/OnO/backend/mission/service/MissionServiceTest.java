@@ -340,18 +340,21 @@ class MissionServiceTest extends MissionSystemTestSupport {
         }
 
         @Test
-        @DisplayName("하루 200점 상한을 채운 뒤에도 미션 보상은 들어온다")
-        void ignoresDailyPointCap() {
-            // 상한은 기존 적립(MissionLog) 경로에만 있는 규칙이다. 미션 보상은 그 위에 얹는 보너스라 상한 밖이다.
+        @DisplayName("행동 기록이 아무리 쌓여 있어도 XP 는 받을 때만 들어온다")
+        void grantsOnlyOnClaim() {
+            // 예전에는 mission_log 가 쌓일 때마다 자동으로 XP 가 들어가고 하루 200점 상한이 그것만 눌렀다.
+            // 이제 지급 경로는 받기 하나뿐이라, 기록이 얼마나 있든 받기 전에는 0 이다.
             saveMissionLog(user, MissionType.PROBLEM_WRITE, null);
             jdbcTemplate.update("UPDATE mission_log SET point = 300 WHERE user_id = ?", user.getId());
 
             MissionProgress progress = completeMission(user.getId(), DAILY_REVIEW_3);
-            long before = problemPracticePoints();
+            assertThat(problemPracticePoints())
+                    .as("완료만 해서는 오르지 않는다")
+                    .isZero();
 
             missionService.claim(user.getId(), progress.getId());
 
-            assertThat(problemPracticePoints() - before).isEqualTo(15);
+            assertThat(problemPracticePoints()).isEqualTo(15);
         }
 
         @Test
