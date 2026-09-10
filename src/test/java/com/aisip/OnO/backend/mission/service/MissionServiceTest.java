@@ -138,6 +138,49 @@ class MissionServiceTest extends MissionSystemTestSupport {
         }
 
         @Test
+        @DisplayName("받은 미션은 claimed 가 참으로 내려간다")
+        void showsClaimedAsTrue() {
+            // 프론트가 이 값으로 받기 버튼을 비활성화한다. 영영 false 로 나가도 화면은 조용히 잘못 동작한다.
+            MissionProgress progress = completeMission(user.getId(), DAILY_NOTE_WRITE);
+            missionService.claim(user.getId(), progress.getId());
+
+            MissionResponseDto noteWrite = findByCode(
+                    missionService.getMissions(user.getId()).daily().missions(), DAILY_NOTE_WRITE);
+
+            assertThat(noteWrite.claimed()).isTrue();
+            assertThat(noteWrite.completed()).isTrue();
+        }
+
+        @Test
+        @DisplayName("진행 중에 목표가 바뀌어도 그 사람은 옛 목표로 끝낸다")
+        void keepsTargetSnapshot() {
+            // 진행도 행을 만들 때 target 을 박아 두는 이유다. 현재 정의를 읽으면
+            // 운영 중에 목표를 낮췄을 때 이미 채운 사람 화면이 "5 / 3" 이 된다.
+            missionProgressUpdater.increase(user.getId(), MissionMetric.SOLVE_RECORDED, 3);
+            changeTarget(DAILY_REVIEW_3, 99);
+
+            MissionResponseDto review = findByCode(
+                    missionService.getMissions(user.getId()).daily().missions(), DAILY_REVIEW_3);
+
+            assertThat(review.target())
+                    .as("진행도가 있는 미션은 그 행이 만들어질 때의 목표를 쓴다")
+                    .isEqualTo(3);
+            assertThat(review.current()).isEqualTo(3);
+            assertThat(review.completed()).isTrue();
+        }
+
+        @Test
+        @DisplayName("진행도가 없는 미션은 바뀐 목표를 그대로 보여준다")
+        void usesCurrentTargetWhenNoProgress() {
+            changeTarget(DAILY_REVIEW_3, 99);
+
+            MissionResponseDto review = findByCode(
+                    missionService.getMissions(user.getId()).daily().missions(), DAILY_REVIEW_3);
+
+            assertThat(review.target()).isEqualTo(99);
+        }
+
+        @Test
         @DisplayName("남의 진행도는 내 목록에 섞이지 않는다")
         void doesNotLeakOtherUsersProgress() {
             User other = fixtures.createOtherUser();
@@ -264,6 +307,34 @@ class MissionServiceTest extends MissionSystemTestSupport {
         }
 
         @Test
+        @DisplayName("상한 경계는 30일이다 - 29일 반나절 전은 들어오고 30일 한 시간 전은 빠진다")
+        void lookbackBoundaryIsThirtyDays() {
+            // 두 점이 상한을 30 으로 못박는다. 29.5일 전이 들어오려면 상한이 30 이상이어야 하고,
+            // 30일 1시간 전이 빠지려면 30 이하여야 한다. 20일과 40일만 재면 29 로 바꿔도 통과한다.
+            insertCompletedProgress(user.getId(), WEEKLY_REVIEW_30, "2020-W10",
+                    LocalDateTime.now().minusDays(29).minusHours(12));
+            insertCompletedProgress(user.getId(), WEEKLY_NOTE_10, "2020-W11",
+                    LocalDateTime.now().minusDays(30).minusHours(1));
+
+            assertThat(missionService.getMissions(user.getId()).expired().missions())
+                    .extracting(MissionResponseDto::code)
+                    .containsExactly(WEEKLY_REVIEW_30);
+        }
+
+        @Test
+        @DisplayName("정의가 비활성화돼도 이미 완료한 미수령 보상은 내려간다")
+        void keepsDeactivatedDefinition() {
+            insertCompletedProgress(
+                    user.getId(), WEEKLY_REVIEW_30, lastWeekKey(), LocalDateTime.now().minusDays(1));
+            deactivateDefinition(WEEKLY_REVIEW_30);
+
+            assertThat(missionService.getMissions(user.getId()).expired().missions())
+                    .as("이미 완료한 건 받을 수 있어야 한다")
+                    .extracting(MissionResponseDto::code)
+                    .containsExactly(WEEKLY_REVIEW_30);
+        }
+
+        @Test
         @DisplayName("남의 미수령 보상은 내 목록에 섞이지 않는다")
         void doesNotLeakOtherUsers() {
             User other = fixtures.createOtherUser();
@@ -354,6 +425,36 @@ class MissionServiceTest extends MissionSystemTestSupport {
                     .isEqualTo(MissionErrorCase.MISSION_PROGRESS_NOT_FOUND);
             assertThat(missionProgressRepository.findById(progress.getId()).orElseThrow().getClaimedAt())
                     .as("거절됐으면 수령 도장도 찍히면 안 된다")
+                    .isNull();
+        }
+
+        @Test
+        @DisplayName("정의가 사라진 진행도는 받을 수 없다")
+        void rejectsWhenDefinitionIsGone() {
+            MissionProgress progress = completeMission(user.getId(), DAILY_REVIEW_3);
+            jdbcTemplate.update("DELETE FROM mission_definition WHERE id = ?", progress.getMissionId());
+
+            assertThatThrownBy(() -> missionService.claim(user.getId(), progress.getId()))
+                    .isInstanceOf(ApplicationException.class)
+                    .extracting(exception -> ((ApplicationException) exception).getErrorCase())
+                    .isEqualTo(MissionErrorCase.MISSION_PROGRESS_NOT_FOUND);
+            assertThat(missionProgressRepository.findById(progress.getId()).orElseThrow().getClaimedAt())
+                    .as("보상 값을 알 수 없으니 수령 도장도 찍히면 안 된다")
+                    .isNull();
+        }
+
+        @Test
+        @DisplayName("사용자가 사라졌으면 USER_NOT_FOUND 로 거절한다")
+        void rejectsWhenUserIsGone() {
+            MissionProgress progress = completeMission(user.getId(), DAILY_REVIEW_3);
+            jdbcTemplate.update("UPDATE user SET deleted_at = NOW(6) WHERE id = ?", user.getId());
+
+            assertThatThrownBy(() -> missionService.claim(user.getId(), progress.getId()))
+                    .isInstanceOf(ApplicationException.class)
+                    .extracting(exception -> ((ApplicationException) exception).getErrorCase())
+                    .isEqualTo(MissionErrorCase.USER_NOT_FOUND);
+            assertThat(missionProgressRepository.findById(progress.getId()).orElseThrow().getClaimedAt())
+                    .as("지급할 대상이 없으면 수령 도장도 찍히면 안 된다")
                     .isNull();
         }
 

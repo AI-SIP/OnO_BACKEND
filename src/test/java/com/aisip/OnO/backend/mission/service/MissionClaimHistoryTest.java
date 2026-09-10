@@ -208,6 +208,20 @@ class MissionClaimHistoryTest extends MissionSystemTestSupport {
         }
 
         @Test
+        @DisplayName("아직 안 받은 내 진행도를 커서로 넘기면 빈 페이지를 준다")
+        void rejectsUnclaimedCursor() {
+            // 커서 행에 claimed_at 이 없으면 자를 기준이 없다. 400 을 던지는 것보다 빈 페이지가 안전하다.
+            MissionProgress unclaimed = completeMission(user.getId(), DAILY_NOTE_WRITE);
+            insertClaimedProgress(user.getId(), DAILY_MOOD, "2020-09-01", BASE);
+
+            MissionClaimHistoryResponseDto history =
+                    missionService.getClaimHistory(user.getId(), unclaimed.getId(), 20);
+
+            assertThat(history.content()).isEmpty();
+            assertThat(history.hasNext()).isFalse();
+        }
+
+        @Test
         @DisplayName("남의 진행도를 커서로 넘겨도 남의 기록이 새지 않는다")
         void rejectsOtherUsersCursor() {
             User other = fixtures.createOtherUser();
@@ -274,6 +288,20 @@ class MissionClaimHistoryTest extends MissionSystemTestSupport {
             MissionClaimHistoryResponseDto history = missionService.getClaimHistory(user.getId(), null, 500);
 
             assertThat(history.size()).isEqualTo(50);
+        }
+
+        @Test
+        @DisplayName("size 가 0 이거나 음수여도 터지지 않는다")
+        void guardsNonPositivePageSize() {
+            // 쿼리 파라미터라 밖에서 그대로 찔린다. 하한이 없으면 PageRequest.of(0, 0) 이 되어 500 이 난다.
+            insertClaimedProgress(user.getId(), DAILY_MOOD, "2020-09-01", BASE);
+
+            for (int size : new int[]{0, -1, Integer.MIN_VALUE}) {
+                MissionClaimHistoryResponseDto history = missionService.getClaimHistory(user.getId(), null, size);
+
+                assertThat(history.size()).as("size=%d", size).isEqualTo(1);
+                assertThat(history.content()).as("size=%d", size).hasSize(1);
+            }
         }
 
         private List<Long> walkAllPages(int size) {

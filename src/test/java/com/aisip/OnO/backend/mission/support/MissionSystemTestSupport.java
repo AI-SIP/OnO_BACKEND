@@ -61,6 +61,10 @@ public abstract class MissionSystemTestSupport extends MissionTestSupport {
                 () -> new IllegalStateException("시드에 없는 미션 코드다: " + code));
     }
 
+    /**
+     * 프로덕션 계산기를 그대로 부른다. "서비스가 같은 계산을 위임했는가"만 확인할 수 있고
+     * 키 형식 자체는 검증하지 못한다. 형식은 {@code MissionPeriodKeyTest} 가 리터럴로 막는다.
+     */
     protected String periodKeyOf(String code) {
         return MissionPeriodKey.of(definitionOf(code).getCategory(), MissionPeriodKey.today());
     }
@@ -156,6 +160,11 @@ public abstract class MissionSystemTestSupport extends MissionTestSupport {
     /** 미션 정의의 보상 값을 바꾼다. 이미 받은 기록이 흔들리지 않는지 확인할 때 쓴다. */
     protected void changeRewardValue(String code, int rewardValue) {
         jdbcTemplate.update("UPDATE mission_definition SET reward_value = ? WHERE code = ?", rewardValue, code);
+    }
+
+    /** 미션 정의의 목표를 바꾼다. 진행 중이던 사용자가 옛 목표로 끝나는지 확인할 때 쓴다. */
+    protected void changeTarget(String code, int target) {
+        jdbcTemplate.update("UPDATE mission_definition SET target = ? WHERE code = ?", target, code);
     }
 
     private Long claimedProgressId(Long userId, Long missionId, String periodKey) {

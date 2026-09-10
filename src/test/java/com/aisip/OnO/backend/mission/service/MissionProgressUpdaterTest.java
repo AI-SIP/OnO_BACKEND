@@ -187,6 +187,21 @@ class MissionProgressUpdaterTest extends MissionSystemTestSupport {
     class NoOp {
 
         @Test
+        @DisplayName("비활성 정의는 진행도가 오르지 않는다")
+        void ignoresInactiveDefinition() {
+            deactivateDefinition(DAILY_NOTE_WRITE);
+
+            missionProgressUpdater.increase(user.getId(), MissionMetric.PROBLEM_CREATED);
+
+            assertThat(currentOf(user.getId(), DAILY_NOTE_WRITE))
+                    .as("내린 미션은 더 이상 쌓이지 않아야 한다")
+                    .isZero();
+            assertThat(currentOf(user.getId(), WEEKLY_NOTE_10))
+                    .as("같은 항목을 세는 다른 미션은 그대로 오른다")
+                    .isEqualTo(1);
+        }
+
+        @Test
         @DisplayName("증가량이 0 이하면 아무 일도 없다")
         void ignoresNonPositiveAmount() {
             missionProgressUpdater.increase(user.getId(), MissionMetric.PROBLEM_CREATED, 0);

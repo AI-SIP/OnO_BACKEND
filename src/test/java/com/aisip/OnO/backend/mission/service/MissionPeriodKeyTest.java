@@ -5,7 +5,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -78,6 +80,30 @@ class MissionPeriodKeyTest {
         @DisplayName("한 자리 주차는 0을 채운다")
         void padsSingleDigitWeek() {
             assertThat(MissionPeriodKey.weekly(LocalDate.of(2026, 1, 5))).isEqualTo("2026-W02");
+        }
+    }
+
+    @Nested
+    @DisplayName("시간대")
+    class TimeZone {
+
+        @Test
+        @DisplayName("하루의 경계를 KST 로 못박는다")
+        void pinsZoneToSeoul() throws NoSuchFieldException, IllegalAccessException {
+            // JVM 기본 시간대를 쓰면 배포 환경에 따라 "오늘"이 하루 어긋난다.
+            // 테스트 JVM 도 KST 로 고정돼 있어 동작만으로는 systemDefault() 와 구별되지 않는다.
+            // 그래서 선언을 직접 확인한다.
+            Field zoneField = MissionPeriodKey.class.getDeclaredField("KST");
+            zoneField.setAccessible(true);
+
+            assertThat(zoneField.get(null)).isEqualTo(ZoneId.of("Asia/Seoul"));
+        }
+
+        @Test
+        @DisplayName("오늘은 KST 기준 날짜다")
+        void todayFollowsSeoul() {
+            assertThat(MissionPeriodKey.today()).isEqualTo(LocalDate.now(ZoneId.of("Asia/Seoul")));
+            assertThat(MissionPeriodKey.now().toLocalDate()).isEqualTo(LocalDate.now(ZoneId.of("Asia/Seoul")));
         }
     }
 
