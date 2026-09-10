@@ -4,7 +4,6 @@ import com.aisip.OnO.backend.mission.support.MissionSystemTestSupport;
 import com.aisip.OnO.backend.user.entity.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -21,9 +20,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @DisplayName("미션 적립 진입점")
 class MissionLogEntryPointTest extends MissionSystemTestSupport {
-
-    @Autowired
-    private MissionLogService missionLogService;
 
     @Test
     @DisplayName("진행도를 올리지 않는 범용 등록 진입점이 없다")

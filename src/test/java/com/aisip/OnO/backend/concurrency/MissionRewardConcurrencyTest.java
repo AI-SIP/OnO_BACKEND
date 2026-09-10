@@ -8,7 +8,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,13 +34,13 @@ class MissionRewardConcurrencyTest extends MissionTestSupport {
 
     private static final int THREAD_COUNT = 8;
 
-    @Autowired
-    private MissionLogService missionLogService;
-
     private User user;
 
     @BeforeEach
     void setUpUser() {
+        // 자동 적립이 켜진 상태의 동시성을 본다. 이 테스트가 지키는 것은 잠금이지 지급 규칙이 아니지만,
+        // 경험치 단언이 있어 어느 상태를 재는지 명시해 둔다.
+        setLegacyAccrual(true);
         user = fixtures.createUser();
     }
 
@@ -60,8 +59,8 @@ class MissionRewardConcurrencyTest extends MissionTestSupport {
                     .as("출석 기록은 하루 한 건")
                     .isEqualTo(1);
             assertThat(attendancePoints())
-                    .as("자동 적립을 걷어낸 뒤로 행동만으로는 경험치가 들어오지 않는다")
-                    .isZero();
+                    .as("출석 경험치도 한 번치만 들어와야 한다")
+                    .isEqualTo(MissionType.USER_LOGIN.getPoint());
         }
 
         @Test
@@ -105,11 +104,11 @@ class MissionRewardConcurrencyTest extends MissionTestSupport {
 
             assertThat(outcome.serverErrors()).isEmpty();
             assertThat(countLogs(MissionType.PROBLEM_WRITE))
-                    .as("하루 상한 3건까지만 기록된다")
+                    .as("하루 상한 3건까지만 적립된다")
                     .isEqualTo(3);
             assertThat(noteWritePoints())
-                    .as("경험치는 미션을 받을 때만 들어온다")
-                    .isZero();
+                    .as("경험치도 3건치까지만")
+                    .isEqualTo(3 * MissionType.PROBLEM_WRITE.getPoint());
         }
 
     }

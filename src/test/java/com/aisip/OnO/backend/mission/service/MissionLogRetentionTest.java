@@ -34,17 +34,14 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 자동 적립을 걷어낸 뒤에도 <b>행동 기록은 그대로 남는지</b>.
+ * 자동 적립을 <b>껐을 때</b>도 행동 기록은 그대로 남는지.
  *
- * <p>이번 변경에서 제일 위험한 지점이다. 지급을 떼어내면서 {@code mission_log} 저장까지 같이 없애면
+ * <p>흡수가 끝난 상태에서 제일 위험한 지점이다. 지급을 끄면서 {@code mission_log} 저장까지 같이 멎으면
  * DAU·순 방문자·복습 로그가 전부 0 이 된다. 관리자 화면 7곳이 이 테이블 하나를 읽는다.
  * 그래서 "행은 계속 만들어진다"와 "XP 는 받을 때만 들어온다"를 한자리에서 잠근다.
  */
-@DisplayName("자동 적립 폐지 후 기록 보존")
+@DisplayName("자동 적립 꺼짐 - 기록 보존")
 class MissionLogRetentionTest extends MissionSystemTestSupport {
-
-    @Autowired
-    private MissionLogService missionLogService;
 
     @Autowired
     private ProblemService problemService;
@@ -66,6 +63,7 @@ class MissionLogRetentionTest extends MissionSystemTestSupport {
 
     @BeforeEach
     void setUpUser() {
+        setLegacyAccrual(false);
         user = fixtures.createUser();
         folder = fixtures.createRootFolder(user.getId());
     }
