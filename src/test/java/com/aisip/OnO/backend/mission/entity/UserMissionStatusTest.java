@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>공식이 두 개다.
  * <ul>
  *   <li>개별 능력치: 레벨 n → n+1 에 {@code 10 + (n-1) * 10} 점 필요, 상한 없음</li>
- *   <li>총 학습 레벨: 개별 필요치의 4배, <b>레벨 15에서 멈춤</b></li>
+ *   <li>총 학습 레벨: 개별 필요치의 4배(= 40 × 레벨), <b>레벨 20에서 멈춤</b></li>
  * </ul>
  * 사용자에게 보이는 숫자라 한 칸만 어긋나도 바로 문의가 들어온다.
  */
@@ -219,24 +219,38 @@ class UserMissionStatusTest {
         }
 
         @Test
-        @DisplayName("총 학습 레벨은 15에서 멈추고 그 뒤 경험치는 그대로 쌓인다")
-        void stopsAtLevelFifteen() {
-            UserMissionStatus status = new UserMissionStatus(1L, 0L, 1L, 0L, 1L, 0L, 1L, 0L, 14L, 0L);
+        @DisplayName("총 학습 레벨은 20에서 멈추고 그 뒤 경험치는 그대로 쌓인다")
+        void stopsAtLevelTwenty() {
+            UserMissionStatus status = new UserMissionStatus(1L, 0L, 1L, 0L, 1L, 0L, 1L, 0L, 19L, 0L);
 
-            status.gainAttendancePoint(560L);
+            status.gainAttendancePoint(760L);
             assertThat(status.getTotalStudyLevel())
-                    .as("레벨 14→15 에 필요한 560점을 채우면 15가 된다")
-                    .isEqualTo(15L);
+                    .as("레벨 19→20 에 필요한 760점(40 × 19)을 채우면 20이 된다")
+                    .isEqualTo(20L);
             assertThat(status.getTotalStudyPoint()).isZero();
 
             status.gainAttendancePoint(10_000L);
 
             assertThat(status.getTotalStudyLevel())
-                    .as("상한을 넘겨 16레벨이 되면 화면에 없는 레벨이 표시된다")
-                    .isEqualTo(15L);
+                    .as("상한을 넘겨 21레벨이 되면 해금표에 없는 레벨이 표시된다")
+                    .isEqualTo(20L);
             assertThat(status.getTotalStudyPoint())
                     .as("상한 이후 경험치는 사라지지 않고 그대로 누적된다")
                     .isEqualTo(10_000L);
+        }
+
+        @Test
+        @DisplayName("상한이 15 였다면 멈췄을 자리를 그대로 지나간다")
+        void passesThroughTheOldCap() {
+            UserMissionStatus status = new UserMissionStatus(1L, 0L, 1L, 0L, 1L, 0L, 1L, 0L, 15L, 0L);
+
+            // 15→20 에 필요한 합은 40 x (15+16+17+18+19) = 3,400 이다.
+            status.gainAttendancePoint(3_400L);
+
+            assertThat(status.getTotalStudyLevel())
+                    .as("여기서 15 에 멈추면 총 학습 16·18·19·20 자리의 치장이 영영 안 열린다")
+                    .isEqualTo(20L);
+            assertThat(status.getTotalStudyPoint()).isZero();
         }
 
         @Test
@@ -246,8 +260,8 @@ class UserMissionStatusTest {
 
             status.gainAttendancePoint(100_000L);
 
-            assertThat(status.getAttendanceLevel()).isGreaterThan(15L);
-            assertThat(status.getTotalStudyLevel()).isEqualTo(15L);
+            assertThat(status.getAttendanceLevel()).isGreaterThan(20L);
+            assertThat(status.getTotalStudyLevel()).isEqualTo(20L);
         }
     }
 

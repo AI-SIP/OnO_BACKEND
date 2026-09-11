@@ -10,6 +10,19 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserMissionStatus {
+
+    /**
+     * 총 학습 레벨 상한.
+     *
+     * <p>치장 해금표가 총 학습 레벨 20 까지 아이템을 두고 있어 15 에서 20 으로 올렸다.
+     * 15 에서 20 까지 더 필요한 경험치는 40 x (15+16+17+18+19) = 3,400 점이다.
+     *
+     * <p>상한에 닿아도 {@code totalStudyPoint} 는 계속 쌓인다. 그래서 상한을 올리는 순간
+     * 이미 쌓아 둔 잔여 포인트로 레벨이 한 번에 여러 단계 오를 수 있는데, 상한 15 에 닿은
+     * 사용자가 아직 없어 이번 변경으로 그런 사용자는 생기지 않는다.
+     */
+    public static final long MAX_TOTAL_STUDY_LEVEL = 20L;
+
     // 데일리 출석
     private Long attendanceLevel;
     private Long attendancePoint;
@@ -86,7 +99,7 @@ public class UserMissionStatus {
         this.totalStudyPoint += gainedPoints;
 
         // 레벨업 처리
-        while (this.totalStudyLevel < 15 && this.totalStudyPoint >= getTotalStudyThresholdForLevel(this.totalStudyLevel)) {
+        while (this.totalStudyLevel < MAX_TOTAL_STUDY_LEVEL && this.totalStudyPoint >= getTotalStudyThresholdForLevel(this.totalStudyLevel)) {
             this.totalStudyPoint -= getTotalStudyThresholdForLevel(this.totalStudyLevel);
             this.totalStudyLevel += 1;
         }
@@ -107,11 +120,12 @@ public class UserMissionStatus {
 
     /**
      * 총 학습 레벨의 필요 경험치 계산
-     * 개별 능력치 필요 경험치 × 4
+     * 개별 능력치 필요 경험치 × 4 = 40 × 레벨
      *
      * - 레벨 1→2: 40 (10 × 4)
      * - 레벨 2→3: 80 (20 × 4)
      * - 레벨 14→15: 560 (140 × 4)
+     * - 레벨 19→20: 760 (190 × 4) — 상한. 15 에서 20 까지 합이 3,400 이다
      */
     private Long getTotalStudyThresholdForLevel(Long level) {
         return getThresholdForLevel(level) * 4;
