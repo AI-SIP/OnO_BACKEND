@@ -31,9 +31,14 @@ import java.util.Locale;
 @Component
 public class CosmeticItemSeeder {
 
-    /** 카탈로그를 손대는 마이그레이션을 새로 만들면 적용 순서대로 여기에 더한다. */
+    /**
+     * 카탈로그를 손대는 마이그레이션을 새로 만들면 적용 순서대로 여기에 더한다.
+     *
+     * <p>순서가 곧 Flyway 적용 순서다. V37 이 V35 의 행을 덮어쓰므로 뒤집으면 결과가 달라진다.
+     */
     private static final List<String> MIGRATION_PATHS = List.of(
-            "db/migration/V35__seed_cosmetic_items.sql"
+            "db/migration/V35__seed_cosmetic_items.sql",
+            "db/migration/V37__seed_cosmetic_items_by_ability.sql"
     );
 
     @PersistenceContext

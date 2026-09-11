@@ -31,7 +31,7 @@ class CosmeticEquipConcurrencyTest extends CosmeticTestSupport {
 
     @BeforeEach
     void setUpUser() {
-        user = userAtLevel(15);
+        user = fullyGrownUser();
     }
 
     @Nested
@@ -98,7 +98,7 @@ class CosmeticEquipConcurrencyTest extends CosmeticTestSupport {
                     .containsEntry(CosmeticSlot.FACE, GLASSES_ROUND);
             assertThat(loadoutRowCount(user.getId()))
                     .as("프리셋이 여러 번 굳어도 슬롯 수를 넘는 행이 생기면 안 된다")
-                    .isEqualTo(7);
+                    .isEqualTo(10);
         }
 
         @Test

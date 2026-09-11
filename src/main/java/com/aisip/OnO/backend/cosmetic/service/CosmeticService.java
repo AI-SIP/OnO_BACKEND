@@ -8,11 +8,12 @@ import com.aisip.OnO.backend.cosmetic.dto.CosmeticSlotDto;
 import com.aisip.OnO.backend.cosmetic.dto.UnlockedCosmeticDto;
 import com.aisip.OnO.backend.cosmetic.entity.CosmeticItem;
 import com.aisip.OnO.backend.cosmetic.entity.CosmeticSlot;
+import com.aisip.OnO.backend.cosmetic.entity.CosmeticUnlockLevels;
 import com.aisip.OnO.backend.cosmetic.entity.UserCosmeticLoadout;
 import com.aisip.OnO.backend.cosmetic.exception.CosmeticErrorCase;
 import com.aisip.OnO.backend.cosmetic.repository.CosmeticItemRepository;
 import com.aisip.OnO.backend.cosmetic.repository.UserCosmeticLoadoutRepository;
-import com.aisip.OnO.backend.mission.entity.UserMissionStatus;
+import com.aisip.OnO.backend.mission.entity.MissionType.AbilityType;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,13 +27,14 @@ import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.TreeMap;
 
 /**
  * 꾸미기 조회와 장착.
  *
- * <p>보유 여부는 저장하지 않는다. {@code required_level <= 총 학습 레벨} 로 매번 계산한다.
+ * <p>보유 여부는 저장하지 않는다. {@code required_level <= 비교 대상 레벨} 로 매번 계산한다.
+ * 비교 대상은 아이템의 {@code required_ability} 가 정한다. 적혀 있으면 그 능력치 레벨,
+ * 비어 있으면 총 학습 레벨이다.
  * 보유를 테이블로 두면 레벨이 오를 때마다 지급이 필요하고, 그 지급이 한 번 밀리면 사용자는
  * 레벨은 올랐는데 아이템은 안 열린 상태로 남는다. 계산으로 두면 그런 상태가 아예 없다.
  * 테마 해금이 같은 방식을 쓴다.
@@ -63,9 +65,6 @@ public class CosmeticService {
      */
     private static final String FALLBACK_BASE_IMAGE_URL = "assets/Cosmetic/BASE.png";
 
-    /** 미션 상태가 아직 없는 사용자의 레벨. {@code StudyRoomMapper} 와 같은 기준이다. */
-    private static final long DEFAULT_STUDY_LEVEL = 1L;
-
     private final CosmeticItemRepository cosmeticItemRepository;
     private final UserCosmeticLoadoutRepository userCosmeticLoadoutRepository;
     private final UserRepository userRepository;
@@ -79,11 +78,11 @@ public class CosmeticService {
      * <p>읽기 전용이다. 여기서 장착 행을 만들지 않는다. 목록만 열어 본 사용자 수만큼 빈 행이 생기는 것을 피한다.
      */
     public CosmeticListResponseDto getCosmetics(Long userId) {
-        long level = totalStudyLevelOf(userId);
+        CosmeticUnlockLevels levels = levelsOf(userId);
         List<CosmeticItem> activeItems = cosmeticItemRepository.findAllByActiveTrue();
 
         List<CosmeticItemResponseDto> items = equippableItems(activeItems).stream()
-                .map(item -> CosmeticItemResponseDto.of(item, level))
+                .map(item -> CosmeticItemResponseDto.of(item, levels))
                 .toList();
 
         return new CosmeticListResponseDto(
@@ -91,7 +90,7 @@ public class CosmeticService {
                 CosmeticSlot.BASE.getLayerOrder(),
                 CosmeticSlot.equippableSlots().stream().map(CosmeticSlotDto::from).toList(),
                 items,
-                currentEquipped(userId, activeItems, level)
+                currentEquipped(userId, activeItems, levels)
         );
     }
 
@@ -104,13 +103,13 @@ public class CosmeticService {
      */
     @Transactional
     public CosmeticEquipResponseDto equip(Long userId, CosmeticSlot slot, String itemKey) {
-        long level = totalStudyLevelOf(userId);
+        CosmeticUnlockLevels levels = levelsOf(userId);
         List<CosmeticItem> activeItems = cosmeticItemRepository.findAllByActiveTrue();
         Map<String, CosmeticItem> itemsByKey = indexByKey(activeItems);
 
-        CosmeticItem item = resolveEquipTarget(slot, itemKey, itemsByKey, level);
+        CosmeticItem item = resolveEquipTarget(slot, itemKey, itemsByKey, levels);
 
-        materializePresetIfUntouched(userId, activeItems, level);
+        materializePresetIfUntouched(userId, activeItems, levels);
 
         // 쓸 내용을 먼저 다 모은 뒤 슬롯 이름 순서로 적용한다.
         //
@@ -128,7 +127,7 @@ public class CosmeticService {
         log.info("userId: {} equipped slot: {}, itemKey: {}, unequipped: {}",
                 userId, slot, itemKey, unequipped);
 
-        return new CosmeticEquipResponseDto(currentEquipped(userId, activeItems, level), unequipped);
+        return new CosmeticEquipResponseDto(currentEquipped(userId, activeItems, levels), unequipped);
     }
 
     /**
@@ -139,7 +138,7 @@ public class CosmeticService {
      */
     @Transactional
     public CosmeticEquipResponseDto equipSet(Long userId, String setId) {
-        long level = totalStudyLevelOf(userId);
+        CosmeticUnlockLevels levels = levelsOf(userId);
         List<CosmeticItem> setItems = cosmeticItemRepository.findAllBySetIdAndActiveTrueOrderByIdAsc(setId).stream()
                 .filter(CosmeticItem::isEquippable)
                 .toList();
@@ -148,7 +147,7 @@ public class CosmeticService {
             throw new ApplicationException(CosmeticErrorCase.COSMETIC_SET_NOT_FOUND);
         }
         // 검사를 먼저 전부 끝낸다. 걸다가 중간에 거절하면 앞의 몇 개만 걸린 채로 롤백을 믿어야 한다.
-        boolean anyLocked = setItems.stream().anyMatch(item -> !item.isOwnedAt(level));
+        boolean anyLocked = setItems.stream().anyMatch(item -> !item.isOwnedBy(levels));
         if (anyLocked) {
             throw new ApplicationException(CosmeticErrorCase.COSMETIC_ITEM_NOT_OWNED);
         }
@@ -156,7 +155,7 @@ public class CosmeticService {
         List<CosmeticItem> activeItems = cosmeticItemRepository.findAllByActiveTrue();
         Map<String, CosmeticItem> itemsByKey = indexByKey(activeItems);
 
-        materializePresetIfUntouched(userId, activeItems, level);
+        materializePresetIfUntouched(userId, activeItems, levels);
 
         Map<CosmeticSlot, String> writes = orderedWrites();
         setItems.forEach(item -> writes.put(item.getSlot(), item.getItemKey()));
@@ -179,7 +178,7 @@ public class CosmeticService {
         log.info("userId: {} equipped set: {}, items: {}, unequipped: {}",
                 userId, setId, setItems.stream().map(CosmeticItem::getItemKey).toList(), unequipped);
 
-        return new CosmeticEquipResponseDto(currentEquipped(userId, activeItems, level), unequipped);
+        return new CosmeticEquipResponseDto(currentEquipped(userId, activeItems, levels), unequipped);
     }
 
     /**
@@ -187,12 +186,53 @@ public class CosmeticService {
      *
      * <p>구간은 {@code (levelBefore, levelAfter]} 라, 레벨이 한 번에 여러 단계 오르면 그 사이 것이 전부 들어온다.
      * 레벨이 그대로면 빈 목록이다.
+     *
+     * <p>총 학습 레벨만 본다. {@code required_ability} 가 있는 아이템은 여기 걸리지 않는다.
      */
     public List<UnlockedCosmeticDto> findUnlockedBetween(long levelBefore, long levelAfter) {
+        return toUnlockedDtos(unlockedByTotalLevel(levelBefore, levelAfter));
+    }
+
+    /**
+     * 이번 지급으로 새로 열린 아이템 전부. 총 학습 레벨과 능력치 레벨을 함께 본다.
+     *
+     * <p>미션 보상은 언제나 한 능력치에만 들어간다. 그 능력치 레벨이 오르면 그쪽 구간에서,
+     * 총 학습 레벨이 오르면 총 학습 구간에서 열린 것이 나온다. 둘 다 오를 수도 있어 합쳐서 준다.
+     *
+     * <p>총 학습 레벨만 보던 때에는 능력치 레벨이 올라 열린 아이템이 수령 응답에서 통째로 빠졌다.
+     * 해금 자체는 계산이라 다음 조회에서 드러나지만, 사용자는 그 순간에 아무 일도 없었다고 본다.
+     *
+     * <p>{@code ability} 가 null 이면(XP 가 아닌 보상 등) 총 학습 구간만 본다.
+     */
+    public List<UnlockedCosmeticDto> findUnlockedBetween(long totalLevelBefore, long totalLevelAfter,
+                                                         AbilityType ability,
+                                                         long abilityLevelBefore, long abilityLevelAfter) {
+        List<CosmeticItem> unlocked = new ArrayList<>(unlockedByTotalLevel(totalLevelBefore, totalLevelAfter));
+
+        if (ability != null && abilityLevelAfter > abilityLevelBefore) {
+            unlocked.addAll(cosmeticItemRepository.findUnlockedByAbilityBetween(
+                    ability, abilityLevelBefore, abilityLevelAfter));
+        }
+
+        // 두 목록을 이어 붙였으니 다시 정렬한다. 정렬 기준이 없으면 같은 레벨업인데도
+        // 응답에 실리는 순서가 조회마다 달라 보인다.
+        unlocked.sort(Comparator
+                .comparingInt((CosmeticItem item) -> item.getRequiredLevel() == null
+                        ? Integer.MAX_VALUE : item.getRequiredLevel())
+                .thenComparing(CosmeticItem::getItemKey));
+
+        return toUnlockedDtos(unlocked);
+    }
+
+    private List<CosmeticItem> unlockedByTotalLevel(long levelBefore, long levelAfter) {
         if (levelAfter <= levelBefore) {
             return List.of();
         }
-        return cosmeticItemRepository.findUnlockedBetween(levelBefore, levelAfter).stream()
+        return cosmeticItemRepository.findUnlockedByTotalLevelBetween(levelBefore, levelAfter);
+    }
+
+    private List<UnlockedCosmeticDto> toUnlockedDtos(List<CosmeticItem> items) {
+        return items.stream()
                 .filter(CosmeticItem::isEquippable)
                 .map(UnlockedCosmeticDto::from)
                 .toList();
@@ -207,7 +247,7 @@ public class CosmeticService {
      * 2차 콘텐츠 목록을 알아낼 수 있다.
      */
     private CosmeticItem resolveEquipTarget(CosmeticSlot slot, String itemKey,
-                                            Map<String, CosmeticItem> itemsByKey, long level) {
+                                            Map<String, CosmeticItem> itemsByKey, CosmeticUnlockLevels levels) {
         if (!slot.isEquippable()) {
             throw new ApplicationException(CosmeticErrorCase.COSMETIC_SLOT_MISMATCH);
         }
@@ -222,7 +262,7 @@ public class CosmeticService {
         if (item.getSlot() != slot) {
             throw new ApplicationException(CosmeticErrorCase.COSMETIC_SLOT_MISMATCH);
         }
-        if (!item.isOwnedAt(level)) {
+        if (!item.isOwnedBy(levels)) {
             throw new ApplicationException(CosmeticErrorCase.COSMETIC_ITEM_NOT_OWNED);
         }
         return item;
@@ -279,10 +319,11 @@ public class CosmeticService {
      * "잠긴 것을 걸고 있다" 는 상태도 화면에서 설명할 방법이 없다.
      * 관리자가 레벨을 되돌리면 걸려 있던 것이 그대로 다시 보인다.
      */
-    private Map<CosmeticSlot, String> currentEquipped(Long userId, List<CosmeticItem> activeItems, long level) {
+    private Map<CosmeticSlot, String> currentEquipped(Long userId, List<CosmeticItem> activeItems,
+                                                      CosmeticUnlockLevels levels) {
         List<UserCosmeticLoadout> rows = userCosmeticLoadoutRepository.findAllByUserId(userId);
         if (rows.isEmpty()) {
-            return defaultPreset(activeItems, level);
+            return defaultPreset(activeItems, levels);
         }
 
         Map<String, CosmeticItem> itemsByKey = indexByKey(activeItems);
@@ -292,7 +333,12 @@ public class CosmeticService {
                 continue;
             }
             CosmeticItem item = itemsByKey.get(row.getItemKey());
-            if (item == null || !item.isEquippable() || !item.isOwnedAt(level)) {
+            if (item == null || !item.isEquippable() || !item.isOwnedBy(levels)) {
+                continue;
+            }
+            // 카탈로그에서 아이템의 슬롯이 옮겨 가면 예전에 쓴 행은 엉뚱한 자리를 가리키게 된다.
+            // 그대로 내려보내면 프론트가 등짐 자리에 앞가방을 그린다. 행은 두고 보여주기만 멈춘다.
+            if (item.getSlot() != row.getSlot()) {
                 continue;
             }
             equipped.put(row.getSlot(), row.getItemKey());
@@ -303,23 +349,26 @@ public class CosmeticService {
     /**
      * 장착 행이 없는 사용자에게 보여줄 기본 차림.
      *
-     * <p>슬롯마다 열린 것 중 {@code required_level} 이 가장 높은 것을 고른다.
+     * <p>슬롯마다 열린 것 중 {@code required_level} 이 가장 높은 것을 고른다. 한 슬롯 안에
+     * 능력치가 다른 아이템이 섞여 있어도(머리 슬롯에는 문제 복습 아이템과 총 학습 아이템이 함께 있다)
+     * 숫자만 비교한다. 어차피 프리셋은 "가장 늦게 열린 것을 보여준다"는 어림이고,
+     * 어느 쪽이 걸리든 사용자가 바꿀 수 있다.
      *
-     * <p><b>이 프리셋이 있는 이유</b>: 지금 레벨 15 인 사용자는 다 자란 개구리를 보고 있다.
+     * <p><b>이 프리셋이 있는 이유</b>: 지금 레벨이 높은 사용자는 다 자란 개구리를 보고 있다.
      * 꾸미기로 전환하면서 장착 데이터가 없다는 이유로 맨 개구리가 되면, 사용자 입장에서는
      * 아무것도 안 했는데 하향된 것이다. 프리셋이 그 순간을 막는다.
      * 마이그레이션으로 전 사용자 행을 만드는 방법도 있지만, 수십만 행을 미리 쓰고 나면
      * 나중에 프리셋 규칙을 바꿀 수 없다. 계산으로 두면 규칙만 고치면 된다.
      */
-    private Map<CosmeticSlot, String> defaultPreset(List<CosmeticItem> activeItems, long level) {
+    private Map<CosmeticSlot, String> defaultPreset(List<CosmeticItem> activeItems, CosmeticUnlockLevels levels) {
         Map<CosmeticSlot, String> preset = new EnumMap<>(CosmeticSlot.class);
         for (CosmeticSlot slot : CosmeticSlot.equippableSlots()) {
             activeItems.stream()
                     .filter(item -> item.getSlot() == slot)
-                    .filter(item -> item.isOwnedAt(level))
+                    .filter(item -> item.isOwnedBy(levels))
                     // 레벨이 높은 것이 나중에 얻은 것이다. 같은 레벨에 여러 개면 키 순서로 고정한다.
                     // 정렬 기준이 없으면 조회할 때마다 다른 것이 걸려 있는 것처럼 보인다.
-                    // isOwnedAt 을 통과한 아이템은 requiredLevel 이 null 이 아니다.
+                    // isOwnedBy 를 통과한 아이템은 requiredLevel 이 null 이 아니다.
                     .min(Comparator
                             .comparingInt((CosmeticItem item) -> -item.getRequiredLevel())
                             .thenComparing(CosmeticItem::getItemKey))
@@ -331,7 +380,7 @@ public class CosmeticService {
     /**
      * 한 번도 장착을 건드리지 않은 사용자의 프리셋을 실제 행으로 굳힌다.
      *
-     * <p>이게 없으면 첫 장착이 재앙이 된다. 레벨 15 사용자가 모자만 바꾸는 순간 행이 하나 생기고,
+     * <p>이게 없으면 첫 장착이 재앙이 된다. 레벨이 높은 사용자가 모자만 바꾸는 순간 행이 하나 생기고,
      * 그때부터 프리셋을 타지 않으므로 배경·옷·가방이 통째로 사라진다. 사용자는 모자를 바꿨을 뿐인데
      * 개구리가 벗겨진다.
      *
@@ -342,13 +391,14 @@ public class CosmeticService {
      * 이 메서드는 아무 일도 하지 않아야 하는데, 조건 검사와 쓰기 사이에 다른 요청이 끼어들어도
      * 그 성질이 유지된다.
      */
-    private void materializePresetIfUntouched(Long userId, List<CosmeticItem> activeItems, long level) {
+    private void materializePresetIfUntouched(Long userId, List<CosmeticItem> activeItems,
+                                              CosmeticUnlockLevels levels) {
         if (userCosmeticLoadoutRepository.countByUserId(userId) > 0) {
             return;
         }
 
         Map<CosmeticSlot, String> preset = orderedWrites();
-        preset.putAll(defaultPreset(activeItems, level));
+        preset.putAll(defaultPreset(activeItems, levels));
         preset.forEach((slot, itemKey) ->
                 userCosmeticLoadoutRepository.insertIfAbsent(userId, slot.name(), itemKey));
     }
@@ -392,12 +442,11 @@ public class CosmeticService {
         return byKey;
     }
 
-    private long totalStudyLevelOf(Long userId) {
+    /** 해금 판정에 쓸 레벨 묶음. 한 요청 안에서는 이 스냅샷 하나만 본다. */
+    private CosmeticUnlockLevels levelsOf(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ApplicationException(CosmeticErrorCase.USER_NOT_FOUND));
 
-        return Optional.ofNullable(user.getUserMissionStatus())
-                .map(UserMissionStatus::getTotalStudyLevel)
-                .orElse(DEFAULT_STUDY_LEVEL);
+        return CosmeticUnlockLevels.from(user.getUserMissionStatus());
     }
 }

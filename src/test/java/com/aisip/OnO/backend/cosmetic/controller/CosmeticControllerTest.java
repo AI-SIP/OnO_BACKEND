@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.cosmetic.entity.CosmeticSlot;
 import com.aisip.OnO.backend.cosmetic.exception.CosmeticErrorCase;
 import com.aisip.OnO.backend.cosmetic.support.CosmeticTestSupport;
 import com.aisip.OnO.backend.user.entity.User;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -25,41 +26,88 @@ class CosmeticControllerTest extends CosmeticTestSupport {
     @Test
     @DisplayName("GET /api/cosmetics - 본체·슬롯·아이템·장착 상태를 한 번에 내려준다")
     void getCosmetics() throws Exception {
-        User user = userAtLevel(6);
+        // 출석 2, 문제 복습 4. 봄 배경(출석 2)과 비니(문제 복습 4)가 열려 있다.
+        User user = setLevels(fixtures.createUser(), 1L, 2L, 1L, 4L, 1L);
         authenticateAs(user.getId());
 
         mockMvc.perform(get("/api/cosmetics"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.baseImageUrl").value("assets/Cosmetic/BASE.png"))
                 .andExpect(jsonPath("$.data.baseLayerOrder").value(300))
-                .andExpect(jsonPath("$.data.slots.length()").value(9))
+                .andExpect(jsonPath("$.data.slots.length()").value(10))
                 .andExpect(jsonPath("$.data.slots[0].slot").value("BACKGROUND"))
                 .andExpect(jsonPath("$.data.slots[0].layerOrder").value(100))
                 .andExpect(jsonPath("$.data.slots[0].nameKo").value("배경"))
                 .andExpect(jsonPath("$.data.items").isArray())
+                .andExpect(jsonPath("$.data.items.length()").value(SEEDED_ITEM_COUNT))
                 .andExpect(jsonPath("$.data.equipped.HEAD").value(HAT_BEANIE))
                 .andExpect(jsonPath("$.data.equipped.BACKGROUND").value(BG_SPRING));
     }
 
     @Test
-    @DisplayName("GET /api/cosmetics - 아이템 한 건의 필드가 계약대로다")
-    void itemShape() throws Exception {
-        User user = userAtLevel(6);
+    @DisplayName("GET /api/cosmetics - slots 에 등짐(200)과 효과(900)가 빠짐없이 들어 있다")
+    void slotsIncludeBackAndEffect() throws Exception {
+        User user = fullyGrownUser();
         authenticateAs(user.getId());
 
-        // 배경(100) 다음이 가방(200), 그다음 옷(400)... 머리(700)의 첫 아이템이 새싹 머리띠(레벨 2)다.
-        String beanie = "$.data.items[?(@.itemKey == '" + HAT_BEANIE + "')]";
+        String back = "$.data.slots[?(@.slot == 'BACK')]";
+        String bag = "$.data.slots[?(@.slot == 'BAG')]";
+        String effect = "$.data.slots[?(@.slot == 'EFFECT')]";
         mockMvc.perform(get("/api/cosmetics"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath(beanie + ".slot").value("HEAD"))
-                .andExpect(jsonPath(beanie + ".nameKo").value("비니"))
-                .andExpect(jsonPath(beanie + ".imageUrl").value("assets/Cosmetic/hat_beanie.png"))
-                .andExpect(jsonPath(beanie + ".requiredLevel").value(6))
-                .andExpect(jsonPath(beanie + ".setId").value(org.hamcrest.Matchers.contains(
-                        org.hamcrest.Matchers.nullValue())))
-                .andExpect(jsonPath(beanie + ".conflictsWith").value(org.hamcrest.Matchers.contains(
-                        org.hamcrest.Matchers.empty())))
-                .andExpect(jsonPath(beanie + ".owned").value(true));
+                .andExpect(jsonPath(back + ".layerOrder").value(Matchers.contains(200)))
+                .andExpect(jsonPath(back + ".nameKo").value(Matchers.contains("등짐")))
+                .andExpect(jsonPath(bag + ".layerOrder").value(Matchers.contains(450)))
+                .andExpect(jsonPath(effect + ".layerOrder").value(Matchers.contains(900)));
+    }
+
+    @Test
+    @DisplayName("GET /api/cosmetics - 아이템 한 건의 필드가 계약대로다")
+    void itemShape() throws Exception {
+        User user = fullyGrownUser();
+        authenticateAs(user.getId());
+
+        String glasses = "$.data.items[?(@.itemKey == '" + GLASSES_ROUND + "')]";
+        mockMvc.perform(get("/api/cosmetics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(glasses + ".slot").value(Matchers.contains("FACE")))
+                .andExpect(jsonPath(glasses + ".nameKo").value(Matchers.contains("동그란 안경")))
+                .andExpect(jsonPath(glasses + ".imageUrl")
+                        .value(Matchers.contains("assets/Cosmetic/glasses_round.png")))
+                .andExpect(jsonPath(glasses + ".requiredLevel").value(Matchers.contains(2)))
+                .andExpect(jsonPath(glasses + ".requiredAbility").value(Matchers.contains("PROBLEM_PRACTICE")))
+                .andExpect(jsonPath(glasses + ".fullBody").value(Matchers.contains(false)))
+                .andExpect(jsonPath(glasses + ".setId").value(Matchers.contains(Matchers.nullValue())))
+                .andExpect(jsonPath(glasses + ".setNameKo").value(Matchers.contains(Matchers.nullValue())))
+                .andExpect(jsonPath(glasses + ".conflictsWith").value(Matchers.contains(Matchers.empty())))
+                .andExpect(jsonPath(glasses + ".owned").value(Matchers.contains(true)));
+    }
+
+    @Test
+    @DisplayName("GET /api/cosmetics - 총 학습 레벨로 열리는 아이템은 requiredAbility 가 null 이다")
+    void totalLevelItemHasNullAbility() throws Exception {
+        User user = fullyGrownUser();
+        authenticateAs(user.getId());
+
+        String sprout = "$.data.items[?(@.itemKey == '" + HEADBAND_SPROUT + "')]";
+        mockMvc.perform(get("/api/cosmetics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(sprout + ".requiredAbility").value(Matchers.contains(Matchers.nullValue())))
+                .andExpect(jsonPath(sprout + ".requiredLevel").value(Matchers.contains(2)));
+    }
+
+    @Test
+    @DisplayName("GET /api/cosmetics - 전신 의상과 세트 이름이 실려 나간다")
+    void fullBodyAndSetName() throws Exception {
+        User user = fullyGrownUser();
+        authenticateAs(user.getId());
+
+        String gown = "$.data.items[?(@.itemKey == '" + OUTFIT_GRADUATE + "')]";
+        mockMvc.perform(get("/api/cosmetics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(gown + ".fullBody").value(Matchers.contains(true)))
+                .andExpect(jsonPath(gown + ".setId").value(Matchers.contains(GRADUATE_SET)))
+                .andExpect(jsonPath(gown + ".setNameKo").value(Matchers.contains(GRADUATE_SET_NAME)));
     }
 
     @Test
@@ -74,7 +122,7 @@ class CosmeticControllerTest extends CosmeticTestSupport {
     @Test
     @DisplayName("PUT /api/cosmetics/equip - 갱신된 장착 상태 전체와 벗겨진 슬롯을 돌려준다")
     void equip() throws Exception {
-        User user = userAtLevel(15);
+        User user = fullyGrownUser();
         authenticateAs(user.getId());
 
         mockMvc.perform(put("/api/cosmetics/equip")
@@ -82,7 +130,7 @@ class CosmeticControllerTest extends CosmeticTestSupport {
                         .content(body("HEAD", HAT_BEANIE)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.equipped.HEAD").value(HAT_BEANIE))
-                .andExpect(jsonPath("$.data.equipped.BACKGROUND").value(BG_NIGHT))
+                .andExpect(jsonPath("$.data.equipped.BACKGROUND").value(BG_SPACE))
                 .andExpect(jsonPath("$.data.unequippedSlots").isArray())
                 .andExpect(jsonPath("$.data.unequippedSlots.length()").value(0));
     }
@@ -90,7 +138,7 @@ class CosmeticControllerTest extends CosmeticTestSupport {
     @Test
     @DisplayName("PUT /api/cosmetics/equip - itemKey 가 null 이면 그 슬롯만 벗는다")
     void unequip() throws Exception {
-        User user = userAtLevel(15);
+        User user = fullyGrownUser();
         authenticateAs(user.getId());
 
         mockMvc.perform(put("/api/cosmetics/equip")
@@ -98,13 +146,32 @@ class CosmeticControllerTest extends CosmeticTestSupport {
                         .content(body("HEAD", null)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.equipped.HEAD").doesNotExist())
-                .andExpect(jsonPath("$.data.equipped.BACKGROUND").value(BG_NIGHT));
+                .andExpect(jsonPath("$.data.equipped.BACKGROUND").value(BG_SPACE));
     }
 
     @Test
-    @DisplayName("PUT /api/cosmetics/equip - 보유하지 않은 아이템은 400 이다")
+    @DisplayName("PUT /api/cosmetics/equip - 앞가방과 등짐은 따로 걸린다")
+    void equipBagAndBack() throws Exception {
+        User user = fullyGrownUser();
+        authenticateAs(user.getId());
+
+        mockMvc.perform(put("/api/cosmetics/equip")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body("BACK", BACK_BACKPACK_NAVY)))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/cosmetics/equip")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body("BAG", BAG_MINI_BACKPACK)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.equipped.BACK").value(BACK_BACKPACK_NAVY))
+                .andExpect(jsonPath("$.data.equipped.BAG").value(BAG_MINI_BACKPACK));
+    }
+
+    @Test
+    @DisplayName("PUT /api/cosmetics/equip - 그 능력치 레벨이 모자라면 400 이다")
     void rejectsUnownedItem() throws Exception {
-        User user = userAtLevel(5);
+        // 총 학습은 20 이지만 문제 복습이 3 이라 비니(문제 복습 4)는 잠겨 있다.
+        User user = setLevels(fixtures.createUser(), 20L, 15L, 15L, 3L, 15L);
         authenticateAs(user.getId());
 
         mockMvc.perform(put("/api/cosmetics/equip")
@@ -119,7 +186,7 @@ class CosmeticControllerTest extends CosmeticTestSupport {
     @Test
     @DisplayName("PUT /api/cosmetics/equip - 없는 슬롯 이름은 400 이다")
     void rejectsUnknownSlot() throws Exception {
-        User user = userAtLevel(15);
+        User user = fullyGrownUser();
         authenticateAs(user.getId());
 
         mockMvc.perform(put("/api/cosmetics/equip")
@@ -131,7 +198,7 @@ class CosmeticControllerTest extends CosmeticTestSupport {
     @Test
     @DisplayName("PUT /api/cosmetics/equip - 슬롯이 빠지면 400 이다")
     void rejectsMissingSlot() throws Exception {
-        User user = userAtLevel(15);
+        User user = fullyGrownUser();
         authenticateAs(user.getId());
 
         mockMvc.perform(put("/api/cosmetics/equip")
@@ -143,7 +210,7 @@ class CosmeticControllerTest extends CosmeticTestSupport {
     @Test
     @DisplayName("PUT /api/cosmetics/equip-set - 세트가 각 슬롯에 한 번에 걸린다")
     void equipSet() throws Exception {
-        User user = userAtLevel(15);
+        User user = fullyGrownUser();
         authenticateAs(user.getId());
 
         mockMvc.perform(put("/api/cosmetics/equip-set")
@@ -158,7 +225,7 @@ class CosmeticControllerTest extends CosmeticTestSupport {
     @Test
     @DisplayName("PUT /api/cosmetics/equip-set - 하나라도 미보유면 400 이다")
     void rejectsPartiallyOwnedSet() throws Exception {
-        User user = userAtLevel(14);
+        User user = setLevels(fixtures.createUser(), 19L, 15L, 15L, 15L, 15L);
         authenticateAs(user.getId());
 
         mockMvc.perform(put("/api/cosmetics/equip-set")
@@ -192,7 +259,7 @@ class CosmeticControllerTest extends CosmeticTestSupport {
     @Test
     @DisplayName("슬롯 이름은 enum 상수 이름 그대로 나간다")
     void slotNamesAreEnumNames() throws Exception {
-        User user = userAtLevel(15);
+        User user = fullyGrownUser();
         authenticateAs(user.getId());
 
         for (CosmeticSlot slot : CosmeticSlot.equippableSlots()) {

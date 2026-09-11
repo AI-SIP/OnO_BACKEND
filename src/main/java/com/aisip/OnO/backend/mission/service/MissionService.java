@@ -225,9 +225,12 @@ public class MissionService {
                 userId, definition.getMetric(), definition.getRewardType(), definition.getRewardValue());
 
         // 해금 조회는 지급이 끝난 뒤에 한다. 사용자 행 잠금을 들고 있는 구간을 늘리지 않기 위해서다.
+        // 총 학습 레벨 구간과 이번에 XP 가 들어간 능력치 레벨 구간을 함께 본다. 능력치 레벨로 열리는
+        // 아이템이 대부분이라, 총 학습 레벨만 보면 레벨업 알림이 거의 늘 비어 있게 된다.
         // cosmetic_item 은 애플리케이션이 읽기만 하는 카탈로그라 이 조회가 새 잠금 순서를 만들지 않는다.
         List<UnlockedCosmeticDto> unlockedCosmetics = cosmeticService.findUnlockedBetween(
-                grantResult.levelBefore(), grantResult.totalStudyLevel());
+                grantResult.levelBefore(), grantResult.totalStudyLevel(),
+                grantResult.abilityType(), grantResult.abilityLevelBefore(), grantResult.abilityLevelAfter());
 
         log.info("userId: {} claimed missionProgressId: {}, code: {}, reward: {} {}, unlocked: {}",
                 userId, progressId, definition.getCode(), definition.getRewardType(), definition.getRewardValue(),

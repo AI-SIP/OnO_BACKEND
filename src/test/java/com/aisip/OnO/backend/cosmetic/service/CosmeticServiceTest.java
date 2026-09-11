@@ -10,6 +10,7 @@ import com.aisip.OnO.backend.cosmetic.entity.CosmeticSlot;
 import com.aisip.OnO.backend.cosmetic.entity.UserCosmeticLoadout;
 import com.aisip.OnO.backend.cosmetic.exception.CosmeticErrorCase;
 import com.aisip.OnO.backend.cosmetic.support.CosmeticTestSupport;
+import com.aisip.OnO.backend.mission.entity.MissionType.AbilityType;
 import com.aisip.OnO.backend.user.entity.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -26,6 +27,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("꾸미기 서비스")
 class CosmeticServiceTest extends CosmeticTestSupport {
 
+    private static final String BADGE_HEART = "badge_heart";
+    private static final String EFFECT_SPARKLE = "effect_sparkle";
+    private static final String BG_RAINY = "bg_rainy";
+    private static final String PROP_NOTEBOOK = "prop_notebook";
+
     @Nested
     @DisplayName("아이템 목록")
     class ItemCatalog {
@@ -33,48 +39,103 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("잠긴 아이템도 owned false 로 함께 내려간다")
         void includesLockedItems() {
-            User user = userAtLevel(6);
+            // 문제 복습만 4 인 사용자. 오답노트 작성은 1 이라 공부방 배경(작성 12)은 아직 잠겨 있다.
+            User user = setLevels(fixtures.createUser(), 1L, 1L, 1L, 4L, 1L);
 
             CosmeticListResponseDto response = cosmeticService.getCosmetics(user.getId());
 
             assertThat(ownedOf(response, HAT_BEANIE))
-                    .as("레벨 6 아이템은 레벨 6 에서 열린다 - 경계는 포함이다")
+                    .as("문제 복습 4 짜리 비니는 문제 복습이 4 가 되는 순간 열린다 - 경계는 포함이다")
                     .isTrue();
             assertThat(ownedOf(response, BG_STUDY))
-                    .as("레벨 7 아이템은 아직 잠겨 있지만 목록에는 있어야 한다")
+                    .as("오답노트 작성 12 짜리 배경은 아직 잠겨 있지만 목록에는 있어야 한다")
                     .isFalse();
             assertThat(itemKeys(response)).contains(BG_STUDY);
         }
 
-        @ParameterizedTest(name = "레벨 {0} 이면 레벨 {1} 아이템 보유는 {2}")
+        @ParameterizedTest(name = "문제 복습 레벨 {0} 이면 비니(문제 복습 4) 보유는 {1}")
         @CsvSource({
-                "5, 6, false",
-                "6, 6, true",
-                "7, 6, true",
+                "3, false",
+                "4, true",
+                "5, true",
         })
-        @DisplayName("해금 경계는 required_level == 레벨 을 포함한다")
-        void unlockBoundaryIsInclusive(long userLevel, int itemLevel, boolean expected) {
-            User user = userAtLevel(userLevel);
-            // 비교 대상은 시드된 레벨 6 아이템(비니) 하나다.
-            assertThat(itemLevel).isEqualTo(6);
+        @DisplayName("해금 경계는 required_level == 그 능력치 레벨 을 포함한다")
+        void unlockBoundaryIsInclusive(long problemPracticeLevel, boolean expected) {
+            User user = setLevels(fixtures.createUser(), 1L, 1L, 1L, problemPracticeLevel, 1L);
 
             assertThat(ownedOf(cosmeticService.getCosmetics(user.getId()), HAT_BEANIE)).isEqualTo(expected);
         }
 
         @Test
+        @DisplayName("능력치 하나만 높아도 다른 능력치 아이템은 열리지 않는다")
+        void abilityLevelDoesNotLeakToOtherAbilities() {
+            // 문제 복습만 15. 출석·작성·복습세트는 1 이다.
+            User user = setLevels(fixtures.createUser(), 1L, 1L, 1L, 15L, 1L);
+
+            CosmeticListResponseDto response = cosmeticService.getCosmetics(user.getId());
+
+            assertThat(ownedOf(response, HEAD_EARMUFFS_WINTER))
+                    .as("문제 복습의 마지막 아이템까지 열린다")
+                    .isTrue();
+            assertThat(ownedOf(response, BG_SPRING))
+                    .as("출석 2 짜리 봄 배경이 문제 복습 15 로 열리면 능력치별 해금이 아니다")
+                    .isFalse();
+            assertThat(ownedOf(response, SCARF)).isFalse();
+            assertThat(ownedOf(response, BAG_MINI_BACKPACK)).isFalse();
+        }
+
+        @Test
+        @DisplayName("required_ability 가 비어 있는 아이템은 총 학습 레벨을 본다")
+        void nullAbilityFallsBackToTotalLevel() {
+            // 총 학습만 2, 능력치 넷은 1.
+            User onlyTotal = userAtLevel(2);
+            // 능력치 넷은 15, 총 학습은 1.
+            User onlyAbilities = setLevels(fixtures.createUser(), 1L, 15L, 15L, 15L, 15L);
+
+            assertThat(ownedOf(cosmeticService.getCosmetics(onlyTotal.getId()), HEADBAND_SPROUT))
+                    .as("새싹 머리띠는 required_ability 가 비어 있어 총 학습 레벨 2 에서 열린다")
+                    .isTrue();
+            assertThat(ownedOf(cosmeticService.getCosmetics(onlyAbilities.getId()), HEADBAND_SPROUT))
+                    .as("능력치를 아무리 올려도 총 학습 레벨이 1 이면 열리지 않는다")
+                    .isFalse();
+        }
+
+        @Test
+        @DisplayName("총 학습 레벨 16 이상에서 열리는 자리도 실제로 열린다")
+        void unlocksAboveOldCap() {
+            User user = userAtLevel(16);
+
+            assertThat(ownedOf(cosmeticService.getCosmetics(user.getId()), PROP_LANTERN))
+                    .as("상한이 15 에 머물면 이 아이템은 영영 열리지 않는다")
+                    .isTrue();
+            assertThat(ownedOf(cosmeticService.getCosmetics(user.getId()), BADGE_SNOWFLAKE)).isFalse();
+        }
+
+        @Test
         @DisplayName("비활성 아이템은 목록에 나오지 않는다")
         void excludesInactiveItems() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
+            deactivate(HAT_BEANIE);
 
             assertThat(itemKeys(cosmeticService.getCosmetics(user.getId())))
-                    .as("2차 콘텐츠가 목록에 새어 나가면 안 된다")
-                    .doesNotContain(INACTIVE_HAT_BERET);
+                    .as("내려간 아이템이 목록에 새어 나가면 안 된다")
+                    .doesNotContain(HAT_BEANIE);
+        }
+
+        @Test
+        @DisplayName("시드된 55개가 빠짐없이 목록에 들어간다")
+        void everySeededItemIsListed() {
+            User user = fullyGrownUser();
+
+            assertThat(itemKeys(cosmeticService.getCosmetics(user.getId())))
+                    .as("본체(BASE)만 빠지고 나머지는 전부 나간다")
+                    .hasSize(SEEDED_ITEM_COUNT);
         }
 
         @Test
         @DisplayName("개구리 본체는 아이템이 아니라 baseImageUrl 로 나간다")
         void baseIsNotAnItem() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
 
             CosmeticListResponseDto response = cosmeticService.getCosmetics(user.getId());
 
@@ -89,24 +150,25 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("슬롯 목록은 장착 가능한 것만, 뒤에서 앞 순서로 나간다")
         void slotsAreOrderedBackToFront() {
-            User user = userAtLevel(1);
+            User user = userAtAllLevels(1);
 
             List<CosmeticSlotDto> slots = cosmeticService.getCosmetics(user.getId()).slots();
 
             assertThat(slots).extracting(CosmeticSlotDto::slot)
                     .containsExactly(
                             CosmeticSlot.BACKGROUND, CosmeticSlot.BACK, CosmeticSlot.OUTFIT,
-                            CosmeticSlot.NECK, CosmeticSlot.FACE, CosmeticSlot.HEAD,
-                            CosmeticSlot.HAND, CosmeticSlot.BADGE, CosmeticSlot.EFFECT);
+                            CosmeticSlot.BAG, CosmeticSlot.NECK, CosmeticSlot.FACE,
+                            CosmeticSlot.HEAD, CosmeticSlot.HAND, CosmeticSlot.BADGE, CosmeticSlot.EFFECT);
             assertThat(slots).extracting(CosmeticSlotDto::layerOrder)
-                    .containsExactly(100, 200, 400, 500, 600, 700, 800, 850, 900);
+                    .as("등짐(200)은 본체(300) 뒤, 앞가방(450)은 옷(400) 위다")
+                    .containsExactly(100, 200, 400, 450, 500, 600, 700, 800, 850, 900);
             assertThat(slots.get(0).nameKo()).isEqualTo("배경");
         }
 
         @Test
         @DisplayName("이미지 경로는 번들 상대 경로다 - S3 전환은 컬럼 값만 바꾸면 된다")
         void imageUrlIsBundlePath() {
-            User user = userAtLevel(6);
+            User user = fullyGrownUser();
 
             assertThat(itemOf(cosmeticService.getCosmetics(user.getId()), HAT_BEANIE).imageUrl())
                     .isEqualTo("assets/Cosmetic/hat_beanie.png");
@@ -115,9 +177,51 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("충돌 목록은 비어 있어도 빈 배열로 나간다")
         void conflictsAreEmptyList() {
-            User user = userAtLevel(6);
+            User user = fullyGrownUser();
 
             assertThat(itemOf(cosmeticService.getCosmetics(user.getId()), HAT_BEANIE).conflictsWith()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("해금 조건·전신 여부·세트 이름이 아이템에 함께 실린다")
+        void carriesUnlockAndDisplayFields() {
+            User user = fullyGrownUser();
+            CosmeticListResponseDto response = cosmeticService.getCosmetics(user.getId());
+
+            CosmeticItemResponseDto glasses = itemOf(response, GLASSES_ROUND);
+            assertThat(glasses.requiredAbility()).isEqualTo(AbilityType.PROBLEM_PRACTICE);
+            assertThat(glasses.requiredLevel()).isEqualTo(2);
+            assertThat(glasses.fullBody()).isFalse();
+            assertThat(glasses.setId()).isNull();
+            assertThat(glasses.setNameKo()).isNull();
+
+            CosmeticItemResponseDto sprout = itemOf(response, HEADBAND_SPROUT);
+            assertThat(sprout.requiredAbility())
+                    .as("총 학습 레벨로 열리는 아이템은 능력치가 비어 있다")
+                    .isNull();
+
+            CosmeticItemResponseDto gown = itemOf(response, OUTFIT_GRADUATE);
+            assertThat(gown.fullBody())
+                    .as("전신 의상이면 앱이 본체를 머리만 있는 그림으로 바꿔 깐다")
+                    .isTrue();
+            assertThat(gown.setId()).isEqualTo(GRADUATE_SET);
+            assertThat(gown.setNameKo()).isEqualTo(GRADUATE_SET_NAME);
+        }
+
+        @Test
+        @DisplayName("전신 의상은 옷 다섯 벌 전부다")
+        void everyOutfitIsFullBody() {
+            User user = fullyGrownUser();
+
+            List<String> fullBody = cosmeticService.getCosmetics(user.getId()).items().stream()
+                    .filter(CosmeticItemResponseDto::fullBody)
+                    .map(CosmeticItemResponseDto::itemKey)
+                    .toList();
+
+            assertThat(fullBody)
+                    .as("소매와 바짓단이 그려진 옷을 빠뜨리면 그 옷만 개구리 팔다리가 삐져나온다")
+                    .containsExactlyInAnyOrder(OUTFIT_CARDIGAN, "outfit_hoodie", "outfit_raincoat",
+                            OUTFIT_SCHOOL, OUTFIT_GRADUATE);
         }
     }
 
@@ -128,38 +232,60 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("장착 행이 없는 사용자는 슬롯마다 가장 높은 해금 아이템을 걸고 있다")
         void presetPicksHighestUnlockedPerSlot() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
 
             assertThat(equippedOf(user.getId()))
-                    .containsEntry(CosmeticSlot.HEAD, HAT_GRADUATE)
-                    .containsEntry(CosmeticSlot.BACKGROUND, BG_NIGHT)
+                    .containsEntry(CosmeticSlot.BACKGROUND, BG_SPACE)
+                    .containsEntry(CosmeticSlot.BACK, BACK_BACKPACK_CANVAS)
                     .containsEntry(CosmeticSlot.OUTFIT, OUTFIT_GRADUATE)
+                    .containsEntry(CosmeticSlot.BAG, BAG_CROSSBODY_SATCHEL)
+                    .containsEntry(CosmeticSlot.NECK, NECK_MEDAL)
+                    .containsEntry(CosmeticSlot.FACE, "face_moustache")
+                    .containsEntry(CosmeticSlot.HEAD, HAT_GRADUATE)
                     .containsEntry(CosmeticSlot.HAND, PROP_DIPLOMA)
-                    .containsEntry(CosmeticSlot.FACE, GLASSES_SUN)
-                    .containsEntry(CosmeticSlot.NECK, SCARF)
-                    .containsEntry(CosmeticSlot.BACK, BAG_MINI_BACKPACK)
-                    .doesNotContainKey(CosmeticSlot.BADGE)
-                    .doesNotContainKey(CosmeticSlot.EFFECT);
+                    .containsEntry(CosmeticSlot.BADGE, BADGE_SNOWFLAKE)
+                    .containsEntry(CosmeticSlot.EFFECT, EFFECT_SNOW);
         }
 
         @Test
-        @DisplayName("레벨이 낮으면 열린 것만 걸린다")
-        void presetFollowsLevel() {
-            User user = userAtLevel(6);
+        @DisplayName("프리셋도 능력치별 기준으로 뽑힌다")
+        void presetFollowsAbilityLevel() {
+            // 출석만 6. 출석 아이템은 배경과 전경 효과뿐이다.
+            User user = setLevels(fixtures.createUser(), 1L, 6L, 1L, 1L, 1L);
 
             assertThat(equippedOf(user.getId()))
-                    .containsEntry(CosmeticSlot.HEAD, HAT_BEANIE)
-                    .containsEntry(CosmeticSlot.BACKGROUND, BG_SPRING)
-                    .containsEntry(CosmeticSlot.FACE, GLASSES_ROUND)
-                    .containsEntry(CosmeticSlot.NECK, SCARF)
-                    .as("레벨 8 가방은 아직 안 열렸다")
-                    .doesNotContainKey(CosmeticSlot.BACK);
+                    .containsEntry(CosmeticSlot.BACKGROUND, BG_RAINY)
+                    .containsEntry(CosmeticSlot.EFFECT, EFFECT_SPARKLE)
+                    .as("출석만 올렸는데 다른 능력치 자리가 채워지면 안 된다")
+                    .doesNotContainKey(CosmeticSlot.HEAD)
+                    .doesNotContainKey(CosmeticSlot.FACE)
+                    .doesNotContainKey(CosmeticSlot.NECK)
+                    .doesNotContainKey(CosmeticSlot.BAG);
+        }
+
+        @Test
+        @DisplayName("총 학습 레벨만 높으면 총 학습 아이템만 걸린다")
+        void presetWithOnlyTotalLevel() {
+            User user = userAtLevel(20);
+
+            assertThat(equippedOf(user.getId()))
+                    .containsEntry(CosmeticSlot.HEAD, HAT_GRADUATE)
+                    .containsEntry(CosmeticSlot.OUTFIT, OUTFIT_GRADUATE)
+                    .containsEntry(CosmeticSlot.HAND, PROP_DIPLOMA)
+                    .containsEntry(CosmeticSlot.BADGE, BADGE_SNOWFLAKE)
+                    .as("배경·얼굴·목·가방은 전부 능력치로만 열린다")
+                    .doesNotContainKey(CosmeticSlot.BACKGROUND)
+                    .doesNotContainKey(CosmeticSlot.FACE)
+                    .doesNotContainKey(CosmeticSlot.NECK)
+                    .doesNotContainKey(CosmeticSlot.BAG)
+                    .doesNotContainKey(CosmeticSlot.BACK)
+                    .doesNotContainKey(CosmeticSlot.EFFECT);
         }
 
         @Test
         @DisplayName("레벨 1 은 아무것도 걸치지 않은 맨 개구리다")
         void level1HasNothing() {
-            User user = userAtLevel(1);
+            User user = userAtAllLevels(1);
 
             assertThat(equippedOf(user.getId())).isEmpty();
         }
@@ -167,9 +293,11 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("해금 레벨이 같으면 키 순서로 고정된다 - 조회할 때마다 달라지면 안 된다")
         void presetTieIsStable() {
-            User user = userAtLevel(15);
-            // hat_bucket 을 학사모와 같은 레벨로 올려 동점을 만든다.
-            jdbcTemplate.update("UPDATE cosmetic_item SET required_level = 15 WHERE item_key = ?", HAT_BUCKET);
+            User user = fullyGrownUser();
+            // 버킷햇을 학사모와 같은 조건으로 올려 동점을 만든다.
+            jdbcTemplate.update(
+                    "UPDATE cosmetic_item SET required_level = 20, required_ability = NULL WHERE item_key = ?",
+                    HAT_BUCKET);
 
             assertThat(equippedOf(user.getId()))
                     .containsEntry(CosmeticSlot.HEAD, HAT_BUCKET);
@@ -181,7 +309,7 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("조회만으로는 행이 생기지 않는다")
         void readingDoesNotCreateRows() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
 
             cosmeticService.getCosmetics(user.getId());
             cosmeticService.getCosmetics(user.getId());
@@ -194,26 +322,26 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("첫 장착 때 프리셋이 행으로 굳어 나머지 슬롯이 벗겨지지 않는다")
         void firstEquipMaterializesPreset() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
 
             cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, HAT_BEANIE);
 
             assertThat(equippedOf(user.getId()))
                     .as("모자만 바꿨는데 배경·옷·가방이 사라지면 사용자 눈에는 하향이다")
                     .containsEntry(CosmeticSlot.HEAD, HAT_BEANIE)
-                    .containsEntry(CosmeticSlot.BACKGROUND, BG_NIGHT)
+                    .containsEntry(CosmeticSlot.BACKGROUND, BG_SPACE)
                     .containsEntry(CosmeticSlot.OUTFIT, OUTFIT_GRADUATE)
                     .containsEntry(CosmeticSlot.HAND, PROP_DIPLOMA);
-            assertThat(loadoutRowCount(user.getId())).isEqualTo(7);
+            assertThat(loadoutRowCount(user.getId())).isEqualTo(10);
         }
 
         @Test
         @DisplayName("한 번 장착한 뒤로는 레벨이 올라도 프리셋을 타지 않는다")
         void presetDoesNotComeBackAfterFirstChange() {
-            User user = userAtLevel(6);
+            User user = setLevels(fixtures.createUser(), 2L, 1L, 1L, 4L, 1L);
             cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, HEADBAND_SPROUT);
 
-            setLevel(user, 15);
+            setLevels(user, 20L, 15L, 15L, 15L, 15L);
 
             assertThat(equippedOf(user.getId()))
                     .as("사용자가 고른 머리띠를 레벨업이 학사모로 바꿔치기하면 안 된다")
@@ -223,7 +351,7 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("모든 슬롯을 벗어도 프리셋이 되살아나지 않는다")
         void unequippingEverythingSticks() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
             Map<CosmeticSlot, String> preset = equippedOf(user.getId());
 
             preset.keySet().forEach(slot -> cosmeticService.equip(user.getId(), slot, null));
@@ -231,6 +359,19 @@ class CosmeticServiceTest extends CosmeticTestSupport {
             assertThat(equippedOf(user.getId()))
                     .as("맨 개구리를 보려고 다 벗은 사용자가 앱을 껐다 켜면 다시 입고 있으면 안 된다")
                     .isEmpty();
+        }
+
+        @Test
+        @DisplayName("아이템이 다른 슬롯으로 옮겨 가면 예전 행은 보여주지 않는다")
+        void staleSlotRowIsHidden() {
+            User user = fullyGrownUser();
+            cosmeticService.equip(user.getId(), CosmeticSlot.BAG, BAG_MINI_BACKPACK);
+            // 카탈로그에서 미니 백팩을 등짐으로 옮긴다. 사용자 행은 여전히 BAG 을 가리킨다.
+            jdbcTemplate.update("UPDATE cosmetic_item SET slot = 'BACK' WHERE item_key = ?", BAG_MINI_BACKPACK);
+
+            assertThat(equippedOf(user.getId()))
+                    .as("앞가방 자리에 등짐을 그리면 개구리 앞에 백팩이 떠 있게 된다")
+                    .doesNotContainEntry(CosmeticSlot.BAG, BAG_MINI_BACKPACK);
         }
     }
 
@@ -241,7 +382,7 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("보유한 아이템을 걸면 갱신된 장착 상태 전체가 돌아온다")
         void equipsOwnedItem() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
 
             CosmeticEquipResponseDto response = cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, HAT_BUCKET);
 
@@ -250,9 +391,23 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         }
 
         @Test
+        @DisplayName("등짐과 앞가방은 서로 다른 자리라 같이 걸린다")
+        void backAndBagCoexist() {
+            User user = fullyGrownUser();
+
+            cosmeticService.equip(user.getId(), CosmeticSlot.BACK, BACK_BACKPACK_NAVY);
+            CosmeticEquipResponseDto response =
+                    cosmeticService.equip(user.getId(), CosmeticSlot.BAG, BAG_MINI_BACKPACK);
+
+            assertThat(response.equipped())
+                    .containsEntry(CosmeticSlot.BACK, BACK_BACKPACK_NAVY)
+                    .containsEntry(CosmeticSlot.BAG, BAG_MINI_BACKPACK);
+        }
+
+        @Test
         @DisplayName("같은 슬롯을 다시 걸어도 행은 하나다")
         void equipIsIdempotentPerSlot() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
 
             cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, HAT_BUCKET);
             cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, HAT_CROWN);
@@ -268,19 +423,19 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("itemKey 가 null 이면 그 슬롯만 벗는다")
         void nullItemKeyUnequipsSlot() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
 
             CosmeticEquipResponseDto response = cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, null);
 
             assertThat(response.equipped())
                     .doesNotContainKey(CosmeticSlot.HEAD)
-                    .containsEntry(CosmeticSlot.BACKGROUND, BG_NIGHT);
+                    .containsEntry(CosmeticSlot.BACKGROUND, BG_SPACE);
         }
 
         @Test
         @DisplayName("해제는 행 삭제가 아니라 표시로 남는다")
         void unequipLeavesMarker() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
 
             cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, null);
 
@@ -290,13 +445,15 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         }
 
         @Test
-        @DisplayName("보유하지 않은 아이템은 걸 수 없다")
+        @DisplayName("그 능력치 레벨이 모자라면 걸 수 없다")
         void rejectsUnownedItem() {
-            User user = userAtLevel(5);
+            // 총 학습은 20 이지만 문제 복습이 3 이라 비니(문제 복습 4)는 아직 잠겨 있다.
+            User user = setLevels(fixtures.createUser(), 20L, 15L, 15L, 3L, 15L);
 
             assertThatThrownBy(() -> cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, HAT_BEANIE))
                     .isInstanceOf(ApplicationException.class)
                     .extracting(exception -> ((ApplicationException) exception).getErrorCase())
+                    .as("총 학습 레벨이 높다고 능력치 아이템이 열리면 안 된다")
                     .isEqualTo(CosmeticErrorCase.COSMETIC_ITEM_NOT_OWNED);
             assertThat(loadoutRowCount(user.getId()))
                     .as("거절된 요청이 프리셋을 굳혀 놓고 가면 안 된다")
@@ -306,34 +463,40 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("없는 아이템과 비활성 아이템은 같은 에러로 답한다")
         void hidesInactiveItems() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
+            deactivate(HAT_BUCKET);
 
             assertThatThrownBy(() -> cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, "not_exists"))
                     .isInstanceOf(ApplicationException.class)
                     .extracting(exception -> ((ApplicationException) exception).getErrorCase())
                     .isEqualTo(CosmeticErrorCase.COSMETIC_ITEM_NOT_FOUND);
-            assertThatThrownBy(() -> cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, INACTIVE_HAT_BERET))
+            assertThatThrownBy(() -> cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, HAT_BUCKET))
                     .isInstanceOf(ApplicationException.class)
                     .extracting(exception -> ((ApplicationException) exception).getErrorCase())
-                    .as("비활성이라고 알려 주면 키를 훑어 2차 콘텐츠 목록을 알아낼 수 있다")
+                    .as("비활성이라고 알려 주면 키를 훑어 공개 전 콘텐츠 목록을 알아낼 수 있다")
                     .isEqualTo(CosmeticErrorCase.COSMETIC_ITEM_NOT_FOUND);
         }
 
         @Test
         @DisplayName("슬롯과 아이템이 어긋나면 조용히 고쳐 주지 않고 거절한다")
         void rejectsSlotMismatch() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
 
             assertThatThrownBy(() -> cosmeticService.equip(user.getId(), CosmeticSlot.OUTFIT, HAT_BEANIE))
                     .isInstanceOf(ApplicationException.class)
                     .extracting(exception -> ((ApplicationException) exception).getErrorCase())
+                    .isEqualTo(CosmeticErrorCase.COSMETIC_SLOT_MISMATCH);
+            assertThatThrownBy(() -> cosmeticService.equip(user.getId(), CosmeticSlot.BACK, BAG_MINI_BACKPACK))
+                    .isInstanceOf(ApplicationException.class)
+                    .extracting(exception -> ((ApplicationException) exception).getErrorCase())
+                    .as("앞가방을 등짐 자리에 걸면 레이어가 뒤집힌다")
                     .isEqualTo(CosmeticErrorCase.COSMETIC_SLOT_MISMATCH);
         }
 
         @Test
         @DisplayName("개구리 본체 슬롯에는 아무것도 걸 수 없다")
         void rejectsBaseSlot() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
 
             assertThatThrownBy(() -> cosmeticService.equip(user.getId(), CosmeticSlot.BASE, "BASE"))
                     .isInstanceOf(ApplicationException.class)
@@ -344,8 +507,8 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("남의 장착 상태는 건드리지 않는다")
         void doesNotTouchOtherUsers() {
-            User user = userAtLevel(15);
-            User other = userAtLevel(15);
+            User user = fullyGrownUser();
+            User other = fullyGrownUser();
             cosmeticService.equip(other.getId(), CosmeticSlot.HEAD, HAT_BEANIE);
 
             cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, HAT_BUCKET);
@@ -361,7 +524,7 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("충돌하는 다른 슬롯은 벗겨지고 벗긴 슬롯이 응답에 담긴다")
         void unequipsConflictingSlot() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
             setConflicts(HAT_BEANIE, OUTFIT_CARDIGAN);
             cosmeticService.equip(user.getId(), CosmeticSlot.OUTFIT, OUTFIT_CARDIGAN);
 
@@ -376,7 +539,7 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("충돌은 반대쪽에만 적혀 있어도 잡힌다")
         void conflictIsBidirectional() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
             // 옷 쪽에만 적는다. 모자를 나중에 거는 순서에서도 걸려야 한다.
             setConflicts(OUTFIT_CARDIGAN, HAT_BEANIE);
             cosmeticService.equip(user.getId(), CosmeticSlot.OUTFIT, OUTFIT_CARDIGAN);
@@ -389,8 +552,8 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("여러 개가 걸리면 전부 벗긴다")
         void unequipsEveryConflict() {
-            User user = userAtLevel(15);
-            setConflicts(HAT_BEANIE, OUTFIT_GRADUATE + "," + SCARF);
+            User user = fullyGrownUser();
+            setConflicts(HAT_BEANIE, OUTFIT_GRADUATE + "," + NECK_MEDAL);
 
             CosmeticEquipResponseDto response = cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, HAT_BEANIE);
 
@@ -401,7 +564,7 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("충돌 목록에 빈 조각이 섞여 있어도 엉뚱한 슬롯을 벗기지 않는다")
         void ignoresBlankConflictEntries() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
             setConflicts(HAT_BEANIE, ",, ,");
 
             CosmeticEquipResponseDto response = cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, HAT_BEANIE);
@@ -412,12 +575,12 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("충돌이 없으면 아무것도 벗기지 않는다")
         void noConflictKeepsEverything() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
 
             CosmeticEquipResponseDto response = cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, HAT_BEANIE);
 
             assertThat(response.unequippedSlots()).isEmpty();
-            assertThat(response.equipped()).hasSize(7);
+            assertThat(response.equipped()).hasSize(10);
         }
     }
 
@@ -428,7 +591,7 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("세트에 속한 아이템이 각자의 슬롯에 한 번에 걸린다")
         void equipsWholeSet() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
             cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, HAT_BEANIE);
 
             CosmeticEquipResponseDto response = cosmeticService.equipSet(user.getId(), GRADUATE_SET);
@@ -442,7 +605,7 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("하나라도 미보유면 통째로 거절한다")
         void rejectsPartiallyOwnedSet() {
-            User user = userAtLevel(14);
+            User user = setLevels(fixtures.createUser(), 19L, 15L, 15L, 15L, 15L);
 
             assertThatThrownBy(() -> cosmeticService.equipSet(user.getId(), GRADUATE_SET))
                     .isInstanceOf(ApplicationException.class)
@@ -456,7 +619,7 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("없는 세트는 거절한다")
         void rejectsUnknownSet() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
 
             assertThatThrownBy(() -> cosmeticService.equipSet(user.getId(), "not_exists"))
                     .isInstanceOf(ApplicationException.class)
@@ -467,18 +630,18 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         @Test
         @DisplayName("세트가 채우지 않는 슬롯은 그대로 남는다")
         void keepsUntouchedSlots() {
-            User user = userAtLevel(15);
+            User user = fullyGrownUser();
 
             CosmeticEquipResponseDto response = cosmeticService.equipSet(user.getId(), GRADUATE_SET);
 
-            assertThat(response.equipped()).containsEntry(CosmeticSlot.BACKGROUND, BG_NIGHT);
+            assertThat(response.equipped()).containsEntry(CosmeticSlot.BACKGROUND, BG_SPACE);
         }
 
         @Test
         @DisplayName("세트와 충돌하는 다른 슬롯은 벗긴다")
         void unequipsConflictingSlot() {
-            User user = userAtLevel(15);
-            setConflicts(HAT_GRADUATE, SCARF);
+            User user = fullyGrownUser();
+            setConflicts(HAT_GRADUATE, NECK_MEDAL);
 
             CosmeticEquipResponseDto response = cosmeticService.equipSet(user.getId(), GRADUATE_SET);
 
@@ -492,24 +655,55 @@ class CosmeticServiceTest extends CosmeticTestSupport {
     class UnlockLookup {
 
         @Test
-        @DisplayName("올라간 구간에서 열린 것만 담긴다")
-        void unlocksWithinRange() {
-            List<UnlockedCosmeticDto> unlocked = cosmeticService.findUnlockedBetween(5, 7);
+        @DisplayName("총 학습 구간에서 열린 것만 담긴다")
+        void unlocksWithinTotalRange() {
+            List<UnlockedCosmeticDto> unlocked = cosmeticService.findUnlockedBetween(1, 3);
 
             assertThat(unlocked)
                     .extracting(UnlockedCosmeticDto::itemKey)
                     .as("구간은 (levelBefore, levelAfter] 다")
-                    .containsExactly(HAT_BEANIE, BG_STUDY);
+                    .containsExactly(HEADBAND_SPROUT, BADGE_LEAF_STAR);
         }
 
         @Test
-        @DisplayName("여러 단계를 한 번에 올라도 전부 담긴다")
-        void unlocksAcrossManyLevels() {
-            assertThat(cosmeticService.findUnlockedBetween(1, 15))
+        @DisplayName("총 학습 구간에 능력치 아이템이 끼어들지 않는다")
+        void totalRangeExcludesAbilityItems() {
+            assertThat(cosmeticService.findUnlockedBetween(1, 20))
                     .extracting(UnlockedCosmeticDto::itemKey)
-                    .hasSize(16)
-                    .startsWith(HEADBAND_SPROUT)
-                    .contains(HAT_GRADUATE, OUTFIT_GRADUATE, PROP_DIPLOMA);
+                    .as("오르지도 않은 능력치의 아이템이 '방금 열렸다' 고 나가면 안 된다")
+                    .doesNotContain(GLASSES_ROUND, BG_SPRING, SCARF, BAG_MINI_BACKPACK)
+                    .hasSize(14);
+        }
+
+        @Test
+        @DisplayName("능력치 레벨이 오른 구간에서 열린 것이 담긴다")
+        void unlocksWithinAbilityRange() {
+            List<UnlockedCosmeticDto> unlocked = cosmeticService.findUnlockedBetween(
+                    1, 1, AbilityType.PROBLEM_PRACTICE, 1, 4);
+
+            assertThat(unlocked)
+                    .extracting(UnlockedCosmeticDto::itemKey)
+                    .containsExactly(GLASSES_ROUND, HAT_BEANIE);
+        }
+
+        @Test
+        @DisplayName("총 학습과 능력치가 같이 오르면 둘 다 담기고 레벨 순으로 정렬된다")
+        void mergesTotalAndAbilityUnlocks() {
+            List<UnlockedCosmeticDto> unlocked = cosmeticService.findUnlockedBetween(
+                    1, 2, AbilityType.ATTENDANCE, 1, 3);
+
+            assertThat(unlocked)
+                    .extracting(UnlockedCosmeticDto::itemKey)
+                    .containsExactly(BG_SPRING, HEADBAND_SPROUT, EFFECT_PETALS);
+        }
+
+        @Test
+        @DisplayName("능력치를 넘겨도 그 능력치 것만 나온다")
+        void abilityRangeIsScopedToThatAbility() {
+            assertThat(cosmeticService.findUnlockedBetween(1, 1, AbilityType.NOTE_WRITE, 1, 3))
+                    .extracting(UnlockedCosmeticDto::itemKey)
+                    .as("작성 2·3 은 미니 백팩과 공책이다. 같은 레벨의 출석·복습 아이템은 끼면 안 된다")
+                    .containsExactly(BAG_MINI_BACKPACK, PROP_NOTEBOOK);
         }
 
         @Test
@@ -517,22 +711,32 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         void emptyWhenLevelUnchanged() {
             assertThat(cosmeticService.findUnlockedBetween(6, 6)).isEmpty();
             assertThat(cosmeticService.findUnlockedBetween(7, 6)).isEmpty();
+            assertThat(cosmeticService.findUnlockedBetween(6, 6, AbilityType.ATTENDANCE, 6, 6)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("능력치가 없는 보상이면 총 학습 구간만 본다")
+        void nullAbilityLooksAtTotalOnly() {
+            assertThat(cosmeticService.findUnlockedBetween(1, 2, null, 0, 0))
+                    .extracting(UnlockedCosmeticDto::itemKey)
+                    .containsExactly(HEADBAND_SPROUT);
         }
 
         @Test
         @DisplayName("비활성 아이템은 해금 알림에 끼지 않는다")
         void skipsInactiveItems() {
-            jdbcTemplate.update("UPDATE cosmetic_item SET active = 0 WHERE item_key = ?", HAT_BEANIE);
+            deactivate(HAT_BEANIE);
 
-            assertThat(cosmeticService.findUnlockedBetween(5, 7))
+            assertThat(cosmeticService.findUnlockedBetween(1, 1, AbilityType.PROBLEM_PRACTICE, 1, 4))
                     .extracting(UnlockedCosmeticDto::itemKey)
-                    .containsExactly(BG_STUDY);
+                    .containsExactly(GLASSES_ROUND);
         }
 
         @Test
         @DisplayName("해금 항목에는 이름과 이미지가 함께 실린다")
         void carriesDisplayFields() {
-            UnlockedCosmeticDto unlocked = cosmeticService.findUnlockedBetween(5, 6).get(0);
+            UnlockedCosmeticDto unlocked = cosmeticService
+                    .findUnlockedBetween(1, 1, AbilityType.PROBLEM_PRACTICE, 3, 4).get(0);
 
             assertThat(unlocked.itemKey()).isEqualTo(HAT_BEANIE);
             assertThat(unlocked.nameKo()).isEqualTo("비니");

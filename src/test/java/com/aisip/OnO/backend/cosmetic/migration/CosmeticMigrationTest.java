@@ -4,26 +4,32 @@ import com.aisip.OnO.backend.cosmetic.entity.CosmeticItem;
 import com.aisip.OnO.backend.cosmetic.entity.CosmeticSlot;
 import com.aisip.OnO.backend.cosmetic.support.CosmeticItemSeeder;
 import com.aisip.OnO.backend.cosmetic.support.CosmeticTestSupport;
+import com.aisip.OnO.backend.mission.entity.MissionType.AbilityType;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.util.StreamUtils;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.sql.Statement;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 마이그레이션이 중간에 끊겨도 다시 돌릴 수 있는지.
+ * 마이그레이션이 중간에 끊겨도 다시 돌릴 수 있는지, 그리고 카탈로그가 해금표와 맞는지.
  *
  * <p>MySQL DDL 은 트랜잭션이 아니다. 테이블은 만들어지고 뒤이은 INSERT 에서 끊기면 Flyway 는 실패로
  * 기록하는데 테이블은 남아, 재기동하면 "table already exists" 로 또 실패한다.
@@ -37,6 +43,8 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
 
     private static final String DDL_MIGRATION = "db/migration/V34__create_cosmetic_system.sql";
     private static final String SEED_MIGRATION = "db/migration/V35__seed_cosmetic_items.sql";
+    private static final String ABILITY_DDL_MIGRATION = "db/migration/V36__add_cosmetic_ability_unlock_columns.sql";
+    private static final String ABILITY_SEED_MIGRATION = "db/migration/V37__seed_cosmetic_items_by_ability.sql";
 
     @Autowired
     private CosmeticItemSeeder seeder;
@@ -50,6 +58,9 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
         assertThat(statementsOf(DDL_MIGRATION))
                 .as("DDL 과 시드가 한 파일에 있으면 시드에서 끊길 때 테이블만 남아 재실행이 막힌다")
                 .doesNotContain("INSERT INTO");
+        assertThat(statementsOf(ABILITY_DDL_MIGRATION))
+                .as("V36 도 같은 이유로 컬럼 추가만 담는다")
+                .doesNotContain("INSERT INTO");
     }
 
     @Test
@@ -61,6 +72,34 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
         assertThat(ddl).contains("CREATE TABLE IF NOT EXISTS USER_COSMETIC_LOADOUT");
         // MySQL 에는 CREATE INDEX IF NOT EXISTS 가 없다. 인덱스를 따로 만들면 그 문장이 재실행 지점이 된다.
         assertThat(ddl).doesNotContain("CREATE INDEX");
+    }
+
+    @Test
+    @DisplayName("컬럼 추가는 information_schema 로 가드한다 - MySQL 에 ADD COLUMN IF NOT EXISTS 가 없다")
+    void abilityDdlGuardsEveryColumn() {
+        String ddl = statementsOf(ABILITY_DDL_MIGRATION);
+
+        for (String column : List.of("REQUIRED_ABILITY", "FULL_BODY", "SET_NAME_KO")) {
+            assertThat(ddl)
+                    .as(column + " 를 가드 없이 추가하면 재실행 때 Duplicate column name 으로 앱이 뜨지 않는다")
+                    .contains("COLUMN_NAME = '" + column + "'");
+        }
+        assertThat(ddl).contains("INFORMATION_SCHEMA.COLUMNS");
+    }
+
+    @Test
+    @DisplayName("이미 컬럼이 있는 스키마에 V36 을 다시 돌려도 터지지 않는다")
+    void rerunningAbilityDdlDoesNotFail() {
+        // 테스트 DB 에는 세 컬럼이 이미 있다(엔티티에서 Hibernate 가 만든다). 그 위에 두 번 더 돌려 본다.
+        for (int attempt = 0; attempt < 2; attempt++) {
+            runMigrationOnOneConnection(ABILITY_DDL_MIGRATION);
+        }
+
+        // 예외가 안 났다는 것만으로는 약하다. 다시 돌린 뒤에도 카탈로그를 읽을 수 있는지 확인한다.
+        assertThat(cosmeticItemRepository.findByItemKey(GLASSES_ROUND))
+                .get()
+                .extracting(CosmeticItem::getRequiredAbility)
+                .isEqualTo(AbilityType.PROBLEM_PRACTICE);
     }
 
     @Test
@@ -91,6 +130,23 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
     @DisplayName("시드는 다시 돌려도 안전하게 쓰여 있다")
     void seedMigrationIsRerunnable() {
         assertThat(statementsOf(SEED_MIGRATION)).contains("ON DUPLICATE KEY UPDATE");
+        assertThat(statementsOf(ABILITY_SEED_MIGRATION)).contains("ON DUPLICATE KEY UPDATE");
+    }
+
+    @Test
+    @DisplayName("V37 은 기존 행을 덮어쓴다 - V35 까지 돈 DB 와 새 DB 가 같은 결과여야 한다")
+    void abilitySeedOverwritesExistingRows() {
+        String seed = statementsOf(ABILITY_SEED_MIGRATION);
+
+        assertThat(seed)
+                .as("덮어쓰지 않으면 이미 V35 가 돈 DB 는 옛 해금 조건을 그대로 들고 있게 된다")
+                .contains("REQUIRED_ABILITY = VALUES(REQUIRED_ABILITY)")
+                .contains("REQUIRED_LEVEL = VALUES(REQUIRED_LEVEL)")
+                .contains("SLOT = VALUES(SLOT)")
+                .contains("ACTIVE = VALUES(ACTIVE)");
+        assertThat(seed)
+                .as("충돌 목록은 운영에서 채우는 값이라 시드가 되돌리면 안 된다")
+                .doesNotContain("CONFLICTS_WITH = VALUES(CONFLICTS_WITH)");
     }
 
     @Test
@@ -98,11 +154,13 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
     void seedIsIdempotent() {
         // @BeforeEach 가 이미 한 번 넣었다. 같은 문장을 다시 돌리는 것이 이 테스트의 핵심이다.
         long before = cosmeticItemRepository.count();
+        Map<String, Integer> levelsBefore = levelsByKey();
 
         seeder.seed();
         seeder.seed();
 
         assertThat(cosmeticItemRepository.count()).isEqualTo(before);
+        assertThat(levelsByKey()).isEqualTo(levelsBefore);
     }
 
     @Test
@@ -114,24 +172,111 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
         }
 
         // 예외가 안 났다는 것만으로는 약하다. 다시 돌린 뒤에도 스키마가 쓸 수 있는 상태인지 확인한다.
-        var user = userAtLevel(15);
+        var user = fullyGrownUser();
         cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, HAT_BEANIE);
         assertThat(equippedOf(user.getId())).containsEntry(CosmeticSlot.HEAD, HAT_BEANIE);
     }
 
     @Test
-    @DisplayName("레벨 해금 아이템은 2부터 15까지 빈 레벨 없이 채워져 있다")
-    void everyLevelHasAnUnlock() {
-        List<Integer> unlockLevels = cosmeticItemRepository.findAllByActiveTrue().stream()
-                .map(CosmeticItem::getRequiredLevel)
-                .filter(java.util.Objects::nonNull)
-                .distinct()
-                .sorted()
-                .toList();
+    @DisplayName("시드는 본체 말고 55개다")
+    void seedsFiftyFiveItems() {
+        assertThat(cosmeticItemRepository.findAll())
+                .filteredOn(item -> !"BASE".equals(item.getItemKey()))
+                .as("해금표의 12 + 9 + 11 + 9 + 14 다")
+                .hasSize(SEEDED_ITEM_COUNT);
+    }
 
-        assertThat(unlockLevels)
-                .as("중간 레벨에 아무것도 안 열리면 그 레벨업만 보상이 없는 것처럼 보인다")
-                .containsExactly(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
+    @Test
+    @DisplayName("능력치별 개수가 해금표와 맞는다")
+    void abilityDistributionMatchesTable() {
+        Map<AbilityType, Long> byAbility = catalog().stream()
+                .filter(item -> item.getRequiredAbility() != null)
+                .collect(Collectors.groupingBy(CosmeticItem::getRequiredAbility, Collectors.counting()));
+
+        assertThat(byAbility).containsOnly(
+                Map.entry(AbilityType.ATTENDANCE, 12L),
+                Map.entry(AbilityType.NOTE_WRITE, 9L),
+                Map.entry(AbilityType.PROBLEM_PRACTICE, 11L),
+                Map.entry(AbilityType.NOTE_PRACTICE, 9L));
+
+        assertThat(catalog()).filteredOn(item -> item.getRequiredAbility() == null)
+                .as("나머지는 총 학습 레벨로 열린다")
+                .hasSize(14);
+    }
+
+    @Test
+    @DisplayName("자리와 레이어 순서가 표와 맞는다")
+    void slotDistributionMatchesTable() {
+        Map<CosmeticSlot, Long> bySlot = catalog().stream()
+                .collect(Collectors.groupingBy(CosmeticItem::getSlot, Collectors.counting()));
+
+        assertThat(bySlot).containsOnly(
+                Map.entry(CosmeticSlot.BACKGROUND, 9L),
+                Map.entry(CosmeticSlot.BACK, 2L),
+                Map.entry(CosmeticSlot.OUTFIT, 5L),
+                Map.entry(CosmeticSlot.BAG, 3L),
+                Map.entry(CosmeticSlot.NECK, 5L),
+                Map.entry(CosmeticSlot.FACE, 6L),
+                Map.entry(CosmeticSlot.HEAD, 8L),
+                Map.entry(CosmeticSlot.HAND, 7L),
+                Map.entry(CosmeticSlot.BADGE, 6L),
+                Map.entry(CosmeticSlot.EFFECT, 4L));
+
+        assertThat(CosmeticSlot.equippableSlots())
+                .extracting(CosmeticSlot::getLayerOrder)
+                .as("등짐(200)은 본체(300) 뒤, 앞가방(450)은 옷(400) 위다")
+                .containsExactly(100, 200, 400, 450, 500, 600, 700, 800, 850, 900);
+    }
+
+    @Test
+    @DisplayName("등에 메는 가방과 앞으로 메는 가방이 갈려 있다")
+    void backAndBagAreSeparated() {
+        assertThat(keysOfSlot(CosmeticSlot.BACK))
+                .as("V35 에서 BACK 은 그냥 '가방' 이었다. 뜻이 바뀌었으니 내용도 바뀌어야 한다")
+                .containsExactly("back_backpack_canvas", "back_backpack_navy");
+        assertThat(keysOfSlot(CosmeticSlot.BAG))
+                .containsExactly("bag_crossbody_satchel", "bag_mini_backpack", "bag_waist_pouch");
+    }
+
+    @Test
+    @DisplayName("능력치 아이템의 해금 레벨은 2 부터 15 사이다")
+    void abilityUnlockLevelsAreWithinAbilityRange() {
+        assertThat(catalog())
+                .filteredOn(item -> item.getRequiredAbility() != null)
+                .allSatisfy(item -> assertThat(item.getRequiredLevel())
+                        .as(item.getItemKey() + " 의 해금 레벨")
+                        .isBetween(2, 15));
+    }
+
+    @Test
+    @DisplayName("총 학습 아이템의 해금 레벨은 상한 20 을 넘지 않는다")
+    void totalUnlockLevelsStayUnderCap() {
+        assertThat(catalog())
+                .filteredOn(item -> item.getRequiredAbility() == null)
+                .allSatisfy(item -> assertThat(item.getRequiredLevel())
+                        .as(item.getItemKey() + " 의 해금 레벨. 상한을 넘기면 영영 열리지 않는다")
+                        .isBetween(2, 20));
+    }
+
+    @Test
+    @DisplayName("한 능력치 안에서 같은 레벨에 두 개가 열리지 않는다")
+    void noDuplicateLevelWithinAbility() {
+        Map<AbilityType, List<Integer>> levels = catalog().stream()
+                .filter(item -> item.getRequiredAbility() != null)
+                .collect(Collectors.groupingBy(CosmeticItem::getRequiredAbility,
+                        Collectors.mapping(CosmeticItem::getRequiredLevel, Collectors.toList())));
+
+        levels.forEach((ability, values) -> assertThat(values)
+                .as(ability + " 의 해금 레벨. 한 레벨에 둘이 열리면 레벨업 알림이 어느 쪽인지 흐려진다")
+                .doesNotHaveDuplicates());
+    }
+
+    @Test
+    @DisplayName("시드된 아이템은 전부 활성이다")
+    void everySeededItemIsActive() {
+        assertThat(cosmeticItemRepository.findAll())
+                .as("2차 콘텐츠로 내려 두었던 19 개가 전부 해금 레벨을 받았다")
+                .allMatch(CosmeticItem::isActive);
     }
 
     @Test
@@ -156,7 +301,21 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
     }
 
     @Test
-    @DisplayName("졸업 세트는 세 슬롯이고 전부 레벨 15 다")
+    @DisplayName("전신 의상은 옷 다섯 벌뿐이다")
+    void fullBodyIsExactlyTheOutfits() {
+        assertThat(cosmeticItemRepository.findAll())
+                .filteredOn(CosmeticItem::isFullBody)
+                .extracting(CosmeticItem::getItemKey)
+                .containsExactlyInAnyOrder("outfit_cardigan", "outfit_hoodie", "outfit_raincoat",
+                        "outfit_school", "outfit_graduate");
+
+        assertThat(keysOfSlot(CosmeticSlot.OUTFIT))
+                .as("옷 슬롯에 전신이 아닌 것이 생기면 이 단언부터 다시 봐야 한다")
+                .hasSize(5);
+    }
+
+    @Test
+    @DisplayName("학사 세트는 세 슬롯이고 전부 총 학습 20 이며 이름이 같다")
     void graduateSetIsConsistent() {
         List<CosmeticItem> setItems = cosmeticItemRepository.findAllBySetIdAndActiveTrueOrderByIdAsc(GRADUATE_SET);
 
@@ -164,18 +323,22 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
                 .containsExactlyInAnyOrder(CosmeticSlot.HEAD, CosmeticSlot.OUTFIT, CosmeticSlot.HAND);
         assertThat(setItems).extracting(CosmeticItem::getRequiredLevel)
                 .as("세트인데 해금 레벨이 다르면 절반만 가진 상태가 생긴다")
-                .containsOnly(15);
+                .containsOnly(20);
+        assertThat(setItems).extracting(CosmeticItem::getRequiredAbility)
+                .as("세트는 총 학습 레벨로 연다")
+                .containsOnlyNulls();
+        assertThat(setItems).extracting(CosmeticItem::getSetNameKo)
+                .as("세트 이름이 아이템마다 다르면 배너 문구가 흔들린다")
+                .containsOnly(GRADUATE_SET_NAME);
     }
 
     @Test
-    @DisplayName("2차 콘텐츠는 비활성이고 해금 레벨이 없다")
-    void inactiveItemsHaveNoLevel() {
-        List<CosmeticItem> inactive = cosmeticItemRepository.findAll().stream()
-                .filter(item -> !item.isActive())
-                .toList();
-
-        assertThat(inactive).hasSize(19);
-        assertThat(inactive).extracting(CosmeticItem::getRequiredLevel).containsOnlyNulls();
+    @DisplayName("세트에 속하지 않은 아이템은 세트 이름도 비어 있다")
+    void setNameFollowsSetId() {
+        assertThat(cosmeticItemRepository.findAll())
+                .filteredOn(item -> item.getSetId() == null)
+                .extracting(CosmeticItem::getSetNameKo)
+                .containsOnlyNulls();
     }
 
     @Test
@@ -185,9 +348,32 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
         // 조회가 성공했다는 것 자체가 검증이지만, 슬롯 분포까지 함께 본다.
         assertThat(cosmeticItemRepository.findAll())
                 .extracting(CosmeticItem::getSlot)
-                .contains(CosmeticSlot.BASE, CosmeticSlot.HEAD, CosmeticSlot.BACKGROUND,
-                        CosmeticSlot.OUTFIT, CosmeticSlot.NECK, CosmeticSlot.FACE,
-                        CosmeticSlot.HAND, CosmeticSlot.BACK, CosmeticSlot.BADGE);
+                .contains(CosmeticSlot.values());
+    }
+
+    // ─────────────────────────── 헬퍼 ───────────────────────────
+
+    /** 본체를 뺀 시드 카탈로그. */
+    private List<CosmeticItem> catalog() {
+        return cosmeticItemRepository.findAll().stream()
+                .filter(item -> !"BASE".equals(item.getItemKey()))
+                .toList();
+    }
+
+    private List<String> keysOfSlot(CosmeticSlot slot) {
+        return catalog().stream()
+                .filter(item -> item.getSlot() == slot)
+                .map(CosmeticItem::getItemKey)
+                .sorted()
+                .toList();
+    }
+
+    private Map<String, Integer> levelsByKey() {
+        return catalog().stream()
+                .sorted(Comparator.comparing(CosmeticItem::getItemKey))
+                .collect(Collectors.toMap(CosmeticItem::getItemKey,
+                        item -> Objects.requireNonNull(item.getRequiredLevel()),
+                        (left, right) -> left));
     }
 
     /** 마이그레이션의 실행 문장을 순서대로 돌린다. */
@@ -196,6 +382,25 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
             for (String statement : executableStatements(path)) {
                 entityManager.createNativeQuery(statement).executeUpdate();
             }
+        });
+    }
+
+    /**
+     * 커넥션 하나에서 순서대로 돌린다.
+     *
+     * <p>V36 은 {@code SET @변수} 로 상태를 넘기고 {@code PREPARE}/{@code EXECUTE} 로 DDL 을 실행한다.
+     * 사용자 변수는 세션(커넥션) 단위라 문장마다 커넥션이 달라지면 가드가 성립하지 않고,
+     * PREPARE 는 prepared statement 프로토콜로는 보낼 수 없어 일반 Statement 가 필요하다.
+     */
+    private void runMigrationOnOneConnection(String path) {
+        List<String> statements = executableStatements(path);
+        jdbcTemplate.execute((ConnectionCallback<Void>) connection -> {
+            try (Statement statement = connection.createStatement()) {
+                for (String sql : statements) {
+                    statement.execute(sql);
+                }
+            }
+            return null;
         });
     }
 
