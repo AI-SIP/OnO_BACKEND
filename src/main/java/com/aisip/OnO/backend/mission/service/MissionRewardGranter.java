@@ -63,9 +63,19 @@ public class MissionRewardGranter {
         }
 
         long levelAfter = status.getTotalStudyLevel();
-        return new GrantResult(levelAfter, levelAfter > levelBefore);
+        return new GrantResult(levelBefore, levelAfter, levelAfter > levelBefore);
     }
 
-    public record GrantResult(Long totalStudyLevel, boolean leveledUp) {
+    /**
+     * 지급 결과.
+     *
+     * <p>{@code levelBefore} 를 함께 돌려주는 이유는 호출부가 "이번에 무엇이 열렸는지" 를
+     * 계산해야 하기 때문이다. 레벨이 한 번에 여러 단계 오를 수 있어 {@code leveledUp} 만으로는
+     * 어디서 어디까지 올랐는지 알 수 없다.
+     *
+     * <p>여기서 해금 아이템까지 조회하지 않는다. 이 클래스는 사용자 행을 배타 잠금으로 잡은
+     * 구간이라, 잠금을 들고 하는 일을 늘리면 같은 사용자의 다른 요청이 그만큼 더 기다린다.
+     */
+    public record GrantResult(long levelBefore, Long totalStudyLevel, boolean leveledUp) {
     }
 }
