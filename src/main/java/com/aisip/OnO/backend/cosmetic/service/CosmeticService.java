@@ -337,7 +337,7 @@ public class CosmeticService {
                 continue;
             }
             // 카탈로그에서 아이템의 슬롯이 옮겨 가면 예전에 쓴 행은 엉뚱한 자리를 가리키게 된다.
-            // 그대로 내려보내면 프론트가 배낭 자리에 앞가방을 그린다. 행은 두고 보여주기만 멈춘다.
+            // 그대로 내려보내면 프론트가 엉뚱한 자리에 그린다. 행은 두고 보여주기만 멈춘다.
             if (item.getSlot() != row.getSlot()) {
                 continue;
             }

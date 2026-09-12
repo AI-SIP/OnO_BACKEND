@@ -34,7 +34,7 @@ class CosmeticControllerTest extends CosmeticTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.baseImageUrl").value("assets/Cosmetic/BASE.png"))
                 .andExpect(jsonPath("$.data.baseLayerOrder").value(300))
-                .andExpect(jsonPath("$.data.slots.length()").value(11))
+                .andExpect(jsonPath("$.data.slots.length()").value(10))
                 .andExpect(jsonPath("$.data.slots[0].slot").value("BACKGROUND"))
                 .andExpect(jsonPath("$.data.slots[0].layerOrder").value(100))
                 .andExpect(jsonPath("$.data.slots[0].nameKo").value("배경"))
@@ -46,20 +46,38 @@ class CosmeticControllerTest extends CosmeticTestSupport {
     }
 
     @Test
-    @DisplayName("GET /api/cosmetics - slots 에 배낭(200)과 효과(900)가 빠짐없이 들어 있다")
-    void slotsIncludeBackAndEffect() throws Exception {
+    @DisplayName("GET /api/cosmetics - 가방 자리는 하나고 BACK 은 사라졌다")
+    void bagSlotIsMerged() throws Exception {
         User user = fullyGrownUser();
         authenticateAs(user.getId());
 
-        String back = "$.data.slots[?(@.slot == 'BACK')]";
         String bag = "$.data.slots[?(@.slot == 'BAG')]";
         String effect = "$.data.slots[?(@.slot == 'EFFECT')]";
         mockMvc.perform(get("/api/cosmetics"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath(back + ".layerOrder").value(Matchers.contains(200)))
-                .andExpect(jsonPath(back + ".nameKo").value(Matchers.contains("배낭")))
+                .andExpect(jsonPath("$.data.slots[?(@.slot == 'BACK')]")
+                        .value(Matchers.empty()))
                 .andExpect(jsonPath(bag + ".layerOrder").value(Matchers.contains(450)))
+                .andExpect(jsonPath(bag + ".nameKo").value(Matchers.contains("가방")))
                 .andExpect(jsonPath(effect + ".layerOrder").value(Matchers.contains(900)));
+    }
+
+    @Test
+    @DisplayName("GET /api/cosmetics - 등에 메는 가방만 layerOrder 로 자리 층을 덮어쓴다")
+    void backpackCarriesItsOwnLayerOrder() throws Exception {
+        User user = fullyGrownUser();
+        authenticateAs(user.getId());
+
+        String navy = "$.data.items[?(@.itemKey == '" + BACK_BACKPACK_NAVY + "')]";
+        String mini = "$.data.items[?(@.itemKey == '" + BAG_MINI_BACKPACK + "')]";
+        mockMvc.perform(get("/api/cosmetics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(navy + ".slot").value(Matchers.contains("BAG")))
+                .andExpect(jsonPath(navy + ".layerOrder").value(Matchers.contains(200)))
+                .andExpect(jsonPath(navy + ".nameKo").value(Matchers.contains("남색 배낭")))
+                .andExpect(jsonPath(mini + ".slot").value(Matchers.contains("BAG")))
+                .andExpect(jsonPath(mini + ".layerOrder")
+                        .value(Matchers.contains(Matchers.nullValue())));
     }
 
     @Test
@@ -201,21 +219,29 @@ class CosmeticControllerTest extends CosmeticTestSupport {
     }
 
     @Test
-    @DisplayName("PUT /api/cosmetics/equip - 앞가방과 배낭은 따로 걸린다")
-    void equipBagAndBack() throws Exception {
+    @DisplayName("PUT /api/cosmetics/equip - 등에 메는 가방도 같은 BAG 자리로 건다")
+    void equipBackpackThroughBagSlot() throws Exception {
+        User user = fullyGrownUser();
+        authenticateAs(user.getId());
+
+        mockMvc.perform(put("/api/cosmetics/equip")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body("BAG", BACK_BACKPACK_NAVY)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.equipped.BAG").value(BACK_BACKPACK_NAVY))
+                .andExpect(jsonPath("$.data.equipped.BACK").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("PUT /api/cosmetics/equip - 없어진 BACK 자리는 400 이다")
+    void rejectsRemovedBackSlot() throws Exception {
         User user = fullyGrownUser();
         authenticateAs(user.getId());
 
         mockMvc.perform(put("/api/cosmetics/equip")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body("BACK", BACK_BACKPACK_NAVY)))
-                .andExpect(status().isOk());
-        mockMvc.perform(put("/api/cosmetics/equip")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body("BAG", BAG_MINI_BACKPACK)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.equipped.BACK").value(BACK_BACKPACK_NAVY))
-                .andExpect(jsonPath("$.data.equipped.BAG").value(BAG_MINI_BACKPACK));
+                .andExpect(status().isBadRequest());
     }
 
     @Test

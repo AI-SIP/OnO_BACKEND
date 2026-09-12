@@ -18,11 +18,17 @@ import java.util.List;
  * <p>{@code requiredAbility} 를 함께 내려보내는 이유는 화면 문구 때문이다. 이 값이 없으면
  * 잠긴 아이템에 "Lv.5 에 열려요" 까지만 쓸 수 있고 어느 레벨을 올려야 하는지는 쓸 수 없다.
  *
- * <p>필드는 뒤에 덧붙이기만 했다. 구버전 앱은 모르는 필드를 무시하므로 그대로 돈다.
+ * <p>{@code layerOrder} 는 이 아이템만의 그리는 층이다. {@code null} 이면 자리의 기본값을 쓴다.
+ * 프론트가 {@code item.layerOrder ?? slot.layerOrder} 로 푼다. 자리 하나에 층이 둘인 것은
+ * 지금 {@code BAG}(등에 메는 가방 200 / 앞으로 메는 가방 450) 뿐이다.
+ *
+ * <p>필드는 더하기만 했다. 구버전 앱은 모르는 필드를 무시하므로 그대로 돈다.
+ * JSON 필드 순서는 계약이 아니다.
  */
 public record CosmeticItemResponseDto(
         String itemKey,
         CosmeticSlot slot,
+        Integer layerOrder,
         String nameKo,
         String imageUrl,
         Integer requiredLevel,
@@ -38,6 +44,7 @@ public record CosmeticItemResponseDto(
         return new CosmeticItemResponseDto(
                 item.getItemKey(),
                 item.getSlot(),
+                item.getLayerOrder(),
                 item.getNameKo(),
                 item.getImageUrl(),
                 item.getRequiredLevel(),

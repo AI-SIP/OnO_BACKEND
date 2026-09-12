@@ -155,14 +155,14 @@ class CosmeticServiceTest extends CosmeticTestSupport {
             List<CosmeticSlotDto> slots = cosmeticService.getCosmetics(user.getId()).slots();
 
             assertThat(slots).extracting(CosmeticSlotDto::slot)
+                    .as("가방은 자리 하나다. 등에 메는 것은 아이템이 층을 덮어써서 뒤로 간다")
                     .containsExactly(
-                            CosmeticSlot.BACKGROUND, CosmeticSlot.BACK, CosmeticSlot.OUTFIT,
-                            CosmeticSlot.BAG, CosmeticSlot.NECK, CosmeticSlot.FACE,
-                            CosmeticSlot.HEAD, CosmeticSlot.HAND, CosmeticSlot.BADGE,
+                            CosmeticSlot.BACKGROUND, CosmeticSlot.OUTFIT, CosmeticSlot.BAG,
+                            CosmeticSlot.NECK, CosmeticSlot.FACE, CosmeticSlot.HEAD,
+                            CosmeticSlot.HAND, CosmeticSlot.BADGE,
                             CosmeticSlot.EFFECT, CosmeticSlot.FRAME);
             assertThat(slots).extracting(CosmeticSlotDto::layerOrder)
-                    .as("배낭(200)은 본체(300) 뒤, 앞가방(450)은 옷(400) 위다")
-                    .containsExactly(100, 200, 400, 450, 500, 600, 700, 800, 850, 900, 1000);
+                    .containsExactly(100, 400, 450, 500, 600, 700, 800, 850, 900, 1000);
             assertThat(slots.get(0).nameKo()).isEqualTo("배경");
         }
 
@@ -180,8 +180,8 @@ class CosmeticServiceTest extends CosmeticTestSupport {
                     .containsExactly(CosmeticSlot.FRAME);
             assertThat(slots)
                     .filteredOn(CosmeticSlotDto::composited)
-                    .as("나머지 열 자리는 전부 개구리에 겹쳐 그린다")
-                    .hasSize(10);
+                    .as("나머지 자리는 전부 개구리에 겹쳐 그린다")
+                    .hasSize(PRESET_SLOT_COUNT);
         }
 
         @Test
@@ -319,7 +319,6 @@ class CosmeticServiceTest extends CosmeticTestSupport {
 
             assertThat(equippedOf(user.getId()))
                     .containsEntry(CosmeticSlot.BACKGROUND, BG_SPACE)
-                    .containsEntry(CosmeticSlot.BACK, BACK_BACKPACK_CANVAS)
                     .containsEntry(CosmeticSlot.OUTFIT, OUTFIT_GRADUATE)
                     .containsEntry(CosmeticSlot.BAG, BAG_CROSSBODY_SATCHEL)
                     .containsEntry(CosmeticSlot.NECK, NECK_MEDAL)
@@ -404,7 +403,6 @@ class CosmeticServiceTest extends CosmeticTestSupport {
                     .doesNotContainKey(CosmeticSlot.FACE)
                     .doesNotContainKey(CosmeticSlot.NECK)
                     .doesNotContainKey(CosmeticSlot.BAG)
-                    .doesNotContainKey(CosmeticSlot.BACK)
                     .doesNotContainKey(CosmeticSlot.EFFECT);
         }
 
@@ -492,11 +490,11 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         void staleSlotRowIsHidden() {
             User user = fullyGrownUser();
             cosmeticService.equip(user.getId(), CosmeticSlot.BAG, BAG_MINI_BACKPACK);
-            // 카탈로그에서 미니 백팩을 배낭 자리로 옮긴다. 사용자 행은 여전히 BAG 을 가리킨다.
-            jdbcTemplate.update("UPDATE cosmetic_item SET slot = 'BACK' WHERE item_key = ?", BAG_MINI_BACKPACK);
+            // 카탈로그에서 미니 백팩을 손 자리로 옮긴다. 사용자 행은 여전히 BAG 을 가리킨다.
+            jdbcTemplate.update("UPDATE cosmetic_item SET slot = 'HAND' WHERE item_key = ?", BAG_MINI_BACKPACK);
 
             assertThat(equippedOf(user.getId()))
-                    .as("앞가방 자리에 배낭을 그리면 개구리 앞에 가방이 떠 있게 된다")
+                    .as("가방 자리에 손에 드는 것을 그리면 엉뚱한 층에 얹힌다")
                     .doesNotContainEntry(CosmeticSlot.BAG, BAG_MINI_BACKPACK);
         }
     }
@@ -517,17 +515,57 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         }
 
         @Test
-        @DisplayName("배낭과 앞가방은 서로 다른 자리라 같이 걸린다")
-        void backAndBagCoexist() {
+        @DisplayName("등에 메는 가방과 앞으로 메는 가방은 같은 자리라 하나만 걸린다")
+        void backpackAndFrontBagShareOneSlot() {
             User user = fullyGrownUser();
 
-            cosmeticService.equip(user.getId(), CosmeticSlot.BACK, BACK_BACKPACK_NAVY);
+            cosmeticService.equip(user.getId(), CosmeticSlot.BAG, BACK_BACKPACK_NAVY);
             CosmeticEquipResponseDto response =
                     cosmeticService.equip(user.getId(), CosmeticSlot.BAG, BAG_MINI_BACKPACK);
 
             assertThat(response.equipped())
-                    .containsEntry(CosmeticSlot.BACK, BACK_BACKPACK_NAVY)
+                    .as("탭이 하나라 뒤에 건 것이 앞의 것을 덮어쓴다")
                     .containsEntry(CosmeticSlot.BAG, BAG_MINI_BACKPACK);
+
+            Long bagRows = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM user_cosmetic_loadout WHERE user_id = ? AND slot = 'BAG'",
+                    Long.class, user.getId());
+            assertThat(bagRows).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("등에 메는 가방은 자리 층을 덮어써 개구리 뒤로 간다")
+        void backpackOverridesSlotLayerOrder() {
+            User user = fullyGrownUser();
+
+            List<CosmeticItemResponseDto> bagItems = cosmeticService.getCosmetics(user.getId()).items().stream()
+                    .filter(item -> item.slot() == CosmeticSlot.BAG)
+                    .toList();
+
+            assertThat(bagItems)
+                    .filteredOn(item -> item.layerOrder() != null)
+                    .as("등에 메는 둘만 층을 직접 갖는다. 자리 값(450)을 그대로 쓰면 개구리 앞으로 나온다")
+                    .extracting(CosmeticItemResponseDto::itemKey, CosmeticItemResponseDto::layerOrder)
+                    .containsExactlyInAnyOrder(
+                            org.assertj.core.groups.Tuple.tuple(BACK_BACKPACK_NAVY, BACKPACK_LAYER_ORDER),
+                            org.assertj.core.groups.Tuple.tuple(BACK_BACKPACK_CANVAS, BACKPACK_LAYER_ORDER));
+            assertThat(bagItems)
+                    .filteredOn(item -> item.layerOrder() == null)
+                    .as("앞으로 메는 셋은 자리 기본값 450 을 쓴다")
+                    .extracting(CosmeticItemResponseDto::itemKey)
+                    .containsExactlyInAnyOrder(BAG_MINI_BACKPACK, "bag_waist_pouch", BAG_CROSSBODY_SATCHEL);
+        }
+
+        @Test
+        @DisplayName("가방 말고는 아무도 자리 층을 덮어쓰지 않는다")
+        void onlyBackpacksOverrideLayerOrder() {
+            User user = fullyGrownUser();
+
+            assertThat(cosmeticService.getCosmetics(user.getId()).items())
+                    .filteredOn(item -> item.layerOrder() != null)
+                    .as("덮어쓰기가 늘면 프론트의 그리기 순서가 자리 목록만으로 설명되지 않는다")
+                    .extracting(CosmeticItemResponseDto::itemKey)
+                    .containsExactlyInAnyOrder(BACK_BACKPACK_NAVY, BACK_BACKPACK_CANVAS);
         }
 
         @Test
@@ -612,10 +650,10 @@ class CosmeticServiceTest extends CosmeticTestSupport {
                     .isInstanceOf(ApplicationException.class)
                     .extracting(exception -> ((ApplicationException) exception).getErrorCase())
                     .isEqualTo(CosmeticErrorCase.COSMETIC_SLOT_MISMATCH);
-            assertThatThrownBy(() -> cosmeticService.equip(user.getId(), CosmeticSlot.BACK, BAG_MINI_BACKPACK))
+            assertThatThrownBy(() -> cosmeticService.equip(user.getId(), CosmeticSlot.HAND, BAG_MINI_BACKPACK))
                     .isInstanceOf(ApplicationException.class)
                     .extracting(exception -> ((ApplicationException) exception).getErrorCase())
-                    .as("앞가방을 배낭 자리에 걸면 레이어가 뒤집힌다")
+                    .as("가방을 손 자리에 걸면 엉뚱한 층에 얹힌다")
                     .isEqualTo(CosmeticErrorCase.COSMETIC_SLOT_MISMATCH);
         }
 

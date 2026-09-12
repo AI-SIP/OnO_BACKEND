@@ -49,11 +49,11 @@ public abstract class CosmeticTestSupport extends IntegrationTestSupport {
     protected static final String FRAME_SUMMER = "frame_summer";
     /** (ATTENDANCE, 15) — 프로필 프레임 */
     protected static final String FRAME_NIGHT = "frame_night";
-    /** (NOTE_WRITE, 2) — 앞으로 메는 가방이라 BAG 이다 */
+    /** (NOTE_WRITE, 2) — 앞으로 메는 가방. 자리 기본값 450 을 그대로 쓴다 */
     protected static final String BAG_MINI_BACKPACK = "bag_mini_backpack";
-    /** (NOTE_WRITE, 5) — 등에 메는 가방이라 BACK 이다 */
+    /** (NOTE_WRITE, 5) — 등에 메는 가방. 자리는 BAG 이지만 layer_order 200 을 직접 갖는다 */
     protected static final String BACK_BACKPACK_NAVY = "back_backpack_navy";
-    /** (NOTE_WRITE, 9) */
+    /** (NOTE_WRITE, 9) — 등에 메는 가방. layer_order 200 */
     protected static final String BACK_BACKPACK_CANVAS = "back_backpack_canvas";
     /** (NOTE_WRITE, 11) */
     protected static final String BAG_CROSSBODY_SATCHEL = "bag_crossbody_satchel";
@@ -94,6 +94,9 @@ public abstract class CosmeticTestSupport extends IntegrationTestSupport {
     /** (총 20) — 학사 세트 */
     protected static final String PROP_DIPLOMA = "prop_diploma";
 
+    /** 등에 메는 가방 둘이 자리 기본값(450)을 덮어쓰는 층. 개구리 본체(300)보다 뒤다. */
+    protected static final int BACKPACK_LAYER_ORDER = 200;
+
     protected static final String GRADUATE_SET = "graduate";
     protected static final String GRADUATE_SET_NAME = "학사 세트";
 
@@ -101,7 +104,7 @@ public abstract class CosmeticTestSupport extends IntegrationTestSupport {
     protected static final int SEEDED_ITEM_COUNT = 63;
 
     /** 장착 가능한 자리 수. 응답의 slots 길이다. */
-    protected static final int EQUIPPABLE_SLOT_COUNT = 11;
+    protected static final int EQUIPPABLE_SLOT_COUNT = 10;
 
     /**
      * 기본 프리셋이 채우는 자리 수.

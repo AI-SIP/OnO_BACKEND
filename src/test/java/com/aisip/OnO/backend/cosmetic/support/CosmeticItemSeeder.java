@@ -22,7 +22,7 @@ import java.util.Locale;
  * 저절로 실행되지 않는데, 꾸미기 조회·장착은 카탈로그가 없으면 아무것도 하지 못하므로
  * 시드가 없으면 이 도메인 테스트는 전부 무의미해진다.
  *
- * <p>시드 내용을 테스트에 다시 적지 않고 <b>마이그레이션 파일의 INSERT 문을 그대로 읽어</b> 실행한다.
+ * <p>시드 내용을 테스트에 다시 적지 않고 <b>마이그레이션 파일의 문장을 그대로 읽어</b> 실행한다.
  * 같은 값을 두 곳에 적으면 한쪽만 고쳐질 때 테스트가 프로덕션 시드와 다른 것을 검증하게 된다.
  * {@code MissionDefinitionSeeder} 와 같은 방식이다.
  *
@@ -34,13 +34,15 @@ public class CosmeticItemSeeder {
     /**
      * 카탈로그를 손대는 마이그레이션을 새로 만들면 적용 순서대로 여기에 더한다.
      *
-     * <p>순서가 곧 Flyway 적용 순서다. V37 이 V35 의 행을 덮어쓰므로 뒤집으면 결과가 달라진다.
+     * <p>순서가 곧 Flyway 적용 순서다. 뒤의 파일이 앞의 파일 값을 덮어쓴다.
+     * V37 이 V35 의 행을, V39 가 이름을, V41 이 가방 자리와 그리는 층을 고친다.
      */
     private static final List<String> MIGRATION_PATHS = List.of(
             "db/migration/V35__seed_cosmetic_items.sql",
             "db/migration/V37__seed_cosmetic_items_by_ability.sql",
             "db/migration/V38__seed_profile_frame_cosmetics.sql",
-            "db/migration/V39__rename_back_slot_item_names.sql"
+            "db/migration/V39__rename_back_slot_item_names.sql",
+            "db/migration/V41__merge_back_slot_into_bag.sql"
     );
 
     @PersistenceContext
@@ -70,8 +72,11 @@ public class CosmeticItemSeeder {
         return Arrays.stream(withoutComments.split(";"))
                 .map(String::trim)
                 .filter(statement -> {
+                    // DELETE 까지 받는다. 카탈로그를 손대는 마이그레이션이 행을 지우는 날
+                    // 그 문장만 조용히 빠지면 테스트가 프로덕션과 다른 카탈로그를 보게 된다.
                     String upper = statement.toUpperCase(Locale.ROOT);
-                    return upper.startsWith("INSERT") || upper.startsWith("UPDATE");
+                    return upper.startsWith("INSERT") || upper.startsWith("UPDATE")
+                            || upper.startsWith("DELETE");
                 })
                 .toList();
     }

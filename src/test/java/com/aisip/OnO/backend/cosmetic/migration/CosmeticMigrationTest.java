@@ -27,6 +27,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.groups.Tuple.tuple;
 
 /**
  * 마이그레이션이 중간에 끊겨도 다시 돌릴 수 있는지, 그리고 카탈로그가 해금표와 맞는지.
@@ -47,6 +48,8 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
     private static final String ABILITY_SEED_MIGRATION = "db/migration/V37__seed_cosmetic_items_by_ability.sql";
     private static final String FRAME_SEED_MIGRATION = "db/migration/V38__seed_profile_frame_cosmetics.sql";
     private static final String BACK_RENAME_MIGRATION = "db/migration/V39__rename_back_slot_item_names.sql";
+    private static final String LAYER_ORDER_DDL_MIGRATION = "db/migration/V40__add_cosmetic_layer_order.sql";
+    private static final String BAG_MERGE_MIGRATION = "db/migration/V41__merge_back_slot_into_bag.sql";
 
     @Autowired
     private CosmeticItemSeeder seeder;
@@ -63,6 +66,10 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
         assertThat(statementsOf(ABILITY_DDL_MIGRATION))
                 .as("V36 도 같은 이유로 컬럼 추가만 담는다")
                 .doesNotContain("INSERT INTO");
+        assertThat(statementsOf(LAYER_ORDER_DDL_MIGRATION))
+                .as("V40 도 같은 이유로 컬럼 추가만 담는다")
+                .doesNotContain("INSERT INTO")
+                .doesNotContain("UPDATE COSMETIC_ITEM");
     }
 
     @Test
@@ -87,6 +94,27 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
                     .contains("COLUMN_NAME = '" + column + "'");
         }
         assertThat(ddl).contains("INFORMATION_SCHEMA.COLUMNS");
+    }
+
+    @Test
+    @DisplayName("layer_order 컬럼 추가도 information_schema 로 가드한다")
+    void layerOrderDdlIsGuarded() {
+        assertThat(statementsOf(LAYER_ORDER_DDL_MIGRATION))
+                .contains("COLUMN_NAME = 'LAYER_ORDER'")
+                .contains("INFORMATION_SCHEMA.COLUMNS");
+    }
+
+    @Test
+    @DisplayName("이미 컬럼이 있는 스키마에 V40 을 다시 돌려도 터지지 않는다")
+    void rerunningLayerOrderDdlDoesNotFail() {
+        for (int attempt = 0; attempt < 2; attempt++) {
+            runMigrationOnOneConnection(LAYER_ORDER_DDL_MIGRATION);
+        }
+
+        assertThat(cosmeticItemRepository.findByItemKey("back_backpack_navy"))
+                .get()
+                .extracting(CosmeticItem::getLayerOrder)
+                .isEqualTo(BACKPACK_LAYER_ORDER);
     }
 
     @Test
@@ -252,9 +280,8 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
 
         assertThat(bySlot).containsOnly(
                 Map.entry(CosmeticSlot.BACKGROUND, 9L),
-                Map.entry(CosmeticSlot.BACK, 2L),
                 Map.entry(CosmeticSlot.OUTFIT, 5L),
-                Map.entry(CosmeticSlot.BAG, 3L),
+                Map.entry(CosmeticSlot.BAG, 5L),
                 Map.entry(CosmeticSlot.NECK, 5L),
                 Map.entry(CosmeticSlot.FACE, 6L),
                 Map.entry(CosmeticSlot.HEAD, 8L),
@@ -265,8 +292,12 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
 
         assertThat(CosmeticSlot.equippableSlots())
                 .extracting(CosmeticSlot::getLayerOrder)
-                .as("배낭(200)은 본체(300) 뒤, 앞가방(450)은 옷(400) 위, 프레임(1000)이 맨 끝이다")
-                .containsExactly(100, 200, 400, 450, 500, 600, 700, 800, 850, 900, 1000);
+                .as("가방 자리는 450 하나다. 등에 메는 것은 아이템이 층을 200 으로 덮어쓴다")
+                .containsExactly(100, 400, 450, 500, 600, 700, 800, 850, 900, 1000);
+
+        assertThat(CosmeticSlot.values())
+                .as("BACK 은 사라졌다. 남겨 두면 장착 행이 그 값을 계속 쓸 수 있다")
+                .noneMatch(slot -> "BACK".equals(slot.name()));
     }
 
     @Test
@@ -279,24 +310,40 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
     }
 
     @Test
-    @DisplayName("등에 메는 가방과 앞으로 메는 가방이 갈려 있다")
-    void backAndBagAreSeparated() {
-        assertThat(keysOfSlot(CosmeticSlot.BACK))
-                .as("V35 에서 BACK 은 그냥 '가방' 이었다. 뜻이 바뀌었으니 내용도 바뀌어야 한다")
-                .containsExactly("back_backpack_canvas", "back_backpack_navy");
+    @DisplayName("가방 다섯 개가 한 자리에 모였다")
+    void everyBagIsInOneSlot() {
         assertThat(keysOfSlot(CosmeticSlot.BAG))
-                .containsExactly("bag_crossbody_satchel", "bag_mini_backpack", "bag_waist_pouch");
+                .as("등에 메는 둘과 앞으로 메는 셋이 같은 탭이다")
+                .containsExactly("back_backpack_canvas", "back_backpack_navy",
+                        "bag_crossbody_satchel", "bag_mini_backpack", "bag_waist_pouch");
     }
 
     @Test
-    @DisplayName("등에 메는 자리의 아이템은 배낭으로 부른다")
-    void backSlotItemsAreNamedBackpacks() {
+    @DisplayName("등에 메는 가방 둘만 layer_order 200 을 갖고 나머지는 전부 NULL 이다")
+    void onlyBackpacksOverrideLayerOrder() {
+        assertThat(cosmeticItemRepository.findAll())
+                .filteredOn(item -> item.getLayerOrder() != null)
+                .as("덮어쓰기가 늘면 그리는 순서를 자리 목록만으로 설명할 수 없게 된다")
+                .extracting(CosmeticItem::getItemKey, CosmeticItem::getLayerOrder)
+                .containsExactlyInAnyOrder(
+                        tuple("back_backpack_navy", BACKPACK_LAYER_ORDER),
+                        tuple("back_backpack_canvas", BACKPACK_LAYER_ORDER));
+
+        assertThat(BACKPACK_LAYER_ORDER)
+                .as("개구리 본체(300)보다 뒤여야 등에 멘 것으로 보인다")
+                .isLessThan(CosmeticSlot.BASE.getLayerOrder());
+        assertThat(CosmeticSlot.BAG.getLayerOrder())
+                .as("자리 기본값은 옷(400) 위다")
+                .isGreaterThan(CosmeticSlot.OUTFIT.getLayerOrder());
+    }
+
+    @Test
+    @DisplayName("한 자리에 모였어도 이름이 등에 메는 것인지 말해 준다")
+    void namesTellBackpackFromFrontBag() {
         assertThat(nameOf("back_backpack_navy")).isEqualTo("남색 배낭");
         assertThat(nameOf("back_backpack_canvas")).isEqualTo("캔버스 배낭");
-
-        assertThat(CosmeticSlot.BACK.getNameKo()).isEqualTo("배낭");
         assertThat(nameOf("bag_mini_backpack"))
-                .as("앞으로 메는 쪽은 그대로 '백팩' 이다. 자리 이름(배낭/가방)과 짝이 맞아야 헷갈리지 않는다")
+                .as("자리가 하나가 됐으니 이름이 구분을 진다")
                 .isEqualTo("미니 백팩");
         assertThat(CosmeticSlot.BAG.getNameKo()).isEqualTo("가방");
     }
@@ -441,6 +488,80 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
     }
 
     @Test
+    @DisplayName("V41 은 키와 이름을 건드리지 않는다")
+    void bagMergeTouchesSlotAndLayerOnly() {
+        String merge = statementsOf(BAG_MERGE_MIGRATION);
+
+        assertThat(merge)
+                .as("에셋 파일명과 해금표가 item_key 로 맞춰져 있다")
+                .doesNotContain("SET ITEM_KEY")
+                .doesNotContain("NAME_KO")
+                .doesNotContain("ALTER TABLE");
+        assertThat(merge).contains("SET SLOT = 'BAG', LAYER_ORDER = 200");
+    }
+
+    @Test
+    @DisplayName("BACK 자리에 걸어 둔 행은 BAG 으로 옮겨진다 - 사용자가 실제로 고른 것이다")
+    void existingBackLoadoutRowMovesToBag() {
+        var user = fullyGrownUser();
+        // BACK 은 이제 enum 에 없어 서비스로는 만들 수 없다. 옛 배포가 남긴 행을 직접 박아 넣는다.
+        insertRawLoadout(user.getId(), "BACK", "back_backpack_navy");
+
+        runMigration(BAG_MERGE_MIGRATION);
+
+        assertThat(rawSlotsOf(user.getId()))
+                .as("BACK 은 CosmeticSlot 에 없는 값이라 남겨 두면 엔티티 매핑이 터진다")
+                .doesNotContain("BACK")
+                .contains("BAG");
+        assertThat(rawItemKeyOf(user.getId(), CosmeticSlot.BAG))
+                .as("지우면 배낭을 메고 있던 사용자가 이유 없이 맨등이 된다")
+                .isEqualTo("back_backpack_navy");
+        assertThat(equippedOf(user.getId()))
+                .containsEntry(CosmeticSlot.BAG, "back_backpack_navy");
+    }
+
+    @Test
+    @DisplayName("BACK 과 BAG 을 둘 다 갖고 있으면 BAG 쪽이 남는다")
+    void bagRowWinsWhenBothExist() {
+        var user = fullyGrownUser();
+        insertRawLoadout(user.getId(), "BACK", "back_backpack_navy");
+        insertRawLoadout(user.getId(), "BAG", "bag_mini_backpack");
+
+        runMigration(BAG_MERGE_MIGRATION);
+
+        assertThat(rawSlotsOf(user.getId())).doesNotContain("BACK");
+        assertThat(rawItemKeyOf(user.getId(), CosmeticSlot.BAG))
+                .as("(user_id, slot) 기본키라 하나만 남길 수 있다. 살아남는 자리의 행을 남긴다")
+                .isEqualTo("bag_mini_backpack");
+    }
+
+    @Test
+    @DisplayName("일부러 비워 둔 BACK 행도 그대로 옮긴다")
+    void emptyMarkerRowAlsoMoves() {
+        var user = fullyGrownUser();
+        insertRawLoadout(user.getId(), "BACK", "__none__");
+
+        runMigration(BAG_MERGE_MIGRATION);
+
+        assertThat(rawItemKeyOf(user.getId(), CosmeticSlot.BAG))
+                .as("비워 둔 것도 사용자의 선택이다. 지우면 기본 프리셋이 되살아날 수 있다")
+                .isEqualTo("__none__");
+    }
+
+    @Test
+    @DisplayName("V41 을 두 번 돌려도 결과가 같다")
+    void bagMergeIsRerunnable() {
+        var user = fullyGrownUser();
+        insertRawLoadout(user.getId(), "BACK", "back_backpack_canvas");
+
+        runMigration(BAG_MERGE_MIGRATION);
+        runMigration(BAG_MERGE_MIGRATION);
+
+        assertThat(rawItemKeyOf(user.getId(), CosmeticSlot.BAG)).isEqualTo("back_backpack_canvas");
+        assertThat(keysOfSlot(CosmeticSlot.BAG)).hasSize(5);
+    }
+
+    @Test
     @DisplayName("모든 슬롯 값이 CosmeticSlot 에 있는 이름이다")
     void slotsAreKnown() {
         // 시드에 오타가 있으면 엔티티 매핑에서 IllegalArgumentException 이 난다.
@@ -457,6 +578,19 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
         return cosmeticItemRepository.findAll().stream()
                 .filter(item -> !"BASE".equals(item.getItemKey()))
                 .toList();
+    }
+
+    /** 옛 배포가 남긴 행을 흉내 낸다. 지금은 enum 에 없는 슬롯이라 서비스로는 못 만든다. */
+    private void insertRawLoadout(Long userId, String slot, String itemKey) {
+        jdbcTemplate.update("""
+                INSERT INTO user_cosmetic_loadout (user_id, slot, item_key, updated_at)
+                VALUES (?, ?, ?, NOW(6))
+                """, userId, slot, itemKey);
+    }
+
+    private List<String> rawSlotsOf(Long userId) {
+        return jdbcTemplate.queryForList(
+                "SELECT slot FROM user_cosmetic_loadout WHERE user_id = ?", String.class, userId);
     }
 
     private String nameOf(String itemKey) {
