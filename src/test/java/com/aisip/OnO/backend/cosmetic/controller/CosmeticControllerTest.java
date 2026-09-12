@@ -63,7 +63,7 @@ class CosmeticControllerTest extends CosmeticTestSupport {
     }
 
     @Test
-    @DisplayName("GET /api/cosmetics - 프레임 자리는 layerOrder 1000 이고 composited 가 false 다")
+    @DisplayName("GET /api/cosmetics - 프레임은 자리만 내려가고 자동으로 걸리지는 않는다")
     void frameSlotIsNotComposited() throws Exception {
         User user = fullyGrownUser();
         authenticateAs(user.getId());
@@ -74,7 +74,9 @@ class CosmeticControllerTest extends CosmeticTestSupport {
                 .andExpect(jsonPath(frame + ".layerOrder").value(Matchers.contains(1000)))
                 .andExpect(jsonPath(frame + ".nameKo").value(Matchers.contains("프레임")))
                 .andExpect(jsonPath(frame + ".composited")
-                        .value(Matchers.contains(false)));
+                        .value(Matchers.contains(false)))
+                .andExpect(jsonPath("$.data.equipped.FRAME")
+                        .doesNotExist());
     }
 
     @Test

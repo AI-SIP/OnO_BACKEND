@@ -100,8 +100,16 @@ public abstract class CosmeticTestSupport extends IntegrationTestSupport {
     /** 전체 시드 개수. 본체(BASE) 는 포함하지 않는다. 능력치별 17 / 10 / 11 / 9 와 총 학습 16 이다. */
     protected static final int SEEDED_ITEM_COUNT = 63;
 
-    /** 장착 가능한 자리 수. 프리셋이 한 자리에 하나씩 채우므로 곧 프리셋 행 수이기도 하다. */
+    /** 장착 가능한 자리 수. 응답의 slots 길이다. */
     protected static final int EQUIPPABLE_SLOT_COUNT = 11;
+
+    /**
+     * 기본 프리셋이 채우는 자리 수.
+     *
+     * <p>장착 가능한 자리에서 프레임 하나가 빠진다. 프레임은 개구리에 겹치지 않고 스터디룸에서
+     * 남들과 나란히 보이는데 멤버 응답에 치장이 실리지 않아, 자동으로 걸면 나만 테두리가 생긴다.
+     */
+    protected static final int PRESET_SLOT_COUNT = EQUIPPABLE_SLOT_COUNT - 1;
 
     @Autowired
     private CosmeticItemSeeder cosmeticItemSeeder;

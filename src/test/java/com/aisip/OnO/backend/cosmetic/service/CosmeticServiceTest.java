@@ -328,7 +328,45 @@ class CosmeticServiceTest extends CosmeticTestSupport {
                     .containsEntry(CosmeticSlot.HAND, PROP_DIPLOMA)
                     .containsEntry(CosmeticSlot.BADGE, BADGE_SNOWFLAKE)
                     .containsEntry(CosmeticSlot.EFFECT, EFFECT_SNOW)
-                    .containsEntry(CosmeticSlot.FRAME, FRAME_MASTER);
+                    .as("프레임은 다 열려 있어도 프리셋이 걸어 주지 않는다")
+                    .doesNotContainKey(CosmeticSlot.FRAME);
+        }
+
+        @Test
+        @DisplayName("프리셋은 프레임을 채우지 않는다 - 스터디룸에서 나만 테두리가 생기면 안 된다")
+        void presetSkipsFrame() {
+            User user = fullyGrownUser();
+
+            assertThat(equippedOf(user.getId()))
+                    .as("프레임은 개구리에 겹치지 않고 멤버 목록에서 남들과 나란히 보인다."
+                            + " 멤버 응답에 치장이 안 실리는 동안에는 내가 고른 것만 걸려야 한다")
+                    .doesNotContainKey(CosmeticSlot.FRAME)
+                    .hasSize(PRESET_SLOT_COUNT);
+        }
+
+        @Test
+        @DisplayName("프레임을 직접 고르면 걸린다 - 프리셋이 안 채울 뿐이다")
+        void frameIsEquippableEvenThoughPresetSkipsIt() {
+            User user = fullyGrownUser();
+
+            cosmeticService.equip(user.getId(), CosmeticSlot.FRAME, FRAME_SPRING);
+
+            assertThat(equippedOf(user.getId()))
+                    .containsEntry(CosmeticSlot.FRAME, FRAME_SPRING)
+                    .as("프레임을 걸었다고 나머지 프리셋이 사라지면 안 된다")
+                    .containsEntry(CosmeticSlot.BACKGROUND, BG_SPACE);
+        }
+
+        @Test
+        @DisplayName("프레임 아닌 자리를 먼저 걸어도 프레임 행은 안 생긴다")
+        void materializedPresetHasNoFrameRow() {
+            User user = fullyGrownUser();
+
+            cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, HAT_BEANIE);
+
+            assertThat(rawItemKeyOf(user.getId(), CosmeticSlot.FRAME))
+                    .as("프리셋을 굳힐 때 프레임 행까지 쓰면 사용자가 안 고른 프레임이 박힌다")
+                    .isNull();
         }
 
         @Test
@@ -340,8 +378,8 @@ class CosmeticServiceTest extends CosmeticTestSupport {
             assertThat(equippedOf(user.getId()))
                     .containsEntry(CosmeticSlot.BACKGROUND, BG_RAINY)
                     .containsEntry(CosmeticSlot.EFFECT, EFFECT_SPARKLE)
-                    .as("출석 5 짜리 여름 프레임까지 열려 있다")
-                    .containsEntry(CosmeticSlot.FRAME, FRAME_SUMMER)
+                    .as("출석 5 짜리 여름 프레임이 열려 있어도 프리셋은 안 걸어 준다")
+                    .doesNotContainKey(CosmeticSlot.FRAME)
                     .as("출석만 올렸는데 다른 능력치 자리가 채워지면 안 된다")
                     .doesNotContainKey(CosmeticSlot.HEAD)
                     .doesNotContainKey(CosmeticSlot.FACE)
@@ -359,8 +397,8 @@ class CosmeticServiceTest extends CosmeticTestSupport {
                     .containsEntry(CosmeticSlot.OUTFIT, OUTFIT_GRADUATE)
                     .containsEntry(CosmeticSlot.HAND, PROP_DIPLOMA)
                     .containsEntry(CosmeticSlot.BADGE, BADGE_SNOWFLAKE)
-                    .as("프레임은 총 학습 17 짜리 마스터가 가장 늦게 열린다")
-                    .containsEntry(CosmeticSlot.FRAME, FRAME_MASTER)
+                    .as("총 학습 17 짜리 마스터 프레임이 열려 있어도 프리셋은 안 걸어 준다")
+                    .doesNotContainKey(CosmeticSlot.FRAME)
                     .as("배경·얼굴·목·가방은 전부 능력치로만 열린다")
                     .doesNotContainKey(CosmeticSlot.BACKGROUND)
                     .doesNotContainKey(CosmeticSlot.FACE)
@@ -420,7 +458,7 @@ class CosmeticServiceTest extends CosmeticTestSupport {
                     .containsEntry(CosmeticSlot.BACKGROUND, BG_SPACE)
                     .containsEntry(CosmeticSlot.OUTFIT, OUTFIT_GRADUATE)
                     .containsEntry(CosmeticSlot.HAND, PROP_DIPLOMA);
-            assertThat(loadoutRowCount(user.getId())).isEqualTo(EQUIPPABLE_SLOT_COUNT);
+            assertThat(loadoutRowCount(user.getId())).isEqualTo(PRESET_SLOT_COUNT);
         }
 
         @Test
@@ -668,7 +706,7 @@ class CosmeticServiceTest extends CosmeticTestSupport {
             CosmeticEquipResponseDto response = cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, HAT_BEANIE);
 
             assertThat(response.unequippedSlots()).isEmpty();
-            assertThat(response.equipped()).hasSize(EQUIPPABLE_SLOT_COUNT);
+            assertThat(response.equipped()).hasSize(PRESET_SLOT_COUNT);
         }
     }
 

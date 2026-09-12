@@ -359,10 +359,20 @@ public class CosmeticService {
      * 아무것도 안 했는데 하향된 것이다. 프리셋이 그 순간을 막는다.
      * 마이그레이션으로 전 사용자 행을 만드는 방법도 있지만, 수십만 행을 미리 쓰고 나면
      * 나중에 프리셋 규칙을 바꿀 수 없다. 계산으로 두면 규칙만 고치면 된다.
+     *
+     * <p><b>{@code composited = false} 인 자리는 채우지 않는다.</b> 지금은 {@link CosmeticSlot#FRAME}
+     * 하나다. 위의 "아무것도 안 했는데 하향된 것" 이라는 근거가 프레임에는 성립하지 않는다.
+     * 프레임은 꾸미기 전에도 없었고, 개구리에 얹히는 것들과 달리 <b>내 화면 밖에서 남들과 나란히</b>
+     * 보인다(스터디룸 멤버 목록). 그런데 멤버 응답에는 아직 치장이 실리지 않아, 프리셋이 내 프레임을
+     * 자동으로 걸면 목록에서 나만 테두리가 있고 나머지는 맨 얼굴이 된다.
+     * 내가 고른 것도 아닌데 그렇게 보이는 것이라 사용자가 직접 고를 때만 걸리게 한다.
+     *
+     * <p>나중에 스터디룸 멤버 응답에 치장이 실리면 이 규칙은 다시 볼 값어치가 있다.
+     * 그때는 모두가 프레임을 갖고 있으니 "나만 튄다" 는 근거가 사라진다.
      */
     private Map<CosmeticSlot, String> defaultPreset(List<CosmeticItem> activeItems, CosmeticUnlockLevels levels) {
         Map<CosmeticSlot, String> preset = new EnumMap<>(CosmeticSlot.class);
-        for (CosmeticSlot slot : CosmeticSlot.equippableSlots()) {
+        for (CosmeticSlot slot : presetSlots()) {
             activeItems.stream()
                     .filter(item -> item.getSlot() == slot)
                     .filter(item -> item.isOwnedBy(levels))
@@ -375,6 +385,18 @@ public class CosmeticService {
                     .ifPresent(item -> preset.put(slot, item.getItemKey()));
         }
         return preset;
+    }
+
+    /**
+     * 프리셋이 채우는 자리. 걸 수 있고 개구리에 겹치는 자리만이다.
+     *
+     * <p>{@code equippable} 과 {@code composited} 를 함께 보는 곳은 여기뿐이다. 장착 자체는
+     * 프레임도 다른 자리와 똑같이 받는다. 자동으로 걸어 주지 않을 뿐이다.
+     */
+    private static List<CosmeticSlot> presetSlots() {
+        return CosmeticSlot.equippableSlots().stream()
+                .filter(CosmeticSlot::isComposited)
+                .toList();
     }
 
     /**
