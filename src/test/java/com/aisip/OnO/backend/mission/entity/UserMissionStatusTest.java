@@ -17,6 +17,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>총 학습 레벨: 개별 필요치의 4배(= 40 × 레벨), <b>레벨 20에서 멈춤</b></li>
  * </ul>
  * 사용자에게 보이는 숫자라 한 칸만 어긋나도 바로 문의가 들어온다.
+ *
+ * <p>두 상한은 서로 맞물려 있다. {@link CapAlignment} 를 참고.
  */
 @DisplayName("UserMissionStatus")
 class UserMissionStatusTest {
@@ -264,6 +266,125 @@ class UserMissionStatusTest {
                     .as("상한이 없으면 내부 레벨만 무한정 올라 응답에서 잘린 레벨과 갈린다")
                     .isEqualTo(UserMissionStatus.MAX_ABILITY_LEVEL);
             assertThat(status.getTotalStudyLevel()).isEqualTo(UserMissionStatus.MAX_TOTAL_STUDY_LEVEL);
+        }
+    }
+
+    /**
+     * 능력치 상한과 총 학습 상한의 대응.
+     *
+     * <p>이번에 어긋난 자리다. 총 학습만 15 에서 20 으로 올리고 능력치는 15 에 뒀더니,
+     * 능력치 넷을 다 채워도(4 x 1,050 = 4,200점) 총 학습은 15 에서 멈췄다.
+     * 그 위 구간은 능력치 넷이 Lv.15 에 멈춘 채로 총 학습만 혼자 오르는, 스탯창이 죽은 화면이었다.
+     *
+     * <p>"능력치 넷을 다 채우면 총 학습이 몇이 되는가" 를 아무도 검증하지 않아서 그냥 지나갔다.
+     * 여기서 그 관계를 못 박는다.
+     */
+    @Nested
+    @DisplayName("능력치 상한과 총 학습 상한의 대응")
+    class CapAlignment {
+
+        @Test
+        @DisplayName("두 상한은 같은 값이다")
+        void bothCapsAreTheSameNumber() {
+            assertThat(UserMissionStatus.MAX_ABILITY_LEVEL)
+                    .as("한쪽만 움직이면 능력치 만렙과 총 학습 만렙이 서로 다른 지점이 된다")
+                    .isEqualTo(UserMissionStatus.MAX_TOTAL_STUDY_LEVEL);
+        }
+
+        @Test
+        @DisplayName("능력치 넷을 한 단계씩 만렙까지 올리면 총 학습도 정확히 만렙에서 끝난다")
+        void fourMaxedAbilitiesLandExactlyOnTotalStudyCap() {
+            UserMissionStatus status = newcomer();
+
+            // 레벨 L → L+1 에 필요한 10L 점씩만 넣는다. 한 점도 남기지 않고 딱 만렙까지 올린다.
+            for (long level = 1; level < UserMissionStatus.MAX_ABILITY_LEVEL; level++) {
+                long needed = 10 * level;
+                status.gainAttendancePoint(needed);
+                status.gainNoteWritePoint(needed);
+                status.gainProblemPracticePoint(needed);
+                status.gainNotePracticePoint(needed);
+            }
+
+            assertThat(status.getAttendanceLevel()).isEqualTo(UserMissionStatus.MAX_ABILITY_LEVEL);
+            assertThat(status.getNoteWriteLevel()).isEqualTo(UserMissionStatus.MAX_ABILITY_LEVEL);
+            assertThat(status.getProblemPracticeLevel()).isEqualTo(UserMissionStatus.MAX_ABILITY_LEVEL);
+            assertThat(status.getNotePracticeLevel()).isEqualTo(UserMissionStatus.MAX_ABILITY_LEVEL);
+            assertThat(status.getAttendancePoint()).isZero();
+            assertThat(status.getNoteWritePoint()).isZero();
+            assertThat(status.getProblemPracticePoint()).isZero();
+            assertThat(status.getNotePracticePoint()).isZero();
+
+            assertThat(status.getTotalStudyLevel())
+                    .as("능력치 넷이 다 만렙인데 총 학습이 그 아래면 스탯창이 죽은 것처럼 보인다")
+                    .isEqualTo(UserMissionStatus.MAX_TOTAL_STUDY_LEVEL);
+            assertThat(status.getTotalStudyPoint())
+                    .as("모자라도 남아도 두 상한이 어긋난 것이다")
+                    .isZero();
+        }
+
+        @Test
+        @DisplayName("능력치 만렙까지 필요한 경험치 넷 몫이 총 학습 만렙까지 필요한 경험치와 같다")
+        void requiredPointsMatchAcrossBothCaps() {
+            long n = UserMissionStatus.MAX_ABILITY_LEVEL;
+
+            // 능력치 1 → N 누적: sum(10L, L=1..N-1) = 5N(N-1). N=20 이면 1,900
+            long perAbility = 5 * n * (n - 1);
+            // 총 학습 1 → N 누적: sum(40L, L=1..N-1) = 20N(N-1). N=20 이면 7,600
+            long totalStudy = 20 * n * (n - 1);
+
+            assertThat(perAbility).isEqualTo(1_900L);
+            assertThat(totalStudy).isEqualTo(7_600L);
+            assertThat(perAbility * 4)
+                    .as("총 학습 임계값이 능력치 임계값의 4배라 넷 몫과 정확히 맞아떨어져야 한다")
+                    .isEqualTo(totalStudy);
+        }
+
+        @Test
+        @DisplayName("만렙에 닿으면 레벨은 멈추고 포인트만 쌓인다")
+        void keepsAccumulatingPointsAfterCap() {
+            UserMissionStatus status = newcomer();
+
+            status.gainAttendancePoint(1_900L);
+            assertThat(status.getAttendanceLevel())
+                    .as("1 → 20 에 필요한 누적은 5 x 20 x 19 = 1,900 이다")
+                    .isEqualTo(20L);
+            assertThat(status.getAttendancePoint()).isZero();
+
+            status.gainAttendancePoint(10_000L);
+
+            assertThat(status.getAttendanceLevel())
+                    .as("상한을 넘겨 21레벨이 되면 해금표에 없는 레벨이 표시된다")
+                    .isEqualTo(20L);
+            assertThat(status.getAttendancePoint())
+                    .as("상한 이후 경험치는 사라지지 않고 그대로 누적된다")
+                    .isEqualTo(10_000L);
+        }
+
+        @Test
+        @DisplayName("상한이 15 였다면 멈췄을 자리를 능력치도 그대로 지나간다")
+        void abilityPassesThroughTheOldCap() {
+            UserMissionStatus status = newcomer();
+
+            // 15 → 20 에 능력치가 더 받아야 하는 양은 10 x (15+16+17+18+19) = 850 이다.
+            status.gainAttendancePoint(1_050L + 850L);
+
+            assertThat(status.getAttendanceLevel())
+                    .as("여기서 15 에 멈추면 능력치 넷을 다 채워도 총 학습이 15 에서 멈춘다")
+                    .isEqualTo(20L);
+            assertThat(status.getAttendancePoint()).isZero();
+        }
+
+        @Test
+        @DisplayName("넷 중 하나만 만렙이면 총 학습은 아직 만렙이 아니다")
+        void oneMaxedAbilityIsNotEnough() {
+            UserMissionStatus status = newcomer();
+
+            status.gainAttendancePoint(1_900L);
+
+            assertThat(status.getAttendanceLevel()).isEqualTo(20L);
+            assertThat(status.getTotalStudyLevel())
+                    .as("한 능력치만으로 총 학습이 만렙이 되면 나머지 셋이 의미를 잃는다")
+                    .isLessThan(UserMissionStatus.MAX_TOTAL_STUDY_LEVEL);
         }
     }
 
