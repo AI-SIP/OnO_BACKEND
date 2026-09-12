@@ -23,6 +23,21 @@ public class UserMissionStatus {
      */
     public static final long MAX_TOTAL_STUDY_LEVEL = 20L;
 
+    /**
+     * 개별 능력치 레벨 상한.
+     *
+     * <p>{@link #MAX_TOTAL_STUDY_LEVEL} 과 반드시 같은 값이어야 해서 상수를 직접 참조한다.
+     * 총 학습 포인트는 능력치 넷이 받은 포인트의 합이고 총 학습 임계값은 능력치 임계값의 정확히 4배다.
+     * 그래서 능력치 넷을 레벨 N 까지 채웠을 때 쌓이는 총 학습 포인트 {@code 4 x 5N(N-1)} 과
+     * 총 학습 N 레벨에 필요한 누적 {@code 20N(N-1)} 이 항상 같다. 한쪽만 움직이면 이 대응이 깨진다.
+     * 실제로 능력치 상한 15, 총 학습 상한 20 이던 동안에는 능력치 넷을 다 채워도(4 x 1,050 = 4,200점)
+     * 총 학습이 15 에서 멈췄다. 지금은 넷을 다 채우면 4 x 1,900 = 7,600 점이라 총 학습도 정확히 20 에 닿는다.
+     *
+     * <p>여기에 상한이 없으면 내부 레벨은 무한정 오르고 응답에서만 잘려, 앱에 보이는 레벨과
+     * 실제 레벨이 갈린다. 총 학습과 같은 방식으로 레벨만 멈추고 포인트는 계속 쌓는다.
+     */
+    public static final long MAX_ABILITY_LEVEL = MAX_TOTAL_STUDY_LEVEL;
+
     // 데일리 출석
     private Long attendanceLevel;
     private Long attendancePoint;
@@ -48,7 +63,7 @@ public class UserMissionStatus {
      */
     public void gainAttendancePoint(Long value) {
         this.attendancePoint += value;
-        while (this.attendancePoint >= getThresholdForLevel(attendanceLevel)) {
+        while (this.attendanceLevel < MAX_ABILITY_LEVEL && this.attendancePoint >= getThresholdForLevel(attendanceLevel)) {
             this.attendancePoint -= getThresholdForLevel(attendanceLevel);
             this.attendanceLevel += 1;
         }
@@ -60,7 +75,7 @@ public class UserMissionStatus {
      */
     public void gainNoteWritePoint(Long value) {
         this.noteWritePoint += value;
-        while (this.noteWritePoint >= getThresholdForLevel(noteWriteLevel)) {
+        while (this.noteWriteLevel < MAX_ABILITY_LEVEL && this.noteWritePoint >= getThresholdForLevel(noteWriteLevel)) {
             this.noteWritePoint -= getThresholdForLevel(noteWriteLevel);
             this.noteWriteLevel += 1;
         }
@@ -72,7 +87,7 @@ public class UserMissionStatus {
      */
     public void gainProblemPracticePoint(Long value) {
         this.problemPracticePoint += value;
-        while (this.problemPracticePoint >= getThresholdForLevel(problemPracticeLevel)) {
+        while (this.problemPracticeLevel < MAX_ABILITY_LEVEL && this.problemPracticePoint >= getThresholdForLevel(problemPracticeLevel)) {
             this.problemPracticePoint -= getThresholdForLevel(problemPracticeLevel);
             this.problemPracticeLevel += 1;
         }
@@ -84,7 +99,7 @@ public class UserMissionStatus {
      */
     public void gainNotePracticePoint(Long value) {
         this.notePracticePoint += value;
-        while (this.notePracticePoint >= getThresholdForLevel(notePracticeLevel)) {
+        while (this.notePracticeLevel < MAX_ABILITY_LEVEL && this.notePracticePoint >= getThresholdForLevel(notePracticeLevel)) {
             this.notePracticePoint -= getThresholdForLevel(notePracticeLevel);
             this.notePracticeLevel += 1;
         }
@@ -113,6 +128,7 @@ public class UserMissionStatus {
      * - 레벨 1→2: 10
      * - 레벨 2→3: 20
      * - 레벨 14→15: 140
+     * - 레벨 19→20: 190 — 상한. 1 에서 20 까지 누적은 1,900 이다
      */
     private Long getThresholdForLevel(Long level) {
         return 10 + (level - 1) * 10;

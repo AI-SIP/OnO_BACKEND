@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>공식이 두 개다.
  * <ul>
- *   <li>개별 능력치: 레벨 n → n+1 에 {@code 10 + (n-1) * 10} 점 필요, 상한 없음</li>
+ *   <li>개별 능력치: 레벨 n → n+1 에 {@code 10 + (n-1) * 10} 점 필요, <b>레벨 20에서 멈춤</b></li>
  *   <li>총 학습 레벨: 개별 필요치의 4배(= 40 × 레벨), <b>레벨 20에서 멈춤</b></li>
  * </ul>
  * 사용자에게 보이는 숫자라 한 칸만 어긋나도 바로 문의가 들어온다.
@@ -254,14 +254,16 @@ class UserMissionStatusTest {
         }
 
         @Test
-        @DisplayName("개별 능력치는 총 학습 레벨과 달리 상한이 없다")
-        void abilityLevelHasNoCap() {
+        @DisplayName("개별 능력치도 총 학습과 같은 레벨에서 멈춘다")
+        void abilityLevelStopsAtTheSameCap() {
             UserMissionStatus status = newcomer();
 
             status.gainAttendancePoint(100_000L);
 
-            assertThat(status.getAttendanceLevel()).isGreaterThan(20L);
-            assertThat(status.getTotalStudyLevel()).isEqualTo(20L);
+            assertThat(status.getAttendanceLevel())
+                    .as("상한이 없으면 내부 레벨만 무한정 올라 응답에서 잘린 레벨과 갈린다")
+                    .isEqualTo(UserMissionStatus.MAX_ABILITY_LEVEL);
+            assertThat(status.getTotalStudyLevel()).isEqualTo(UserMissionStatus.MAX_TOTAL_STUDY_LEVEL);
         }
     }
 
