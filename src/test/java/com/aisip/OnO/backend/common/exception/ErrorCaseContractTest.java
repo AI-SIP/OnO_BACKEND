@@ -34,7 +34,7 @@ class ErrorCaseContractTest {
     private static final String BASE_PACKAGE = "com.aisip.OnO.backend";
 
     /** 도메인별 ErrorCase enum 개수. 새 도메인을 추가하면 늘어난다. */
-    private static final int MINIMUM_ERROR_CASE_TYPES = 13;
+    private static final int MINIMUM_ERROR_CASE_TYPES = 14;
 
     @Nested
     @DisplayName("전체 집합")

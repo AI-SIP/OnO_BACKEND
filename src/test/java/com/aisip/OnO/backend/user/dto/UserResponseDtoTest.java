@@ -98,7 +98,7 @@ class UserResponseDtoTest {
     class LevelCap {
 
         @Test
-        @DisplayName("15레벨 미만은 저장된 값을 그대로 내보낸다")
+        @DisplayName("상한 미만은 저장된 값을 그대로 내보낸다")
         void keepsValuesBelowMaxLevel() {
             User user = user();
             user.getUserMissionStatus().setAttendanceLevel(3L, 7L);
@@ -114,8 +114,8 @@ class UserResponseDtoTest {
         }
 
         @Test
-        @DisplayName("정확히 15레벨이면 게이지 기준치는 15레벨 기준으로 고정된다")
-        void pinsThresholdAtMaxLevel() {
+        @DisplayName("총 학습 15레벨은 더 이상 만렙이 아니다 - 게이지가 계속 올라간다")
+        void totalStudyKeepsGrowingPastFifteen() {
             User user = user();
             user.getUserMissionStatus().setTotalStudyLevel(15L, 100L);
 
@@ -123,22 +123,52 @@ class UserResponseDtoTest {
 
             assertThat(response.totalStudyLevel()).isEqualTo(15L);
             assertThat(response.totalStudyCurrentPoint()).isEqualTo(100L);
-            assertThat(response.totalStudyNextLevelThreshold()).isEqualTo(600L);
+            assertThat(response.totalStudyNextLevelThreshold())
+                    .as("15 에서 멈추면 총 학습 16·18·19·20 에 걸린 치장이 앱에서 영영 안 보인다")
+                    .isEqualTo(600L);
         }
 
         @Test
-        @DisplayName("15레벨을 넘긴 미션 정보는 15레벨 풀 게이지로 눌러서 응답한다")
-        void capsMissionStatusOverMaxLevel() {
+        @DisplayName("정확히 20레벨이면 게이지 기준치는 20레벨 기준으로 고정된다")
+        void pinsThresholdAtMaxTotalStudyLevel() {
+            User user = user();
+            user.getUserMissionStatus().setTotalStudyLevel(20L, 100L);
+
+            UserResponseDto response = UserResponseDto.from(user);
+
+            assertThat(response.totalStudyLevel()).isEqualTo(20L);
+            assertThat(response.totalStudyCurrentPoint()).isEqualTo(100L);
+            assertThat(response.totalStudyNextLevelThreshold()).isEqualTo(800L);
+        }
+
+        @Test
+        @DisplayName("총 학습 16~20 은 그대로 나간다 - 능력치 상한 15 와 다른 값이다")
+        void totalStudyLevelIsNotCappedAtFifteen() {
+            User user = user();
+            user.getUserMissionStatus().setTotalStudyLevel(18L, 120L);
+
+            UserResponseDto response = UserResponseDto.from(user);
+
+            assertThat(response.totalStudyLevel()).isEqualTo(18L);
+            assertThat(response.totalStudyCurrentPoint()).isEqualTo(120L);
+            assertThat(response.totalStudyNextLevelThreshold()).isEqualTo(720L);
+        }
+
+        @Test
+        @DisplayName("능력치는 15레벨을 넘겨도 15레벨 풀 게이지로 눌러서 응답한다")
+        void capsAbilityStatusOverMaxLevel() {
             User user = user();
             user.getUserMissionStatus().setAttendanceLevel(16L, 10L);
             user.getUserMissionStatus().setNoteWriteLevel(17L, 20L);
             user.getUserMissionStatus().setProblemPracticeLevel(18L, 30L);
             user.getUserMissionStatus().setNotePracticeLevel(19L, 40L);
-            user.getUserMissionStatus().setTotalStudyLevel(16L, 50L);
+            user.getUserMissionStatus().setTotalStudyLevel(21L, 50L);
 
             UserResponseDto response = UserResponseDto.from(user);
 
-            assertThat(response.attendanceLevel()).isEqualTo(15L);
+            assertThat(response.attendanceLevel())
+                    .as("능력치 게이지는 15칸이고 치장 해금표도 능력치 15 가 마지막이다")
+                    .isEqualTo(15L);
             assertThat(response.attendancePoint()).isEqualTo(150L);
             assertThat(response.noteWriteLevel()).isEqualTo(15L);
             assertThat(response.noteWritePoint()).isEqualTo(150L);
@@ -146,11 +176,13 @@ class UserResponseDtoTest {
             assertThat(response.problemPracticePoint()).isEqualTo(150L);
             assertThat(response.notePracticeLevel()).isEqualTo(15L);
             assertThat(response.notePracticePoint()).isEqualTo(150L);
-            assertThat(response.totalStudyLevel()).isEqualTo(15L);
+            assertThat(response.totalStudyLevel())
+                    .as("총 학습만 상한이 20 이다")
+                    .isEqualTo(20L);
             assertThat(response.totalStudyCurrentPoint())
-                    .as("게이지가 넘치지 않도록 15레벨 만점으로 눌러 보낸다")
-                    .isEqualTo(600L);
-            assertThat(response.totalStudyNextLevelThreshold()).isEqualTo(600L);
+                    .as("게이지가 넘치지 않도록 20레벨 만점으로 눌러 보낸다")
+                    .isEqualTo(800L);
+            assertThat(response.totalStudyNextLevelThreshold()).isEqualTo(800L);
         }
     }
 }

@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.mission.service;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.mission.entity.MissionMetric;
 import com.aisip.OnO.backend.mission.entity.MissionRewardType;
+import com.aisip.OnO.backend.mission.entity.MissionType.AbilityType;
 import com.aisip.OnO.backend.mission.entity.UserMissionStatus;
 import com.aisip.OnO.backend.mission.exception.MissionErrorCase;
 import com.aisip.OnO.backend.user.entity.User;
@@ -52,9 +53,15 @@ public class MissionRewardGranter {
         UserMissionStatus status = user.getUserMissionStatus();
         long levelBefore = status.getTotalStudyLevel();
 
-        if (rewardType == MissionRewardType.XP && rewardValue > 0) {
+        // 어느 능력치에 넣었는지와 그 능력치의 전후 레벨을 함께 돌려준다. 치장 해금이
+        // 총 학습 레벨만이 아니라 능력치 레벨로도 열리기 때문에, 호출부가 이 값을 모르면
+        // 능력치가 올라 열린 것을 수령 응답에서 통째로 빠뜨린다.
+        AbilityType ability = metric == null ? null : metric.getAbilityType();
+        long abilityLevelBefore = abilityLevelOf(status, ability);
+
+        if (rewardType == MissionRewardType.XP && rewardValue > 0 && ability != null) {
             long point = rewardValue;
-            switch (metric.getAbilityType()) {
+            switch (ability) {
                 case ATTENDANCE -> status.gainAttendancePoint(point);
                 case NOTE_WRITE -> status.gainNoteWritePoint(point);
                 case PROBLEM_PRACTICE -> status.gainProblemPracticePoint(point);
@@ -63,9 +70,44 @@ public class MissionRewardGranter {
         }
 
         long levelAfter = status.getTotalStudyLevel();
-        return new GrantResult(levelAfter, levelAfter > levelBefore);
+        return new GrantResult(levelBefore, levelAfter, levelAfter > levelBefore,
+                ability, abilityLevelBefore, abilityLevelOf(status, ability));
     }
 
-    public record GrantResult(Long totalStudyLevel, boolean leveledUp) {
+    /** 능력치가 없는 보상이면 0 이다. 전후가 같으니 해금 구간이 비게 된다. */
+    private long abilityLevelOf(UserMissionStatus status, AbilityType ability) {
+        if (ability == null) {
+            return 0L;
+        }
+        return switch (ability) {
+            case ATTENDANCE -> status.getAttendanceLevel();
+            case NOTE_WRITE -> status.getNoteWriteLevel();
+            case PROBLEM_PRACTICE -> status.getProblemPracticeLevel();
+            case NOTE_PRACTICE -> status.getNotePracticeLevel();
+        };
+    }
+
+    /**
+     * 지급 결과.
+     *
+     * <p>{@code levelBefore} 를 함께 돌려주는 이유는 호출부가 "이번에 무엇이 열렸는지" 를
+     * 계산해야 하기 때문이다. 레벨이 한 번에 여러 단계 오를 수 있어 {@code leveledUp} 만으로는
+     * 어디서 어디까지 올랐는지 알 수 없다.
+     *
+     * <p>{@code abilityType} 과 그 능력치의 전후 레벨도 함께 준다. 치장 해금이 능력치별로도
+     * 열리는데, 어느 능력치에 얼마가 들어갔는지는 여기서만 알 수 있다.
+     * XP 가 아닌 보상이면 {@code abilityType} 이 null 이고 전후 레벨은 둘 다 0 이라 구간이 비어 있다.
+     *
+     * <p>여기서 해금 아이템까지 조회하지 않는다. 이 클래스는 사용자 행을 배타 잠금으로 잡은
+     * 구간이라, 잠금을 들고 하는 일을 늘리면 같은 사용자의 다른 요청이 그만큼 더 기다린다.
+     */
+    public record GrantResult(
+            long levelBefore,
+            Long totalStudyLevel,
+            boolean leveledUp,
+            AbilityType abilityType,
+            long abilityLevelBefore,
+            long abilityLevelAfter
+    ) {
     }
 }
