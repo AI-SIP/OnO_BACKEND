@@ -38,7 +38,8 @@ public class CosmeticItemSeeder {
      */
     private static final List<String> MIGRATION_PATHS = List.of(
             "db/migration/V35__seed_cosmetic_items.sql",
-            "db/migration/V37__seed_cosmetic_items_by_ability.sql"
+            "db/migration/V37__seed_cosmetic_items_by_ability.sql",
+            "db/migration/V38__seed_profile_frame_cosmetics.sql"
     );
 
     @PersistenceContext

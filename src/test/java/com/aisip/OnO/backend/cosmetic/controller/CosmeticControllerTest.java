@@ -34,10 +34,11 @@ class CosmeticControllerTest extends CosmeticTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.baseImageUrl").value("assets/Cosmetic/BASE.png"))
                 .andExpect(jsonPath("$.data.baseLayerOrder").value(300))
-                .andExpect(jsonPath("$.data.slots.length()").value(10))
+                .andExpect(jsonPath("$.data.slots.length()").value(11))
                 .andExpect(jsonPath("$.data.slots[0].slot").value("BACKGROUND"))
                 .andExpect(jsonPath("$.data.slots[0].layerOrder").value(100))
                 .andExpect(jsonPath("$.data.slots[0].nameKo").value("배경"))
+                .andExpect(jsonPath("$.data.slots[0].composited").value(true))
                 .andExpect(jsonPath("$.data.items").isArray())
                 .andExpect(jsonPath("$.data.items.length()").value(SEEDED_ITEM_COUNT))
                 .andExpect(jsonPath("$.data.equipped.HEAD").value(HAT_BEANIE))
@@ -59,6 +60,54 @@ class CosmeticControllerTest extends CosmeticTestSupport {
                 .andExpect(jsonPath(back + ".nameKo").value(Matchers.contains("등짐")))
                 .andExpect(jsonPath(bag + ".layerOrder").value(Matchers.contains(450)))
                 .andExpect(jsonPath(effect + ".layerOrder").value(Matchers.contains(900)));
+    }
+
+    @Test
+    @DisplayName("GET /api/cosmetics - 프레임 자리는 layerOrder 1000 이고 composited 가 false 다")
+    void frameSlotIsNotComposited() throws Exception {
+        User user = fullyGrownUser();
+        authenticateAs(user.getId());
+
+        String frame = "$.data.slots[?(@.slot == 'FRAME')]";
+        mockMvc.perform(get("/api/cosmetics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(frame + ".layerOrder").value(Matchers.contains(1000)))
+                .andExpect(jsonPath(frame + ".nameKo").value(Matchers.contains("프레임")))
+                .andExpect(jsonPath(frame + ".composited")
+                        .value(Matchers.contains(false)));
+    }
+
+    @Test
+    @DisplayName("GET /api/cosmetics - 프레임 아이템은 SVG 경로로 나간다")
+    void frameItemShape() throws Exception {
+        User user = fullyGrownUser();
+        authenticateAs(user.getId());
+
+        String frame = "$.data.items[?(@.itemKey == '" + FRAME_SPRING + "')]";
+        mockMvc.perform(get("/api/cosmetics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(frame + ".slot").value(Matchers.contains("FRAME")))
+                .andExpect(jsonPath(frame + ".nameKo").value(Matchers.contains("봄 프레임")))
+                .andExpect(jsonPath(frame + ".imageUrl")
+                        .value(Matchers.contains("assets/ProfileFrame/frame_spring.svg")))
+                .andExpect(jsonPath(frame + ".requiredLevel").value(Matchers.contains(3)))
+                .andExpect(jsonPath(frame + ".requiredAbility").value(Matchers.contains("ATTENDANCE")))
+                .andExpect(jsonPath(frame + ".fullBody").value(Matchers.contains(false)))
+                .andExpect(jsonPath(frame + ".owned").value(Matchers.contains(true)));
+    }
+
+    @Test
+    @DisplayName("PUT /api/cosmetics/equip - 프레임도 다른 자리처럼 걸린다")
+    void equipFrame() throws Exception {
+        User user = fullyGrownUser();
+        authenticateAs(user.getId());
+
+        mockMvc.perform(put("/api/cosmetics/equip")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body("FRAME", FRAME_SPRING)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.equipped.FRAME").value(FRAME_SPRING))
+                .andExpect(jsonPath("$.data.equipped.BACKGROUND").value(BG_SPACE));
     }
 
     @Test

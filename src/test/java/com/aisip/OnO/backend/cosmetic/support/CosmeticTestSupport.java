@@ -43,6 +43,12 @@ public abstract class CosmeticTestSupport extends IntegrationTestSupport {
     protected static final String EFFECT_SNOW = "effect_snow";
     /** (ATTENDANCE, 15) */
     protected static final String BG_SPACE = "bg_space";
+    /** (ATTENDANCE, 3) — 프로필 프레임. 개구리에 겹치지 않는다 */
+    protected static final String FRAME_SPRING = "frame_spring";
+    /** (ATTENDANCE, 5) — 프로필 프레임 */
+    protected static final String FRAME_SUMMER = "frame_summer";
+    /** (ATTENDANCE, 15) — 프로필 프레임 */
+    protected static final String FRAME_NIGHT = "frame_night";
     /** (NOTE_WRITE, 2) — 앞으로 메는 가방이라 BAG 이다 */
     protected static final String BAG_MINI_BACKPACK = "bag_mini_backpack";
     /** (NOTE_WRITE, 5) — 등에 메는 가방이라 BACK 이다 */
@@ -53,6 +59,8 @@ public abstract class CosmeticTestSupport extends IntegrationTestSupport {
     protected static final String BAG_CROSSBODY_SATCHEL = "bag_crossbody_satchel";
     /** (NOTE_WRITE, 12) */
     protected static final String BG_STUDY = "bg_study";
+    /** (NOTE_WRITE, 14) — 프로필 프레임 */
+    protected static final String FRAME_STUDY = "frame_study";
     /** (NOTE_PRACTICE, 2) */
     protected static final String SCARF = "scarf";
     /** (NOTE_PRACTICE, 5) — 전신 의상 */
@@ -67,6 +75,10 @@ public abstract class CosmeticTestSupport extends IntegrationTestSupport {
     protected static final String HEADBAND_SPROUT = "headband_sprout";
     /** (총 3) */
     protected static final String BADGE_LEAF_STAR = "badge_leaf_star";
+    /** (총 4) — 프로필 프레임 */
+    protected static final String FRAME_LEAF = "frame_leaf";
+    /** (총 17) — 프로필 프레임. 총 학습 프레임 중 가장 늦게 열린다 */
+    protected static final String FRAME_MASTER = "frame_master";
     /** (총 8) */
     protected static final String PROP_BOUQUET = "prop_bouquet";
     /** (총 16) — 상한이 20 으로 오르면서 생긴 자리 */
@@ -85,8 +97,11 @@ public abstract class CosmeticTestSupport extends IntegrationTestSupport {
     protected static final String GRADUATE_SET = "graduate";
     protected static final String GRADUATE_SET_NAME = "학사 세트";
 
-    /** 전체 시드 개수. 본체(BASE) 는 포함하지 않는다. */
-    protected static final int SEEDED_ITEM_COUNT = 55;
+    /** 전체 시드 개수. 본체(BASE) 는 포함하지 않는다. 능력치별 17 / 10 / 11 / 9 와 총 학습 16 이다. */
+    protected static final int SEEDED_ITEM_COUNT = 63;
+
+    /** 장착 가능한 자리 수. 프리셋이 한 자리에 하나씩 채우므로 곧 프리셋 행 수이기도 하다. */
+    protected static final int EQUIPPABLE_SLOT_COUNT = 11;
 
     @Autowired
     private CosmeticItemSeeder cosmeticItemSeeder;
@@ -151,7 +166,7 @@ public abstract class CosmeticTestSupport extends IntegrationTestSupport {
     }
 
     /**
-     * 다 자란 사용자. 총 학습 20, 능력치 넷 모두 15 라 시드된 55 개가 전부 열려 있다.
+     * 다 자란 사용자. 총 학습 20, 능력치 넷 모두 15 라 시드된 63 개가 전부 열려 있다.
      *
      * <p>능력치별 아이템의 마지막 해금 레벨이 15, 총 학습 아이템의 마지막이 20 이다.
      */

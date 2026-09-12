@@ -123,7 +123,7 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         }
 
         @Test
-        @DisplayName("시드된 55개가 빠짐없이 목록에 들어간다")
+        @DisplayName("시드된 63개가 빠짐없이 목록에 들어간다")
         void everySeededItemIsListed() {
             User user = fullyGrownUser();
 
@@ -158,11 +158,94 @@ class CosmeticServiceTest extends CosmeticTestSupport {
                     .containsExactly(
                             CosmeticSlot.BACKGROUND, CosmeticSlot.BACK, CosmeticSlot.OUTFIT,
                             CosmeticSlot.BAG, CosmeticSlot.NECK, CosmeticSlot.FACE,
-                            CosmeticSlot.HEAD, CosmeticSlot.HAND, CosmeticSlot.BADGE, CosmeticSlot.EFFECT);
+                            CosmeticSlot.HEAD, CosmeticSlot.HAND, CosmeticSlot.BADGE,
+                            CosmeticSlot.EFFECT, CosmeticSlot.FRAME);
             assertThat(slots).extracting(CosmeticSlotDto::layerOrder)
                     .as("등짐(200)은 본체(300) 뒤, 앞가방(450)은 옷(400) 위다")
-                    .containsExactly(100, 200, 400, 450, 500, 600, 700, 800, 850, 900);
+                    .containsExactly(100, 200, 400, 450, 500, 600, 700, 800, 850, 900, 1000);
             assertThat(slots.get(0).nameKo()).isEqualTo("배경");
+        }
+
+        @Test
+        @DisplayName("프레임만 개구리 합성에서 빠진다 - composited 로 갈라 보낸다")
+        void onlyFrameIsNotComposited() {
+            User user = userAtAllLevels(1);
+
+            List<CosmeticSlotDto> slots = cosmeticService.getCosmetics(user.getId()).slots();
+
+            assertThat(slots)
+                    .filteredOn(slot -> !slot.composited())
+                    .as("layerOrder 만 내려보내면 프론트는 순서대로 겹치는 수밖에 없어 프레임이 개구리 위에 덮인다")
+                    .extracting(CosmeticSlotDto::slot)
+                    .containsExactly(CosmeticSlot.FRAME);
+            assertThat(slots)
+                    .filteredOn(CosmeticSlotDto::composited)
+                    .as("나머지 열 자리는 전부 개구리에 겹쳐 그린다")
+                    .hasSize(10);
+        }
+
+        @Test
+        @DisplayName("프레임은 옷장 목록에서 빠지지 않는다")
+        void frameItemsAreListed() {
+            User user = fullyGrownUser();
+
+            CosmeticListResponseDto response = cosmeticService.getCosmetics(user.getId());
+
+            assertThat(response.items())
+                    .filteredOn(item -> item.slot() == CosmeticSlot.FRAME)
+                    .as("개구리에 안 겹친다고 목록에서 빼면 옷장에서 고를 수가 없다")
+                    .extracting(CosmeticItemResponseDto::itemKey)
+                    .containsExactlyInAnyOrder(FRAME_SPRING, FRAME_SUMMER, "frame_autumn", "frame_winter",
+                            FRAME_NIGHT, FRAME_STUDY, FRAME_LEAF, FRAME_MASTER);
+        }
+
+        @Test
+        @DisplayName("프레임 에셋만 SVG 이고 경로도 다르다")
+        void frameAssetsAreSvg() {
+            User user = fullyGrownUser();
+
+            List<CosmeticItemResponseDto> items = cosmeticService.getCosmetics(user.getId()).items();
+
+            assertThat(items)
+                    .filteredOn(item -> item.slot() == CosmeticSlot.FRAME)
+                    .allSatisfy(item -> assertThat(item.imageUrl())
+                            .as(item.itemKey() + " 는 원형 테두리라 확대해도 깨지면 안 된다")
+                            .isEqualTo("assets/ProfileFrame/" + item.itemKey() + ".svg"));
+            assertThat(items)
+                    .filteredOn(item -> item.slot() != CosmeticSlot.FRAME)
+                    .allSatisfy(item -> assertThat(item.imageUrl())
+                            .as("나머지는 그대로 번들 PNG 다")
+                            .isEqualTo("assets/Cosmetic/" + item.itemKey() + ".png"));
+        }
+
+        @Test
+        @DisplayName("프레임 해금도 능력치별 기준으로 판정된다")
+        void frameUnlockFollowsAbility() {
+            // 출석만 3. 봄 프레임(출석 3)은 열리고 여름 프레임(출석 5)은 아직이다.
+            User user = setLevels(fixtures.createUser(), 1L, 3L, 1L, 1L, 1L);
+
+            CosmeticListResponseDto response = cosmeticService.getCosmetics(user.getId());
+
+            assertThat(ownedOf(response, FRAME_SPRING))
+                    .as("경계는 포함이다")
+                    .isTrue();
+            assertThat(ownedOf(response, FRAME_SUMMER)).isFalse();
+            assertThat(ownedOf(response, FRAME_STUDY))
+                    .as("공부방 프레임은 작성 14 라 출석을 올려서는 안 열린다")
+                    .isFalse();
+            assertThat(ownedOf(response, FRAME_LEAF))
+                    .as("잎새 프레임은 총 학습 4 다. required_ability 가 비어 있다")
+                    .isFalse();
+        }
+
+        @Test
+        @DisplayName("총 학습 프레임은 능력치를 아무리 올려도 안 열린다")
+        void totalLevelFrameIgnoresAbilities() {
+            User onlyAbilities = setLevels(fixtures.createUser(), 1L, 15L, 15L, 15L, 15L);
+            User onlyTotal = userAtLevel(4);
+
+            assertThat(ownedOf(cosmeticService.getCosmetics(onlyAbilities.getId()), FRAME_LEAF)).isFalse();
+            assertThat(ownedOf(cosmeticService.getCosmetics(onlyTotal.getId()), FRAME_LEAF)).isTrue();
         }
 
         @Test
@@ -244,7 +327,8 @@ class CosmeticServiceTest extends CosmeticTestSupport {
                     .containsEntry(CosmeticSlot.HEAD, HAT_GRADUATE)
                     .containsEntry(CosmeticSlot.HAND, PROP_DIPLOMA)
                     .containsEntry(CosmeticSlot.BADGE, BADGE_SNOWFLAKE)
-                    .containsEntry(CosmeticSlot.EFFECT, EFFECT_SNOW);
+                    .containsEntry(CosmeticSlot.EFFECT, EFFECT_SNOW)
+                    .containsEntry(CosmeticSlot.FRAME, FRAME_MASTER);
         }
 
         @Test
@@ -256,6 +340,8 @@ class CosmeticServiceTest extends CosmeticTestSupport {
             assertThat(equippedOf(user.getId()))
                     .containsEntry(CosmeticSlot.BACKGROUND, BG_RAINY)
                     .containsEntry(CosmeticSlot.EFFECT, EFFECT_SPARKLE)
+                    .as("출석 5 짜리 여름 프레임까지 열려 있다")
+                    .containsEntry(CosmeticSlot.FRAME, FRAME_SUMMER)
                     .as("출석만 올렸는데 다른 능력치 자리가 채워지면 안 된다")
                     .doesNotContainKey(CosmeticSlot.HEAD)
                     .doesNotContainKey(CosmeticSlot.FACE)
@@ -273,6 +359,8 @@ class CosmeticServiceTest extends CosmeticTestSupport {
                     .containsEntry(CosmeticSlot.OUTFIT, OUTFIT_GRADUATE)
                     .containsEntry(CosmeticSlot.HAND, PROP_DIPLOMA)
                     .containsEntry(CosmeticSlot.BADGE, BADGE_SNOWFLAKE)
+                    .as("프레임은 총 학습 17 짜리 마스터가 가장 늦게 열린다")
+                    .containsEntry(CosmeticSlot.FRAME, FRAME_MASTER)
                     .as("배경·얼굴·목·가방은 전부 능력치로만 열린다")
                     .doesNotContainKey(CosmeticSlot.BACKGROUND)
                     .doesNotContainKey(CosmeticSlot.FACE)
@@ -332,7 +420,7 @@ class CosmeticServiceTest extends CosmeticTestSupport {
                     .containsEntry(CosmeticSlot.BACKGROUND, BG_SPACE)
                     .containsEntry(CosmeticSlot.OUTFIT, OUTFIT_GRADUATE)
                     .containsEntry(CosmeticSlot.HAND, PROP_DIPLOMA);
-            assertThat(loadoutRowCount(user.getId())).isEqualTo(10);
+            assertThat(loadoutRowCount(user.getId())).isEqualTo(EQUIPPABLE_SLOT_COUNT);
         }
 
         @Test
@@ -580,7 +668,7 @@ class CosmeticServiceTest extends CosmeticTestSupport {
             CosmeticEquipResponseDto response = cosmeticService.equip(user.getId(), CosmeticSlot.HEAD, HAT_BEANIE);
 
             assertThat(response.unequippedSlots()).isEmpty();
-            assertThat(response.equipped()).hasSize(10);
+            assertThat(response.equipped()).hasSize(EQUIPPABLE_SLOT_COUNT);
         }
     }
 
@@ -672,7 +760,7 @@ class CosmeticServiceTest extends CosmeticTestSupport {
                     .extracting(UnlockedCosmeticDto::itemKey)
                     .as("오르지도 않은 능력치의 아이템이 '방금 열렸다' 고 나가면 안 된다")
                     .doesNotContain(GLASSES_ROUND, BG_SPRING, SCARF, BAG_MINI_BACKPACK)
-                    .hasSize(14);
+                    .hasSize(16);
         }
 
         @Test
@@ -694,7 +782,8 @@ class CosmeticServiceTest extends CosmeticTestSupport {
 
             assertThat(unlocked)
                     .extracting(UnlockedCosmeticDto::itemKey)
-                    .containsExactly(BG_SPRING, HEADBAND_SPROUT, EFFECT_PETALS);
+                    .as("레벨 2 는 봄 배경과 새싹 머리띠, 레벨 3 은 꽃잎 효과와 봄 프레임이다")
+                    .containsExactly(BG_SPRING, HEADBAND_SPROUT, EFFECT_PETALS, FRAME_SPRING);
         }
 
         @Test

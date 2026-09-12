@@ -45,6 +45,7 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
     private static final String SEED_MIGRATION = "db/migration/V35__seed_cosmetic_items.sql";
     private static final String ABILITY_DDL_MIGRATION = "db/migration/V36__add_cosmetic_ability_unlock_columns.sql";
     private static final String ABILITY_SEED_MIGRATION = "db/migration/V37__seed_cosmetic_items_by_ability.sql";
+    private static final String FRAME_SEED_MIGRATION = "db/migration/V38__seed_profile_frame_cosmetics.sql";
 
     @Autowired
     private CosmeticItemSeeder seeder;
@@ -131,6 +132,16 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
     void seedMigrationIsRerunnable() {
         assertThat(statementsOf(SEED_MIGRATION)).contains("ON DUPLICATE KEY UPDATE");
         assertThat(statementsOf(ABILITY_SEED_MIGRATION)).contains("ON DUPLICATE KEY UPDATE");
+        assertThat(statementsOf(FRAME_SEED_MIGRATION)).contains("ON DUPLICATE KEY UPDATE");
+    }
+
+    @Test
+    @DisplayName("V38 은 컬럼을 건드리지 않는다 - 시드만 늘어난다")
+    void frameSeedHasNoDdl() {
+        assertThat(statementsOf(FRAME_SEED_MIGRATION))
+                .as("V36 이 이미 적용된 DB 에 얹히는 파일이라 추가할 컬럼이 없다")
+                .doesNotContain("ALTER TABLE")
+                .doesNotContain("CREATE TABLE");
     }
 
     @Test
@@ -178,12 +189,40 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
     }
 
     @Test
-    @DisplayName("시드는 본체 말고 55개다")
-    void seedsFiftyFiveItems() {
+    @DisplayName("시드는 본체 말고 63개다")
+    void seedsEverythingInTheTable() {
         assertThat(cosmeticItemRepository.findAll())
                 .filteredOn(item -> !"BASE".equals(item.getItemKey()))
-                .as("해금표의 12 + 9 + 11 + 9 + 14 다")
+                .as("해금표의 17 + 10 + 11 + 9 + 16 이다")
                 .hasSize(SEEDED_ITEM_COUNT);
+    }
+
+    @Test
+    @DisplayName("프로필 프레임 8종이 전부 들어갔다")
+    void everyFrameIsSeeded() {
+        assertThat(keysOfSlot(CosmeticSlot.FRAME))
+                .containsExactly("frame_autumn", "frame_leaf", "frame_master", "frame_night",
+                        "frame_spring", "frame_study", "frame_summer", "frame_winter");
+    }
+
+    @Test
+    @DisplayName("프레임 해금 자리가 표와 맞는다")
+    void frameUnlockPositionsMatchTable() {
+        Map<String, String> unlocks = catalog().stream()
+                .filter(item -> item.getSlot() == CosmeticSlot.FRAME)
+                .collect(Collectors.toMap(CosmeticItem::getItemKey,
+                        item -> (item.getRequiredAbility() == null ? "-" : item.getRequiredAbility().name())
+                                + " " + item.getRequiredLevel()));
+
+        assertThat(unlocks).containsOnly(
+                Map.entry("frame_spring", "ATTENDANCE 3"),
+                Map.entry("frame_summer", "ATTENDANCE 5"),
+                Map.entry("frame_autumn", "ATTENDANCE 10"),
+                Map.entry("frame_winter", "ATTENDANCE 13"),
+                Map.entry("frame_night", "ATTENDANCE 15"),
+                Map.entry("frame_study", "NOTE_WRITE 14"),
+                Map.entry("frame_leaf", "- 4"),
+                Map.entry("frame_master", "- 17"));
     }
 
     @Test
@@ -194,14 +233,14 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
                 .collect(Collectors.groupingBy(CosmeticItem::getRequiredAbility, Collectors.counting()));
 
         assertThat(byAbility).containsOnly(
-                Map.entry(AbilityType.ATTENDANCE, 12L),
-                Map.entry(AbilityType.NOTE_WRITE, 9L),
+                Map.entry(AbilityType.ATTENDANCE, 17L),
+                Map.entry(AbilityType.NOTE_WRITE, 10L),
                 Map.entry(AbilityType.PROBLEM_PRACTICE, 11L),
                 Map.entry(AbilityType.NOTE_PRACTICE, 9L));
 
         assertThat(catalog()).filteredOn(item -> item.getRequiredAbility() == null)
                 .as("나머지는 총 학습 레벨로 열린다")
-                .hasSize(14);
+                .hasSize(16);
     }
 
     @Test
@@ -220,12 +259,22 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
                 Map.entry(CosmeticSlot.HEAD, 8L),
                 Map.entry(CosmeticSlot.HAND, 7L),
                 Map.entry(CosmeticSlot.BADGE, 6L),
-                Map.entry(CosmeticSlot.EFFECT, 4L));
+                Map.entry(CosmeticSlot.EFFECT, 4L),
+                Map.entry(CosmeticSlot.FRAME, 8L));
 
         assertThat(CosmeticSlot.equippableSlots())
                 .extracting(CosmeticSlot::getLayerOrder)
-                .as("등짐(200)은 본체(300) 뒤, 앞가방(450)은 옷(400) 위다")
-                .containsExactly(100, 200, 400, 450, 500, 600, 700, 800, 850, 900);
+                .as("등짐(200)은 본체(300) 뒤, 앞가방(450)은 옷(400) 위, 프레임(1000)이 맨 끝이다")
+                .containsExactly(100, 200, 400, 450, 500, 600, 700, 800, 850, 900, 1000);
+    }
+
+    @Test
+    @DisplayName("프레임만 개구리 합성에서 빠진다")
+    void onlyFrameIsNotComposited() {
+        assertThat(CosmeticSlot.values())
+                .filteredOn(slot -> !slot.isComposited())
+                .as("합성에서 빠지는 자리가 늘면 프론트의 그리기 코드가 통째로 흔들린다")
+                .containsExactly(CosmeticSlot.FRAME);
     }
 
     @Test
@@ -259,16 +308,18 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
     }
 
     @Test
-    @DisplayName("한 능력치 안에서 같은 레벨에 두 개가 열리지 않는다")
-    void noDuplicateLevelWithinAbility() {
-        Map<AbilityType, List<Integer>> levels = catalog().stream()
-                .filter(item -> item.getRequiredAbility() != null)
-                .collect(Collectors.groupingBy(CosmeticItem::getRequiredAbility,
-                        Collectors.mapping(CosmeticItem::getRequiredLevel, Collectors.toList())));
+    @DisplayName("같은 해금 조건에 같은 자리가 둘 열리지 않는다")
+    void noDuplicateSlotAtTheSameUnlock() {
+        // 같은 레벨에 두 개가 열리는 것 자체는 막지 않는다. 프레임을 계절 배경과 짝 맞추면서
+        // 출석 3 / 5 / 13 / 15 에 두 개씩 열리게 됐고, 그건 의도다.
+        // 막아야 하는 것은 "같은 조건에 같은 자리" 다. 그러면 기본 프리셋이 어느 쪽을 고를지가
+        // 키 순서라는 우연에 걸린다.
+        List<String> keys = catalog().stream()
+                .map(item -> (item.getRequiredAbility() == null ? "-" : item.getRequiredAbility().name())
+                        + "/" + item.getRequiredLevel() + "/" + item.getSlot())
+                .toList();
 
-        levels.forEach((ability, values) -> assertThat(values)
-                .as(ability + " 의 해금 레벨. 한 레벨에 둘이 열리면 레벨업 알림이 어느 쪽인지 흐려진다")
-                .doesNotHaveDuplicates());
+        assertThat(keys).doesNotHaveDuplicates();
     }
 
     @Test
@@ -283,13 +334,31 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
     @DisplayName("모든 이미지 경로가 item_key 와 짝이 맞는다")
     void imageUrlMatchesItemKey() {
         List<String> mismatched = cosmeticItemRepository.findAll().stream()
-                .filter(item -> !item.getImageUrl().equals("assets/Cosmetic/" + item.getItemKey() + ".png"))
+                .filter(item -> !item.getImageUrl().equals(expectedImageUrl(item)))
                 .map(CosmeticItem::getItemKey)
                 .toList();
 
         assertThat(mismatched)
                 .as("프론트 에셋 파일명은 item_key 로 찾는다. 어긋나면 이미지가 안 나온다")
                 .isEmpty();
+    }
+
+    @Test
+    @DisplayName("프레임만 SVG 이고 폴더도 다르다")
+    void frameAssetsAreSvg() {
+        assertThat(catalog())
+                .filteredOn(item -> item.getSlot() == CosmeticSlot.FRAME)
+                .as("원형 테두리라 확대해도 깨지면 안 돼서 SVG 다")
+                .allSatisfy(item -> assertThat(item.getImageUrl())
+                        .startsWith("assets/ProfileFrame/")
+                        .endsWith(".svg"));
+
+        assertThat(cosmeticItemRepository.findAll())
+                .filteredOn(item -> item.getSlot() != CosmeticSlot.FRAME)
+                .as("나머지는 그대로 번들 PNG 다")
+                .allSatisfy(item -> assertThat(item.getImageUrl())
+                        .startsWith("assets/Cosmetic/")
+                        .endsWith(".png"));
     }
 
     @Test
@@ -358,6 +427,14 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
         return cosmeticItemRepository.findAll().stream()
                 .filter(item -> !"BASE".equals(item.getItemKey()))
                 .toList();
+    }
+
+    /** 프레임만 폴더와 확장자가 다르다. */
+    private String expectedImageUrl(CosmeticItem item) {
+        if (item.getSlot() == CosmeticSlot.FRAME) {
+            return "assets/ProfileFrame/" + item.getItemKey() + ".svg";
+        }
+        return "assets/Cosmetic/" + item.getItemKey() + ".png";
     }
 
     private List<String> keysOfSlot(CosmeticSlot slot) {

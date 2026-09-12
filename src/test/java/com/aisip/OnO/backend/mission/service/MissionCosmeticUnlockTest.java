@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>해금 자체는 계산이라 알림이 없어도 다음 조회에서 드러나지만, 사용자가 "레벨이 올랐는데
  * 뭐가 좋아졌는지" 를 그 순간에 모르면 레벨업이 아무 일도 아닌 것이 된다.
  *
- * <p>해금 기준이 능력치별로 갈리면서 여기가 특히 중요해졌다. 시드된 55 개 중 41 개가
+ * <p>해금 기준이 능력치별로 갈리면서 여기가 특히 중요해졌다. 시드된 63 개 중 47 개가
  * 능력치로 열린다. 총 학습 레벨만 보면 보상을 받아도 알림이 거의 늘 비어 있게 된다.
  *
  * <p>{@code MissionRewardGranter} 의 트랜잭션 경계와 잠금 순서(사용자 → 진행도)는 건드리지 않았다.
@@ -90,8 +90,9 @@ class MissionCosmeticUnlockTest extends MissionSystemTestSupport {
         assertThat(response.totalStudyLevel()).isEqualTo(2L);
         assertThat(response.unlockedCosmetics())
                 .extracting(UnlockedCosmeticDto::itemKey)
-                .as("출석 2·3·4·5 네 개와 총 학습 2 하나. 레벨 순, 같은 레벨이면 키 순이다")
-                .containsExactly("bg_spring", "headband_sprout", "effect_petals", "bg_summer", "effect_sparkle");
+                .as("출석 2~5 여섯 개와 총 학습 2 하나. 레벨 순, 같은 레벨이면 키 순이다")
+                .containsExactly("bg_spring", "headband_sprout", "effect_petals", "frame_spring",
+                        "bg_summer", "effect_sparkle", "frame_summer");
         assertThat(response.unlockedCosmetics().get(0).slot()).isEqualTo(CosmeticSlot.BACKGROUND);
         assertThat(response.unlockedCosmetics().get(0).nameKo()).isEqualTo("봄 배경");
     }
@@ -110,8 +111,8 @@ class MissionCosmeticUnlockTest extends MissionSystemTestSupport {
                 .containsExactly("bag_mini_backpack", "headband_sprout", "prop_notebook");
         assertThat(response.unlockedCosmetics())
                 .extracting(UnlockedCosmeticDto::itemKey)
-                .as("출석 2 짜리 봄 배경은 출석 레벨이 오르지 않았으니 열리지 않는다")
-                .doesNotContain("bg_spring", "glasses_round", "scarf");
+                .as("출석 2 짜리 봄 배경과 출석 3 짜리 봄 프레임은 출석이 오르지 않았으니 열리지 않는다")
+                .doesNotContain("bg_spring", "frame_spring", "glasses_round", "scarf");
     }
 
     @Test
