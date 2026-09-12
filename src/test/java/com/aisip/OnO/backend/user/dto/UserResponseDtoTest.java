@@ -217,5 +217,45 @@ class UserResponseDtoTest {
                     .isEqualTo(800L);
             assertThat(response.totalStudyNextLevelThreshold()).isEqualTo(800L);
         }
+
+        /**
+         * 상한에 닿아도 포인트는 계속 쌓인다. 앱은 능력치 게이지의 분모를
+         * {@code 10 + (level - 1) * 10} 으로 직접 계산하므로
+         * (OnO_FRONT/lib/Screen/Character/Widget/AbilityStatPanel.dart:198),
+         * 쌓인 잔여 포인트를 그대로 내보내면 게이지가 한 칸을 넘어간다.
+         */
+        @Test
+        @DisplayName("상한 레벨에 쌓인 잔여 포인트는 게이지 분모를 넘기지 않는다")
+        void clampsLeftoverPointAtMaxLevel() {
+            User user = user();
+            user.getUserMissionStatus().setAttendanceLevel(20L, 10_000L);
+            user.getUserMissionStatus().setTotalStudyLevel(20L, 10_000L);
+
+            UserResponseDto response = UserResponseDto.from(user);
+
+            assertThat(response.attendanceLevel()).isEqualTo(20L);
+            assertThat(response.attendancePoint())
+                    .as("20레벨 게이지의 분모는 10 + 19 x 10 = 200 이다")
+                    .isEqualTo(200L);
+            assertThat(response.totalStudyLevel()).isEqualTo(20L);
+            assertThat(response.totalStudyCurrentPoint())
+                    .as("총 학습 20레벨 게이지의 분모는 200 x 4 = 800 이다")
+                    .isEqualTo(800L);
+        }
+
+        @Test
+        @DisplayName("상한 미만에서는 잔여 포인트를 그대로 내보낸다")
+        void keepsLeftoverPointBelowMaxLevel() {
+            User user = user();
+            user.getUserMissionStatus().setAttendanceLevel(19L, 189L);
+            user.getUserMissionStatus().setTotalStudyLevel(19L, 759L);
+
+            UserResponseDto response = UserResponseDto.from(user);
+
+            assertThat(response.attendancePoint())
+                    .as("19레벨 분모는 190 이라 189 는 그대로 나가야 한다")
+                    .isEqualTo(189L);
+            assertThat(response.totalStudyCurrentPoint()).isEqualTo(759L);
+        }
     }
 }

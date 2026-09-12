@@ -91,7 +91,9 @@ public record UserResponseDto (
         if (level > MAX_ABILITY_LEVEL) {
             return getThresholdForLevel(MAX_ABILITY_LEVEL);
         }
-        return point;
+        // 상한에 닿은 뒤에도 포인트는 계속 쌓인다. 그대로 내보내면 게이지 분모를 넘겨 칸이 넘친다.
+        // 상한 미만에서는 잔여 포인트가 항상 임계값보다 작아 이 클램프가 걸리지 않는다.
+        return Math.min(point, getThresholdForLevel(level));
     }
 
     private static Long getTotalStudyResponseLevel(Long level) {
@@ -105,7 +107,7 @@ public record UserResponseDto (
         if (level > MAX_TOTAL_STUDY_LEVEL) {
             return getTotalStudyThresholdForLevel(MAX_TOTAL_STUDY_LEVEL);
         }
-        return point;
+        return Math.min(point, getTotalStudyThresholdForLevel(level));
     }
 
     private static Long getTotalStudyNextLevelThreshold(com.aisip.OnO.backend.mission.entity.UserMissionStatus status) {
