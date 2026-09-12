@@ -55,9 +55,33 @@ public class CosmeticItem {
     @Column(name = "item_key", nullable = false, length = 64)
     private String itemKey;
 
+    /**
+     * {@code columnDefinition} 을 못 박는 이유는 V34 의 {@code slot VARCHAR(32)} 과 맞추기 위해서다.
+     *
+     * <p>비워 두면 Hibernate 는 MySQL 에서 이 컬럼을 네이티브 {@code ENUM(...)} 으로 만든다.
+     * 그러면 운영 스키마(VARCHAR)와 테스트 스키마(ENUM)가 갈리고, 이 enum 에서 상수를 하나 지우는
+     * 순간 그 값을 담고 있던 옛 마이그레이션이 테스트에서만 "Data truncated" 로 죽는다.
+     * 운영에서는 VARCHAR 라 아무 일도 없는데 테스트만 터지는 차이는 만들지 않는다.
+     */
     @Enumerated(EnumType.STRING)
-    @Column(name = "slot", nullable = false, length = 32)
+    @Column(name = "slot", nullable = false, length = 32, columnDefinition = "varchar(32)")
     private CosmeticSlot slot;
+
+    /**
+     * 이 아이템만의 그리는 층. {@code null} 이면 자리의 기본값({@link CosmeticSlot#getLayerOrder()})을 쓴다.
+     *
+     * <p>{@link CosmeticSlot#BAG} 하나를 위해 생겼다. 등에 메는 가방과 앞으로 메는 가방은 같은 자리인데
+     * 그리는 층이 다르다. 전자는 개구리 본체보다 뒤(200), 후자는 옷 위(450)다.
+     * 층이 다르다는 이유만으로 자리를 둘로 나누면 아이템 두세 개짜리 탭이 하나 더 생긴다.
+     *
+     * <p>0 이나 -1 같은 마법값을 쓰지 않는다. {@code required_level} 과 같은 이유로,
+     * "덮어쓰지 않는다" 와 "0층에 그린다" 는 다른 말이다.
+     *
+     * <p>서버는 이 값을 풀지 않고 그대로 내려보낸다. 합성은 프론트가 하고
+     * {@code item.layerOrder ?? slot.layerOrder} 로 푼다.
+     */
+    @Column(name = "layer_order")
+    private Integer layerOrder;
 
     @Column(name = "name_ko", nullable = false, length = 64)
     private String nameKo;

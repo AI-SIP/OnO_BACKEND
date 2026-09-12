@@ -55,9 +55,15 @@ public class UserCosmeticLoadout {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
+    /**
+     * V34 의 {@code slot VARCHAR(32)} 과 맞춘다. {@code columnDefinition} 이 없으면 Hibernate 가
+     * MySQL 에서 네이티브 {@code ENUM(...)} 으로 만들어, 운영에는 들어갈 수 있는 값(옛 배포가 남긴
+     * 슬롯 이름)이 테스트 스키마에는 아예 못 들어간다. 그 차이를 두면 자리를 없애는 변경의
+     * 마이그레이션을 테스트로 재현할 수 없다.
+     */
     @Id
     @Enumerated(EnumType.STRING)
-    @Column(name = "slot", nullable = false, length = 32)
+    @Column(name = "slot", nullable = false, length = 32, columnDefinition = "varchar(32)")
     private CosmeticSlot slot;
 
     @Column(name = "item_key", nullable = false, length = 64)
