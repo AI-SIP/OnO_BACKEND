@@ -46,7 +46,7 @@ class CosmeticControllerTest extends CosmeticTestSupport {
     }
 
     @Test
-    @DisplayName("GET /api/cosmetics - slots 에 등짐(200)과 효과(900)가 빠짐없이 들어 있다")
+    @DisplayName("GET /api/cosmetics - slots 에 배낭(200)과 효과(900)가 빠짐없이 들어 있다")
     void slotsIncludeBackAndEffect() throws Exception {
         User user = fullyGrownUser();
         authenticateAs(user.getId());
@@ -57,7 +57,7 @@ class CosmeticControllerTest extends CosmeticTestSupport {
         mockMvc.perform(get("/api/cosmetics"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(back + ".layerOrder").value(Matchers.contains(200)))
-                .andExpect(jsonPath(back + ".nameKo").value(Matchers.contains("등짐")))
+                .andExpect(jsonPath(back + ".nameKo").value(Matchers.contains("배낭")))
                 .andExpect(jsonPath(bag + ".layerOrder").value(Matchers.contains(450)))
                 .andExpect(jsonPath(effect + ".layerOrder").value(Matchers.contains(900)));
     }
@@ -201,7 +201,7 @@ class CosmeticControllerTest extends CosmeticTestSupport {
     }
 
     @Test
-    @DisplayName("PUT /api/cosmetics/equip - 앞가방과 등짐은 따로 걸린다")
+    @DisplayName("PUT /api/cosmetics/equip - 앞가방과 배낭은 따로 걸린다")
     void equipBagAndBack() throws Exception {
         User user = fullyGrownUser();
         authenticateAs(user.getId());

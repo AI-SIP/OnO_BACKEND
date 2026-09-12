@@ -161,7 +161,7 @@ class CosmeticServiceTest extends CosmeticTestSupport {
                             CosmeticSlot.HEAD, CosmeticSlot.HAND, CosmeticSlot.BADGE,
                             CosmeticSlot.EFFECT, CosmeticSlot.FRAME);
             assertThat(slots).extracting(CosmeticSlotDto::layerOrder)
-                    .as("등짐(200)은 본체(300) 뒤, 앞가방(450)은 옷(400) 위다")
+                    .as("배낭(200)은 본체(300) 뒤, 앞가방(450)은 옷(400) 위다")
                     .containsExactly(100, 200, 400, 450, 500, 600, 700, 800, 850, 900, 1000);
             assertThat(slots.get(0).nameKo()).isEqualTo("배경");
         }
@@ -492,11 +492,11 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         void staleSlotRowIsHidden() {
             User user = fullyGrownUser();
             cosmeticService.equip(user.getId(), CosmeticSlot.BAG, BAG_MINI_BACKPACK);
-            // 카탈로그에서 미니 백팩을 등짐으로 옮긴다. 사용자 행은 여전히 BAG 을 가리킨다.
+            // 카탈로그에서 미니 백팩을 배낭 자리로 옮긴다. 사용자 행은 여전히 BAG 을 가리킨다.
             jdbcTemplate.update("UPDATE cosmetic_item SET slot = 'BACK' WHERE item_key = ?", BAG_MINI_BACKPACK);
 
             assertThat(equippedOf(user.getId()))
-                    .as("앞가방 자리에 등짐을 그리면 개구리 앞에 백팩이 떠 있게 된다")
+                    .as("앞가방 자리에 배낭을 그리면 개구리 앞에 가방이 떠 있게 된다")
                     .doesNotContainEntry(CosmeticSlot.BAG, BAG_MINI_BACKPACK);
         }
     }
@@ -517,7 +517,7 @@ class CosmeticServiceTest extends CosmeticTestSupport {
         }
 
         @Test
-        @DisplayName("등짐과 앞가방은 서로 다른 자리라 같이 걸린다")
+        @DisplayName("배낭과 앞가방은 서로 다른 자리라 같이 걸린다")
         void backAndBagCoexist() {
             User user = fullyGrownUser();
 
@@ -615,7 +615,7 @@ class CosmeticServiceTest extends CosmeticTestSupport {
             assertThatThrownBy(() -> cosmeticService.equip(user.getId(), CosmeticSlot.BACK, BAG_MINI_BACKPACK))
                     .isInstanceOf(ApplicationException.class)
                     .extracting(exception -> ((ApplicationException) exception).getErrorCase())
-                    .as("앞가방을 등짐 자리에 걸면 레이어가 뒤집힌다")
+                    .as("앞가방을 배낭 자리에 걸면 레이어가 뒤집힌다")
                     .isEqualTo(CosmeticErrorCase.COSMETIC_SLOT_MISMATCH);
         }
 

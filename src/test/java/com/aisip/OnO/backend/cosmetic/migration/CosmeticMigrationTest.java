@@ -46,6 +46,7 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
     private static final String ABILITY_DDL_MIGRATION = "db/migration/V36__add_cosmetic_ability_unlock_columns.sql";
     private static final String ABILITY_SEED_MIGRATION = "db/migration/V37__seed_cosmetic_items_by_ability.sql";
     private static final String FRAME_SEED_MIGRATION = "db/migration/V38__seed_profile_frame_cosmetics.sql";
+    private static final String BACK_RENAME_MIGRATION = "db/migration/V39__rename_back_slot_item_names.sql";
 
     @Autowired
     private CosmeticItemSeeder seeder;
@@ -264,7 +265,7 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
 
         assertThat(CosmeticSlot.equippableSlots())
                 .extracting(CosmeticSlot::getLayerOrder)
-                .as("등짐(200)은 본체(300) 뒤, 앞가방(450)은 옷(400) 위, 프레임(1000)이 맨 끝이다")
+                .as("배낭(200)은 본체(300) 뒤, 앞가방(450)은 옷(400) 위, 프레임(1000)이 맨 끝이다")
                 .containsExactly(100, 200, 400, 450, 500, 600, 700, 800, 850, 900, 1000);
     }
 
@@ -285,6 +286,35 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
                 .containsExactly("back_backpack_canvas", "back_backpack_navy");
         assertThat(keysOfSlot(CosmeticSlot.BAG))
                 .containsExactly("bag_crossbody_satchel", "bag_mini_backpack", "bag_waist_pouch");
+    }
+
+    @Test
+    @DisplayName("등에 메는 자리의 아이템은 배낭으로 부른다")
+    void backSlotItemsAreNamedBackpacks() {
+        assertThat(nameOf("back_backpack_navy")).isEqualTo("남색 배낭");
+        assertThat(nameOf("back_backpack_canvas")).isEqualTo("캔버스 배낭");
+
+        assertThat(CosmeticSlot.BACK.getNameKo()).isEqualTo("배낭");
+        assertThat(nameOf("bag_mini_backpack"))
+                .as("앞으로 메는 쪽은 그대로 '백팩' 이다. 자리 이름(배낭/가방)과 짝이 맞아야 헷갈리지 않는다")
+                .isEqualTo("미니 백팩");
+        assertThat(CosmeticSlot.BAG.getNameKo()).isEqualTo("가방");
+    }
+
+    @Test
+    @DisplayName("이름 변경 마이그레이션은 키와 자리를 건드리지 않는다")
+    void renameMigrationTouchesNamesOnly() {
+        String rename = statementsOf(BACK_RENAME_MIGRATION);
+
+        assertThat(rename)
+                .as("프론트 에셋 파일명과 해금표가 item_key 로 맞춰져 있다. 키가 바뀌면 이미지가 통째로 안 나온다")
+                .doesNotContain("SET ITEM_KEY")
+                .doesNotContain("SET SLOT")
+                .doesNotContain("ALTER TABLE")
+                .doesNotContain("INSERT INTO");
+        assertThat(rename)
+                .as("값 변경은 UPDATE 로 얹는다. 몇 번을 다시 돌려도 결과가 같다")
+                .contains("UPDATE COSMETIC_ITEM SET NAME_KO");
     }
 
     @Test
@@ -427,6 +457,12 @@ class CosmeticMigrationTest extends CosmeticTestSupport {
         return cosmeticItemRepository.findAll().stream()
                 .filter(item -> !"BASE".equals(item.getItemKey()))
                 .toList();
+    }
+
+    private String nameOf(String itemKey) {
+        return cosmeticItemRepository.findByItemKey(itemKey)
+                .orElseThrow(() -> new IllegalStateException("시드에 없는 아이템이다: " + itemKey))
+                .getNameKo();
     }
 
     /** 프레임만 폴더와 확장자가 다르다. */
