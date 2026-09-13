@@ -1,0 +1,291 @@
+{
+  "data": {
+    "baseImageUrl": "assets/Cosmetic/BASE.png",
+    "baseLayerOrder": 300,
+    "equipped": {
+      "BACKGROUND": "bg_spring",
+      "BADGE": "badge_leaf_star",
+      "BAG": "back_backpack_navy",
+      "EFFECT": "effect_petals",
+      "FACE": "glasses_round",
+      "FRAME": "frame_spring",
+      "HEAD": "hat_beanie",
+      "NECK": "scarf",
+      "OUTFIT": "outfit_cardigan"
+    },
+    "items": [
+      {
+        "conflictsWith": [ ],
+        "fullBody": false,
+        "imageUrl": "assets/Cosmetic/bg_spring.png",
+        "itemKey": "bg_spring",
+        "layerOrder": null,
+        "nameKo": "봄 배경",
+        "owned": true,
+        "requiredAbility": "ATTENDANCE",
+        "requiredLevel": 2,
+        "setId": null,
+        "setNameKo": null,
+        "slot": "BACKGROUND"
+      },
+      {
+        "conflictsWith": [ ],
+        "fullBody": false,
+        "imageUrl": "assets/Cosmetic/bg_space.png",
+        "itemKey": "bg_space",
+        "layerOrder": null,
+        "nameKo": "우주 배경",
+        "owned": false,
+        "requiredAbility": "ATTENDANCE",
+        "requiredLevel": 15,
+        "setId": null,
+        "setNameKo": null,
+        "slot": "BACKGROUND"
+      },
+      {
+        "conflictsWith": [ ],
+        "fullBody": true,
+        "imageUrl": "assets/Cosmetic/outfit_cardigan.png",
+        "itemKey": "outfit_cardigan",
+        "layerOrder": null,
+        "nameKo": "가디건",
+        "owned": true,
+        "requiredAbility": "NOTE_PRACTICE",
+        "requiredLevel": 5,
+        "setId": null,
+        "setNameKo": null,
+        "slot": "OUTFIT"
+      },
+      {
+        "conflictsWith": [ ],
+        "fullBody": true,
+        "imageUrl": "assets/Cosmetic/outfit_graduate.png",
+        "itemKey": "outfit_graduate",
+        "layerOrder": null,
+        "nameKo": "졸업 가운",
+        "owned": false,
+        "requiredAbility": null,
+        "requiredLevel": 20,
+        "setId": "graduate",
+        "setNameKo": "학사 세트",
+        "slot": "OUTFIT"
+      },
+      {
+        "conflictsWith": [ ],
+        "fullBody": false,
+        "imageUrl": "assets/Cosmetic/bag_mini_backpack.png",
+        "itemKey": "bag_mini_backpack",
+        "layerOrder": null,
+        "nameKo": "미니 백팩",
+        "owned": true,
+        "requiredAbility": "NOTE_WRITE",
+        "requiredLevel": 2,
+        "setId": null,
+        "setNameKo": null,
+        "slot": "BAG"
+      },
+      {
+        "conflictsWith": [ ],
+        "fullBody": false,
+        "imageUrl": "assets/Cosmetic/back_backpack_navy.png",
+        "itemKey": "back_backpack_navy",
+        "layerOrder": 200,
+        "nameKo": "남색 배낭",
+        "owned": true,
+        "requiredAbility": "NOTE_WRITE",
+        "requiredLevel": 5,
+        "setId": null,
+        "setNameKo": null,
+        "slot": "BAG"
+      },
+      {
+        "conflictsWith": [ ],
+        "fullBody": false,
+        "imageUrl": "assets/Cosmetic/scarf.png",
+        "itemKey": "scarf",
+        "layerOrder": null,
+        "nameKo": "목도리",
+        "owned": true,
+        "requiredAbility": "NOTE_PRACTICE",
+        "requiredLevel": 2,
+        "setId": null,
+        "setNameKo": null,
+        "slot": "NECK"
+      },
+      {
+        "conflictsWith": [ ],
+        "fullBody": false,
+        "imageUrl": "assets/Cosmetic/glasses_round.png",
+        "itemKey": "glasses_round",
+        "layerOrder": null,
+        "nameKo": "동그란 안경",
+        "owned": true,
+        "requiredAbility": "PROBLEM_PRACTICE",
+        "requiredLevel": 2,
+        "setId": null,
+        "setNameKo": null,
+        "slot": "FACE"
+      },
+      {
+        "conflictsWith": [ ],
+        "fullBody": false,
+        "imageUrl": "assets/Cosmetic/headband_sprout.png",
+        "itemKey": "headband_sprout",
+        "layerOrder": null,
+        "nameKo": "새싹 머리띠",
+        "owned": true,
+        "requiredAbility": null,
+        "requiredLevel": 2,
+        "setId": null,
+        "setNameKo": null,
+        "slot": "HEAD"
+      },
+      {
+        "conflictsWith": [ ],
+        "fullBody": false,
+        "imageUrl": "assets/Cosmetic/hat_beanie.png",
+        "itemKey": "hat_beanie",
+        "layerOrder": null,
+        "nameKo": "비니",
+        "owned": true,
+        "requiredAbility": "PROBLEM_PRACTICE",
+        "requiredLevel": 4,
+        "setId": null,
+        "setNameKo": null,
+        "slot": "HEAD"
+      },
+      {
+        "conflictsWith": [ ],
+        "fullBody": false,
+        "imageUrl": "assets/Cosmetic/hat_graduate.png",
+        "itemKey": "hat_graduate",
+        "layerOrder": null,
+        "nameKo": "학사모",
+        "owned": false,
+        "requiredAbility": null,
+        "requiredLevel": 20,
+        "setId": "graduate",
+        "setNameKo": "학사 세트",
+        "slot": "HEAD"
+      },
+      {
+        "conflictsWith": [ ],
+        "fullBody": false,
+        "imageUrl": "assets/Cosmetic/prop_diploma.png",
+        "itemKey": "prop_diploma",
+        "layerOrder": null,
+        "nameKo": "졸업장",
+        "owned": false,
+        "requiredAbility": null,
+        "requiredLevel": 20,
+        "setId": "graduate",
+        "setNameKo": "학사 세트",
+        "slot": "HAND"
+      },
+      {
+        "conflictsWith": [ ],
+        "fullBody": false,
+        "imageUrl": "assets/Cosmetic/badge_leaf_star.png",
+        "itemKey": "badge_leaf_star",
+        "layerOrder": null,
+        "nameKo": "잎새 별 뱃지",
+        "owned": true,
+        "requiredAbility": null,
+        "requiredLevel": 3,
+        "setId": null,
+        "setNameKo": null,
+        "slot": "BADGE"
+      },
+      {
+        "conflictsWith": [ ],
+        "fullBody": false,
+        "imageUrl": "assets/Cosmetic/effect_petals.png",
+        "itemKey": "effect_petals",
+        "layerOrder": null,
+        "nameKo": "꽃잎 효과",
+        "owned": true,
+        "requiredAbility": "ATTENDANCE",
+        "requiredLevel": 3,
+        "setId": null,
+        "setNameKo": null,
+        "slot": "EFFECT"
+      },
+      {
+        "conflictsWith": [ ],
+        "fullBody": false,
+        "imageUrl": "assets/ProfileFrame/frame_spring.svg",
+        "itemKey": "frame_spring",
+        "layerOrder": null,
+        "nameKo": "봄 프레임",
+        "owned": true,
+        "requiredAbility": "ATTENDANCE",
+        "requiredLevel": 3,
+        "setId": null,
+        "setNameKo": null,
+        "slot": "FRAME"
+      }
+    ],
+    "slots": [
+      {
+        "composited": true,
+        "layerOrder": 100,
+        "nameKo": "배경",
+        "slot": "BACKGROUND"
+      },
+      {
+        "composited": true,
+        "layerOrder": 400,
+        "nameKo": "옷",
+        "slot": "OUTFIT"
+      },
+      {
+        "composited": true,
+        "layerOrder": 450,
+        "nameKo": "가방",
+        "slot": "BAG"
+      },
+      {
+        "composited": true,
+        "layerOrder": 500,
+        "nameKo": "목",
+        "slot": "NECK"
+      },
+      {
+        "composited": true,
+        "layerOrder": 600,
+        "nameKo": "얼굴",
+        "slot": "FACE"
+      },
+      {
+        "composited": true,
+        "layerOrder": 700,
+        "nameKo": "머리",
+        "slot": "HEAD"
+      },
+      {
+        "composited": true,
+        "layerOrder": 800,
+        "nameKo": "손",
+        "slot": "HAND"
+      },
+      {
+        "composited": true,
+        "layerOrder": 850,
+        "nameKo": "뱃지",
+        "slot": "BADGE"
+      },
+      {
+        "composited": true,
+        "layerOrder": 900,
+        "nameKo": "효과",
+        "slot": "EFFECT"
+      },
+      {
+        "composited": false,
+        "layerOrder": 1000,
+        "nameKo": "프레임",
+        "slot": "FRAME"
+      }
+    ]
+  }
+}
