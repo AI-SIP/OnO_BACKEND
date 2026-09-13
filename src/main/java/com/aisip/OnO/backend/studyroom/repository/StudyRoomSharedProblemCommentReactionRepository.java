@@ -20,6 +20,9 @@ public interface StudyRoomSharedProblemCommentReactionRepository extends JpaRepo
     @Query("select r from StudyRoomSharedProblemCommentReaction r where r.comment.id in :commentIds")
     List<StudyRoomSharedProblemCommentReaction> findAllByCommentIds(@Param("commentIds") Collection<Long> commentIds);
 
+    /** 훈장 '응원단장' 판정용. 누른 자리가 어디든 응원한 것은 응원한 것이라 세 테이블을 합쳐 센다. */
+    long countByUserId(Long userId);
+
     @Modifying
     @Query("delete from StudyRoomSharedProblemCommentReaction r where r.user.id = :userId")
     void deleteByUserId(@Param("userId") Long userId);

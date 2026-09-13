@@ -16,6 +16,21 @@ public interface FolderRepository extends JpaRepository<Folder, Long>, FolderRep
 
     List<Folder> findAllByUserId(Long userId);
 
+    /**
+     * 훈장 '정리의 신' 판정용. <b>루트 폴더는 빼고</b> 센다.
+     *
+     * <p>{@code FolderService.initializeDefaultFoldersIfAbsent} 가 가입 시점에 루트 폴더와 기본 하위
+     * 폴더를 자동으로 만든다. 전부 세면 아무것도 안 한 사람이 2/10 에서 시작해 "폴더를 열 개나 만들어
+     * 정리했어요" 라는 말과 안 맞는다.
+     *
+     * <p>기본 하위 폴더까지 빼지 않는 이유는 그쪽은 이름으로만 거를 수 있기 때문이다. 사용자가 이름을
+     * 바꾸는 순간 판정이 달라진다. 루트는 {@code parentFolder IS NULL} 이라는 구조로 걸러져 이름과 무관하다.
+     * 그래서 갓 가입한 사람은 1/10 에서 시작하고, 그 하나는 실제로 자기 폴더 트리에 있는 폴더다.
+     *
+     * <p>소프트 삭제된 폴더는 {@code @SQLRestriction} 이 걸러 준다.
+     */
+    long countByUserIdAndParentFolderIsNotNull(Long userId);
+
     @Modifying
     @Query("delete from Folder f where f.id in :folderIds")
     void deleteAllByIdIn(@Param("folderIds") Collection<Long> folderIds);

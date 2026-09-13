@@ -17,4 +17,7 @@ public interface StudyRoomFeedReactionRepository extends JpaRepository<StudyRoom
     List<StudyRoomFeedReaction> findAllByFeedIds(@Param("feedIds") Collection<Long> feedIds);
 
     List<StudyRoomFeedReaction> findAllByFeedId(Long feedId);
+
+    /** 훈장 '응원단장' 판정용. 누른 자리가 어디든 응원한 것은 응원한 것이라 세 테이블을 합쳐 센다. */
+    long countByUserId(Long userId);
 }
