@@ -19,6 +19,9 @@ public interface StudyRoomSharedProblemReactionRepository extends JpaRepository<
 
     List<StudyRoomSharedProblemReaction> findAllBySharedProblemId(Long sharedProblemId);
 
+    /** 훈장 '응원단장' 판정용. 누른 자리가 어디든 응원한 것은 응원한 것이라 세 테이블을 합쳐 센다. */
+    long countByUserId(Long userId);
+
     @Modifying
     @Query("delete from StudyRoomSharedProblemReaction r where r.sharedProblem.id = :sharedProblemId")
     void deleteBySharedProblemId(@Param("sharedProblemId") Long sharedProblemId);

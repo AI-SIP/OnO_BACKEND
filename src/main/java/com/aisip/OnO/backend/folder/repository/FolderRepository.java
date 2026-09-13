@@ -16,6 +16,9 @@ public interface FolderRepository extends JpaRepository<Folder, Long>, FolderRep
 
     List<Folder> findAllByUserId(Long userId);
 
+    /** 훈장 '정리의 신' 판정용. 소프트 삭제된 폴더는 {@code @SQLRestriction} 이 걸러 준다. */
+    long countByUserId(Long userId);
+
     @Modifying
     @Query("delete from Folder f where f.id in :folderIds")
     void deleteAllByIdIn(@Param("folderIds") Collection<Long> folderIds);
