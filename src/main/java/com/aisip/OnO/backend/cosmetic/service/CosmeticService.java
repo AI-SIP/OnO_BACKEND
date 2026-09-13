@@ -131,6 +131,104 @@ public class CosmeticService {
     }
 
     /**
+     * 차림 전체를 한 번에 바꾼다. 꾸미기 화면의 저장 버튼이 이 경로다.
+     *
+     * <p><b>전체 교체다. 요청에 없는 슬롯은 비운다.</b> 저장 버튼은 "지금 이 차림이 내 차림이다" 라는
+     * 선언이라 서버도 그대로 받는다. "안 보낸 것은 그대로 둔다" 로 하면 시착 화면에서 벗어 놓고
+     * 저장한 것을 표현할 방법이 없어진다.
+     *
+     * <p>한 건이라도 검증에 걸리면 전부 거절한다. 프론트가 슬롯 수만큼 {@link #equip} 을 부르면
+     * 중간에 끊겼을 때 모자만 바뀌고 옷은 안 바뀐 반쪽 차림이 남는데, 사용자는 저장을 한 번 눌렀을 뿐이라
+     * 다시 들어왔을 때 무엇이 저장된 것인지 알 수 없다. 그 상태를 아예 만들지 않으려고 이 API 가 있다.
+     *
+     * <p>{@link #equip} 과 {@link #equipSet} 은 그대로 둔다. 옷장 격자에서 한 칸만 눌러 바로 거는
+     * 경로가 따로 있다.
+     */
+    @Transactional
+    public CosmeticEquipResponseDto equipAll(Long userId, Map<CosmeticSlot, String> requested) {
+        CosmeticUnlockLevels levels = levelsOf(userId);
+        List<CosmeticItem> activeItems = cosmeticItemRepository.findAllByActiveTrue();
+        Map<String, CosmeticItem> itemsByKey = indexByKey(activeItems);
+
+        // 검사를 먼저 전부 끝낸다. equipSet 과 같은 이유로, 쓰다가 중간에 거절하면 앞의 몇 개만 걸린
+        // 채로 롤백을 믿어야 한다. 판정은 equip 이 쓰는 것과 같은 규칙을 그대로 탄다.
+        // 없는 키·비활성·잠김·슬롯 어긋남이 여기서 걸리면 아래 쓰기로 내려가지 않는다.
+        List<CosmeticItem> targets = new ArrayList<>();
+        for (Map.Entry<CosmeticSlot, String> entry : requested.entrySet()) {
+            CosmeticItem item = resolveEquipTarget(entry.getKey(), entry.getValue(), itemsByKey, levels);
+            // null 은 "그 자리를 비운다" 다. 키를 아예 빼고 보낸 것과 같게 다룬다.
+            if (item != null) {
+                targets.add(item);
+            }
+        }
+
+        List<CosmeticSlot> unequipped = new ArrayList<>();
+        List<CosmeticItem> kept = resolveInRequestConflicts(targets, unequipped);
+
+        // 전체 교체라 걸 수 있는 자리를 하나도 빠짐없이 쓴다. 요청에 없던 자리를 NONE 으로 덮어야
+        // "지금 이 차림이 전부" 가 된다.
+        //
+        // 여기에는 materializePresetIfUntouched 가 없다. 프리셋을 굳히는 이유는 첫 변경 때 나머지
+        // 자리가 통째로 사라지는 것을 막으려는 것인데, 전체 교체는 그 나머지 자리까지 사용자가 정한
+        // 값으로 직접 채운다. 프리셋을 먼저 깔면 방금 벗어 놓고 저장한 것을 되살렸다가 다시 벗는 셈이다.
+        // 이 요청 하나로 모든 자리에 행이 생기므로 다음 조회에서 프리셋이 되살아날 여지도 없다.
+        Map<CosmeticSlot, String> writes = orderedWrites();
+        CosmeticSlot.equippableSlots().forEach(slot -> writes.put(slot, UserCosmeticLoadout.NONE));
+        kept.forEach(item -> writes.put(item.getSlot(), item.getItemKey()));
+
+        applyWrites(userId, writes);
+
+        log.info("userId: {} equipped all: {}, unequipped: {}",
+                userId, kept.stream().map(CosmeticItem::getItemKey).toList(), unequipped);
+
+        return new CosmeticEquipResponseDto(currentEquipped(userId, activeItems, levels), unequipped);
+    }
+
+    /**
+     * 한 요청 안에서 서로 충돌하는 둘이 함께 들어왔을 때 어느 쪽을 남길지 가른다.
+     *
+     * <p>프론트도 {@code conflictsWith} 를 보지만 같이 걸 수 없는 조합이 그대로 담겨 들어올 수 있다.
+     * 받은 차림을 그대로 저장하지 않고 서버가 마지막으로 한 번 더 본다.
+     *
+     * <p><b>뒤에 깔리는 자리(layerOrder 가 작은 쪽)를 남기고 앞의 것을 벗긴다.</b> 맵에 담긴 순서나
+     * JSON 키 순서에 맡기면 같은 본문을 두 번 보냈을 때 다른 것이 걸릴 수 있고, 사용자는 조회할 때마다
+     * 걸려 있는 것이 달라 보인다.
+     *
+     * <p>층 순서를 기준으로 삼은 이유는 충돌이 잡히는 조합이 대개 "옷과 그 위에 얹히는 것" 이기
+     * 때문이다. 뒤를 남기면 옷 입은 개구리에서 모자 하나가 빠지고, 앞을 남기면 모자만 쓴 벗은 개구리가
+     * 된다. 잃는 것이 작은 쪽을 고른다.
+     *
+     * <p>지금은 자리마다 층이 겹치지 않지만 자리 이름으로 한 번 더 묶는다. 나중에 같은 층의 자리가
+     * 생겨도 결과가 흔들리지 않는다.
+     *
+     * <p>여기서 보는 것은 <b>요청 안의 충돌뿐</b>이다. 지금 걸려 있는 것과의 충돌은 볼 필요가 없다.
+     * 전체 교체라 걸려 있던 것은 모두 이 요청의 결과로 덮이기 때문이다.
+     *
+     * @param unequipped 벗겨진 자리를 담아 갈 목록. 프론트가 "가디건이 벗겨졌어요" 를 띄우는 데 쓴다.
+     */
+    private List<CosmeticItem> resolveInRequestConflicts(List<CosmeticItem> targets,
+                                                         List<CosmeticSlot> unequipped) {
+        List<CosmeticItem> ordered = targets.stream()
+                .sorted(Comparator
+                        .comparingInt((CosmeticItem item) -> item.getSlot().getLayerOrder())
+                        .thenComparing(item -> item.getSlot().name()))
+                .toList();
+
+        List<CosmeticItem> kept = new ArrayList<>();
+        for (CosmeticItem candidate : ordered) {
+            if (kept.stream().anyMatch(accepted -> conflictsEachOther(accepted, candidate))) {
+                unequipped.add(candidate.getSlot());
+                continue;
+            }
+            kept.add(candidate);
+        }
+
+        // 응답에 실리는 순서를 자리 이름으로 고정한다. conflictingSlots 가 쓰는 순서와 같다.
+        unequipped.sort(Comparator.comparing(Enum::name));
+        return kept;
+    }
+
+    /**
      * 세트 한 번에 장착.
      *
      * <p>하나라도 보유하지 않았으면 통째로 거절한다. 되는 것만 걸어 주면 사용자는 "졸업 세트를 걸었는데
@@ -294,13 +392,24 @@ public class CosmeticService {
             if (equipped == null) {
                 continue;
             }
-            if (item.conflictKeys().contains(equipped.getItemKey())
-                    || equipped.conflictKeys().contains(item.getItemKey())) {
+            if (conflictsEachOther(item, equipped)) {
                 conflicting.add(row.getSlot());
             }
         }
         conflicting.sort(Comparator.comparing(Enum::name));
         return conflicting;
+    }
+
+    /**
+     * 둘을 같이 걸 수 없는지.
+     *
+     * <p>충돌은 <b>양쪽 모두</b> 본다. 근거는 {@link #conflictingSlots} 에 있다.
+     * 한 슬롯씩 거는 경로와 차림 전체를 저장하는 경로가 같은 판정을 써야 해서 여기로 뽑았다.
+     * 둘로 나눠 적으면 한쪽만 고쳐질 때 같은 조합이 경로에 따라 다르게 걸린다.
+     */
+    private boolean conflictsEachOther(CosmeticItem one, CosmeticItem other) {
+        return one.conflictKeys().contains(other.getItemKey())
+                || other.conflictKeys().contains(one.getItemKey());
     }
 
     /** 이 아이템을 충돌 대상으로 지목한 아이템이 하나라도 있는지. 없으면 장착 행을 읽지 않고 끝낸다. */
