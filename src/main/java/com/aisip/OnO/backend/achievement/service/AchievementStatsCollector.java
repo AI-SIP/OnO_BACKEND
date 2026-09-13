@@ -30,9 +30,13 @@ import java.util.List;
  * ({@link SolveScan}). 나머지는 인덱스를 타는 단순 count 라 더 접을 것이 없다.
  *
  * <p>리액션 셋을 한 문장으로 합치면 아홉이 일곱이 되지만 그렇게 하지 않았다. 세 도메인에 걸친
- * 네이티브 쿼리를 어느 리포지토리에도 자연스럽게 둘 수 없고, 정작 비용은 문장 수가 아니라
- * {@code study_room_feed_reaction} 과 {@code study_room_shared_problem_reaction} 에
- * {@code user_id} 선두 인덱스가 없다는 쪽에 있다. 합쳐도 그 스캔은 그대로다.
+ * 네이티브 쿼리를 어느 리포지토리에도 자연스럽게 둘 수 없는 데 비해, 줄어드는 것은 문장 두 개뿐이다.
+ *
+ * <p>리액션 세 테이블의 {@code COUNT(*) WHERE user_id = ?} 는 전부 인덱스를 탄다. 유니크 키가
+ * {@code (feed_id, user_id, emoji)} 처럼 {@code user_id} 를 선두에 두지 않아 그것만 보면 풀스캔처럼
+ * 보이지만, 세 테이블 모두 {@code user_id} 에 사용자 테이블을 향한 외래키가 걸려 있어 InnoDB 가
+ * {@code (user_id)} 단독 인덱스를 함께 만든다(V6, V11). 댓글 리액션은 {@code idx_shared_problem_comment_reaction_user}
+ * 로 명시까지 돼 있다. {@code AchievementMigrationTest} 가 이 인덱스들이 사라지지 않는지 잠근다.
  */
 @Component
 @RequiredArgsConstructor
@@ -53,7 +57,7 @@ public class AchievementStatsCollector {
 
         return new AchievementStats(
                 nullSafe(problemRepository.countByUserId(userId)),
-                folderRepository.countByUserId(userId),
+                folderRepository.countByUserIdAndParentFolderIsNotNull(userId),
                 solves.maxSolveCountOnOneProblem(),
                 solves.comebackCount(),
                 solves.dawnSolveCount(),

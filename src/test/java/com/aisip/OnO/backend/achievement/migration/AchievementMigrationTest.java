@@ -97,6 +97,46 @@ class AchievementMigrationTest extends AchievementTestSupport {
                 .isEqualTo(32L);
     }
 
+    /**
+     * 응원단장이 세는 리액션 세 테이블이 {@code user_id} 로 시작하는 인덱스를 갖고 있는지.
+     *
+     * <p>훈장 화면을 열 때마다 세 테이블에 {@code COUNT(*) WHERE user_id = ?} 가 나간다. 인덱스가
+     * 없으면 그대로 풀스캔이고, 리액션은 사용자가 늘수록 가장 빨리 자라는 표 중 하나다.
+     *
+     * <p>지금은 인덱스를 새로 만들 필요가 없다. 세 테이블 모두 {@code user_id} 에 사용자 테이블을 향한
+     * 외래키가 걸려 있어 InnoDB 가 {@code (user_id)} 단독 인덱스를 함께 만들어 두었고(V6, V11),
+     * 댓글 리액션은 {@code idx_shared_problem_comment_reaction_user} 로 명시까지 돼 있다.
+     * 같은 것을 한 벌 더 만들면 쓰기마다 갱신할 인덱스만 늘어난다.
+     *
+     * <p>그래서 이 테스트가 필요하다. 근거가 <b>외래키가 딸려 만든 인덱스</b>라, 나중에 외래키를 떼는
+     * 변경이 있으면 인덱스도 조용히 같이 사라진다. 그때 훈장 화면이 느려지고 나서야 알게 되는 대신
+     * 여기서 걸린다.
+     */
+    @Test
+    @DisplayName("리액션 세 테이블이 user_id 선두 인덱스를 갖고 있다 - 응원단장 카운트가 이것을 탄다")
+    void reactionTablesAreIndexedByUserId() {
+        List<String> reactionTables = List.of(
+                "study_room_feed_reaction",
+                "study_room_shared_problem_reaction",
+                "study_room_shared_problem_comment_reaction");
+
+        for (String table : reactionTables) {
+            Long indexCount = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*)
+                    FROM information_schema.statistics
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = ?
+                      AND COLUMN_NAME = 'user_id'
+                      AND SEQ_IN_INDEX = 1
+                    """, Long.class, table);
+
+            assertThat(indexCount)
+                    .as(table + " 에 user_id 선두 인덱스가 없으면 훈장 화면을 열 때마다 풀스캔이 돈다")
+                    .isNotNull()
+                    .isPositive();
+        }
+    }
+
     private void runMigrationOnOneConnection() {
         List<String> statements = executableStatements();
         jdbcTemplate.execute((ConnectionCallback<Void>) connection -> {

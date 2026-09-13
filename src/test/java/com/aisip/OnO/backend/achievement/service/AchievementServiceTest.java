@@ -172,6 +172,29 @@ class AchievementServiceTest extends AchievementTestSupport {
         }
 
         @Test
+        @DisplayName("가입 직후 기본 폴더만 있는 사용자는 정리의 신이 1 에서 시작한다")
+        void defaultFoldersDoNotInflateProgress() {
+            User user = fixtures.createUser();
+            // 실제 가입 경로가 부르는 것과 같은 메서드다. 루트 폴더와 기본 하위 폴더가 생긴다.
+            folderService.initializeDefaultFoldersIfAbsent(user.getId());
+
+            assertThat(itemOf(user, "organizer").current())
+                    .as("아무것도 안 한 사람이 2/10 에서 시작하면 '폴더를 열 개나 만들어 정리했어요' 와 안 맞는다")
+                    .isLessThanOrEqualTo(1L);
+        }
+
+        @Test
+        @DisplayName("루트 폴더는 안 센다")
+        void rootFolderIsNotCounted() {
+            User user = fixtures.createUser();
+            fixtures.createRootFolder(user.getId());
+
+            assertThat(itemOf(user, "organizer").current())
+                    .as("루트는 사용자가 만든 것이 아니라 parentFolder IS NULL 이라는 구조로 걸러진다")
+                    .isZero();
+        }
+
+        @Test
         @DisplayName("목표치를 넘어도 목표치로 잘라서 준다")
         void clampsToTarget() {
             User user = fixtures.createUser();

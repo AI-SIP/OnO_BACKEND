@@ -2,6 +2,8 @@ package com.aisip.OnO.backend.achievement.support;
 
 import com.aisip.OnO.backend.achievement.repository.UserAchievementRepository;
 import com.aisip.OnO.backend.achievement.service.AchievementService;
+import com.aisip.OnO.backend.folder.entity.Folder;
+import com.aisip.OnO.backend.folder.service.FolderService;
 import com.aisip.OnO.backend.mission.dto.MissionRegisterDto;
 import com.aisip.OnO.backend.mission.entity.MissionLog;
 import com.aisip.OnO.backend.mission.entity.MissionType;
@@ -70,6 +72,9 @@ public abstract class AchievementTestSupport extends IntegrationTestSupport {
     protected ProblemRepository problemRepository;
 
     @Autowired
+    protected FolderService folderService;
+
+    @Autowired
     protected ProblemSolveRepository problemSolveRepository;
 
     @Autowired
@@ -126,9 +131,17 @@ public abstract class AchievementTestSupport extends IntegrationTestSupport {
         }
     }
 
+    /**
+     * 루트 폴더 하나와 그 아래 하위 폴더 {@code count} 개.
+     *
+     * <p>훈장은 루트를 안 센다. 사용자가 직접 만드는 폴더는 언제나 루트 아래에 붙으므로
+     * ({@code FolderService.createFolder} 는 부모 없는 생성을 거절한다) 같은 모양으로 만든다.
+     * 전부 루트로 만들면 판정이 0 이 나와 무엇을 재는 테스트인지 알 수 없게 된다.
+     */
     protected void saveFolders(Long userId, int count) {
+        Folder root = fixtures.createRootFolder(userId);
         for (int i = 0; i < count; i++) {
-            fixtures.createFolder(userId, "폴더" + SEQUENCE.incrementAndGet(), null);
+            fixtures.createFolder(userId, "폴더" + SEQUENCE.incrementAndGet(), root);
         }
     }
 
