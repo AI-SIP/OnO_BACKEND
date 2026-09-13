@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.cosmetic.controller;
 
 import com.aisip.OnO.backend.common.response.CommonResponse;
+import com.aisip.OnO.backend.cosmetic.dto.CosmeticEquipAllRequestDto;
 import com.aisip.OnO.backend.cosmetic.dto.CosmeticEquipRequestDto;
 import com.aisip.OnO.backend.cosmetic.dto.CosmeticEquipResponseDto;
 import com.aisip.OnO.backend.cosmetic.dto.CosmeticEquipSetRequestDto;
@@ -46,6 +47,20 @@ public class CosmeticController {
     public CommonResponse<CosmeticEquipResponseDto> equip(@Valid @RequestBody CosmeticEquipRequestDto request) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         return CommonResponse.success(cosmeticService.equip(userId, request.slot(), request.itemKey()));
+    }
+
+    /**
+     * 차림 전체 저장. 꾸미기 화면의 저장 버튼 한 번이 이 요청 하나다.
+     *
+     * <p>전체 교체라 본문에 없는 슬롯은 비운다. 빈 맵이면 전부 벗는다.
+     * 한 건이라도 검증에 걸리면 한 트랜잭션이 통째로 거절돼 반쪽 차림이 남지 않는다.
+     *
+     * <p>같은 본문을 두 번 보내도 결과가 같은 멱등 연산이라 POST 가 아니라 PUT 이다.
+     */
+    @PutMapping("/equip-all")
+    public CommonResponse<CosmeticEquipResponseDto> equipAll(@Valid @RequestBody CosmeticEquipAllRequestDto request) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return CommonResponse.success(cosmeticService.equipAll(userId, request.equipped()));
     }
 
     @PutMapping("/equip-set")

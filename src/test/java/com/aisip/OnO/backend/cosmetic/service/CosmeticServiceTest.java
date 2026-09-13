@@ -18,6 +18,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -811,6 +813,218 @@ class CosmeticServiceTest extends CosmeticTestSupport {
 
             assertThat(response.unequippedSlots()).containsExactly(CosmeticSlot.NECK);
             assertThat(response.equipped()).doesNotContainKey(CosmeticSlot.NECK);
+        }
+    }
+
+    @Nested
+    @DisplayName("차림 전체 저장")
+    class EquipAll {
+
+        @Test
+        @DisplayName("요청에 없는 슬롯은 비운다 - 저장 버튼은 '지금 이 차림이 전부' 라는 선언이다")
+        void replacesWholeLoadout() {
+            User user = fullyGrownUser();
+
+            CosmeticEquipResponseDto response = cosmeticService.equipAll(
+                    user.getId(), Map.of(CosmeticSlot.HEAD, HAT_BEANIE));
+
+            assertThat(response.equipped())
+                    .as("프리셋이 채우고 있던 나머지 자리가 남아 있으면 벗는 것을 저장할 방법이 없다")
+                    .containsOnlyKeys(CosmeticSlot.HEAD)
+                    .containsEntry(CosmeticSlot.HEAD, HAT_BEANIE);
+            assertThat(rawItemKeyOf(user.getId(), CosmeticSlot.BACKGROUND))
+                    .as("비운 자리는 지우는 게 아니라 비웠다는 표시로 남는다")
+                    .isEqualTo(UserCosmeticLoadout.NONE);
+        }
+
+        @Test
+        @DisplayName("빈 맵을 보내면 전부 벗는다")
+        void emptyMapUnequipsEverything() {
+            User user = fullyGrownUser();
+
+            CosmeticEquipResponseDto response = cosmeticService.equipAll(user.getId(), Map.of());
+
+            assertThat(response.equipped()).isEmpty();
+            assertThat(equippedOf(user.getId()))
+                    .as("모든 자리에 행이 남아야 다음 조회에서 프리셋이 되살아나지 않는다")
+                    .isEmpty();
+            assertThat(loadoutRowCount(user.getId())).isEqualTo(EQUIPPABLE_SLOT_COUNT);
+        }
+
+        @Test
+        @DisplayName("값이 null 인 항목은 키를 빼고 보낸 것과 같다")
+        void nullValueIsSameAsAbsent() {
+            User user = fullyGrownUser();
+            Map<CosmeticSlot, String> requested = new HashMap<>();
+            requested.put(CosmeticSlot.HEAD, HAT_BEANIE);
+            requested.put(CosmeticSlot.BACKGROUND, null);
+
+            CosmeticEquipResponseDto response = cosmeticService.equipAll(user.getId(), requested);
+
+            assertThat(response.equipped())
+                    .as("프론트가 빈 자리를 null 로 채워 보내든 빼고 보내든 같은 차림이 되어야 한다")
+                    .containsOnlyKeys(CosmeticSlot.HEAD);
+        }
+
+        @Test
+        @DisplayName("잠긴 아이템이 하나라도 섞이면 아무것도 저장되지 않는다")
+        void rejectsWholeRequestWhenAnyItemIsLocked() {
+            // 총 학습은 20 이지만 문제 복습이 3 이라 비니(문제 복습 4)는 잠겨 있다.
+            User user = setLevels(fixtures.createUser(), 20L, 15L, 15L, 3L, 15L);
+            cosmeticService.equipAll(user.getId(), Map.of(
+                    CosmeticSlot.BACKGROUND, BG_SPACE,
+                    CosmeticSlot.OUTFIT, OUTFIT_CARDIGAN));
+
+            assertThatThrownBy(() -> cosmeticService.equipAll(user.getId(), Map.of(
+                    CosmeticSlot.BACKGROUND, BG_SPRING,
+                    CosmeticSlot.HEAD, HAT_BEANIE)))
+                    .isInstanceOf(ApplicationException.class)
+                    .extracting(exception -> ((ApplicationException) exception).getErrorCase())
+                    .isEqualTo(CosmeticErrorCase.COSMETIC_ITEM_NOT_OWNED);
+
+            assertThat(equippedOf(user.getId()))
+                    .as("한 건이 걸렸는데 배경만 바뀌어 있으면 사용자는 무엇이 저장된 것인지 알 수 없다")
+                    .containsEntry(CosmeticSlot.BACKGROUND, BG_SPACE)
+                    .containsEntry(CosmeticSlot.OUTFIT, OUTFIT_CARDIGAN);
+        }
+
+        @Test
+        @DisplayName("슬롯과 아이템이 어긋나면 거절한다")
+        void rejectsSlotMismatch() {
+            User user = fullyGrownUser();
+
+            assertThatThrownBy(() -> cosmeticService.equipAll(user.getId(), Map.of(
+                    CosmeticSlot.BACKGROUND, BG_SPACE,
+                    CosmeticSlot.OUTFIT, HAT_BEANIE)))
+                    .isInstanceOf(ApplicationException.class)
+                    .extracting(exception -> ((ApplicationException) exception).getErrorCase())
+                    .isEqualTo(CosmeticErrorCase.COSMETIC_SLOT_MISMATCH);
+            assertThat(loadoutRowCount(user.getId()))
+                    .as("거절된 요청은 아무것도 쓰지 않는다")
+                    .isZero();
+        }
+
+        @Test
+        @DisplayName("없는 아이템과 비활성 아이템은 같은 에러로 거절한다")
+        void rejectsUnknownAndInactiveItems() {
+            User user = fullyGrownUser();
+            deactivate(HAT_BUCKET);
+
+            assertThatThrownBy(() -> cosmeticService.equipAll(user.getId(),
+                    Map.of(CosmeticSlot.HEAD, "not_exists")))
+                    .isInstanceOf(ApplicationException.class)
+                    .extracting(exception -> ((ApplicationException) exception).getErrorCase())
+                    .isEqualTo(CosmeticErrorCase.COSMETIC_ITEM_NOT_FOUND);
+            assertThatThrownBy(() -> cosmeticService.equipAll(user.getId(),
+                    Map.of(CosmeticSlot.HEAD, HAT_BUCKET)))
+                    .isInstanceOf(ApplicationException.class)
+                    .extracting(exception -> ((ApplicationException) exception).getErrorCase())
+                    .isEqualTo(CosmeticErrorCase.COSMETIC_ITEM_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("개구리 본체 슬롯이 섞여 있으면 거절한다")
+        void rejectsBaseSlot() {
+            User user = fullyGrownUser();
+
+            assertThatThrownBy(() -> cosmeticService.equipAll(user.getId(),
+                    Map.of(CosmeticSlot.BASE, "BASE")))
+                    .isInstanceOf(ApplicationException.class)
+                    .extracting(exception -> ((ApplicationException) exception).getErrorCase())
+                    .isEqualTo(CosmeticErrorCase.COSMETIC_SLOT_MISMATCH);
+        }
+
+        @Test
+        @DisplayName("충돌하는 둘이 함께 들어오면 뒤에 깔리는 쪽을 남기고 앞의 것을 벗긴다")
+        void resolvesConflictWithinRequest() {
+            User user = fullyGrownUser();
+            setConflicts(HAT_BEANIE, OUTFIT_CARDIGAN);
+
+            CosmeticEquipResponseDto response = cosmeticService.equipAll(user.getId(), Map.of(
+                    CosmeticSlot.OUTFIT, OUTFIT_CARDIGAN,
+                    CosmeticSlot.HEAD, HAT_BEANIE));
+
+            assertThat(response.unequippedSlots())
+                    .as("옷(400)을 남기고 모자(700)를 벗긴다. 반대로 하면 모자만 쓴 벗은 개구리가 된다")
+                    .containsExactly(CosmeticSlot.HEAD);
+            assertThat(response.equipped())
+                    .containsEntry(CosmeticSlot.OUTFIT, OUTFIT_CARDIGAN)
+                    .doesNotContainKey(CosmeticSlot.HEAD);
+        }
+
+        @Test
+        @DisplayName("보내는 순서를 바꿔도 남는 쪽이 같다")
+        void conflictWinnerDoesNotDependOnRequestOrder() {
+            User user = fullyGrownUser();
+            User other = fullyGrownUser();
+            // 옷 쪽에만 적어도 양쪽 모두 본다. 규칙은 층 순서지 적힌 쪽이 아니다.
+            setConflicts(OUTFIT_CARDIGAN, HAT_BEANIE);
+
+            Map<CosmeticSlot, String> headFirst = new LinkedHashMap<>();
+            headFirst.put(CosmeticSlot.HEAD, HAT_BEANIE);
+            headFirst.put(CosmeticSlot.OUTFIT, OUTFIT_CARDIGAN);
+            Map<CosmeticSlot, String> outfitFirst = new LinkedHashMap<>();
+            outfitFirst.put(CosmeticSlot.OUTFIT, OUTFIT_CARDIGAN);
+            outfitFirst.put(CosmeticSlot.HEAD, HAT_BEANIE);
+
+            CosmeticEquipResponseDto first = cosmeticService.equipAll(user.getId(), headFirst);
+            CosmeticEquipResponseDto second = cosmeticService.equipAll(other.getId(), outfitFirst);
+
+            assertThat(first.equipped())
+                    .as("키 순서에 맡기면 같은 본문인데 조회할 때마다 다른 것이 걸려 있는 것처럼 보인다")
+                    .isEqualTo(second.equipped());
+            assertThat(first.unequippedSlots())
+                    .isEqualTo(second.unequippedSlots())
+                    .containsExactly(CosmeticSlot.HEAD);
+        }
+
+        @Test
+        @DisplayName("충돌이 없으면 받은 차림 그대로 저장한다")
+        void keepsEverythingWhenNoConflict() {
+            User user = fullyGrownUser();
+
+            CosmeticEquipResponseDto response = cosmeticService.equipAll(user.getId(), Map.of(
+                    CosmeticSlot.HEAD, HAT_BEANIE,
+                    CosmeticSlot.OUTFIT, OUTFIT_CARDIGAN,
+                    CosmeticSlot.FRAME, FRAME_SPRING));
+
+            assertThat(response.unequippedSlots()).isEmpty();
+            assertThat(response.equipped())
+                    .as("프레임도 다른 자리와 똑같이 받는다. 프리셋이 자동으로 안 채울 뿐이다")
+                    .containsOnlyKeys(CosmeticSlot.HEAD, CosmeticSlot.OUTFIT, CosmeticSlot.FRAME);
+        }
+
+        @Test
+        @DisplayName("같은 요청을 두 번 보내면 결과가 같다")
+        void isIdempotent() {
+            User user = fullyGrownUser();
+            Map<CosmeticSlot, String> requested = Map.of(
+                    CosmeticSlot.HEAD, HAT_BEANIE,
+                    CosmeticSlot.OUTFIT, OUTFIT_CARDIGAN);
+
+            CosmeticEquipResponseDto first = cosmeticService.equipAll(user.getId(), requested);
+            CosmeticEquipResponseDto second = cosmeticService.equipAll(user.getId(), requested);
+
+            assertThat(second.equipped()).isEqualTo(first.equipped());
+            assertThat(second.unequippedSlots()).isEqualTo(first.unequippedSlots());
+            assertThat(loadoutRowCount(user.getId()))
+                    .as("(user_id, slot) 기본키가 한 자리 한 행을 보장한다")
+                    .isEqualTo(EQUIPPABLE_SLOT_COUNT);
+        }
+
+        @Test
+        @DisplayName("남의 장착 상태는 건드리지 않는다")
+        void doesNotTouchOtherUsers() {
+            User user = fullyGrownUser();
+            User other = fullyGrownUser();
+            cosmeticService.equipAll(other.getId(), Map.of(CosmeticSlot.HEAD, HAT_BEANIE));
+
+            cosmeticService.equipAll(user.getId(), Map.of(CosmeticSlot.HEAD, HAT_BUCKET));
+
+            assertThat(equippedOf(other.getId()))
+                    .as("전체 교체가 남의 자리까지 비우면 안 된다")
+                    .containsOnlyKeys(CosmeticSlot.HEAD)
+                    .containsEntry(CosmeticSlot.HEAD, HAT_BEANIE);
         }
     }
 

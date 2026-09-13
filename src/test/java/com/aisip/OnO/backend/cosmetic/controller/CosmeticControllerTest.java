@@ -314,6 +314,143 @@ class CosmeticControllerTest extends CosmeticTestSupport {
     }
 
     @Test
+    @DisplayName("PUT /api/cosmetics/equip-all - 받은 차림으로 통째로 바뀌고 나머지 자리는 비워진다")
+    void equipAll() throws Exception {
+        User user = fullyGrownUser();
+        authenticateAs(user.getId());
+
+        mockMvc.perform(put("/api/cosmetics/equip-all")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"equipped\":{\"HEAD\":\"" + HAT_BEANIE + "\","
+                                + "\"OUTFIT\":\"" + OUTFIT_CARDIGAN + "\"}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.equipped.HEAD").value(HAT_BEANIE))
+                .andExpect(jsonPath("$.data.equipped.OUTFIT").value(OUTFIT_CARDIGAN))
+                .andExpect(jsonPath("$.data.equipped.BACKGROUND")
+                        .doesNotExist())
+                .andExpect(jsonPath("$.data.unequippedSlots").isArray())
+                .andExpect(jsonPath("$.data.unequippedSlots.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("PUT /api/cosmetics/equip-all - 빈 맵은 전부 벗기라는 뜻이라 200 이다")
+    void equipAllWithEmptyMap() throws Exception {
+        User user = fullyGrownUser();
+        authenticateAs(user.getId());
+
+        mockMvc.perform(put("/api/cosmetics/equip-all")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"equipped\":{}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.equipped").value(Matchers.anEmptyMap()));
+    }
+
+    @Test
+    @DisplayName("PUT /api/cosmetics/equip-all - equipped 가 빠지면 400 이다")
+    void equipAllRejectsMissingEquipped() throws Exception {
+        User user = fullyGrownUser();
+        authenticateAs(user.getId());
+
+        mockMvc.perform(put("/api/cosmetics/equip-all")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PUT /api/cosmetics/equip-all - 잠긴 아이템이 섞이면 400 이고 아무것도 저장되지 않는다")
+    void equipAllRejectsLockedItem() throws Exception {
+        // 총 학습은 20 이지만 문제 복습이 3 이라 비니(문제 복습 4)는 잠겨 있다.
+        User user = setLevels(fixtures.createUser(), 20L, 15L, 15L, 3L, 15L);
+        authenticateAs(user.getId());
+        mockMvc.perform(put("/api/cosmetics/equip-all")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"equipped\":{\"BACKGROUND\":\"" + BG_SPACE + "\","
+                                + "\"OUTFIT\":\"" + OUTFIT_CARDIGAN + "\"}}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/cosmetics/equip-all")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"equipped\":{\"HEAD\":\"" + HAT_BEANIE + "\","
+                                + "\"BACKGROUND\":\"" + BG_SPRING + "\"}}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode")
+                        .value(CosmeticErrorCase.COSMETIC_ITEM_NOT_OWNED.getErrorCode()))
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        mockMvc.perform(get("/api/cosmetics"))
+                .andExpect(jsonPath("$.data.equipped.BACKGROUND")
+                        .value(BG_SPACE))
+                .andExpect(jsonPath("$.data.equipped.OUTFIT")
+                        .value(OUTFIT_CARDIGAN))
+                .andExpect(jsonPath("$.data.equipped.HEAD").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("PUT /api/cosmetics/equip-all - 충돌하는 조합은 한쪽이 벗겨져 응답에 실린다")
+    void equipAllResolvesConflict() throws Exception {
+        User user = fullyGrownUser();
+        authenticateAs(user.getId());
+        setConflicts(HAT_BEANIE, OUTFIT_CARDIGAN);
+
+        mockMvc.perform(put("/api/cosmetics/equip-all")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"equipped\":{\"HEAD\":\"" + HAT_BEANIE + "\","
+                                + "\"OUTFIT\":\"" + OUTFIT_CARDIGAN + "\"}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.unequippedSlots").value(Matchers.contains("HEAD")))
+                .andExpect(jsonPath("$.data.equipped.OUTFIT").value(OUTFIT_CARDIGAN))
+                .andExpect(jsonPath("$.data.equipped.HEAD").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("PUT /api/cosmetics/equip-all - 본문에 userId 를 넣어도 남의 차림은 안 바뀐다")
+    void equipAllIgnoresUserIdInBody() throws Exception {
+        User user = fullyGrownUser();
+        User other = fullyGrownUser();
+        authenticateAs(other.getId());
+        mockMvc.perform(put("/api/cosmetics/equip-all")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"equipped\":{\"HEAD\":\"" + HAT_BEANIE + "\"}}"))
+                .andExpect(status().isOk());
+
+        // 남의 식별자를 본문에 실어 "전부 벗기" 를 보낸다. 대상은 인증 컨텍스트의 나여야 한다.
+        authenticateAs(user.getId());
+        mockMvc.perform(put("/api/cosmetics/equip-all")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":" + other.getId() + ",\"equipped\":{}}"))
+                .andExpect(status().isOk());
+
+        authenticateAs(other.getId());
+        mockMvc.perform(get("/api/cosmetics"))
+                .andExpect(jsonPath("$.data.equipped.HEAD")
+                        .value(HAT_BEANIE));
+    }
+
+    @Test
+    @DisplayName("PUT /api/cosmetics/equip-all - 없는 슬롯 이름은 400 이다")
+    void equipAllRejectsUnknownSlot() throws Exception {
+        User user = fullyGrownUser();
+        authenticateAs(user.getId());
+
+        mockMvc.perform(put("/api/cosmetics/equip-all")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"equipped\":{\"WINGS\":\"" + HAT_BEANIE + "\"}}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PUT /api/cosmetics/equip-all - 비로그인 요청은 401 이다")
+    void equipAllRequiresAuthentication() throws Exception {
+        clearAuthentication();
+
+        mockMvc.perform(put("/api/cosmetics/equip-all")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"equipped\":{}}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     @DisplayName("PUT /api/cosmetics/equip - 비로그인 요청은 401 이다")
     void equipRequiresAuthentication() throws Exception {
         clearAuthentication();
