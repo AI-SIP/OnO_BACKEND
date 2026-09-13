@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.user.dto;
 
+import com.aisip.OnO.backend.mission.entity.UserMissionStatus;
 import com.aisip.OnO.backend.user.entity.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -142,7 +143,7 @@ class UserResponseDtoTest {
         }
 
         @Test
-        @DisplayName("총 학습 16~20 은 그대로 나간다 - 능력치 상한 15 와 다른 값이다")
+        @DisplayName("총 학습 16~20 은 그대로 나간다")
         void totalStudyLevelIsNotCappedAtFifteen() {
             User user = user();
             user.getUserMissionStatus().setTotalStudyLevel(18L, 120L);
@@ -155,34 +156,106 @@ class UserResponseDtoTest {
         }
 
         @Test
-        @DisplayName("능력치는 15레벨을 넘겨도 15레벨 풀 게이지로 눌러서 응답한다")
+        @DisplayName("능력치 16~20 은 그대로 나간다 - 예전 상한 15 에서 멈추지 않는다")
+        void abilityLevelIsNotCappedAtFifteen() {
+            User user = user();
+            user.getUserMissionStatus().setAttendanceLevel(16L, 30L);
+            user.getUserMissionStatus().setNoteWriteLevel(20L, 70L);
+
+            UserResponseDto response = UserResponseDto.from(user);
+
+            assertThat(response.attendanceLevel())
+                    .as("15 에서 자르면 능력치 넷이 Lv.15 에 멈춘 채 총 학습만 혼자 오른다")
+                    .isEqualTo(16L);
+            assertThat(response.attendancePoint()).isEqualTo(30L);
+            assertThat(response.noteWriteLevel()).isEqualTo(20L);
+            assertThat(response.noteWritePoint()).isEqualTo(70L);
+        }
+
+        @Test
+        @DisplayName("능력치 상한은 도메인 상수를 그대로 따라간다")
+        void abilityCapFollowsDomainConstant() {
+            long max = UserMissionStatus.MAX_ABILITY_LEVEL;
+            User user = user();
+
+            user.getUserMissionStatus().setAttendanceLevel(max, 0L);
+            assertThat(UserResponseDto.from(user).attendanceLevel())
+                    .as("응답 쪽 상한이 도메인 상한보다 낮으면 실제 레벨과 보이는 레벨이 갈린다")
+                    .isEqualTo(max);
+
+            user.getUserMissionStatus().setAttendanceLevel(max + 1, 0L);
+            assertThat(UserResponseDto.from(user).attendanceLevel())
+                    .as("도메인 상한보다 높으면 해금표에 없는 레벨이 앱에 표시된다")
+                    .isEqualTo(max);
+        }
+
+        @Test
+        @DisplayName("상한을 넘긴 능력치는 상한 레벨 풀 게이지로 눌러서 응답한다")
         void capsAbilityStatusOverMaxLevel() {
             User user = user();
-            user.getUserMissionStatus().setAttendanceLevel(16L, 10L);
-            user.getUserMissionStatus().setNoteWriteLevel(17L, 20L);
-            user.getUserMissionStatus().setProblemPracticeLevel(18L, 30L);
-            user.getUserMissionStatus().setNotePracticeLevel(19L, 40L);
+            user.getUserMissionStatus().setAttendanceLevel(21L, 10L);
+            user.getUserMissionStatus().setNoteWriteLevel(22L, 20L);
+            user.getUserMissionStatus().setProblemPracticeLevel(23L, 30L);
+            user.getUserMissionStatus().setNotePracticeLevel(24L, 40L);
             user.getUserMissionStatus().setTotalStudyLevel(21L, 50L);
 
             UserResponseDto response = UserResponseDto.from(user);
 
             assertThat(response.attendanceLevel())
-                    .as("능력치 게이지는 15칸이고 치장 해금표도 능력치 15 가 마지막이다")
-                    .isEqualTo(15L);
-            assertThat(response.attendancePoint()).isEqualTo(150L);
-            assertThat(response.noteWriteLevel()).isEqualTo(15L);
-            assertThat(response.noteWritePoint()).isEqualTo(150L);
-            assertThat(response.problemPracticeLevel()).isEqualTo(15L);
-            assertThat(response.problemPracticePoint()).isEqualTo(150L);
-            assertThat(response.notePracticeLevel()).isEqualTo(15L);
-            assertThat(response.notePracticePoint()).isEqualTo(150L);
-            assertThat(response.totalStudyLevel())
-                    .as("총 학습만 상한이 20 이다")
+                    .as("상한을 올리기 전에 이미 21레벨을 넘겨 둔 사용자가 있을 수 있다")
                     .isEqualTo(20L);
+            assertThat(response.attendancePoint()).isEqualTo(200L);
+            assertThat(response.noteWriteLevel()).isEqualTo(20L);
+            assertThat(response.noteWritePoint()).isEqualTo(200L);
+            assertThat(response.problemPracticeLevel()).isEqualTo(20L);
+            assertThat(response.problemPracticePoint()).isEqualTo(200L);
+            assertThat(response.notePracticeLevel()).isEqualTo(20L);
+            assertThat(response.notePracticePoint()).isEqualTo(200L);
+            assertThat(response.totalStudyLevel()).isEqualTo(20L);
             assertThat(response.totalStudyCurrentPoint())
                     .as("게이지가 넘치지 않도록 20레벨 만점으로 눌러 보낸다")
                     .isEqualTo(800L);
             assertThat(response.totalStudyNextLevelThreshold()).isEqualTo(800L);
+        }
+
+        /**
+         * 상한에 닿아도 포인트는 계속 쌓인다. 앱은 능력치 게이지의 분모를
+         * {@code 10 + (level - 1) * 10} 으로 직접 계산하므로
+         * (OnO_FRONT/lib/Screen/Character/Widget/AbilityStatPanel.dart:198),
+         * 쌓인 잔여 포인트를 그대로 내보내면 게이지가 한 칸을 넘어간다.
+         */
+        @Test
+        @DisplayName("상한 레벨에 쌓인 잔여 포인트는 게이지 분모를 넘기지 않는다")
+        void clampsLeftoverPointAtMaxLevel() {
+            User user = user();
+            user.getUserMissionStatus().setAttendanceLevel(20L, 10_000L);
+            user.getUserMissionStatus().setTotalStudyLevel(20L, 10_000L);
+
+            UserResponseDto response = UserResponseDto.from(user);
+
+            assertThat(response.attendanceLevel()).isEqualTo(20L);
+            assertThat(response.attendancePoint())
+                    .as("20레벨 게이지의 분모는 10 + 19 x 10 = 200 이다")
+                    .isEqualTo(200L);
+            assertThat(response.totalStudyLevel()).isEqualTo(20L);
+            assertThat(response.totalStudyCurrentPoint())
+                    .as("총 학습 20레벨 게이지의 분모는 200 x 4 = 800 이다")
+                    .isEqualTo(800L);
+        }
+
+        @Test
+        @DisplayName("상한 미만에서는 잔여 포인트를 그대로 내보낸다")
+        void keepsLeftoverPointBelowMaxLevel() {
+            User user = user();
+            user.getUserMissionStatus().setAttendanceLevel(19L, 189L);
+            user.getUserMissionStatus().setTotalStudyLevel(19L, 759L);
+
+            UserResponseDto response = UserResponseDto.from(user);
+
+            assertThat(response.attendancePoint())
+                    .as("19레벨 분모는 190 이라 189 는 그대로 나가야 한다")
+                    .isEqualTo(189L);
+            assertThat(response.totalStudyCurrentPoint()).isEqualTo(759L);
         }
     }
 }
