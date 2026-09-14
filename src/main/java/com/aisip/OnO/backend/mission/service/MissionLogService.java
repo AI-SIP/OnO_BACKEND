@@ -2,6 +2,8 @@ package com.aisip.OnO.backend.mission.service;
 
 import com.aisip.OnO.backend.admin.dto.AdminPracticeLogResponseDto;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.common.web.AppVersion;
+import com.aisip.OnO.backend.common.web.AppVersionResolver;
 import com.aisip.OnO.backend.mission.dto.MissionRegisterDto;
 import com.aisip.OnO.backend.mission.entity.MissionLog;
 import com.aisip.OnO.backend.mission.entity.MissionMetric;
@@ -34,20 +36,22 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 사용자의 행동 기록({@code mission_log})을 남긴다.
  *
- * <p><b>자동 적립은 설정으로 켜고 끈다.</b> {@code ono.mission.legacy-accrual.enabled} 이고 기본값은 켜짐이다.
+ * <p><b>자동 적립은 요청이 온 앱 버전에 따라 갈린다.</b> 미션을 받을 수 있는 앱이면 끄고, 아니면 켠다.
+ * 기준은 {@code ono.mission.mission-capable-version} 이다. 그 위에 버전과 무관하게 전부 끄는
+ * 비상 스위치로 {@code ono.mission.legacy-accrual.enabled} 가 있고, 이쪽이 우선한다.
  *
- * <p>최종 목표는 끄는 것이다. 켜져 있으면 같은 XP 가 두 경로로 들어온다. 오답노트를 하나 쓰면
+ * <p>가르는 이유는 켜져 있으면 같은 XP 가 두 경로로 들어오기 때문이다. 오답노트를 하나 쓰면
  * 자동 적립 +10 이 조용히 들어가고 미션 "오늘의 오답"을 받으면 +10 이 또 들어가,
  * 화면의 {@code +10 XP} 와 실제 증가량 20 이 어긋난다. 하루 200점 상한도 자동 적립에만 걸려
  * 같은 이름의 XP 가 출처에 따라 다른 규칙으로 움직인다.
  *
- * <p>그런데도 기본값을 켜짐으로 두는 이유는 <b>배포 순서</b> 때문이다. 백엔드가 먼저 나가고 프론트에
- * 미션 화면이 없는 동안 자동 적립까지 꺼져 있으면 XP 유입이 통째로 멈춰 레벨도 스터디룸 랭킹도 정지한다.
- * 켜 둔 채로 백엔드를 배포하면 사용자 입장에서는 달라지는 게 없고, 화면이 없으니 미션을 받을 수도 없어
- * 이중 지급도 일어나지 않는다. 프론트가 나간 뒤 설정으로 끄면 흡수가 끝난다. 각 단계가 되돌릴 수 있다.
+ * <p>그렇다고 <b>플래그 하나로 전체를 끌 수는 없다.</b> 적립과 미션 진행도는 서버가 올리지만
+ * <b>받는 것은 앱이 한다.</b> 미션 화면이 없는 구버전 앱은 {@code claim} 을 부를 방법이 없어,
+ * 통째로 끄면 구버전 사용자는 공부를 해도 XP 가 한 점도 안 쌓인다. 진행도만 쌓이고 레벨은 멈춘다.
+ * 스토어 심사와 강제 업데이트 없이는 구버전이 한동안 남으므로, 요청마다 앱 버전을 보고 가른다.
  *
  * <p>꺼져도 <b>기록은 그대로 남는다.</b> DAU·순 방문자·복습 로그 같은 관리자 통계가 전부 이 테이블을 읽는다.
- * 행이 사라지면 그 지표들이 통째로 0 이 된다. 중복 방지 판정과 미션 진행도 증가도 플래그와 무관하게 돈다.
+ * 행이 사라지면 그 지표들이 통째로 0 이 된다. 중복 방지 판정과 미션 진행도 증가도 설정과 무관하게 돈다.
  * <b>꺼지는 것은 포인트 지급 하나뿐이다.</b>
  */
 @Service
@@ -63,14 +67,33 @@ public class MissionLogService {
 
     private final MissionProgressUpdater missionProgressUpdater;
 
+    private final AppVersionResolver appVersionResolver;
+
     /**
      * 행동만으로 경험치를 주던 예전 적립을 계속 쓸지.
      *
-     * <p>기본값이 켜짐이라 설정을 건드리지 않으면 지금 운영과 똑같이 동작한다.
-     * 끄는 것은 프론트에 미션 화면이 나간 뒤의 별도 결정이다.
+     * <p><b>비상 스위치다.</b> 꺼지면 앱 버전을 보지 않고 전부 끈다. 자동 적립 자체에 문제가 생겼을 때
+     * 배포 없이 통째로 멈출 자리가 하나 있어야 한다.
+     *
+     * <p>기본값이 켜짐이라 설정을 건드리지 않으면 버전 판정만 돈다.
      */
     @Value("${ono.mission.legacy-accrual.enabled:true}")
     private boolean legacyAccrualEnabled;
+
+    /**
+     * 미션을 받을 수 있는 첫 앱 버전. 이 버전 이상에서 온 요청은 자동 적립을 끈다.
+     *
+     * <p>기본값이 {@code 4.0.0} 인 근거는 <b>헤더 자체가 이 버전 라인에서 처음 붙는다</b> 는 것이다
+     * (AI-SIP/OnO_FRONT#214, 프론트 {@code pubspec.yaml} 이 {@code 4.0.0+70}). 헤더를 안 보내는 앱은
+     * 기준값이 무엇이든 구버전으로 떨어지므로, 이 값은 <b>헤더를 보내는 앱 중 어디까지를 새 앱으로 볼지</b>만
+     * 가른다. 미션 화면은 이미 4.0.0 앱에 있으니(치장·미션 아이콘 에셋이 들어 있다) 기준을 더 낮출 이유가 없고,
+     * 더 높이면 헤더를 보내는 새 앱에서 이중 지급이 계속된다.
+     *
+     * <p>설정값으로 둔 이유는 미션 화면이 빠지거나 받기가 고장 난 버전이 뒤늦게 드러났을 때
+     * 배포 없이 기준을 올려 되돌리기 위해서다.
+     */
+    @Value("${ono.mission.mission-capable-version:4.0.0}")
+    private String missionCapableVersion;
 
     private static final Long DAILY_MISSION_POINT_LIMIT = 200L;
 
@@ -199,14 +222,20 @@ public class MissionLogService {
     /**
      * 행동 자체에 대한 자동 적립.
      *
-     * <p>플래그가 꺼져 있으면 아무것도 하지 않는다. 이 메서드만 비는 것이지 호출부의 기록 저장과
+     * <p>적립하지 않기로 하면 아무것도 하지 않는다. 이 메서드만 비는 것이지 호출부의 기록 저장과
      * 중복 방지 판정, 진행도 증가는 그대로 돈다.
      *
      * <p>하루 200점 상한은 이 경로에만 있는 규칙이다. 미션 보상은 {@link MissionRewardGranter} 가
      * 따로 지급하고 상한을 타지 않는다.
      */
     private Long addPointToUser(User user, MissionLog missionLog) {
+        // 비상 스위치가 먼저다. 꺼져 있으면 버전을 아예 보지 않는다.
         if (!legacyAccrualEnabled) {
+            return 0L;
+        }
+
+        // 미션을 받을 수 있는 앱이면 보상 경로 하나만 남긴다.
+        if (missionCapableRequest()) {
             return 0L;
         }
 
@@ -225,6 +254,22 @@ public class MissionLogService {
             return point;
         }
         return 0L;
+    }
+
+    /**
+     * 이번 요청이 미션을 받을 수 있는 앱에서 왔는가.
+     *
+     * <p><b>모르면 아니라고 답한다.</b> 헤더가 없거나, 읽을 수 없는 값이거나, 애초에 HTTP 요청이 아닌
+     * 자리에서 불렸으면 전부 구버전으로 본다. 자동 적립이 한 번 더 도는 것은 XP 를 조금 더 주는 일이지만,
+     * 반대로 틀리면 구버전 사용자는 받을 방법이 없어 XP 가 통째로 멈춘다. 덜 주는 쪽이 더 위험하다.
+     *
+     * <p>기준값이 읽히지 않을 때도 같은 이유로 아무도 새 앱으로 보지 않는다. 설정 오타 하나가
+     * 전체 사용자의 XP 유입을 끊는 것보다 이중 지급이 조금 더 도는 편이 낫다.
+     */
+    private boolean missionCapableRequest() {
+        return AppVersion.parse(missionCapableVersion)
+                .flatMap(threshold -> appVersionResolver.resolve().map(requested -> requested.isAtLeast(threshold)))
+                .orElse(false);
     }
 
     @Transactional(readOnly = true)
