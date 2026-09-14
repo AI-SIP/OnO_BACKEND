@@ -410,8 +410,8 @@ class ProblemApiIntegrationTest extends ProblemTestSupport {
         }
 
         @Test
-        @DisplayName("SOLVE_IMAGE 는 하루에 한 번만 등록된다")
-        void solveImageIsOncePerDay() throws Exception {
+        @DisplayName("SOLVE_IMAGE 는 하루에 여러 번 등록할 수 있다")
+        void solveImageHasNoDailyLimit() throws Exception {
             Long problemId = registerProblem("복습 기록", ownerRoot.getId());
 
             mockMvc.perform(post("/api/problems/{id}/imageData/urls", problemId)
@@ -426,12 +426,12 @@ class ProblemApiIntegrationTest extends ProblemTestSupport {
                             .content(json(new AddProblemImageUrlsRequest(List.of(
                                     new AddProblemImageUrlsRequest.ImageUrlItem("https://s3/s2.png", "SOLVE_IMAGE")
                             )))))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.errorCode").value(4003));
+                    .andExpect(status().isOk());
 
             assertThat(problemImageDataRepository.findAllByProblemId(problemId))
+                    .as("하루에 두 번 복습했으면 사진도 두 장 남는다. 중복 보상은 미션 로그 쪽에서 막는다")
                     .filteredOn(image -> image.getProblemImageType() == ProblemImageType.SOLVE_IMAGE)
-                    .hasSize(1);
+                    .hasSize(2);
         }
     }
 }
