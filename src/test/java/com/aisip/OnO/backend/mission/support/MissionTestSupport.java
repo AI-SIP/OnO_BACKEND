@@ -45,6 +45,9 @@ public abstract class MissionTestSupport extends IntegrationTestSupport {
     /** {@code ono.mission.legacy-accrual.enabled} 의 기본값. 설정을 안 건드리면 운영이 이 상태다. */
     protected static final boolean LEGACY_ACCRUAL_DEFAULT = true;
 
+    /** {@code ono.mission.mission-capable-version} 의 기본값. */
+    protected static final String MISSION_CAPABLE_VERSION_DEFAULT = "4.0.0";
+
     /**
      * 자동 적립 플래그를 바꾼다.
      *
@@ -61,14 +64,22 @@ public abstract class MissionTestSupport extends IntegrationTestSupport {
         ReflectionTestUtils.setField(target, "legacyAccrualEnabled", enabled);
     }
 
+    /** 자동 적립을 끄는 기준 앱 버전을 바꾼다. 플래그와 같은 이유로 대상 객체에 넣고 앞뒤로 되돌린다. */
+    protected void setMissionCapableVersion(String version) {
+        MissionLogService target = AopTestUtils.getTargetObject(missionLogService);
+        ReflectionTestUtils.setField(target, "missionCapableVersion", version);
+    }
+
     @BeforeEach
-    void restoreLegacyAccrualBeforeEachTest() {
+    void restoreAccrualSettingsBeforeEachTest() {
         setLegacyAccrual(LEGACY_ACCRUAL_DEFAULT);
+        setMissionCapableVersion(MISSION_CAPABLE_VERSION_DEFAULT);
     }
 
     @AfterEach
-    void restoreLegacyAccrualAfterEachTest() {
+    void restoreAccrualSettingsAfterEachTest() {
         setLegacyAccrual(LEGACY_ACCRUAL_DEFAULT);
+        setMissionCapableVersion(MISSION_CAPABLE_VERSION_DEFAULT);
     }
 
     protected MissionLog saveMissionLog(User user, MissionType missionType, Long referenceId) {
