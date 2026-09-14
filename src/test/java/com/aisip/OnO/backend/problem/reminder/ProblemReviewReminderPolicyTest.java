@@ -31,9 +31,9 @@ class ProblemReviewReminderPolicyTest {
     // ──────────────────────── calculateScheduledAt ─────────────────
 
     @Test
-    @DisplayName("일반 시간대 작성 시 각 interval별 예약시각은 createdAt + N일과 동일하다")
-    void calculateScheduledAt_normalTime_allIntervals() {
-        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 18, 22, 35, 0);
+    @DisplayName("발송 창 안(14:35) 작성 시 각 interval별 예약시각은 createdAt + N일과 동일하다")
+    void calculateScheduledAt_withinWindow_allIntervals() {
+        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 18, 14, 35, 0);
         List<Integer> intervals = policy.getIntervals(); // [1, 3, 7, 14, 30]
 
         for (int intervalDays : intervals) {
@@ -45,35 +45,75 @@ class ProblemReviewReminderPolicyTest {
     }
 
     @Test
-    @DisplayName("야간(00:05) 작성 후 D+1 예약시각은 다음날 06:00로 조정된다")
-    void calculateScheduledAt_nightTime_adjustsToMorning() {
+    @DisplayName("새벽(00:05) 작성 후 D+1 예약시각은 같은 날 09:00로 당겨진다")
+    void calculateScheduledAt_earlyMorning_pulledToWindowStart() {
         LocalDateTime createdAt = LocalDateTime.of(2026, 7, 18, 0, 5, 0);
         LocalDateTime result = policy.calculateScheduledAt(createdAt, 1);
-        assertThat(result).isEqualTo(LocalDateTime.of(2026, 7, 19, 6, 0, 0));
+        assertThat(result).isEqualTo(LocalDateTime.of(2026, 7, 19, 9, 0, 0));
     }
 
     @Test
-    @DisplayName("야간 경계: 05:59 작성 → D+1 06:00 조정")
-    void calculateScheduledAt_justBeforeNightEnd_adjusts() {
-        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 18, 5, 59, 0);
+    @DisplayName("시작 경계: 08:59 작성 → D+1 09:00 으로 당겨진다")
+    void calculateScheduledAt_justBeforeWindowStart_pulled() {
+        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 18, 8, 59, 0);
         LocalDateTime result = policy.calculateScheduledAt(createdAt, 1);
-        assertThat(result).isEqualTo(LocalDateTime.of(2026, 7, 19, 6, 0, 0));
+        assertThat(result).isEqualTo(LocalDateTime.of(2026, 7, 19, 9, 0, 0));
     }
 
     @Test
-    @DisplayName("야간 경계: 06:00 정각 작성 → 조정 없이 D+1 06:00 그대로")
-    void calculateScheduledAt_exactlyNightEnd_noAdjustment() {
-        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 18, 6, 0, 0);
+    @DisplayName("시작 경계: 09:00 정각 작성 → 조정 없이 D+1 09:00 그대로")
+    void calculateScheduledAt_exactlyWindowStart_noAdjustment() {
+        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 18, 9, 0, 0);
         LocalDateTime result = policy.calculateScheduledAt(createdAt, 1);
-        assertThat(result).isEqualTo(LocalDateTime.of(2026, 7, 19, 6, 0, 0));
+        assertThat(result).isEqualTo(LocalDateTime.of(2026, 7, 19, 9, 0, 0));
     }
 
     @Test
-    @DisplayName("야간이 아닌 23:50 작성 → D+1 23:50 그대로 유지")
-    void calculateScheduledAt_lateEvening_noAdjustment() {
+    @DisplayName("끝 경계: 20:59 작성 → 조정 없이 D+1 20:59 그대로")
+    void calculateScheduledAt_justBeforeWindowEnd_noAdjustment() {
+        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 18, 20, 59, 0);
+        LocalDateTime result = policy.calculateScheduledAt(createdAt, 1);
+        assertThat(result).isEqualTo(LocalDateTime.of(2026, 7, 19, 20, 59, 0));
+    }
+
+    @Test
+    @DisplayName("끝 경계: 21:00 정각 작성 → 다음 날 09:00 으로 미뤄진다")
+    void calculateScheduledAt_exactlyWindowEnd_pushedToNextMorning() {
+        LocalDateTime createdAt = LocalDateTime.of(2026, 7, 18, 21, 0, 0);
+        LocalDateTime result = policy.calculateScheduledAt(createdAt, 1);
+        assertThat(result).isEqualTo(LocalDateTime.of(2026, 7, 20, 9, 0, 0));
+    }
+
+    @Test
+    @DisplayName("밤(23:50) 작성 → D+1 그대로가 아니라 그 다음 날 09:00 으로 미뤄진다")
+    void calculateScheduledAt_lateEvening_pushedToNextMorning() {
         LocalDateTime createdAt = LocalDateTime.of(2026, 7, 18, 23, 50, 0);
         LocalDateTime result = policy.calculateScheduledAt(createdAt, 1);
-        assertThat(result).isEqualTo(LocalDateTime.of(2026, 7, 19, 23, 50, 0));
+        assertThat(result)
+                .as("23:50 에 등록했다고 D+1 23:50 에 푸시가 나가면 안 된다")
+                .isEqualTo(LocalDateTime.of(2026, 7, 20, 9, 0, 0));
+    }
+
+    // ──────────────────────── isWithinSendWindow ───────────────────
+
+    @Test
+    @DisplayName("자정에는 보내지 않는다 - 밀린 예약이 몰리는 시각이다")
+    void isWithinSendWindow_midnight_false() {
+        assertThat(policy.isWithinSendWindow(LocalDateTime.of(2026, 7, 18, 0, 0, 0))).isFalse();
+    }
+
+    @Test
+    @DisplayName("창 경계: 08:59 은 false, 09:00 은 true")
+    void isWithinSendWindow_startBoundary() {
+        assertThat(policy.isWithinSendWindow(LocalDateTime.of(2026, 7, 18, 8, 59, 59))).isFalse();
+        assertThat(policy.isWithinSendWindow(LocalDateTime.of(2026, 7, 18, 9, 0, 0))).isTrue();
+    }
+
+    @Test
+    @DisplayName("창 경계: 20:59 은 true, 21:00 은 false")
+    void isWithinSendWindow_endBoundary() {
+        assertThat(policy.isWithinSendWindow(LocalDateTime.of(2026, 7, 18, 20, 59, 59))).isTrue();
+        assertThat(policy.isWithinSendWindow(LocalDateTime.of(2026, 7, 18, 21, 0, 0))).isFalse();
     }
 
     // ──────────────────────── buildNotification ────────────────────

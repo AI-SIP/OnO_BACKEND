@@ -14,12 +14,14 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 import static com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderStatus.CANCELED;
+import static com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderStatus.EXPIRED;
 import static com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderStatus.FAILED;
 import static com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderStatus.SCHEDULED;
 import static com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderStatus.SENDING;
@@ -70,6 +72,16 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
                 .toList();
     }
 
+    /**
+     * 발송 창(09:00~21:00) 안에 있는 기준 시각.
+     *
+     * <p>예약 시각 정규화와 발송 가드가 둘 다 시각을 보기 때문에, 테스트가 몇 시에
+     * 돌아가느냐에 따라 결과가 갈린다. 날짜는 오늘로 두고 시각만 고정한다.
+     */
+    private static LocalDateTime nowInSendWindow() {
+        return LocalDate.now().atTime(12, 0);
+    }
+
     private ProblemReviewReminder saveDueReminder(Long ownerId, Long problemId, LocalDateTime scheduledAt) {
         return reminderRepository.save(
                 ProblemReviewReminder.create(ownerId, problemId, "메모", "출처", 1, 1, scheduledAt));
@@ -88,7 +100,7 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         @Test
         @DisplayName("문제 1개당 망각곡선 간격(1·3·7·14·30일) 5건이 sequence 1~5로 예약된다")
         void createsFiveRowsPerProblem() {
-            LocalDateTime createdAt = LocalDateTime.of(2026, 7, 18, 22, 0);
+            LocalDateTime createdAt = LocalDateTime.of(2026, 7, 18, 14, 0);
 
             service.scheduleForNewProblems(userId, List.of(
                     new ProblemCreatedEvent.ProblemData(1001L, "메모", "출처", createdAt)));
@@ -107,7 +119,7 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         @Test
         @DisplayName("문제 2개를 한 번에 예약하면 10건이 만들어진다")
         void createsRowsForEveryProblem() {
-            LocalDateTime createdAt = LocalDateTime.now();
+            LocalDateTime createdAt = nowInSendWindow();
 
             service.scheduleForNewProblems(userId, List.of(
                     new ProblemCreatedEvent.ProblemData(2001L, "메모1", "출처1", createdAt),
@@ -120,7 +132,7 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         @DisplayName("같은 문제로 두 번 예약해도 sequence 유니크 제약 때문에 5건으로 유지된다")
         void isIdempotent() {
             ProblemCreatedEvent.ProblemData data =
-                    new ProblemCreatedEvent.ProblemData(3001L, "메모", "출처", LocalDateTime.now());
+                    new ProblemCreatedEvent.ProblemData(3001L, "메모", "출처", nowInSendWindow());
 
             service.scheduleForNewProblems(userId, List.of(data));
             service.scheduleForNewProblems(userId, List.of(data));
@@ -131,7 +143,7 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         @Test
         @DisplayName("일부 sequence 만 남아 있으면 빠진 것만 채워 넣는다")
         void fillsOnlyMissingSequences() {
-            LocalDateTime createdAt = LocalDateTime.now();
+            LocalDateTime createdAt = nowInSendWindow();
             reminderRepository.save(
                     ProblemReviewReminder.create(userId, 3101L, "메모", "출처", 1, 1, createdAt.plusDays(1)));
 
@@ -152,7 +164,7 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         }
 
         @Test
-        @DisplayName("새벽에 작성한 문제의 D+1 알림은 06:00로 미뤄진다")
+        @DisplayName("새벽에 작성한 문제의 D+1 알림은 09:00로 미뤄진다")
         void movesNightScheduleToMorning() {
             LocalDateTime createdAt = LocalDateTime.of(2026, 7, 18, 0, 5);
 
@@ -161,7 +173,20 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
 
             assertThat(remindersOf(3201L).get(0).getScheduledAt())
                     .as("자는 시간에 푸시를 보내지 않는다")
-                    .isEqualTo(LocalDateTime.of(2026, 7, 19, 6, 0));
+                    .isEqualTo(LocalDateTime.of(2026, 7, 19, 9, 0));
+        }
+
+        @Test
+        @DisplayName("밤에 작성한 문제의 D+1 알림은 그 다음 날 09:00로 미뤄진다")
+        void movesLateNightScheduleToNextMorning() {
+            LocalDateTime createdAt = LocalDateTime.of(2026, 7, 18, 23, 30);
+
+            service.scheduleForNewProblems(userId, List.of(
+                    new ProblemCreatedEvent.ProblemData(3202L, "메모", "출처", createdAt)));
+
+            assertThat(remindersOf(3202L).get(0).getScheduledAt())
+                    .as("23:30 에 등록했다고 D+1 23:30 에 푸시가 나가면 안 된다")
+                    .isEqualTo(LocalDateTime.of(2026, 7, 20, 9, 0));
         }
 
         @Test
@@ -170,7 +195,7 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
             String memo = "가".repeat(1000);
 
             service.scheduleForNewProblems(userId, List.of(
-                    new ProblemCreatedEvent.ProblemData(3301L, memo, "출처", LocalDateTime.now())));
+                    new ProblemCreatedEvent.ProblemData(3301L, memo, "출처", nowInSendWindow())));
 
             assertThat(remindersOf(3301L))
                     .allSatisfy(reminder -> assertThat(reminder.getProblemMemoSnapshot()).hasSize(1000));
@@ -187,7 +212,7 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         @DisplayName("문제 삭제 시 대기 중인 알림이 모두 CANCELED 가 된다")
         void cancelsPendingByProblem() {
             service.scheduleForNewProblems(userId, List.of(
-                    new ProblemCreatedEvent.ProblemData(4001L, "메모", "출처", LocalDateTime.now())));
+                    new ProblemCreatedEvent.ProblemData(4001L, "메모", "출처", nowInSendWindow())));
 
             service.cancelPendingByProblem(4001L);
 
@@ -197,7 +222,7 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         @Test
         @DisplayName("다른 문제의 예약은 취소되지 않는다")
         void cancelIsScopedToProblem() {
-            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime now = nowInSendWindow();
             service.scheduleForNewProblems(userId, List.of(
                     new ProblemCreatedEvent.ProblemData(4101L, "메모", "출처", now),
                     new ProblemCreatedEvent.ProblemData(4102L, "메모", "출처", now)));
@@ -211,7 +236,7 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         @DisplayName("탈퇴 시 사용자의 대기 알림만 취소되고 다른 사용자 것은 남는다")
         void cancelAllByUserIsUserScoped() {
             User other = fixtures.createOtherUser();
-            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime now = nowInSendWindow();
             service.scheduleForNewProblems(userId, List.of(
                     new ProblemCreatedEvent.ProblemData(4201L, "메모", "출처", now)));
             service.scheduleForNewProblems(other.getId(), List.of(
@@ -229,7 +254,7 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         @DisplayName("메모 수정 시 SCHEDULED 알림의 스냅샷이 갱신된다")
         void refreshesSnapshot() {
             service.scheduleForNewProblems(userId, List.of(
-                    new ProblemCreatedEvent.ProblemData(5001L, "이전 메모", "이전 출처", LocalDateTime.now())));
+                    new ProblemCreatedEvent.ProblemData(5001L, "이전 메모", "이전 출처", nowInSendWindow())));
 
             service.refreshSnapshot(5001L, "새 메모", "새 출처");
 
@@ -243,7 +268,7 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         @DisplayName("취소된 알림의 스냅샷은 갱신하지 않는다")
         void doesNotRefreshCanceledRows() {
             service.scheduleForNewProblems(userId, List.of(
-                    new ProblemCreatedEvent.ProblemData(5101L, "이전 메모", "이전 출처", LocalDateTime.now())));
+                    new ProblemCreatedEvent.ProblemData(5101L, "이전 메모", "이전 출처", nowInSendWindow())));
             service.cancelPendingByProblem(5101L);
 
             service.refreshSnapshot(5101L, "새 메모", "새 출처");
@@ -258,7 +283,7 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         void refreshesWithLongMemo() {
             String memo = "나".repeat(1000);
             service.scheduleForNewProblems(userId, List.of(
-                    new ProblemCreatedEvent.ProblemData(5201L, "짧은 메모", "출처", LocalDateTime.now())));
+                    new ProblemCreatedEvent.ProblemData(5201L, "짧은 메모", "출처", nowInSendWindow())));
 
             service.refreshSnapshot(5201L, memo, "출처");
 
@@ -274,7 +299,7 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         @Test
         @DisplayName("복습 시각 이전의 예약만 SKIPPED_BY_COMPLETION 이 된다")
         void skipsOnlyDueRows() {
-            LocalDateTime base = LocalDateTime.of(2026, 7, 18, 22, 0);
+            LocalDateTime base = LocalDateTime.of(2026, 7, 18, 14, 0);
             service.scheduleForNewProblems(userId, List.of(
                     new ProblemCreatedEvent.ProblemData(6001L, "메모", "출처", base)));
 
@@ -291,7 +316,7 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         @Test
         @DisplayName("아직 도래하지 않은 예약만 있으면 아무것도 skip 되지 않는다")
         void skipsNothingWhenNothingDue() {
-            LocalDateTime base = LocalDateTime.now();
+            LocalDateTime base = nowInSendWindow();
             service.scheduleForNewProblems(userId, List.of(
                     new ProblemCreatedEvent.ProblemData(6101L, "메모", "출처", base)));
 
@@ -324,9 +349,9 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         @DisplayName("발송 조건을 모두 만족하면 FCM 을 한 번 부르고 SENT 로 바꾼다")
         void sendsAndMarksSent() {
             giveFcmToken(userId, "token-1");
-            ProblemReviewReminder due = saveDueReminder(userId, 8001L, LocalDateTime.now().minusMinutes(1));
+            ProblemReviewReminder due = saveDueReminder(userId, 8001L, nowInSendWindow().minusMinutes(1));
 
-            service.sendDueReminders(LocalDateTime.now());
+            service.sendDueReminders(nowInSendWindow());
 
             verify(fcmService, times(1))
                     .sendNotificationToAllUserDevice(eq(userId), any(NotificationRequestDto.class));
@@ -334,12 +359,55 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         }
 
         @Test
+        @DisplayName("발송 창 밖(자정)에는 due 가 있어도 보내지 않는다")
+        void doesNotSendOutsideSendWindow() {
+            giveFcmToken(userId, "token-1");
+            LocalDateTime midnight = LocalDate.now().atStartOfDay();
+            ProblemReviewReminder due = saveDueReminder(userId, 8201L, midnight.minusMinutes(1));
+
+            service.sendDueReminders(midnight);
+
+            verify(fcmService, never()).sendNotificationToAllUserDevice(any(), any());
+            assertThat(reminderRepository.findById(due.getId()).orElseThrow().getStatus())
+                    .as("자정은 밀린 예약이 한꺼번에 due 가 되는 시각이라 특히 막아야 한다")
+                    .isEqualTo(SCHEDULED);
+        }
+
+        @Test
+        @DisplayName("기한이 사흘 넘게 지난 예약은 보내지 않고 EXPIRED 로 접는다")
+        void expiresLongOverdueReminders() {
+            giveFcmToken(userId, "token-1");
+            LocalDateTime now = nowInSendWindow();
+            ProblemReviewReminder overdue = saveDueReminder(userId, 8301L, now.minusDays(4));
+
+            service.sendDueReminders(now);
+
+            verify(fcmService, never()).sendNotificationToAllUserDevice(any(), any());
+            assertThat(reminderRepository.findById(overdue.getId()).orElseThrow().getStatus())
+                    .as("접지 않으면 매일 한 건씩 밀린 알림이 계속 나간다")
+                    .isEqualTo(EXPIRED);
+        }
+
+        @Test
+        @DisplayName("기한이 이틀 지난 예약은 아직 만료하지 않고 보낸다")
+        void stillSendsRecentlyOverdueReminders() {
+            giveFcmToken(userId, "token-1");
+            LocalDateTime now = nowInSendWindow();
+            ProblemReviewReminder overdue = saveDueReminder(userId, 8401L, now.minusDays(2));
+
+            service.sendDueReminders(now);
+
+            assertThat(reminderRepository.findById(overdue.getId()).orElseThrow().getStatus())
+                    .isEqualTo(SENT);
+        }
+
+        @Test
         @DisplayName("예약 시각이 아직 오지 않았으면 발송하지 않는다")
         void doesNotSendFutureReminders() {
             giveFcmToken(userId, "token-1");
-            ProblemReviewReminder future = saveDueReminder(userId, 8101L, LocalDateTime.now().plusHours(1));
+            ProblemReviewReminder future = saveDueReminder(userId, 8101L, nowInSendWindow().plusHours(1));
 
-            service.sendDueReminders(LocalDateTime.now());
+            service.sendDueReminders(nowInSendWindow());
 
             verify(fcmService, never()).sendNotificationToAllUserDevice(any(), any());
             assertThat(reminderRepository.findById(future.getId()).orElseThrow().getStatus()).isEqualTo(SCHEDULED);
@@ -351,9 +419,9 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
             user.updateNotificationEnabled(false);
             userRepository.save(user);
             giveFcmToken(userId, "token-1");
-            ProblemReviewReminder due = saveDueReminder(userId, 9001L, LocalDateTime.now().minusMinutes(1));
+            ProblemReviewReminder due = saveDueReminder(userId, 9001L, nowInSendWindow().minusMinutes(1));
 
-            service.sendDueReminders(LocalDateTime.now());
+            service.sendDueReminders(nowInSendWindow());
 
             verify(fcmService, never()).sendNotificationToAllUserDevice(any(), any());
             assertThat(reminderRepository.findById(due.getId()).orElseThrow().getStatus()).isEqualTo(SCHEDULED);
@@ -362,9 +430,9 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         @Test
         @DisplayName("FCM 토큰이 없으면 발송하지 않는다")
         void skipsUserWithoutFcmToken() {
-            ProblemReviewReminder due = saveDueReminder(userId, 10001L, LocalDateTime.now().minusMinutes(1));
+            ProblemReviewReminder due = saveDueReminder(userId, 10001L, nowInSendWindow().minusMinutes(1));
 
-            service.sendDueReminders(LocalDateTime.now());
+            service.sendDueReminders(nowInSendWindow());
 
             verify(fcmService, never()).sendNotificationToAllUserDevice(any(), any());
             assertThat(reminderRepository.findById(due.getId()).orElseThrow().getStatus()).isEqualTo(SCHEDULED);
@@ -375,13 +443,13 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         void sendsAtMostOncePerDay() {
             giveFcmToken(userId, "token-1");
             ProblemReviewReminder alreadySent =
-                    saveDueReminder(userId, 11001L, LocalDateTime.now().minusDays(1));
-            LocalDateTime sentAt = LocalDateTime.now();
+                    saveDueReminder(userId, 11001L, nowInSendWindow().minusDays(1));
+            LocalDateTime sentAt = nowInSendWindow();
             inTransaction(() -> reminderRepository.markSent(alreadySent.getId(), sentAt, SENT));
 
-            ProblemReviewReminder due = saveDueReminder(userId, 11002L, LocalDateTime.now().minusMinutes(1));
+            ProblemReviewReminder due = saveDueReminder(userId, 11002L, nowInSendWindow().minusMinutes(1));
 
-            service.sendDueReminders(LocalDateTime.now());
+            service.sendDueReminders(nowInSendWindow());
 
             verify(fcmService, never()).sendNotificationToAllUserDevice(any(), any());
             assertThat(reminderRepository.findById(due.getId()).orElseThrow().getStatus()).isEqualTo(SCHEDULED);
@@ -392,11 +460,11 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         void sendsOnlyEarliestPerUser() {
             giveFcmToken(userId, "token-1");
             ProblemReviewReminder earlier =
-                    saveDueReminder(userId, 12001L, LocalDateTime.now().minusMinutes(10));
+                    saveDueReminder(userId, 12001L, nowInSendWindow().minusMinutes(10));
             ProblemReviewReminder later =
-                    saveDueReminder(userId, 12002L, LocalDateTime.now().minusMinutes(5));
+                    saveDueReminder(userId, 12002L, nowInSendWindow().minusMinutes(5));
 
-            service.sendDueReminders(LocalDateTime.now());
+            service.sendDueReminders(nowInSendWindow());
 
             verify(fcmService, times(1)).sendNotificationToAllUserDevice(eq(userId), any());
             assertThat(reminderRepository.findById(earlier.getId()).orElseThrow().getStatus()).isEqualTo(SENT);
@@ -411,14 +479,14 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
             giveFcmToken(other.getId(), "token-u2");
 
             ProblemReviewReminder alreadySent =
-                    saveDueReminder(userId, 13001L, LocalDateTime.now().minusDays(1));
-            LocalDateTime sentAt = LocalDateTime.now();
+                    saveDueReminder(userId, 13001L, nowInSendWindow().minusDays(1));
+            LocalDateTime sentAt = nowInSendWindow();
             inTransaction(() -> reminderRepository.markSent(alreadySent.getId(), sentAt, SENT));
 
             ProblemReviewReminder othersDue =
-                    saveDueReminder(other.getId(), 13002L, LocalDateTime.now().minusMinutes(1));
+                    saveDueReminder(other.getId(), 13002L, nowInSendWindow().minusMinutes(1));
 
-            service.sendDueReminders(LocalDateTime.now());
+            service.sendDueReminders(nowInSendWindow());
 
             verify(fcmService, times(1)).sendNotificationToAllUserDevice(eq(other.getId()), any());
             verify(fcmService, never()).sendNotificationToAllUserDevice(eq(userId), any());
@@ -429,11 +497,11 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         @DisplayName("FCM 발송이 실패하면 FAILED 로 기록하고 재시도 횟수를 올린다")
         void marksFailedOnFcmError() {
             giveFcmToken(userId, "token-1");
-            ProblemReviewReminder due = saveDueReminder(userId, 8002L, LocalDateTime.now().minusMinutes(1));
+            ProblemReviewReminder due = saveDueReminder(userId, 8002L, nowInSendWindow().minusMinutes(1));
             doThrow(new IllegalStateException("enqueue failed"))
                     .when(fcmService).sendNotificationToAllUserDevice(eq(userId), any(NotificationRequestDto.class));
 
-            service.sendDueReminders(LocalDateTime.now());
+            service.sendDueReminders(nowInSendWindow());
 
             ProblemReviewReminder updated = reminderRepository.findById(due.getId()).orElseThrow();
             assertThat(updated.getStatus()).isEqualTo(FAILED);
@@ -445,11 +513,11 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         @DisplayName("500자를 넘는 에러 메시지는 컬럼 길이에 맞게 잘려 저장된다")
         void truncatesLongErrorMessage() {
             giveFcmToken(userId, "token-1");
-            ProblemReviewReminder due = saveDueReminder(userId, 8003L, LocalDateTime.now().minusMinutes(1));
+            ProblemReviewReminder due = saveDueReminder(userId, 8003L, nowInSendWindow().minusMinutes(1));
             doThrow(new IllegalStateException("e".repeat(600)))
                     .when(fcmService).sendNotificationToAllUserDevice(eq(userId), any(NotificationRequestDto.class));
 
-            service.sendDueReminders(LocalDateTime.now());
+            service.sendDueReminders(nowInSendWindow());
 
             assertThat(reminderRepository.findById(due.getId()).orElseThrow().getLastErrorMessage())
                     .as("varchar(500) 을 넘기면 Data truncation 으로 발송 배치 전체가 죽는다")
@@ -459,17 +527,17 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         @Test
         @DisplayName("10분 넘게 SENDING 에 멈춰 있는 행은 FAILED 로 복구된다")
         void recoversStuckSendingRows() {
-            ProblemReviewReminder stuck = saveDueReminder(userId, 14001L, LocalDateTime.now().minusMinutes(30));
+            ProblemReviewReminder stuck = saveDueReminder(userId, 14001L, nowInSendWindow().minusMinutes(30));
             inTransaction(() ->
-                    reminderRepository.tryUpdateStatus(stuck.getId(), SCHEDULED, SENDING, LocalDateTime.now()));
-            LocalDateTime stuckSince = LocalDateTime.now().minusMinutes(11);
+                    reminderRepository.tryUpdateStatus(stuck.getId(), SCHEDULED, SENDING, nowInSendWindow()));
+            LocalDateTime stuckSince = nowInSendWindow().minusMinutes(11);
             inTransaction(() -> entityManager
                     .createNativeQuery("UPDATE problem_review_reminder SET updated_at = ? WHERE id = ?")
                     .setParameter(1, stuckSince)
                     .setParameter(2, stuck.getId())
                     .executeUpdate());
 
-            service.sendDueReminders(LocalDateTime.now());
+            service.sendDueReminders(nowInSendWindow());
 
             ProblemReviewReminder recovered = reminderRepository.findById(stuck.getId()).orElseThrow();
             assertThat(recovered.getStatus()).isEqualTo(FAILED);
@@ -479,11 +547,11 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         @Test
         @DisplayName("SENDING 상태로 남아 있어도 10분이 지나지 않았으면 건드리지 않는다")
         void keepsRecentSendingRows() {
-            ProblemReviewReminder sending = saveDueReminder(userId, 14002L, LocalDateTime.now().minusMinutes(1));
+            ProblemReviewReminder sending = saveDueReminder(userId, 14002L, nowInSendWindow().minusMinutes(1));
             inTransaction(() ->
-                    reminderRepository.tryUpdateStatus(sending.getId(), SCHEDULED, SENDING, LocalDateTime.now()));
+                    reminderRepository.tryUpdateStatus(sending.getId(), SCHEDULED, SENDING, nowInSendWindow()));
 
-            service.sendDueReminders(LocalDateTime.now());
+            service.sendDueReminders(nowInSendWindow());
 
             assertThat(reminderRepository.findById(sending.getId()).orElseThrow().getStatus())
                     .as("발송 중인 행을 성급히 되돌리면 중복 발송이 난다")
@@ -495,7 +563,7 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         void doesNothingWhenNoDueRow() {
             giveFcmToken(userId, "token-1");
 
-            service.sendDueReminders(LocalDateTime.now());
+            service.sendDueReminders(nowInSendWindow());
 
             verify(fcmService, never()).sendNotificationToAllUserDevice(any(), any());
         }
