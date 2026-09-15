@@ -77,3 +77,6 @@ monitoring/README.md
 ### Claude Code local settings (machine-specific, not team-shared)
 .claude/settings.local.json
 .claude/hooks/__pycache__/
+
+### Smoke test script (python cache)
+scripts/smoke/__pycache__/

@@ -1,0 +1,227 @@
+name: Smoke Test
+
+# 배포된 서버가 사용자를 받을 수 있는 상태인지 실제 도메인으로 확인한다. 자세한 내용은 scripts/smoke/README.md 에 있다.
+#
+# 언제 도는가
+#  - 배포 워크플로가 끝난 뒤: 배포가 성공했으면 full(조회 + 스모크 계정 안의 쓰기 흐름), 실패했으면 read.
+#  - 매시 17분: prod 에 read. 맥미니나 네트워크가 죽은 것을 배포와 상관없이 잡는다.
+#  - 수동 실행: 대상과 단계를 고른다. bootstrap 은 스모크 계정을 처음 한 번 만들 때만 쓴다.
+#
+# 운영 서버에 영향을 주지 않으려고 지키는 것
+#  - 배포 워크플로(ci-prod / deploy-prod / ci-dev / deploy-dev)는 수정하지 않았다. 끝난 것을 workflow_run 으로 받아서
+#    따로 돌기 때문에, 스모크 테스트가 틀려도 배포와 nginx 전환에는 아무 영향이 없다.
+#  - 맥미니 러너(self-hosted)가 아니라 GitHub 호스티드 러너에서 돈다.
+#  - 스크립트 자체 테스트가 먼저 통과해야 실제 서버에 요청을 보낸다.
+#  - 보낼 수 있는 요청과 요청 수 상한은 스크립트에 고정되어 있다.
+#
+# 필요한 Secrets (없으면 할 수 있는 단계까지만 한다)
+#   SMOKE_PROD_ACCESS_TOKEN_SECRET, SMOKE_PROD_USER_ID, SMOKE_DEV_ACCESS_TOKEN_SECRET, SMOKE_DEV_USER_ID, DISCORD_WEBHOOK_URL
+#
+# workflow_run 과 schedule 은 이 파일이 기본 브랜치(main)에 있어야 동작한다.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "확인할 서버"
+        type: choice
+        options: [prod, dev]
+        default: prod
+      level:
+        description: "reach: 닿는지만 / read: 조회 / full: 조회 + 쓰기 흐름 / bootstrap: 스모크 계정 만들기(처음 한 번)"
+        type: choice
+        options: [read, full, reach, bootstrap]
+        default: read
+  workflow_run:
+    workflows:
+      - "CI Build & Deploy Prod"
+      - "Deploy to Production Server (Manual Fallback)"
+      - "CI Build & Deploy Dev"
+      - "Deploy to Development Server (Manual Fallback)"
+    types: [completed]
+  schedule:
+    - cron: "17 * * * *"
+
+permissions:
+  contents: read
+  actions: read
+
+# 쓰기가 있는 실행(배포 성공 뒤 full, 수동 full, bootstrap)만 대상별로 한 줄로 세운다. 같은 스모크 계정에 쓰기가 겹치지 않게 한다.
+# 조회만 하는 실행은 실행마다 그룹을 따로 둔다. 같은 그룹에 대기 중인 실행이 새 실행에 밀려 취소되는 일을 막는다.
+concurrency:
+  group: >-
+    ${{
+      ((github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+        || (github.event_name == 'workflow_dispatch' && (inputs.level == 'full' || inputs.level == 'bootstrap')))
+      && format('smoke-write-{0}', github.event_name == 'workflow_dispatch' && inputs.target || (contains(github.event.workflow_run.name, 'Dev') && 'dev' || 'prod'))
+      || format('smoke-read-{0}', github.run_id)
+    }}
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: 스모크 테스트
+    # 배포가 취소되거나 건너뛰어졌으면 확인할 것이 없다.
+    if: github.event_name != 'workflow_run' || contains(fromJSON('["success","failure"]'), github.event.workflow_run.conclusion)
+    runs-on: ubuntu-latest
+    # 스크립트 자체 테스트 약 30초 + 스모크 실행 상한 200초 + 준비 시간
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: 대상과 단계 정하기
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_TARGET: ${{ inputs.target }}
+          INPUT_LEVEL: ${{ inputs.level }}
+          REF: ${{ github.ref }}
+          RUN_NAME: ${{ github.event.workflow_run.name }}
+          RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        run: |
+          case "$EVENT" in
+            workflow_dispatch)
+              target="$INPUT_TARGET"; level="$INPUT_LEVEL" ;;
+            workflow_run)
+              # "CI Build & Deploy Dev", "Deploy to Development Server ..." 는 둘 다 Dev 를 포함한다.
+              case "$RUN_NAME" in *Dev*) target="dev" ;; *) target="prod" ;; esac
+              if [ "$RUN_CONCLUSION" = "success" ]; then level="full"; else level="read"; fi ;;
+            schedule)
+              target="prod"; level="read" ;;
+            *)
+              echo "알 수 없는 이벤트: $EVENT"; exit 2 ;;
+          esac
+          # 수동 실행은 아무 브랜치에서나 할 수 있어서, prod 는 main 의 스크립트로만 돌린다.
+          if [ "$EVENT" = "workflow_dispatch" ] && [ "$target" = "prod" ] && [ "$REF" != "refs/heads/main" ]; then
+            echo "prod 대상 수동 실행은 main 브랜치에서만 할 수 있습니다 (현재 $REF)"; exit 2
+          fi
+          case "$target" in
+            prod) url="https://ono-prod.seungminki.shop" ;;
+            dev) url="https://ono-dev.seungminki.shop" ;;
+            *) echo "알 수 없는 대상: $target"; exit 2 ;;
+          esac
+          {
+            echo "target=$target"
+            echo "level=$level"
+            echo "url=$url"
+          } >> "$GITHUB_OUTPUT"
+          echo "대상 $target ($url), 단계 $level"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 스크립트 자체 테스트
+        run: python3 -m unittest discover -s scripts/smoke -p 'test_*.py'
+
+      # 대상 서버의 시크릿만 그 스텝에 넘긴다. 한 스텝에 dev 와 prod 시크릿을 같이 두지 않는다.
+      - name: 스모크 테스트 (prod)
+        id: smoke_prod
+        if: steps.plan.outputs.target == 'prod'
+        env:
+          SMOKE_BASE_URL: ${{ steps.plan.outputs.url }}
+          SMOKE_LEVEL: ${{ steps.plan.outputs.level }}
+          SMOKE_ACCESS_TOKEN_SECRET: ${{ secrets.SMOKE_PROD_ACCESS_TOKEN_SECRET }}
+          SMOKE_USER_ID: ${{ secrets.SMOKE_PROD_USER_ID }}
+        run: |
+          if [ "$SMOKE_LEVEL" = "bootstrap" ]; then
+            unset SMOKE_ACCESS_TOKEN_SECRET
+            python3 scripts/smoke/smoke_test.py bootstrap
+          else
+            python3 scripts/smoke/smoke_test.py
+          fi
+
+      - name: 스모크 테스트 (dev)
+        id: smoke_dev
+        if: steps.plan.outputs.target == 'dev'
+        env:
+          SMOKE_BASE_URL: ${{ steps.plan.outputs.url }}
+          SMOKE_LEVEL: ${{ steps.plan.outputs.level }}
+          SMOKE_ACCESS_TOKEN_SECRET: ${{ secrets.SMOKE_DEV_ACCESS_TOKEN_SECRET }}
+          SMOKE_USER_ID: ${{ secrets.SMOKE_DEV_USER_ID }}
+        run: |
+          if [ "$SMOKE_LEVEL" = "bootstrap" ]; then
+            unset SMOKE_ACCESS_TOKEN_SECRET
+            python3 scripts/smoke/smoke_test.py bootstrap
+          else
+            python3 scripts/smoke/smoke_test.py
+          fi
+
+      # 알림 규칙
+      #  - 배포 뒤 확인: 통과와 실패 모두 알린다.
+      #  - 매시 확인: 정상에서 실패로 바뀔 때와 복구될 때 알린다. 실패가 이어지면 6시간마다 한 번 다시 알린다.
+      #    첫 알림 전송이 실패해도 늦어도 6시간 뒤에는 알림이 가게 하려는 것이다.
+      #  - 수동 실행과 bootstrap: 알리지 않는다. 실행한 사람이 화면에서 본다.
+      - name: Discord 알림
+        if: always() && steps.plan.outputs.level != 'bootstrap' && github.event_name != 'workflow_dispatch'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          EVENT: ${{ github.event_name }}
+          TARGET: ${{ steps.plan.outputs.target }}
+          LEVEL: ${{ steps.plan.outputs.level }}
+          # 대상이 아닌 스텝의 outcome 은 빈 값이 아니라 skipped 라서, 대상으로 골라야 한다.
+          OUTCOME: ${{ steps.plan.outputs.target == 'prod' && steps.smoke_prod.outcome || steps.smoke_dev.outcome }}
+          FIRST_FAILURE: ${{ steps.plan.outputs.target == 'prod' && steps.smoke_prod.outputs.first_failure || steps.smoke_dev.outputs.first_failure }}
+          FAILED_COUNT: ${{ steps.plan.outputs.target == 'prod' && steps.smoke_prod.outputs.failed || steps.smoke_dev.outputs.failed }}
+          DEPLOY_NAME: ${{ github.event.workflow_run.name }}
+          DEPLOY_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$WEBHOOK" ]; then
+            echo "DISCORD_WEBHOOK_URL 이 없어 알림을 건너뜁니다"; exit 0
+          fi
+          if [ "$OUTCOME" = "success" ]; then passed=true; else passed=false; fi
+
+          streak=0
+          if [ "$EVENT" = "schedule" ]; then
+            # 직전 매시 실행들이 연속으로 몇 번 성공하지 못했는지 센다. cancelled, timed_out 도 실패로 본다.
+            # 조회에 실패하면 알림을 보내는 쪽으로 기운다(streak=0).
+            conclusions=$(gh api "repos/$REPO/actions/workflows/smoke-test.yml/runs?event=schedule&status=completed&per_page=12" \
+              --jq '.workflow_runs[].conclusion' 2>/dev/null || true)
+            previous=""
+            for c in $conclusions; do
+              [ -z "$previous" ] && previous="$c"
+              if [ "$c" = "success" ]; then break; fi
+              streak=$((streak + 1))
+            done
+            if $passed && [ "$streak" -eq 0 ]; then echo "정상 유지, 알림 없음"; exit 0; fi
+            # 직전이 failure 일 때만 "이미 알렸다"고 본다. cancelled 나 timed_out 은 알림 스텝이 못 돌았을 수 있다.
+            if ! $passed && [ "$previous" = "failure" ] && [ $((streak % 6)) -ne 0 ]; then
+              echo "장애 지속 (직전 연속 실패 $streak 회), 6회마다 다시 알립니다"; exit 0
+            fi
+          fi
+
+          export PASSED=$passed STREAK=$streak
+          python3 - <<'PY' > payload.json
+          import json, os
+          env = os.environ
+          passed = env["PASSED"] == "true"
+          event, target, level = env["EVENT"], env["TARGET"], env["LEVEL"]
+          if event == "schedule":
+              streak = int(env.get("STREAK") or 0)
+              if passed:
+                  title = f"✅ 스모크 테스트 복구 ({target})"
+              elif streak:
+                  title = f"🚨 스모크 테스트 실패 {streak + 1}시간째 ({target})"
+              else:
+                  title = f"🚨 스모크 테스트 실패 ({target})"
+              context = "매시 확인"
+          else:
+              title = f"{'✅' if passed else '🚨'} 배포 후 스모크 테스트 {'통과' if passed else '실패'} ({target})"
+              context = f"{env.get('DEPLOY_NAME', '')} ({env.get('DEPLOY_CONCLUSION', '')}) 뒤 확인"
+          lines = [f"{context}, 단계 `{level}`"]
+          if not passed:
+              lines.append(f"실패 {env.get('FAILED_COUNT') or '?'}건. 첫 실패: {env.get('FIRST_FAILURE') or '스크립트가 끝까지 돌지 못했습니다'}")
+          lines.append(env["RUN_URL"])
+          # 실패 문구에 서버 응답 일부가 들어가므로 @everyone 같은 멘션이 발동하지 않게 막는다.
+          print(json.dumps({"allowed_mentions": {"parse": []},
+                            "embeds": [{"title": title, "description": "\n".join(lines),
+                                        "color": 3066993 if passed else 15158332}]}))
+          PY
+          curl -fsS -X POST "$WEBHOOK" -H "Content-Type: application/json" --data @payload.json
