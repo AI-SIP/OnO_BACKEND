@@ -1,0 +1,68 @@
+name: Smoke Test
+
+# 배포된 서버가 사용자를 받을 수 있는 상태인지 실제 도메인으로 확인한다.
+# 컨테이너 healthcheck 는 프로세스가 떴는지만 보고, Cloudflare 와 nginx, JWT 서명 키, DB 조회는 거치지 않는다.
+#
+# 운영 서버에 영향을 주지 않는 것이 제일 중요한 조건이라 아래를 지킨다. 자세한 근거는 scripts/smoke/smoke_test.py 에 있다.
+#  - 수동 실행만 한다. 배포 워크플로(ci-prod / deploy-prod / ci-dev)와 연결하지 않았다.
+#    스모크 테스트가 틀려도 배포와 nginx 전환에는 아무 영향이 없다.
+#  - 맥미니 러너(self-hosted)가 아니라 GitHub 호스티드 러너에서 돈다.
+#    운영 기계의 자원을 쓰지 않고, 배포 job 과 러너를 두고 경쟁하지 않는다.
+#  - 조회 전용 GET 하나(/api/problems/problemCount)만, 한 번 실행에 최대 6번 보낸다.
+#  - 스크립트 자체 테스트가 먼저 통과해야 실제 서버에 요청을 보낸다.
+#
+# 인증 확인까지 하려면 저장소 Secrets 에 서버의 jwt.accessToken.secret 과 같은 값을 넣는다.
+#   SMOKE_DEV_ACCESS_TOKEN_SECRET, SMOKE_PROD_ACCESS_TOKEN_SECRET
+# 없으면 인증 확인은 건너뛰고 "앱까지 닿는가"만 본다.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "확인할 서버"
+        type: choice
+        options:
+          - dev
+          - prod
+        default: dev
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-test-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: 스모크 테스트 (${{ inputs.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 스크립트 자체 테스트
+        run: python3 -m unittest discover -s scripts/smoke -p 'test_*.py'
+
+      # 대상 서버의 시크릿만 그 스텝에 넘긴다. 한 스텝에 dev 와 prod 시크릿을 같이 두지 않고,
+      # 표현식의 a && b || c 는 b 가 비면 c 로 넘어가 다른 환경 값이 들어갈 수 있어서 쓰지 않는다.
+      - name: 스모크 테스트 (dev)
+        if: inputs.target == 'dev'
+        env:
+          SMOKE_BASE_URL: https://ono-dev.seungminki.shop
+          SMOKE_ACCESS_TOKEN_SECRET: ${{ secrets.SMOKE_DEV_ACCESS_TOKEN_SECRET }}
+        run: python3 scripts/smoke/smoke_test.py
+
+      - name: 스모크 테스트 (prod)
+        if: inputs.target == 'prod'
+        env:
+          SMOKE_BASE_URL: https://ono-prod.seungminki.shop
+          SMOKE_ACCESS_TOKEN_SECRET: ${{ secrets.SMOKE_PROD_ACCESS_TOKEN_SECRET }}
+        run: python3 scripts/smoke/smoke_test.py
