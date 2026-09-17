@@ -11,6 +11,8 @@ import com.aisip.OnO.backend.user.entity.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 
 import java.time.LocalDateTime;
 
@@ -18,6 +20,11 @@ import java.time.LocalDateTime;
  * 미션 시스템(정의/진행도/보상) 테스트의 공통 베이스.
  *
  * <p>{@code @MockBean} 을 새로 선언하지 않아 스프링 컨텍스트는 다른 도메인 테스트와 그대로 공유된다.
+ *
+ * <p><b>기본은 미션을 받을 수 있는 앱에서 온 요청이다.</b> 자동 적립이 도는 요청(헤더 없음, 구버전 앱,
+ * HTTP 요청 밖)에서는 진행도가 오르지 않기 때문에, 진행도와 받기를 보는 테스트는 새 앱을 전제로 한다.
+ * 구버전 앱이나 요청 밖을 보려면 테스트에서 {@link #requestFromApp(String)} 이나
+ * {@code RequestContextHolder.resetRequestAttributes()} 로 바꾼다.
  */
 public abstract class MissionSystemTestSupport extends MissionTestSupport {
 
@@ -56,6 +63,11 @@ public abstract class MissionSystemTestSupport extends MissionTestSupport {
         missionDefinitionSeeder.seed();
     }
 
+    @BeforeEach
+    void requestFromMissionCapableAppByDefault() {
+        requestFromApp(MISSION_CAPABLE_APP_HEADER);
+    }
+
     protected MissionDefinition definitionOf(String code) {
         return missionDefinitionRepository.findByCode(code).orElseThrow(
                 () -> new IllegalStateException("시드에 없는 미션 코드다: " + code));
@@ -85,10 +97,21 @@ public abstract class MissionSystemTestSupport extends MissionTestSupport {
         return progress == null ? 0 : progress.getCurrentValue();
     }
 
-    /** 미션을 목표까지 밀어 올린다. 받기 시나리오의 사전 준비용. */
+    /**
+     * 미션을 목표까지 밀어 올린다. 받기 시나리오의 사전 준비용.
+     *
+     * <p>준비 단계라 테스트가 어떤 요청을 흉내 내고 있든 <b>새 앱에서 한 활동</b>으로 채운다.
+     * 구버전 앱으로 적립을 받던 사용자가 새 앱으로 미션을 채우는 흐름도 이것으로 만든다.
+     */
     protected MissionProgress completeMission(Long userId, String code) {
         MissionDefinition definition = definitionOf(code);
-        missionProgressUpdater.increase(userId, definition.getMetric(), definition.getTarget());
+        RequestAttributes previous = RequestContextHolder.getRequestAttributes();
+        try {
+            requestFromApp(MISSION_CAPABLE_APP_HEADER);
+            missionProgressUpdater.increase(userId, definition.getMetric(), definition.getTarget());
+        } finally {
+            RequestContextHolder.setRequestAttributes(previous, true);
+        }
         return progressOf(userId, code);
     }
 

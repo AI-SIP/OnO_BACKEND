@@ -38,6 +38,9 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  *
  * <p>이 클래스의 주제는 <b>어느 쪽으로 틀리는가</b>다. 헤더가 없든, 값이 이상하든, HTTP 요청 자체가 없든
  * 전부 구버전으로 떨어져 지금과 같이 적립된다. 덜 주는 것보다 더 주는 것이 낫다.
+ *
+ * <p>구버전으로 떨어진 요청은 <b>진행도를 올리지 않는다.</b> 적립으로 받은 행동이 미션으로 한 번 더 받을 수
+ * 있게 남으면 안 되기 때문이다. 조합 전체는 {@code MissionXpSinglePathTest} 가 본다.
  */
 @DisplayName("앱 버전별 자동 적립")
 class MissionAccrualAppVersionTest extends MissionSystemTestSupport {
@@ -65,7 +68,7 @@ class MissionAccrualAppVersionTest extends MissionSystemTestSupport {
     @DisplayName("기준 버전은 설정으로 바꿀 수 있고 기본값은 4.0.0 이다")
     void thresholdIsConfigurable() throws NoSuchFieldException {
         // 코드에 박으면 기준을 되돌릴 때마다 배포해야 한다. 값이 아니라 선언을 본다.
-        Field field = MissionLogService.class.getDeclaredField("missionCapableVersion");
+        Field field = LegacyAccrualPolicy.class.getDeclaredField("missionCapableVersion");
 
         assertThat(field.getAnnotation(Value.class).value())
                 .as("프로퍼티 이름과 기본값은 운영에서 기준을 옮길 때 쓰는 계약이다")
@@ -148,6 +151,9 @@ class MissionAccrualAppVersionTest extends MissionSystemTestSupport {
             missionLogService.registerLoginMission(user.getId());
 
             assertThat(attendancePoints()).isEqualTo(MissionType.USER_LOGIN.getPoint());
+            assertThat(currentOf(user.getId(), DAILY_ATTEND))
+                    .as("적립으로 받은 출석이 새 앱에서 미션으로 한 번 더 받을 수 있게 남으면 안 된다")
+                    .isZero();
         }
 
         @Test
@@ -159,6 +165,7 @@ class MissionAccrualAppVersionTest extends MissionSystemTestSupport {
             missionLogService.registerLoginMission(user.getId());
 
             assertThat(attendancePoints()).isEqualTo(MissionType.USER_LOGIN.getPoint());
+            assertThat(currentOf(user.getId(), DAILY_ATTEND)).isZero();
         }
 
         @ParameterizedTest(name = "\"{0}\"")
@@ -204,6 +211,9 @@ class MissionAccrualAppVersionTest extends MissionSystemTestSupport {
             assertThatCode(() -> missionLogService.registerLoginMission(user.getId()))
                     .doesNotThrowAnyException();
             assertThat(attendancePoints()).isEqualTo(MissionType.USER_LOGIN.getPoint());
+            assertThat(currentOf(user.getId(), DAILY_ATTEND))
+                    .as("진행도도 같은 판정을 봐서 적립과 함께 돌지 않는다")
+                    .isZero();
         }
     }
 
@@ -235,6 +245,9 @@ class MissionAccrualAppVersionTest extends MissionSystemTestSupport {
             missionLogService.registerLoginMission(user.getId());
 
             assertThat(missionStatus().getTotalStudyPoint()).isZero();
+            assertThat(currentOf(user.getId(), DAILY_ATTEND))
+                    .as("적립이 전부 꺼지면 진행도는 버전과 무관하게 오른다")
+                    .isEqualTo(1);
         }
 
         @Test
@@ -273,6 +286,7 @@ class MissionAccrualAppVersionTest extends MissionSystemTestSupport {
             missionLogService.registerLoginMission(user.getId());
 
             assertThat(attendancePoints()).isEqualTo(MissionType.USER_LOGIN.getPoint());
+            assertThat(currentOf(user.getId(), DAILY_ATTEND)).isZero();
         }
 
         @Test
@@ -304,7 +318,7 @@ class MissionAccrualAppVersionTest extends MissionSystemTestSupport {
                     .as("컨트롤러 → 서비스 사이에 버전을 인자로 넘기지 않아도 닿아야 한다")
                     .isZero();
             assertThat(currentOf(user.getId(), DAILY_ATTEND))
-                    .as("진행도는 버전과 무관하게 오른다")
+                    .as("새 앱이면 진행도가 오른다")
                     .isEqualTo(1);
         }
 
@@ -317,6 +331,7 @@ class MissionAccrualAppVersionTest extends MissionSystemTestSupport {
             assertThat(attendancePoints())
                     .as("구버전 앱이 보내는 요청 그대로다")
                     .isEqualTo(MissionType.USER_LOGIN.getPoint());
+            assertThat(currentOf(user.getId(), DAILY_ATTEND)).isZero();
         }
 
         private RequestPostProcessor asUser(User user) {
