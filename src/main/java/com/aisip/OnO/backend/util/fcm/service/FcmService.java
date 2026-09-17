@@ -25,7 +25,6 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class FcmService {
 
     private final FcmTokenRepository fcmTokenRepository;
@@ -35,6 +34,7 @@ public class FcmService {
 
     private final FcmNotificationProducer fcmNotificationProducer;
 
+    @Transactional
     public void registerToken(FcmTokenRequestDto fcmTokenRequestDto, Long userId) {
         if(!fcmTokenRepository.existsByUserIdAndToken(userId, fcmTokenRequestDto.token())){
             FcmToken fcmToken = FcmToken.From(fcmTokenRequestDto, userId);
@@ -80,6 +80,9 @@ public class FcmService {
      * 사용자의 모든 디바이스로 푸시 알림 전송 (RabbitMQ 비동기 방식)
      * - 기존 동기 방식에서 RabbitMQ 비동기 방식으로 변경
      * - Quartz Job이나 API에서 호출 시 즉시 반환
+     * - 큐 적재에 실패하면 예외를 그대로 던진다. 리마인더 발송기가 이 예외로 FAILED 를 기록한다.
+     * - 트랜잭션을 걸지 않는다. 트랜잭션 경계 안에서 적재 예외가 나면 호출자가 try/catch 로 삼켜도
+     *   바깥 트랜잭션이 rollback-only 로 표시돼, 공유·반응·댓글 저장까지 되돌아가고 500 이 나갔다.
      */
     public void sendNotificationToAllUserDevice(Long userId, NotificationRequestDto notificationRequestDto) {
         // RabbitMQ Producer로 메시지 전송 (비동기)

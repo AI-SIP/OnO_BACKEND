@@ -20,6 +20,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -251,6 +253,29 @@ class FcmServiceTest {
             fcmService.sendNotificationToAllUserDevice(1L, notification(null));
 
             verify(fcmTokenRepository, never()).findAllByUserId(anyLong());
+        }
+
+        @Test
+        @DisplayName("큐 적재 실패는 호출자에게 그대로 알린다 - 리마인더가 FAILED 로 기록할 수 있어야 한다")
+        void propagatesEnqueueFailure() {
+            IllegalStateException enqueueFailure = new IllegalStateException("RabbitMQ FCM notification enqueue failed");
+            doThrow(enqueueFailure).when(fcmNotificationProducer)
+                    .sendNotificationMessage(anyLong(), anyString(), anyString(), any());
+
+            assertThatThrownBy(() -> fcmService.sendNotificationToAllUserDevice(1L, notification(null)))
+                    .isSameAs(enqueueFailure);
+        }
+
+        @Test
+        @DisplayName("큐 적재는 트랜잭션에 참여하지 않는다 - 적재 실패가 호출자 트랜잭션을 rollback-only 로 만들면 안 된다")
+        void enqueueIsNotTransactional() throws Exception {
+            AnnotationTransactionAttributeSource source = new AnnotationTransactionAttributeSource();
+
+            assertThat(source.getTransactionAttribute(
+                    FcmService.class.getMethod("sendNotificationToAllUserDevice", Long.class, NotificationRequestDto.class),
+                    FcmService.class))
+                    .as("트랜잭션 경계를 지나며 런타임 예외가 나면 삼켜도 바깥 트랜잭션이 커밋되지 않는다")
+                    .isNull();
         }
     }
 
