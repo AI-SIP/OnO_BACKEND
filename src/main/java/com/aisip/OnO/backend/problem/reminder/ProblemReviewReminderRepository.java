@@ -74,6 +74,16 @@ public interface ProblemReviewReminderRepository extends JpaRepository<ProblemRe
 
     @Transactional
     @Modifying(clearAutomatically = true)
+    @Query("UPDATE ProblemReviewReminder r SET r.status = :expired, r.updatedAt = :updatedAt WHERE r.status = :scheduled AND r.scheduledAt < :expireBefore AND r.deletedAt IS NULL")
+    int expireOverdueRows(
+            @Param("scheduled") ProblemReviewReminderStatus scheduled,
+            @Param("expired") ProblemReviewReminderStatus expired,
+            @Param("expireBefore") LocalDateTime expireBefore,
+            @Param("updatedAt") LocalDateTime updatedAt
+    );
+
+    @Transactional
+    @Modifying(clearAutomatically = true)
     @Query("UPDATE ProblemReviewReminder r SET r.status = :failed, r.retryCount = r.retryCount + 1, r.lastErrorMessage = 'stuck recovery' WHERE r.status = :sending AND r.updatedAt < :stuckBefore AND r.deletedAt IS NULL")
     int recoverStuckRows(
             @Param("sending") ProblemReviewReminderStatus sending,

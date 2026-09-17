@@ -29,6 +29,7 @@ public class ProblemReviewReminderService {
 
     private static final int STUCK_TIMEOUT_MINUTES = 10;
     private static final int DUE_REMINDER_BATCH_SIZE = 500;
+    private static final int OVERDUE_EXPIRE_DAYS = 3;
     private static final List<ProblemReviewReminderStatus> PENDING_STATUSES = List.of(SCHEDULED, SENDING);
 
     private final ProblemReviewReminderRepository repository;
@@ -105,6 +106,14 @@ public class ProblemReviewReminderService {
 
     public void sendDueReminders(LocalDateTime now) {
         recoverStuckRows(now);
+        expireOverdueRows(now);
+
+        // 예약 시각을 창 안으로 맞춰 두어도 밀린 예약은 창 밖에서 due 가 된다.
+        // 특히 자정에 "오늘 보낸 것" 판정이 리셋되는 순간 가장 오래된 밀린 예약이
+        // 바로 조건을 만족해, 밀린 것이 있는 사용자는 매일 새벽에 푸시를 받게 된다.
+        if (!policy.isWithinSendWindow(now)) {
+            return;
+        }
 
         LocalDate today = now.toLocalDate();
         LocalDateTime startOfDay = today.atStartOfDay();
@@ -123,6 +132,21 @@ public class ProblemReviewReminderService {
                     .min(Comparator.comparing(ProblemReviewReminder::getScheduledAt))
                     .orElseThrow();
             sender.send(candidate, now);
+        }
+    }
+
+    /**
+     * 기한이 한참 지난 예약을 접는다.
+     *
+     * <p>하루에 한 건만 나가므로 같은 날 due 가 겹치면 나머지는 {@code SCHEDULED} 로 남는다.
+     * 이걸 정리하지 않으면 영원히 밀린 채로 남아 매일 한 건씩 나가게 된다.
+     * 사흘이 지난 복습 알림은 지금 보내도 의미가 없으니 보내지 않는다.
+     */
+    private void expireOverdueRows(LocalDateTime now) {
+        LocalDateTime expireBefore = now.minusDays(OVERDUE_EXPIRE_DAYS);
+        int expired = repository.expireOverdueRows(SCHEDULED, EXPIRED, expireBefore, now);
+        if (expired > 0) {
+            log.info("[ReviewReminder] 기한이 지난 예약 만료: {}건", expired);
         }
     }
 
