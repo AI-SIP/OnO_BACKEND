@@ -61,7 +61,8 @@ class RabbitMessageSerializationTest extends RabbitConsumerTestSupport {
             assertThat(restored.getTitle()).isEqualTo("제목");
             assertThat(restored.getBody()).isEqualTo("본문");
             assertThat(restored.getData()).containsEntry("type", "review_due");
-            assertThat(restored.getRetryCount()).as("재시도 횟수는 DLQ 알림에 실린다").isEqualTo(2);
+            assertThat(restored.getRetryCount())
+                    .as("쓰지 않는 필드지만 메시지 모양을 바꾸지 않으려고 그대로 싣는다").isEqualTo(2);
         }
 
         @Test
@@ -132,6 +133,24 @@ class RabbitMessageSerializationTest extends RabbitConsumerTestSupport {
 
             assertThat(restored.getProblemId()).isNull();
             assertThat(restored.getRetryCount()).isZero();
+        }
+    }
+
+    @Nested
+    @DisplayName("모르는 필드가 실린 메시지")
+    class UnknownFields {
+
+        @Test
+        @DisplayName("컨슈머가 모르는 필드는 무시하고 역직렬화한다")
+        void ignoresUnknownField() {
+            S3DeleteMessage restored = fromJson(
+                    "{\"imageUrl\":\"https://bucket.s3.amazonaws.com/a/b.png\",\"problemId\":11,\"retryCount\":0,\"attempt\":2}",
+                    S3DeleteMessage.class);
+
+            assertThat(restored.getImageUrl())
+                    .as("Spring AMQP 기본 컨버터는 FAIL_ON_UNKNOWN_PROPERTIES 를 끈 ObjectMapper 를 쓴다")
+                    .isEqualTo("https://bucket.s3.amazonaws.com/a/b.png");
+            assertThat(restored.getProblemId()).isEqualTo(11L);
         }
     }
 }

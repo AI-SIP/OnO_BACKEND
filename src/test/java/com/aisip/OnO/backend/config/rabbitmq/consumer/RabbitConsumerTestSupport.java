@@ -21,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -66,25 +67,30 @@ public abstract class RabbitConsumerTestSupport extends IntegrationTestSupport {
         return fcmMessage(userId, Map.of("type", "review_due"));
     }
 
-    /** 재시도 횟수는 로그·DLQ 알림에만 쓰이므로 전체 생성자로 직접 세운다. */
-    protected FcmNotificationMessage fcmMessageWithRetryCount(Long userId, int retryCount) {
-        return new FcmNotificationMessage(userId, "제목", "본문", Map.of("type", "review_due"), retryCount);
-    }
-
     protected S3DeleteMessage s3Message(String imageUrl, Long problemId) {
         return new S3DeleteMessage(imageUrl, problemId);
-    }
-
-    protected S3DeleteMessage s3MessageWithRetryCount(String imageUrl, Long problemId, int retryCount) {
-        return new S3DeleteMessage(imageUrl, problemId, retryCount);
     }
 
     protected ProblemAnalysisMessage analysisMessage(Long problemId) {
         return new ProblemAnalysisMessage(problemId);
     }
 
-    protected ProblemAnalysisMessage analysisMessageWithRetryCount(Long problemId, int retryCount) {
-        return new ProblemAnalysisMessage(problemId, retryCount);
+    /**
+     * 브로커가 dead-letter 하면서 붙이는 {@code x-death} 헤더 값.
+     * 실제 배달에서는 {@code DefaultMessagePropertiesConverter} 가 LongString 을 String 으로 바꿔 이 모양이 된다.
+     */
+    protected static List<Map<String, ?>> xDeath(String queue, String reason, long count) {
+        return List.of(Map.of(
+                "queue", queue,
+                "reason", reason,
+                "count", count,
+                "exchange", "",
+                "routing-keys", List.of(queue)));
+    }
+
+    /** 재시도 인터셉터가 시도를 모두 소진하고 거절해 DLQ 로 한 번 넘어간 메시지의 헤더. */
+    protected static List<Map<String, ?>> rejectedAfterRetries(String queue) {
+        return xDeath(queue, "rejected", 1);
     }
 
     // ─────────────────────────── 픽스처 ───────────────────────────

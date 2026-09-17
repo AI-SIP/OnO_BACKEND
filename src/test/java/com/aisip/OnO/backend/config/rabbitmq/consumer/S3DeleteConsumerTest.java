@@ -1,10 +1,33 @@
 package com.aisip.OnO.backend.config.rabbitmq.consumer;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import com.aisip.OnO.backend.config.rabbitmq.RabbitMQConfig;
+import com.aisip.OnO.backend.config.rabbitmq.RabbitRetryAttempts;
+import com.aisip.OnO.backend.config.rabbitmq.message.S3DeleteMessage;
+import com.rabbitmq.client.Channel;
+import org.aopalliance.aop.Advice;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
+import org.springframework.amqp.rabbit.listener.AbstractMessageListenerContainer;
+import org.springframework.amqp.rabbit.listener.RabbitListenerEndpointRegistry;
+import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
+import org.springframework.amqp.rabbit.listener.api.ChannelAwareMessageListener;
+import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -12,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -90,7 +114,7 @@ class S3DeleteConsumerTest extends RabbitConsumerTestSupport {
             willThrow(new IllegalStateException("S3 timeout"))
                     .given(fileUploadService).deleteImageFileFromS3(IMAGE_URL);
 
-            assertThatThrownBy(() -> consumer.handleS3DeleteMessage(s3MessageWithRetryCount(IMAGE_URL, 77L, 2)))
+            assertThatThrownBy(() -> consumer.handleS3DeleteMessage(s3Message(IMAGE_URL, 77L)))
                     .isInstanceOf(RuntimeException.class);
 
             verifyNoInteractions(discordWebhookNotificationService);
@@ -141,18 +165,18 @@ class S3DeleteConsumerTest extends RabbitConsumerTestSupport {
         @Test
         @DisplayName("최종 실패 메시지는 Discord 로 알린다")
         void notifiesDiscord() {
-            consumer.handleS3DeleteDLQ(s3MessageWithRetryCount(IMAGE_URL, 77L, 3));
+            consumer.handleS3DeleteDLQ(s3Message(IMAGE_URL, 77L), rejectedAfterRetries(RabbitMQConfig.S3_DELETE_QUEUE));
 
             assertThat(capturedDlqDetails())
-                    .as("어떤 문제의 몇 번째 재시도가 최종 실패했는지 알 수 있어야 한다")
-                    .contains("77")
-                    .contains("3");
+                    .as("어떤 문제가 몇 번 시도한 끝에 최종 실패했는지 알 수 있어야 한다")
+                    .contains("**Problem ID:** 77")
+                    .contains("**Attempts:** 3회");
         }
 
         @Test
         @DisplayName("DLQ 알림에 S3 객체 키 원문을 그대로 넣지 않는다")
         void masksObjectKey() {
-            consumer.handleS3DeleteDLQ(s3Message(IMAGE_URL, 77L));
+            consumer.handleS3DeleteDLQ(s3Message(IMAGE_URL, 77L), rejectedAfterRetries(RabbitMQConfig.S3_DELETE_QUEUE));
 
             String details = capturedDlqDetails();
             assertThat(details)
@@ -166,7 +190,7 @@ class S3DeleteConsumerTest extends RabbitConsumerTestSupport {
         @DisplayName("짧은 객체 키는 통째로 가린다")
         void masksShortObjectKeyCompletely() {
             consumer.handleS3DeleteDLQ(
-                    s3Message("https://test-ono-bucket.s3.amazonaws.com/a.png", 77L));
+                    s3Message("https://test-ono-bucket.s3.amazonaws.com/a.png", 77L), rejectedAfterRetries(RabbitMQConfig.S3_DELETE_QUEUE));
 
             assertThat(capturedDlqDetails())
                     .as("앞뒤를 남기면 짧은 키는 사실상 노출된다")
@@ -177,7 +201,7 @@ class S3DeleteConsumerTest extends RabbitConsumerTestSupport {
         @Test
         @DisplayName("imageUrl 이 null 이면 unknown 으로 알린다")
         void reportsUnknownForNullUrl() {
-            assertThatCode(() -> consumer.handleS3DeleteDLQ(s3Message(null, 77L)))
+            assertThatCode(() -> consumer.handleS3DeleteDLQ(s3Message(null, 77L), rejectedAfterRetries(RabbitMQConfig.S3_DELETE_QUEUE)))
                     .doesNotThrowAnyException();
 
             assertThat(capturedDlqDetails()).contains("unknown");
@@ -186,7 +210,7 @@ class S3DeleteConsumerTest extends RabbitConsumerTestSupport {
         @Test
         @DisplayName("DLQ 처리에서 S3 삭제를 다시 시도하지는 않는다")
         void doesNotRetryDeletion() {
-            consumer.handleS3DeleteDLQ(s3Message(IMAGE_URL, 77L));
+            consumer.handleS3DeleteDLQ(s3Message(IMAGE_URL, 77L), rejectedAfterRetries(RabbitMQConfig.S3_DELETE_QUEUE));
 
             verifyNoInteractions(fileUploadService);
         }
@@ -198,9 +222,105 @@ class S3DeleteConsumerTest extends RabbitConsumerTestSupport {
                     .given(discordWebhookNotificationService)
                     .sendErrorNotification(anyString(), anyString(), anyString(), anyString());
 
-            assertThatCode(() -> consumer.handleS3DeleteDLQ(s3Message(IMAGE_URL, 77L)))
+            assertThatCode(() -> consumer.handleS3DeleteDLQ(s3Message(IMAGE_URL, 77L), rejectedAfterRetries(RabbitMQConfig.S3_DELETE_QUEUE)))
                     .as("DLQ 에서 예외를 던지면 최종 실패 기록마저 잃는다")
                     .doesNotThrowAnyException();
+        }
+    }
+
+    // ════════════════════════════ 실제 재시도·DLQ 경로 ════════════════════════════
+
+    /**
+     * 컨슈머를 리스너 컨테이너가 실제로 쓰는 재시도 인터셉터와 리스너 어댑터로 감싸 돌린다.
+     * 위의 테스트들은 핸들러를 직접 부르므로 시도 횟수가 항상 첫 시도로 잡힌다.
+     */
+    @Nested
+    @DisplayName("실제 재시도·DLQ 경로의 시도 횟수")
+    class Attempts {
+
+        @Autowired
+        private SimpleRabbitListenerContainerFactory listenerContainerFactory;
+
+        @Autowired
+        private RabbitListenerEndpointRegistry listenerEndpointRegistry;
+
+        @Autowired
+        private MessageConverter messageConverter;
+
+        /** 재시도 인터셉터는 (channel, message) 인자를 받는 리스너 호출을 감싼다. */
+        interface ListenerInvoker {
+            void invoke(Channel channel, Message message);
+        }
+
+        @Test
+        @DisplayName("세 번 실패하면 로그에 1/3, 2/3, 3/3 이 찍히고 거절 사유에 실패 횟수가 남는다")
+        void logsEachAttemptThroughRetryInterceptor() {
+            willThrow(new IllegalStateException("S3 timeout"))
+                    .given(fileUploadService).deleteImageFileFromS3(IMAGE_URL);
+
+            SimpleMessageListenerContainer container = listenerContainerFactory.createListenerContainer();
+            Advice[] adviceChain = (Advice[]) ReflectionTestUtils.getField(container, "adviceChain");
+
+            ProxyFactory proxyFactory = new ProxyFactory();
+            proxyFactory.addInterface(ListenerInvoker.class);
+            proxyFactory.setTarget((ListenerInvoker) (channel, message) ->
+                    consumer.handleS3DeleteMessage(s3Message(IMAGE_URL, 77L)));
+            Arrays.stream(adviceChain).forEach(proxyFactory::addAdvice);
+            ListenerInvoker invoker = (ListenerInvoker) proxyFactory.getProxy();
+
+            Logger logger = (Logger) LoggerFactory.getLogger(S3DeleteConsumer.class);
+            ListAppender<ILoggingEvent> appender = new ListAppender<>();
+            appender.start();
+            logger.addAppender(appender);
+            try {
+                Message amqpMessage = messageConverter.toMessage(s3Message(IMAGE_URL, 77L), new MessageProperties());
+
+                assertThatThrownBy(() -> invoker.invoke(mock(Channel.class), amqpMessage))
+                        .as("재시도를 소진하면 거절되어 DLQ 로 간다. 거절 사유에 실제 실패 횟수가 남는다")
+                        .hasMessageContaining("attempts: 3/3");
+            } finally {
+                logger.detachAppender(appender);
+            }
+
+            List<String> failures = appender.list.stream()
+                    .filter(event -> event.getMessage().startsWith("RabbitMQ message failed"))
+                    .map(ILoggingEvent::getFormattedMessage)
+                    .toList();
+            assertThat(failures).hasSize(RabbitRetryAttempts.MAX_ATTEMPTS);
+            assertThat(failures.get(0)).contains("attempt: 1/3");
+            assertThat(failures.get(1)).contains("attempt: 2/3");
+            assertThat(failures.get(2)).contains("attempt: 3/3");
+        }
+
+        @Test
+        @DisplayName("DLQ 리스너는 x-death 헤더를 받아 시도 횟수를 알린다")
+        void dlqListenerReadsXDeathHeader() throws Exception {
+            deliverToDlq(Map.of(RabbitRetryAttempts.X_DEATH_HEADER, rejectedAfterRetries(RabbitMQConfig.S3_DELETE_QUEUE)));
+
+            assertThat(capturedDlqDetails()).contains("**Attempts:** 3회 (재시도 소진)");
+        }
+
+        @Test
+        @DisplayName("x-death 헤더가 없어도 DLQ 리스너는 알림을 보낸다")
+        void dlqListenerWithoutXDeathHeader() throws Exception {
+            deliverToDlq(Map.of());
+
+            assertThat(capturedDlqDetails()).contains("**Attempts:** 알 수 없음");
+        }
+
+        private void deliverToDlq(Map<String, Object> headers) throws Exception {
+            MessageProperties properties = new MessageProperties();
+            headers.forEach(properties::setHeader);
+            Message amqpMessage = messageConverter.toMessage(new S3DeleteMessage(IMAGE_URL, 77L), properties);
+
+            AbstractMessageListenerContainer dlqContainer = listenerEndpointRegistry.getListenerContainers().stream()
+                    .map(AbstractMessageListenerContainer.class::cast)
+                    .filter(container -> Arrays.asList(container.getQueueNames()).contains(RabbitMQConfig.S3_DELETE_DLQ))
+                    .findFirst()
+                    .orElseThrow();
+
+            ((ChannelAwareMessageListener) dlqContainer.getMessageListener())
+                    .onMessage(amqpMessage, mock(Channel.class));
         }
     }
 }

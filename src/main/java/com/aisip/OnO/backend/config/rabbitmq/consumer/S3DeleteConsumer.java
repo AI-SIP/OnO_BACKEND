@@ -1,13 +1,18 @@
 package com.aisip.OnO.backend.config.rabbitmq.consumer;
 
 import com.aisip.OnO.backend.config.rabbitmq.RabbitMQConfig;
+import com.aisip.OnO.backend.config.rabbitmq.RabbitRetryAttempts;
 import com.aisip.OnO.backend.config.rabbitmq.message.S3DeleteMessage;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.util.webhook.DiscordWebhookNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * S3 파일 삭제 메시지 Consumer
@@ -29,15 +34,16 @@ public class S3DeleteConsumer {
      */
     @RabbitListener(queues = RabbitMQConfig.S3_DELETE_QUEUE, concurrency = "3-10")
     public void handleS3DeleteMessage(S3DeleteMessage message) {
-        log.info("RabbitMQ message received - queue: {}, operation: {}, problemId: {}, messageRetryCount: {}",
-                RabbitMQConfig.S3_DELETE_QUEUE, "s3_delete", message.getProblemId(), message.getRetryCount());
+        log.info("RabbitMQ message received - queue: {}, operation: {}, problemId: {}, attempt: {}/{}",
+                RabbitMQConfig.S3_DELETE_QUEUE, "s3_delete", message.getProblemId(),
+                RabbitRetryAttempts.currentAttempt(), RabbitRetryAttempts.MAX_ATTEMPTS);
 
         // 삭제 대상 URL 이 없으면 재시도해도 영원히 실패한다(FileUploadService 가 NPE).
         // 재시도 소진 후 DLQ 알림까지 울리는 것을 막기 위해 여기서 정상 종료(ACK)한다.
         if (message.getImageUrl() == null || message.getImageUrl().isBlank()) {
-            log.warn("RabbitMQ message skipped - queue: {}, operation: {}, outcome: {}, problemId: {}, messageRetryCount: {}",
+            log.warn("RabbitMQ message skipped - queue: {}, operation: {}, outcome: {}, problemId: {}, attempt: {}/{}",
                     RabbitMQConfig.S3_DELETE_QUEUE, "s3_delete", "image_url_missing",
-                    message.getProblemId(), message.getRetryCount());
+                    message.getProblemId(), RabbitRetryAttempts.currentAttempt(), RabbitRetryAttempts.MAX_ATTEMPTS);
             return;
         }
 
@@ -49,9 +55,9 @@ public class S3DeleteConsumer {
                     RabbitMQConfig.S3_DELETE_QUEUE, "s3_delete", "success", message.getProblemId());
 
         } catch (Exception e) {
-            log.error("RabbitMQ message failed - queue: {}, operation: {}, outcome: {}, problemId: {}, messageRetryCount: {}, error: {}",
+            log.error("RabbitMQ message failed - queue: {}, operation: {}, outcome: {}, problemId: {}, attempt: {}/{}, error: {}",
                     RabbitMQConfig.S3_DELETE_QUEUE, "s3_delete", "failure",
-                    message.getProblemId(), message.getRetryCount(), e.getMessage());
+                    message.getProblemId(), RabbitRetryAttempts.currentAttempt(), RabbitRetryAttempts.MAX_ATTEMPTS, e.getMessage());
 
             // 예외를 던지면 RabbitMQ가 자동으로 재시도 or DLQ로 전송
             throw new RuntimeException("S3 파일 삭제 실패 - problemId: " + message.getProblemId(), e);
@@ -64,23 +70,26 @@ public class S3DeleteConsumer {
      * - Discord 알림 전송하여 관리자에게 수동 처리 요청
      */
     @RabbitListener(queues = RabbitMQConfig.S3_DELETE_DLQ)
-    public void handleS3DeleteDLQ(S3DeleteMessage message) {
+    public void handleS3DeleteDLQ(S3DeleteMessage message,
+            @Header(name = RabbitRetryAttempts.X_DEATH_HEADER, required = false) List<Map<String, ?>> xDeath) {
+        String attempts = RabbitRetryAttempts.describeDeadLetter(xDeath, RabbitMQConfig.S3_DELETE_QUEUE);
+
         String maskedObjectKey = maskS3ObjectKey(message.getImageUrl());
 
-        log.error("RabbitMQ message moved to DLQ - queue: {}, operation: {}, outcome: {}, problemId: {}, objectKey: {}, messageRetryCount: {}",
+        log.error("RabbitMQ message moved to DLQ - queue: {}, operation: {}, outcome: {}, problemId: {}, objectKey: {}, attempts: {}",
                 RabbitMQConfig.S3_DELETE_DLQ, "s3_delete", "dlq",
-                message.getProblemId(), maskedObjectKey, message.getRetryCount());
+                message.getProblemId(), maskedObjectKey, attempts);
 
         // Discord 알림 전송
         String errorTitle = String.format("🚨 S3 파일 삭제 최종 실패 (DLQ)");
         String errorDetails = String.format(
-                "**Queue:** %s\n**Operation:** %s\n**Problem ID:** %d\n**Object Key:** %s\n**Message Retry Count:** %d\n\n" +
+                "**Queue:** %s\n**Operation:** %s\n**Problem ID:** %d\n**Object Key:** %s\n**Attempts:** %s\n\n" +
                 "모든 재시도가 실패했습니다. 수동으로 S3에서 파일을 삭제하거나 메시지를 재처리해주세요.",
                 RabbitMQConfig.S3_DELETE_DLQ,
                 "s3_delete",
                 message.getProblemId(),
                 maskedObjectKey,
-                message.getRetryCount()
+                attempts
         );
 
         try {

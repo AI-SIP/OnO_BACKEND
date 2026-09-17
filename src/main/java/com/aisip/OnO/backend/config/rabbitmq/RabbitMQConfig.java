@@ -90,12 +90,17 @@ public class RabbitMQConfig {
         // 컨테이너 아웃바운드 네트워크를 고갈시켰다. GPT 분석은 같은 상황에서 30분 동안
         // OpenAI 를 다시 호출한다(비용·레이트리밋 직결).
         factory.setDefaultRequeueRejected(false);
+        //
+        // 이 재시도는 같은 스레드 안에서 리스너를 다시 부르는 방식이라 브로커 재전달이 아니다.
+        // 몇 번째 시도인지는 메시지 본문이 아니라 RabbitRetryAttempts 로 읽는다.
         factory.setAdviceChain(RetryInterceptorBuilder.stateless()
-                .maxAttempts(3)
+                .maxAttempts(RabbitRetryAttempts.MAX_ATTEMPTS)
                 // 1초 → 2초 → 4초. 네트워크 순단이나 일시적 5xx 는 이 사이에 회복되고,
                 // 영구적 실패(잘못된 입력, 4xx)는 4초 안에 포기하고 DLQ 로 넘어간다.
                 .backOffOptions(1000, 2.0, 4000)
-                .recoverer(new org.springframework.amqp.rabbit.retry.RejectAndDontRequeueRecoverer())
+                // 거절 예외 메시지에 실제로 실패한 시도 횟수를 남긴다.
+                .recoverer(new org.springframework.amqp.rabbit.retry.RejectAndDontRequeueRecoverer(
+                        () -> "Retry Policy Exhausted - attempts: " + RabbitRetryAttempts.exhaustedAttempts()))
                 .build());
 
         return factory;
