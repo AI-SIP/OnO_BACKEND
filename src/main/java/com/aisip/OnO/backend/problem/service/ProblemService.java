@@ -223,7 +223,7 @@ public class ProblemService {
             throw new ApplicationException(ProblemErrorCase.PROBLEM_FOLDER_ID_REQUIRED);
         }
 
-        Folder folder = folderRepository.findById(problemRegisterDto.folderId())
+        Folder folder = folderRepository.findByIdForShare(problemRegisterDto.folderId())
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
         validateFolderOwner(folder, userId);
 
@@ -391,7 +391,7 @@ public class ProblemService {
             return resolveRootFolder(userId);
         }
 
-        return folderRepository.findById(folderId)
+        return folderRepository.findByIdForShare(folderId)
                 .map(folder -> {
                     validateFolderOwner(folder, userId);
                     return folder;
@@ -414,7 +414,7 @@ public class ProblemService {
             return Map.of();
         }
 
-        Map<Long, Folder> foldersById = folderRepository.findAllById(folderIds).stream()
+        Map<Long, Folder> foldersById = folderRepository.findAllByIdInForShare(folderIds).stream()
                 .collect(Collectors.toMap(Folder::getId, folder -> folder));
         if (foldersById.size() != folderIds.size()) {
             throw new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND);
@@ -628,7 +628,7 @@ public class ProblemService {
         Problem problem = findProblemEntity(problemRegisterDto.problemId(), userId);
 
         if (problemRegisterDto.folderId() != null) {
-            Folder folder = folderRepository.findById(problemRegisterDto.folderId())
+            Folder folder = folderRepository.findByIdForShare(problemRegisterDto.folderId())
                     .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
             validateFolderOwner(folder, userId);
 
