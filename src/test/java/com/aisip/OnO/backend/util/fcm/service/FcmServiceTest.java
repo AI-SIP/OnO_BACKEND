@@ -105,17 +105,30 @@ class FcmServiceTest {
         }
 
         @Test
-        @DisplayName("같은 토큰이라도 사용자가 다르면 각자 저장한다 - 기기 공유 사용자")
-        void savesSameTokenForDifferentUser() {
-            when(fcmTokenRepository.existsByUserIdAndToken(1L, "shared-token")).thenReturn(true);
+        @DisplayName("같은 토큰이 다른 사용자에게 묶여 있으면 그 행을 지우고 새 사용자로 저장한다 - 기기 계정 전환")
+        void movesTokenFromPreviousOwner() {
+            FcmToken previousOwner = tokenOf(1L, "shared-token");
+            when(fcmTokenRepository.findAllByTokenAndUserIdNot("shared-token", 2L)).thenReturn(List.of(previousOwner));
             when(fcmTokenRepository.existsByUserIdAndToken(2L, "shared-token")).thenReturn(false);
 
-            fcmService.registerToken(new FcmTokenRequestDto("shared-token"), 1L);
             fcmService.registerToken(new FcmTokenRequestDto("shared-token"), 2L);
 
+            verify(fcmTokenRepository).deleteAllInBatch(List.of(previousOwner));
             ArgumentCaptor<FcmToken> saved = ArgumentCaptor.forClass(FcmToken.class);
-            verify(fcmTokenRepository, times(1)).save(saved.capture());
+            verify(fcmTokenRepository).save(saved.capture());
             assertThat(saved.getValue().getUserId()).isEqualTo(2L);
+        }
+
+        @Test
+        @DisplayName("다른 사용자에게 묶인 행이 없으면 아무것도 지우지 않는다")
+        void deletesNothingWithoutPreviousOwner() {
+            when(fcmTokenRepository.findAllByTokenAndUserIdNot("token-1", 1L)).thenReturn(List.of());
+            when(fcmTokenRepository.existsByUserIdAndToken(1L, "token-1")).thenReturn(true);
+
+            fcmService.registerToken(new FcmTokenRequestDto("token-1"), 1L);
+
+            verify(fcmTokenRepository, never()).deleteAllInBatch(any());
+            verify(fcmTokenRepository, never()).save(any());
         }
 
         @Test

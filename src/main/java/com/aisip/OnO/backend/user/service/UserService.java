@@ -14,6 +14,7 @@ import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.exception.UserErrorCase;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.user.repository.UserRepository;
+import com.aisip.OnO.backend.util.fcm.repository.FcmTokenRepository;
 import com.aisip.OnO.backend.util.fileupload.exception.FileUploadErrorCase;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.util.webhook.DiscordWebhookNotificationService;
@@ -77,6 +78,8 @@ public class UserService {
     private final S3DeleteProducer s3DeleteProducer;
 
     private final DiscordWebhookNotificationService discordWebhookNotificationService;
+
+    private final FcmTokenRepository fcmTokenRepository;
 
     private User findUserEntity(Long userId){
         return userRepository.findById(userId)
@@ -256,6 +259,8 @@ public class UserService {
         reminderService.cancelAllByUser(userId);
         problemService.deleteAllUserProblems(userId);
         folderService.deleteAllUserFolders(userId);
+        // 탈퇴 계정 앞으로 발송이 생기면 그 기기를 이어 쓰는 사람에게 알림이 뜬다. 토큰 행을 남기지 않는다.
+        fcmTokenRepository.deleteAllByUserId(userId);
 
         user.maskIdentifierForDeletion(makeDeletedIdentifier(userId));
         userRepository.flush();

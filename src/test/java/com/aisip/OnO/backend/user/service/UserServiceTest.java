@@ -14,6 +14,7 @@ import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.exception.UserErrorCase;
 import com.aisip.OnO.backend.user.repository.UserRepository;
+import com.aisip.OnO.backend.util.fcm.repository.FcmTokenRepository;
 import com.aisip.OnO.backend.util.fileupload.exception.FileUploadErrorCase;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.util.webhook.DiscordWebhookNotificationService;
@@ -87,6 +88,8 @@ class UserServiceTest {
     private DiscordWebhookNotificationService discordWebhookNotificationService;
     @Mock
     private UserRegistrationWriter registrationWriter;
+    @Mock
+    private FcmTokenRepository fcmTokenRepository;
 
     @InjectMocks
     private UserService userService;
@@ -485,6 +488,7 @@ class UserServiceTest {
             verify(reminderService).cancelAllByUser(USER_ID);
             verify(problemService).deleteAllUserProblems(USER_ID);
             verify(folderService).deleteAllUserFolders(USER_ID);
+            verify(fcmTokenRepository).deleteAllByUserId(USER_ID);
             verify(userRepository).deleteById(USER_ID);
         }
 

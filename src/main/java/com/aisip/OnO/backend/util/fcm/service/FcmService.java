@@ -34,8 +34,27 @@ public class FcmService {
 
     private final FcmNotificationProducer fcmNotificationProducer;
 
+    /**
+     * 토큰은 기기 하나를 가리키므로 한 사용자에게만 묶여 있어야 한다.
+     *
+     * <p>같은 기기에서 A 가 로그아웃하고 B 가 로그인하면 같은 토큰으로 등록이 들어온다.
+     * 이때 (A, 토큰) 행을 남겨 두면 A 앞으로 가는 알림(댓글 작성자 이름, 미리보기 포함)이 B 기기에 뜬다.
+     * 클라이언트가 로그아웃 때 토큰을 해제하지 않으므로, 서버가 등록 시점에 이전 소유자 행을 지운다.
+     *
+     * <p>{@code token = ? AND user_id <> ?} 로 바로 DELETE 하지 않고 id 로 골라 지운다.
+     * token 단독 인덱스가 없어 조건 DELETE 는 테이블 전체 행에 잠금을 걸고, 그동안 다른 사용자 등록이 막힌다.
+     * 대부분의 등록은 지울 행이 없으니 잠금 없는 조회로 끝난다.
+     */
     @Transactional
     public void registerToken(FcmTokenRequestDto fcmTokenRequestDto, Long userId) {
+        List<FcmToken> previousOwnerTokens =
+                fcmTokenRepository.findAllByTokenAndUserIdNot(fcmTokenRequestDto.token(), userId);
+        if (!previousOwnerTokens.isEmpty()) {
+            fcmTokenRepository.deleteAllInBatch(previousOwnerTokens);
+            log.info("FCM token moved to another user - userId: {}, removedPreviousOwnerRows: {}",
+                    userId, previousOwnerTokens.size());
+        }
+
         if(!fcmTokenRepository.existsByUserIdAndToken(userId, fcmTokenRequestDto.token())){
             FcmToken fcmToken = FcmToken.From(fcmTokenRequestDto, userId);
             fcmTokenRepository.save(fcmToken);
