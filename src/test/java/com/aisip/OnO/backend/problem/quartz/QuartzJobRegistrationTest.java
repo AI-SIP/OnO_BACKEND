@@ -1,19 +1,32 @@
 package com.aisip.OnO.backend.problem.quartz;
 
+import com.aisip.OnO.backend.practicenote.service.PracticeNotificationJob;
 import com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderJob;
+import com.aisip.OnO.backend.studyroom.quartz.ChallengeNotificationJob;
 import com.aisip.OnO.backend.support.IntegrationTestSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.quartz.CronTrigger;
+import org.quartz.Job;
+import org.quartz.JobBuilder;
 import org.quartz.JobDetail;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
+import org.quartz.SimpleScheduleBuilder;
 import org.quartz.Trigger;
+import org.quartz.TriggerBuilder;
 import org.quartz.TriggerKey;
+import org.quartz.core.QuartzScheduler;
+import org.quartz.spi.JobFactory;
+import org.quartz.spi.OperableTrigger;
+import org.quartz.spi.TriggerFiredBundle;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.util.AopTestUtils;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
 
@@ -89,6 +102,77 @@ class QuartzJobRegistrationTest extends IntegrationTestSupport {
 
             assertThat(trigger.getCronExpression()).isEqualTo("0 */5 * ? * *");
             assertThat(trigger.getTimeZone()).isEqualTo(TimeZone.getTimeZone("Asia/Seoul"));
+        }
+    }
+
+    /**
+     * 발화 시각이 되면 스케줄러는 자기 JobFactory 로 잡 인스턴스를 만든 뒤 execute 를 부른다.
+     * 잡을 빈으로 주입받아 execute 를 직접 부르는 테스트는 이 생성 단계를 건너뛰어, 생성자 주입 잡이
+     * 인스턴스화에 실패해 트리거가 ERROR 로 바뀌는 문제를 잡지 못했다.
+     *
+     * <p>스케줄러를 시작하면 등록된 잡이 실제로 돌기 때문에, 스케줄러가 쓰는 JobFactory 를 꺼내
+     * 발화 때와 같은 {@link TriggerFiredBundle} 로 인스턴스만 만든다. execute 는 부르지 않는다.
+     */
+    @Nested
+    @DisplayName("발화 시 잡 인스턴스 생성")
+    class JobInstantiation {
+
+        private Job newJobLikeFiring(JobDetail jobDetail) throws SchedulerException {
+            QuartzScheduler quartzScheduler = (QuartzScheduler) ReflectionTestUtils.getField(scheduler, "sched");
+            JobFactory jobFactory = quartzScheduler.getJobFactory();
+
+            OperableTrigger trigger = (OperableTrigger) TriggerBuilder.newTrigger()
+                    .forJob(jobDetail)
+                    .withSchedule(SimpleScheduleBuilder.simpleSchedule())
+                    .build();
+            Date now = new Date();
+            TriggerFiredBundle bundle = new TriggerFiredBundle(
+                    jobDetail, trigger, null, false, now, now, null, null);
+
+            return jobFactory.newJob(bundle, scheduler);
+        }
+
+        private JobDetail jobDetailOf(Class<? extends Job> jobClass) {
+            return JobBuilder.newJob(jobClass).withIdentity("instantiation-test-" + jobClass.getSimpleName()).build();
+        }
+
+        @Test
+        @DisplayName("생성자 주입을 쓰는 챌린지 알림 잡도 의존성이 채워진 채로 만들어진다")
+        void challengeNotificationJob() throws Exception {
+            JobDetail jobDetail = JobBuilder.newJob(ChallengeNotificationJob.class)
+                    .withIdentity("instantiation-test-challenge")
+                    .usingJobData("roomId", "1")
+                    .usingJobData("challengeTitle", "챌린지")
+                    .usingJobData("notificationType", "HALFWAY")
+                    .build();
+
+            Job job = newJobLikeFiring(jobDetail);
+
+            assertThat(job).isInstanceOf(ChallengeNotificationJob.class);
+            assertThat(job).extracting("memberRepository").isNotNull();
+            assertThat(job).extracting("fcmService").isNotNull();
+        }
+
+        @Test
+        @DisplayName("필드 주입을 쓰는 기존 잡들도 그대로 의존성이 채워진다")
+        void fieldInjectedJobs() throws Exception {
+            Job reviewDue = newJobLikeFiring(jobDetailOf(ReviewDueNotificationJob.class));
+            assertThat(reviewDue).isInstanceOf(ReviewDueNotificationJob.class);
+            assertThat(AopTestUtils.<Object>getUltimateTargetObject(reviewDue))
+                    .extracting("problemRepository", "userRepository", "fcmService")
+                    .doesNotContainNull();
+
+            Job reminder = newJobLikeFiring(jobDetailOf(ProblemReviewReminderJob.class));
+            assertThat(reminder).isInstanceOf(ProblemReviewReminderJob.class);
+            assertThat(AopTestUtils.<Object>getUltimateTargetObject(reminder))
+                    .extracting("reminderService")
+                    .isNotNull();
+
+            Job practice = newJobLikeFiring(jobDetailOf(PracticeNotificationJob.class));
+            assertThat(practice).isInstanceOf(PracticeNotificationJob.class);
+            assertThat(AopTestUtils.<Object>getUltimateTargetObject(practice))
+                    .extracting("fcmService")
+                    .isNotNull();
         }
     }
 
