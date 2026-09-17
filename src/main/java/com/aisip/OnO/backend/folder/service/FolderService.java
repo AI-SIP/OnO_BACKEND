@@ -167,6 +167,9 @@ public class FolderService {
     }
 
     public void deleteFoldersWithProblems(Long userId, List<Long> folderIds) {
+        // 같은 폴더로 들어오는 문제 등록과 순서를 맞춘다. 이 줄보다 앞에 조회를 두면 안 된다. (#233)
+        folderRepository.lockAllByUserId(userId);
+
         // 삭제할 모든 폴더의 ID 조회 (하위 폴더 포함)
         Set<Long> allFolderIds = getAllFolderIdsIncludingSubFolders(userId, folderIds);
 
