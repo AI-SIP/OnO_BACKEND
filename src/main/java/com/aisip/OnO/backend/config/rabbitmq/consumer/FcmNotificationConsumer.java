@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.config.rabbitmq.consumer;
 
 import com.aisip.OnO.backend.config.rabbitmq.RabbitMQConfig;
+import com.aisip.OnO.backend.config.rabbitmq.RabbitRetryAttempts;
 import com.aisip.OnO.backend.config.rabbitmq.message.FcmNotificationMessage;
 import com.aisip.OnO.backend.util.fcm.entity.FcmToken;
 import com.aisip.OnO.backend.util.fcm.repository.FcmTokenRepository;
@@ -15,9 +16,11 @@ import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * FCM 푸시 알림 메시지 Consumer
@@ -41,18 +44,18 @@ public class FcmNotificationConsumer {
      */
     @RabbitListener(queues = RabbitMQConfig.FCM_NOTIFICATION_QUEUE, concurrency = "5-15")
     public void handleNotificationMessage(FcmNotificationMessage message) {
-        log.info("RabbitMQ message received - queue: {}, operation: {}, userId: {}, messageRetryCount: {}",
+        log.info("RabbitMQ message received - queue: {}, operation: {}, userId: {}, attempt: {}/{}",
                 RabbitMQConfig.FCM_NOTIFICATION_QUEUE, "fcm_notification",
-                message.getUserId(), message.getRetryCount());
+                message.getUserId(), RabbitRetryAttempts.currentAttempt(), RabbitRetryAttempts.MAX_ATTEMPTS);
 
         try {
             // 사용자의 모든 FCM 토큰 조회
             List<FcmToken> userFcmTokenList = fcmTokenRepository.findAllByUserId(message.getUserId());
 
             if (userFcmTokenList.isEmpty()) {
-                log.warn("RabbitMQ message skipped - queue: {}, operation: {}, outcome: {}, userId: {}, messageRetryCount: {}",
+                log.warn("RabbitMQ message skipped - queue: {}, operation: {}, outcome: {}, userId: {}, attempt: {}/{}",
                         RabbitMQConfig.FCM_NOTIFICATION_QUEUE, "fcm_notification", "token_not_found",
-                        message.getUserId(), message.getRetryCount());
+                        message.getUserId(), RabbitRetryAttempts.currentAttempt(), RabbitRetryAttempts.MAX_ATTEMPTS);
                 return; // 토큰 없으면 스킵 (정상 처리)
             }
 
@@ -91,9 +94,9 @@ public class FcmNotificationConsumer {
                     message.getUserId(), successCount, failCount);
 
         } catch (Exception e) {
-            log.error("RabbitMQ message failed - queue: {}, operation: {}, outcome: {}, userId: {}, messageRetryCount: {}, error: {}",
+            log.error("RabbitMQ message failed - queue: {}, operation: {}, outcome: {}, userId: {}, attempt: {}/{}, error: {}",
                     RabbitMQConfig.FCM_NOTIFICATION_QUEUE, "fcm_notification", "failure",
-                    message.getUserId(), message.getRetryCount(), e.getMessage());
+                    message.getUserId(), RabbitRetryAttempts.currentAttempt(), RabbitRetryAttempts.MAX_ATTEMPTS, e.getMessage());
 
             // 예외를 던지면 RabbitMQ가 자동으로 재시도 or DLQ로 전송
             throw new RuntimeException("FCM 푸시 알림 전송 실패: " + message.getUserId(), e);
@@ -137,20 +140,23 @@ public class FcmNotificationConsumer {
      * - Discord 알림 전송하여 관리자에게 수동 처리 요청
      */
     @RabbitListener(queues = RabbitMQConfig.FCM_NOTIFICATION_DLQ)
-    public void handleNotificationDLQ(FcmNotificationMessage message) {
-        log.error("RabbitMQ message moved to DLQ - queue: {}, operation: {}, outcome: {}, userId: {}, messageRetryCount: {}",
+    public void handleNotificationDLQ(FcmNotificationMessage message,
+            @Header(name = RabbitRetryAttempts.X_DEATH_HEADER, required = false) List<Map<String, ?>> xDeath) {
+        String attempts = RabbitRetryAttempts.describeDeadLetter(xDeath, RabbitMQConfig.FCM_NOTIFICATION_QUEUE);
+
+        log.error("RabbitMQ message moved to DLQ - queue: {}, operation: {}, outcome: {}, userId: {}, attempts: {}",
                 RabbitMQConfig.FCM_NOTIFICATION_DLQ, "fcm_notification", "dlq",
-                message.getUserId(), message.getRetryCount());
+                message.getUserId(), attempts);
 
         // Discord 알림 전송
         String errorTitle = String.format("🚨 FCM 푸시 알림 최종 실패 (DLQ)");
         String errorDetails = String.format(
-                "**Queue:** %s\n**Operation:** %s\n**User ID:** %d\n**Message Retry Count:** %d\n\n" +
+                "**Queue:** %s\n**Operation:** %s\n**User ID:** %d\n**Attempts:** %s\n\n" +
                 "모든 재시도가 실패했습니다. FCM 토큰을 확인하거나 수동으로 알림을 재전송해주세요.",
                 RabbitMQConfig.FCM_NOTIFICATION_DLQ,
                 "fcm_notification",
                 message.getUserId(),
-                message.getRetryCount()
+                attempts
         );
 
         try {

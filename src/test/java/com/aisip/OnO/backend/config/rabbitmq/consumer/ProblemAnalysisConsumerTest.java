@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.config.rabbitmq.consumer;
 
+import com.aisip.OnO.backend.config.rabbitmq.RabbitMQConfig;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.Problem;
@@ -249,7 +250,7 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
 
             // 이미 예외를 던지도록 스텁된 목이라 given(...) 형태로 다시 스텁하면 스텁 도중 예외가 난다.
             willReturn(successResult()).given(openAIClient).analyzeImages(anyList());
-            consumer.handleAnalysisMessage(analysisMessageWithRetryCount(problem.getId(), 1));
+            consumer.handleAnalysisMessage(analysisMessage(problem.getId()));
 
             assertThat(statusOf(problem))
                     .as("FAILED 로 기록된 뒤에도 재시도 메시지는 정상 처리돼야 한다")
@@ -296,14 +297,14 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
         void notifiesDiscord() {
             Problem problem = analyzableProblem();
 
-            consumer.handleAnalysisDLQ(analysisMessageWithRetryCount(problem.getId(), 3));
+            consumer.handleAnalysisDLQ(analysisMessage(problem.getId()), rejectedAfterRetries(RabbitMQConfig.GPT_ANALYSIS_QUEUE));
 
             ArgumentCaptor<String> details = ArgumentCaptor.forClass(String.class);
             verify(discordWebhookNotificationService).sendErrorNotification(
                     eq("RabbitMQ DLQ - GPT Analysis"), details.capture(), eq("ERROR"), anyString());
             assertThat(details.getValue())
-                    .contains(String.valueOf(problem.getId()))
-                    .contains("3");
+                    .contains("**Problem ID:** " + problem.getId())
+                    .contains("**Attempts:** 3회");
         }
 
         @Test
@@ -316,7 +317,7 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
                 problemAnalysisRepository.save(analysis);
             });
 
-            consumer.handleAnalysisDLQ(analysisMessage(problem.getId()));
+            consumer.handleAnalysisDLQ(analysisMessage(problem.getId()), rejectedAfterRetries(RabbitMQConfig.GPT_ANALYSIS_QUEUE));
 
             ProblemAnalysis analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
             assertThat(analysis.getStatus()).isEqualTo(AnalysisStatus.FAILED);
@@ -328,7 +329,7 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
         void doesNotReanalyze() {
             Problem problem = analyzableProblem();
 
-            consumer.handleAnalysisDLQ(analysisMessage(problem.getId()));
+            consumer.handleAnalysisDLQ(analysisMessage(problem.getId()), rejectedAfterRetries(RabbitMQConfig.GPT_ANALYSIS_QUEUE));
 
             verify(openAIClient, never()).analyzeImages(anyList());
         }
@@ -336,7 +337,7 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
         @Test
         @DisplayName("분석 레코드가 없어도 DLQ 알림은 나간다")
         void notifiesEvenWithoutAnalysisRow() {
-            assertThatCode(() -> consumer.handleAnalysisDLQ(analysisMessage(deletedProblemId())))
+            assertThatCode(() -> consumer.handleAnalysisDLQ(analysisMessage(deletedProblemId()), rejectedAfterRetries(RabbitMQConfig.GPT_ANALYSIS_QUEUE)))
                     .doesNotThrowAnyException();
 
             verify(discordWebhookNotificationService)
@@ -351,7 +352,7 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
                     .given(discordWebhookNotificationService)
                     .sendErrorNotification(anyString(), anyString(), anyString(), anyString());
 
-            assertThatCode(() -> consumer.handleAnalysisDLQ(analysisMessage(problem.getId())))
+            assertThatCode(() -> consumer.handleAnalysisDLQ(analysisMessage(problem.getId()), rejectedAfterRetries(RabbitMQConfig.GPT_ANALYSIS_QUEUE)))
                     .doesNotThrowAnyException();
 
             assertThat(statusOf(problem))

@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.config.rabbitmq.consumer;
 
+import com.aisip.OnO.backend.config.rabbitmq.RabbitMQConfig;
 import com.aisip.OnO.backend.config.rabbitmq.message.FcmNotificationMessage;
 import com.aisip.OnO.backend.user.entity.User;
 import com.google.firebase.messaging.FirebaseMessaging;
@@ -341,7 +342,7 @@ class FcmNotificationConsumerTest extends RabbitConsumerTestSupport {
         @Test
         @DisplayName("최종 실패 메시지는 Discord 로 알린다")
         void notifiesDiscord() {
-            consumer.handleNotificationDLQ(fcmMessageWithRetryCount(owner.getId(), 3));
+            consumer.handleNotificationDLQ(fcmMessage(owner.getId()), rejectedAfterRetries(RabbitMQConfig.FCM_NOTIFICATION_QUEUE));
 
             ArgumentCaptor<String> details = ArgumentCaptor.forClass(String.class);
             verify(discordWebhookNotificationService).sendErrorNotification(
@@ -351,9 +352,9 @@ class FcmNotificationConsumerTest extends RabbitConsumerTestSupport {
                     anyString());
 
             assertThat(details.getValue())
-                    .as("어느 사용자의 몇 번째 재시도가 최종 실패했는지 알 수 있어야 한다")
-                    .contains(String.valueOf(owner.getId()))
-                    .contains("3");
+                    .as("어느 사용자가 몇 번 시도한 끝에 최종 실패했는지 알 수 있어야 한다")
+                    .contains("**User ID:** " + owner.getId())
+                    .contains("**Attempts:** 3회");
         }
 
         @Test
@@ -361,7 +362,7 @@ class FcmNotificationConsumerTest extends RabbitConsumerTestSupport {
         void doesNotResendPush() {
             saveFcmToken(owner.getId(), uniqueToken("device"));
 
-            consumer.handleNotificationDLQ(fcmMessage(owner.getId()));
+            consumer.handleNotificationDLQ(fcmMessage(owner.getId()), rejectedAfterRetries(RabbitMQConfig.FCM_NOTIFICATION_QUEUE));
 
             verifyNoInteractions(firebaseMessaging);
         }
@@ -373,7 +374,7 @@ class FcmNotificationConsumerTest extends RabbitConsumerTestSupport {
                     .given(discordWebhookNotificationService)
                     .sendErrorNotification(anyString(), anyString(), anyString(), anyString());
 
-            assertThatCode(() -> consumer.handleNotificationDLQ(fcmMessage(owner.getId())))
+            assertThatCode(() -> consumer.handleNotificationDLQ(fcmMessage(owner.getId()), rejectedAfterRetries(RabbitMQConfig.FCM_NOTIFICATION_QUEUE)))
                     .as("DLQ 에서 예외를 던지면 최종 실패 메시지마저 잃는다")
                     .doesNotThrowAnyException();
         }
@@ -381,7 +382,7 @@ class FcmNotificationConsumerTest extends RabbitConsumerTestSupport {
         @Test
         @DisplayName("userId 가 null 인 메시지도 DLQ 알림을 만들 수 있다")
         void handlesNullUserId() {
-            assertThatCode(() -> consumer.handleNotificationDLQ(fcmMessage(null)))
+            assertThatCode(() -> consumer.handleNotificationDLQ(fcmMessage(null), rejectedAfterRetries(RabbitMQConfig.FCM_NOTIFICATION_QUEUE)))
                     .doesNotThrowAnyException();
 
             verify(discordWebhookNotificationService, times(1))
