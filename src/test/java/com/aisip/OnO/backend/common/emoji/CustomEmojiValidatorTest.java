@@ -33,6 +33,15 @@ class CustomEmojiValidatorTest {
             assertThat(validator.isAllowed(emojiKey)).isTrue();
             assertThatCode(() -> validator.validate(emojiKey)).doesNotThrowAnyException();
         }
+
+        // 앱 목록에 늦게 들어온 넷이다. 서버 목록에 빠져 있어 고르면 저장이 11001 로 실패했다 (OnO_FRONT#232).
+        @ParameterizedTest(name = "{0}")
+        @ValueSource(strings = {"angry_on_fire", "christmas_santa", "excited_sparkles", "peeking_pole"})
+        @DisplayName("앱 목록에 새로 들어온 키도 통과한다")
+        void passesKeyAddedToAppCatalog(String emojiKey) {
+            assertThat(validator.isAllowed(emojiKey)).isTrue();
+            assertThatCode(() -> validator.validate(emojiKey)).doesNotThrowAnyException();
+        }
     }
 
     @Nested
