@@ -360,24 +360,28 @@ class AuthApiTest extends IntegrationTestSupport {
                     .isEqualTo(Authority.ROLE_GUEST);
         }
 
+        /**
+         * 1002 가 401 이어야 스토어 4.0.0 이 토큰을 지우고 로그인 화면으로 간다.
+         * 그 빌드는 400·403 일 때만 errorCode 를 보고, 그 밖에는 401 여부로만 판정한다(#265).
+         */
         @Test
-        @DisplayName("회전된 옛 리프레시 토큰을 다시 쓰면 404 + 1002 로 거절한다")
+        @DisplayName("회전된 옛 리프레시 토큰을 다시 쓰면 401 + 1002 로 거절한다")
         void rejectsRotatedRefreshToken() throws Exception {
             String oldRefreshToken = signUpGuest().path("refreshToken").asText();
             refresh(oldRefreshToken).andExpect(status().isOk());
 
             refresh(oldRefreshToken)
-                    .andExpect(status().isNotFound())
+                    .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.errorCode").value(AuthErrorCase.REFRESH_TOKEN_NOT_FOUND.getErrorCode()));
         }
 
         @Test
-        @DisplayName("서명은 유효하지만 저장된 적 없는 리프레시 토큰은 404 + 1002 로 거절한다")
+        @DisplayName("서명은 유효하지만 저장된 적 없는 리프레시 토큰은 401 + 1002 로 거절한다")
         void rejectsUnknownRefreshToken() throws Exception {
             String neverStored = validTokenizer.createRefreshToken("1", Map.of("authority", Authority.ROLE_MEMBER));
 
             refresh(neverStored)
-                    .andExpect(status().isNotFound())
+                    .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.errorCode").value(AuthErrorCase.REFRESH_TOKEN_NOT_FOUND.getErrorCode()));
         }
 
@@ -450,7 +454,7 @@ class AuthApiTest extends IntegrationTestSupport {
                     .andExpect(status().isOk());
 
             refresh(tokens.path("refreshToken").asText())
-                    .andExpect(status().isNotFound())
+                    .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.errorCode").value(AuthErrorCase.REFRESH_TOKEN_NOT_FOUND.getErrorCode()));
         }
 
