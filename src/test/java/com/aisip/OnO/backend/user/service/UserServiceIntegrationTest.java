@@ -8,10 +8,14 @@ import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.exception.UserErrorCase;
 import com.aisip.OnO.backend.user.repository.UserRepository;
+import com.aisip.OnO.backend.util.fcm.dto.FcmTokenRequestDto;
+import com.aisip.OnO.backend.util.fcm.entity.FcmToken;
+import com.aisip.OnO.backend.util.fcm.repository.FcmTokenRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -36,6 +40,12 @@ class UserServiceIntegrationTest extends IntegrationTestSupport {
 
     @Autowired
     private FolderRepository folderRepository;
+
+    @Autowired
+    private FcmTokenRepository fcmTokenRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private static UserRegisterDto registerDto(String identifier) {
         return UserRegisterDto.builder()
@@ -181,6 +191,29 @@ class UserServiceIntegrationTest extends IntegrationTestSupport {
             assertThat(folderRepository.findAllByUserId(other.getId()))
                     .as("남의 폴더까지 지워지면 복구 불가능한 사고다")
                     .isNotEmpty();
+        }
+
+        @Test
+        @DisplayName("탈퇴하면 본인 기기 토큰 행이 지워지고 다른 사용자 토큰은 남는다")
+        void deletesOwnFcmTokens() {
+            User me = fixtures.createUser();
+            User other = fixtures.createOtherUser();
+            // 테이블 기반 id 생성기의 초기 행. FcmTokenRepositoryTest 와 같은 이유로 없으면 채운다.
+            Integer seqRows = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM fcm_token_seq", Integer.class);
+            if (seqRows == null || seqRows == 0) {
+                jdbcTemplate.update("INSERT INTO fcm_token_seq (next_val) VALUES (1)");
+            }
+            fcmTokenRepository.save(FcmToken.From(new FcmTokenRequestDto("my-phone"), me.getId()));
+            fcmTokenRepository.save(FcmToken.From(new FcmTokenRequestDto("other-phone"), other.getId()));
+
+            userService.deleteUserById(me.getId());
+
+            assertThat(fcmTokenRepository.findAllByUserId(me.getId()))
+                    .as("탈퇴 계정 토큰이 남으면 그 기기를 이어 쓰는 사람에게 탈퇴 계정 알림이 뜰 수 있다")
+                    .isEmpty();
+            assertThat(fcmTokenRepository.findAllByUserId(other.getId()))
+                    .extracting(FcmToken::getToken)
+                    .containsExactly("other-phone");
         }
 
         @Test
