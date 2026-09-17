@@ -7,6 +7,7 @@ import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
 import com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderService;
 import com.aisip.OnO.backend.problem.service.ProblemService;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomSharedProblemCommentReactionRepository;
+import com.aisip.OnO.backend.studyroom.service.StudyRoomService;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomSharedProblemCommentRepository;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
@@ -27,6 +28,7 @@ import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -44,6 +46,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.util.ReflectionTestUtils.setField;
@@ -74,6 +77,8 @@ class UserServiceTest {
     private StudyRoomSharedProblemCommentRepository sharedProblemCommentRepository;
     @Mock
     private StudyRoomSharedProblemCommentReactionRepository sharedProblemCommentReactionRepository;
+    @Mock
+    private StudyRoomService studyRoomService;
     @Mock
     private FileUploadService fileUploadService;
     @Mock
@@ -475,11 +480,24 @@ class UserServiceTest {
             verify(sharedProblemCommentReactionRepository).deleteByCommentAuthorId(USER_ID);
             verify(sharedProblemCommentReactionRepository).deleteByUserId(USER_ID);
             verify(sharedProblemCommentRepository).deleteByAuthorId(USER_ID);
+            verify(studyRoomService).leaveAllRoomsForWithdrawal(USER_ID);
             verify(practiceNoteService).deleteAllPracticesByUser(USER_ID);
             verify(reminderService).cancelAllByUser(USER_ID);
             verify(problemService).deleteAllUserProblems(USER_ID);
             verify(folderService).deleteAllUserFolders(USER_ID);
             verify(userRepository).deleteById(USER_ID);
+        }
+
+        @Test
+        @DisplayName("스터디룸 정리는 사용자를 소프트 삭제하기 전에 한다")
+        void leavesStudyRoomsBeforeSoftDelete() {
+            givenExistingUser(User.from(registerDto));
+
+            userService.deleteUserById(USER_ID);
+
+            InOrder inOrder = inOrder(studyRoomService, userRepository);
+            inOrder.verify(studyRoomService).leaveAllRoomsForWithdrawal(USER_ID);
+            inOrder.verify(userRepository).deleteById(USER_ID);
         }
 
         @Test
@@ -490,6 +508,7 @@ class UserServiceTest {
             assertThatThrownBy(() -> userService.deleteUserById(404L))
                     .isInstanceOf(ApplicationException.class);
             verify(problemService, never()).deleteAllUserProblems(anyLong());
+            verify(studyRoomService, never()).leaveAllRoomsForWithdrawal(anyLong());
             verify(userRepository, never()).deleteById(anyLong());
         }
 

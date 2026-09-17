@@ -23,6 +23,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -144,7 +145,31 @@ public class StudyRoomService {
     @Transactional
     public void leaveRoom(Long roomId, Long userId) {
         StudyRoomMember member = accessService.getMemberOrThrow(roomId, userId);
-        if (member.getRole() != StudyRoomMemberRole.HOST) {
+        removeMembership(roomId, userId, member.getRole());
+    }
+
+    /**
+     * 회원 탈퇴 시 그 사용자가 속한 모든 방에서 직접 나간 것과 같게 처리한다.
+     *
+     * <p>{@code User} 는 소프트 삭제라 이 정리를 하지 않으면 멤버 행과 {@code host_user_id} 가 남는다.
+     * 방장이 탈퇴한 방은 방장 권한이 사라져 남은 멤버가 방을 관리할 수 없고, 탈퇴자 멤버 행은
+     * 정원에도 계속 잡힌다. 사용자를 소프트 삭제하기 전에 같은 트랜잭션에서 호출해야 한다.
+     *
+     * <p>방장인 방은 행 잠금을 잡으므로 방 id 순으로 돌아 잠금 순서를 일정하게 둔다.
+     */
+    @Transactional
+    public void leaveAllRoomsForWithdrawal(Long userId) {
+        memberRepository.findAllWithRoomByUserId(userId).stream()
+                .sorted(Comparator.comparing(member -> member.getRoom().getId()))
+                .forEach(member -> removeMembership(member.getRoom().getId(), userId, member.getRole()));
+    }
+
+    /**
+     * 멤버십 하나를 정리한다. 방장이면 가장 먼저 들어온 멤버에게 방장을 넘기고,
+     * 남은 멤버가 없으면 방을 지운다.
+     */
+    private void removeMembership(Long roomId, Long userId, StudyRoomMemberRole role) {
+        if (role != StudyRoomMemberRole.HOST) {
             memberRepository.deleteByRoomIdAndUserId(roomId, userId);
             return;
         }

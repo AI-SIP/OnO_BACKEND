@@ -7,6 +7,7 @@ import com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderService;
 import com.aisip.OnO.backend.problem.service.ProblemService;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomSharedProblemCommentRepository;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomSharedProblemCommentReactionRepository;
+import com.aisip.OnO.backend.studyroom.service.StudyRoomService;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.entity.User;
@@ -68,6 +69,8 @@ public class UserService {
     private final StudyRoomSharedProblemCommentRepository sharedProblemCommentRepository;
 
     private final StudyRoomSharedProblemCommentReactionRepository sharedProblemCommentReactionRepository;
+
+    private final StudyRoomService studyRoomService;
 
     private final FileUploadService fileUploadService;
 
@@ -248,6 +251,7 @@ public class UserService {
         sharedProblemCommentReactionRepository.deleteByCommentAuthorId(userId);
         sharedProblemCommentReactionRepository.deleteByUserId(userId);
         sharedProblemCommentRepository.deleteByAuthorId(userId);
+        studyRoomService.leaveAllRoomsForWithdrawal(userId);
         practiceNoteService.deleteAllPracticesByUser(userId);
         reminderService.cancelAllByUser(userId);
         problemService.deleteAllUserProblems(userId);
