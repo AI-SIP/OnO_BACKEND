@@ -8,11 +8,13 @@ import com.aisip.OnO.backend.util.fcm.dto.FcmTokenRequestDto;
 import com.aisip.OnO.backend.util.fcm.dto.NotificationRequestDto;
 import com.aisip.OnO.backend.util.fcm.entity.FcmToken;
 import com.aisip.OnO.backend.util.fcm.repository.FcmTokenRepository;
+import com.aisip.OnO.backend.util.fcm.support.BrokerOutageFcm;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -53,6 +55,9 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
 
     @Autowired
     private FcmTokenRepository fcmTokenRepository;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private User user;
     private Long userId;
@@ -385,6 +390,29 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
 
             verify(fcmService, never()).sendNotificationToAllUserDevice(any(), any());
             assertThat(reminderRepository.findById(due.getId()).orElseThrow().getStatus()).isEqualTo(SCHEDULED);
+        }
+
+        @Test
+        @DisplayName("브로커 장애로 한 사용자의 적재가 실패해도 FAILED 로 남기고 다음 사용자를 계속 처리한다")
+        void continuesAfterBrokerFailure() {
+            BrokerOutageFcm brokerOutage = BrokerOutageFcm.create(transactionManager, 1);
+            brokerOutage.routeFrom(fcmService);
+            User otherUser = fixtures.createUser();
+            giveFcmToken(userId, "token-1");
+            giveFcmToken(otherUser.getId(), "token-2");
+            ProblemReviewReminder mine = saveDueReminder(userId, 13001L, LocalDateTime.now().minusMinutes(1));
+            ProblemReviewReminder others = saveDueReminder(otherUser.getId(), 13002L, LocalDateTime.now().minusMinutes(1));
+
+            service.sendDueReminders(LocalDateTime.now());
+
+            assertThat(brokerOutage.enqueueAttempts())
+                    .as("첫 적재가 실패해도 두 번째 사용자까지 적재를 시도해야 한다")
+                    .isEqualTo(2);
+            assertThat(List.of(
+                    reminderRepository.findById(mine.getId()).orElseThrow().getStatus(),
+                    reminderRepository.findById(others.getId()).orElseThrow().getStatus()))
+                    .as("실패한 한 건은 FAILED, 나머지는 SENT")
+                    .containsExactlyInAnyOrder(FAILED, SENT);
         }
 
         @Test

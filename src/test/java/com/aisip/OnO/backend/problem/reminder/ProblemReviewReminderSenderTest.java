@@ -3,11 +3,13 @@ package com.aisip.OnO.backend.problem.reminder;
 import com.aisip.OnO.backend.problem.support.ProblemTestSupport;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.util.fcm.dto.NotificationRequestDto;
+import com.aisip.OnO.backend.util.fcm.support.BrokerOutageFcm;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -42,6 +44,9 @@ class ProblemReviewReminderSenderTest extends ProblemTestSupport {
 
     @Autowired
     private ProblemReviewReminderRepository reminderRepository;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private User user;
 
@@ -125,6 +130,25 @@ class ProblemReviewReminderSenderTest extends ProblemTestSupport {
             assertThat(failed.getLastErrorMessage()).isNull();
             assertThat(failed.getRetryCount()).isEqualTo(1);
             assertThat(failed.getSentAt()).as("보내지 못했으므로 발송 시각은 없다").isNull();
+        }
+
+        @Test
+        @DisplayName("브로커 장애로 큐 적재가 실패하면 FAILED 로 남고 예외가 새어 나가지 않는다")
+        void recordsFailureWhenBrokerIsDown() {
+            BrokerOutageFcm.create(transactionManager).routeFrom(fcmService);
+            ProblemReviewReminder reminder = saveReminder(LocalDateTime.now().minusHours(1));
+
+            assertThatCode(() -> sender.send(reminder, LocalDateTime.now()))
+                    .as("적재 실패가 발송기 밖으로 나가면 폴링 루프가 멈춘다")
+                    .doesNotThrowAnyException();
+
+            ProblemReviewReminder failed = reload(reminder.getId());
+            assertThat(failed.getStatus())
+                    .as("선점(SENDING)과 실패 기록이 함께 롤백돼 SCHEDULED 로 돌아가면 안 된다")
+                    .isEqualTo(FAILED);
+            assertThat(failed.getRetryCount()).isEqualTo(1);
+            assertThat(failed.getLastErrorMessage()).isEqualTo("RabbitMQ FCM notification enqueue failed");
+            assertThat(failed.getSentAt()).isNull();
         }
     }
 
