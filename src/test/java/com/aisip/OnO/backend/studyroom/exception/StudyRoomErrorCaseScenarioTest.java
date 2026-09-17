@@ -35,31 +35,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class StudyRoomErrorCaseScenarioTest extends StudyRoomTestSupport {
 
     /**
-     * 프로덕션 코드에서 더 이상 던지지 않는 값들.
+     * 지운 값이 쓰던 errorCode. 구버전 앱이 아직 이 코드를 매핑하고 있어 다른 에러에 다시 붙이지 않는다.
      *
      * <ul>
-     *   <li>{@code SESSION_ALREADY_ACTIVE}, {@code SESSION_NOT_FOUND} — 공부 세션 기능이 제거되면서 남은 값</li>
-     *   <li>{@code INVALID_REACTION_EMOJI} — 이모지 검증이 공통 {@code CustomEmojiValidator} 로 옮겨가면서
+     *   <li>10011 SESSION_ALREADY_ACTIVE, 10012 SESSION_NOT_FOUND — 공부 세션 기능이 제거되면서 지웠다</li>
+     *   <li>10015 INVALID_REACTION_EMOJI — 이모지 검증이 공통 {@code CustomEmojiValidator} 로 옮겨가
      *       실제 응답은 11001(INVALID_EMOJI_KEY)로 나간다</li>
      * </ul>
      */
-    private static final List<StudyRoomErrorCase> UNREACHABLE = List.of(
-            StudyRoomErrorCase.SESSION_ALREADY_ACTIVE,
-            StudyRoomErrorCase.SESSION_NOT_FOUND,
-            StudyRoomErrorCase.INVALID_REACTION_EMOJI
-    );
+    private static final List<Integer> RETIRED_ERROR_CODES = List.of(10011, 10012, 10015);
 
     @Test
-    @DisplayName("현재 발생 경로가 없는 값은 세 개뿐이고 그 목록은 고정되어 있다")
-    void unreachableCasesAreKnown() {
+    @DisplayName("값은 17개로 모두 아래 시나리오가 있고, 지운 errorCode 는 다시 쓰지 않는다")
+    void retiredCodesAreNotReused() {
         assertThat(Arrays.stream(StudyRoomErrorCase.values()).toList())
-                .as("전체 에러 케이스")
-                .hasSize(20)
-                .containsAll(UNREACHABLE);
-        assertThat(UNREACHABLE)
-                .as("발생 경로가 없는 값 — 새로 쓰기 시작하면 시나리오 테스트를 추가한다")
-                .extracting(StudyRoomErrorCase::getErrorCode)
-                .containsExactly(10011, 10012, 10015);
+                .as("전체 에러 케이스 — 값을 추가하면 시나리오 테스트도 추가한다")
+                .hasSize(17);
+        assertThat(Arrays.stream(StudyRoomErrorCase.values()).map(StudyRoomErrorCase::getErrorCode).toList())
+                .as("지운 errorCode 를 재사용하면 구버전 앱이 엉뚱한 메시지를 띄운다")
+                .doesNotContainAnyElementsOf(RETIRED_ERROR_CODES);
     }
 
     @Nested
