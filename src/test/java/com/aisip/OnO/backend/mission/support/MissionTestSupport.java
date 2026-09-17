@@ -1,10 +1,12 @@
 package com.aisip.OnO.backend.mission.support;
 
+import com.aisip.OnO.backend.common.web.AppVersionResolver;
 import com.aisip.OnO.backend.mission.dto.MissionRegisterDto;
 import com.aisip.OnO.backend.mission.entity.MissionLog;
 import com.aisip.OnO.backend.mission.entity.MissionType;
 import com.aisip.OnO.backend.mission.entity.UserMissionStatus;
 import com.aisip.OnO.backend.mission.repository.MissionLogRepository;
+import com.aisip.OnO.backend.mission.service.LegacyAccrualPolicy;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.support.IntegrationTestSupport;
 import com.aisip.OnO.backend.user.entity.User;
@@ -13,8 +15,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.util.AopTestUtils;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -42,32 +46,37 @@ public abstract class MissionTestSupport extends IntegrationTestSupport {
     @Autowired
     protected MissionLogService missionLogService;
 
+    @Autowired
+    private LegacyAccrualPolicy legacyAccrualPolicy;
+
     /** {@code ono.mission.legacy-accrual.enabled} 의 기본값. 설정을 안 건드리면 운영이 이 상태다. */
     protected static final boolean LEGACY_ACCRUAL_DEFAULT = true;
 
     /** {@code ono.mission.mission-capable-version} 의 기본값. */
     protected static final String MISSION_CAPABLE_VERSION_DEFAULT = "4.0.0";
 
+    /** 미션을 받을 수 있는 앱이 보내는 헤더. 프론트가 보내는 형식 그대로다. */
+    protected static final String MISSION_CAPABLE_APP_HEADER = "4.0.0+70";
+
+    /** 기준에 못 미치는 앱이 보내는 헤더. */
+    protected static final String LEGACY_APP_HEADER = "3.9.9+69";
+
     /**
      * 자동 적립 플래그를 바꾼다.
      *
-     * <p>{@code MissionLogService} 는 {@code @Transactional} 프록시라 프록시에 값을 넣으면
-     * 정작 로직이 도는 대상 객체의 필드는 그대로다. 대상 객체를 꺼내서 넣어야 한다.
+     * <p>판정은 {@link LegacyAccrualPolicy} 한 곳에 있어 자동 적립과 미션 진행도가 함께 바뀐다.
+     * 이 빈은 프록시가 아니라 필드에 바로 넣으면 된다.
      *
      * <p>싱글턴 빈을 건드리는 것이라 테스트 사이에 값이 새면 엉뚱한 테스트가 깨진다.
      * 앞뒤로 기본값을 되돌려 이 클래스를 상속하지 않는 테스트까지 오염되지 않게 한다.
      */
     protected void setLegacyAccrual(boolean enabled) {
-        // 대상 객체를 지역 변수로 받아 둔다. getTargetObject 의 반환형이 제네릭이라 그대로 넘기면
-        // 컴파일러가 setField(Class, ...) 오버로드를 골라 실행 시점에 ClassCastException 이 난다.
-        MissionLogService target = AopTestUtils.getTargetObject(missionLogService);
-        ReflectionTestUtils.setField(target, "legacyAccrualEnabled", enabled);
+        ReflectionTestUtils.setField(legacyAccrualPolicy, "legacyAccrualEnabled", enabled);
     }
 
-    /** 자동 적립을 끄는 기준 앱 버전을 바꾼다. 플래그와 같은 이유로 대상 객체에 넣고 앞뒤로 되돌린다. */
+    /** 자동 적립을 끄는 기준 앱 버전을 바꾼다. 플래그와 같은 이유로 앞뒤로 되돌린다. */
     protected void setMissionCapableVersion(String version) {
-        MissionLogService target = AopTestUtils.getTargetObject(missionLogService);
-        ReflectionTestUtils.setField(target, "missionCapableVersion", version);
+        ReflectionTestUtils.setField(legacyAccrualPolicy, "missionCapableVersion", version);
     }
 
     @BeforeEach
@@ -80,6 +89,22 @@ public abstract class MissionTestSupport extends IntegrationTestSupport {
     void restoreAccrualSettingsAfterEachTest() {
         setLegacyAccrual(LEGACY_ACCRUAL_DEFAULT);
         setMissionCapableVersion(MISSION_CAPABLE_VERSION_DEFAULT);
+        // 싱글턴이 아니라 스레드에 붙는 값이라 안 지우면 다음 테스트가 이 헤더를 그대로 물려받는다.
+        RequestContextHolder.resetRequestAttributes();
+    }
+
+    /**
+     * 지금 스레드를 "그 헤더를 단 요청을 처리하는 중" 으로 만든다.
+     *
+     * <p>{@code null} 이면 헤더를 아예 붙이지 않는다. 헤더를 안 보내는 구버전 앱이다.
+     * 자식 스레드에도 물려준다. 동시성 테스트의 작업 스레드도 같은 앱에서 온 요청으로 봐야 하기 때문이다.
+     */
+    protected void requestFromApp(String appVersionHeader) {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        if (appVersionHeader != null) {
+            request.addHeader(AppVersionResolver.APP_VERSION_HEADER, appVersionHeader);
+        }
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request), true);
     }
 
     protected MissionLog saveMissionLog(User user, MissionType missionType, Long referenceId) {

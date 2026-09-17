@@ -22,7 +22,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 프론트에 미션 화면이 나간 뒤 끄면 흡수가 끝난다. 되돌리려면 다시 켜면 된다.
  *
  * <p>플래그가 <b>무엇을 끄고 무엇을 끄지 않는지</b>가 이 클래스의 주제다.
- * 꺼지는 것은 포인트 지급 하나뿐이고, 기록과 중복 방지와 진행도는 양쪽에서 똑같이 돈다.
+ * 기록과 중복 방지는 양쪽에서 똑같이 돈다. 자동 적립과 진행도는 둘 중 하나만 돈다.
+ * 켜져 있으면 헤더 없는 요청은 적립만, 꺼져 있으면 진행도만 오른다.
  */
 @DisplayName("자동 적립 플래그")
 class MissionLegacyAccrualTest extends MissionSystemTestSupport {
@@ -32,6 +33,8 @@ class MissionLegacyAccrualTest extends MissionSystemTestSupport {
     @BeforeEach
     void setUpUser() {
         user = fixtures.createUser();
+        // 헤더를 안 보내는 구버전 앱. 버전 판정은 MissionAccrualAppVersionTest 가 따로 본다.
+        requestFromApp(null);
     }
 
     @Test
@@ -39,7 +42,7 @@ class MissionLegacyAccrualTest extends MissionSystemTestSupport {
     void defaultsToEnabled() throws NoSuchFieldException {
         // 기본값이 꺼짐이면 백엔드만 배포하는 순간 XP 유입이 통째로 멈춘다.
         // 필드 값이 아니라 선언을 본다. 테스트가 값을 바꿔 가며 도는데 값으로 확인하면 순환 논증이다.
-        Field field = MissionLogService.class.getDeclaredField("legacyAccrualEnabled");
+        Field field = LegacyAccrualPolicy.class.getDeclaredField("legacyAccrualEnabled");
 
         assertThat(field.getAnnotation(Value.class).value())
                 .as("프로퍼티 이름과 기본값은 운영에서 끌 때 쓰는 계약이다")
@@ -56,16 +59,16 @@ class MissionLegacyAccrualTest extends MissionSystemTestSupport {
         }
 
         @Test
-        @DisplayName("행동만으로 경험치가 들어오고 진행도도 함께 오른다")
-        void grantsPointAndRaisesProgress() {
+        @DisplayName("행동만으로 경험치가 들어오고 진행도는 오르지 않는다")
+        void grantsPointWithoutRaisingProgress() {
             missionLogService.registerLoginMission(user.getId());
 
             assertThat(accumulatedPoints(status().getAttendanceLevel(), status().getAttendancePoint()))
                     .as("출석 자동 적립")
                     .isEqualTo(MissionType.USER_LOGIN.getPoint());
             assertThat(currentOf(user.getId(), DAILY_ATTEND))
-                    .as("진행도는 플래그와 무관하게 오른다")
-                    .isEqualTo(1);
+                    .as("적립으로 받은 출석을 미션으로 한 번 더 받으면 이중 지급이다")
+                    .isZero();
         }
 
         @Test

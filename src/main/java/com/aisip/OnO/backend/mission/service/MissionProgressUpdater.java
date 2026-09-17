@@ -36,6 +36,13 @@ import java.util.List;
  * <p>덧붙여 이 방식은 "본 작업이 롤백되면 진행도도 남지 않는다"를 그대로 지킨다.
  * 하지도 않은 행동으로 보상을 받는 일은 없다.
  *
+ * <p><b>자동 적립이 도는 요청에서는 올리지 않는다.</b> 로그인, 오답노트 등록, 복습, 세트 완료는
+ * 자동 적립도 함께 부른다. 헤더를 안 보내는 구버전 앱에서 한 활동이 자동 적립 XP 를 받으면서 진행도까지
+ * 완료되면, 같은 사용자가 새 앱으로 미션 화면을 열었을 때 그 미션을 받아 XP 를 한 번 더 받는다.
+ * 판정은 자동 적립과 같은 {@link LegacyAccrualPolicy} 를 본다. 호출부마다 막지 않고 여기 한 곳에서 막는 이유는
+ * 호출부가 여러 도메인에 흩어져 있어 하나라도 빠지면 이중 지급이 다시 열리기 때문이다.
+ * 자동 적립을 부르지 않는 항목({@link MissionMetric#MOOD_LOGGED})은 버전과 무관하게 오른다.
+ *
  * <p>증가는 리포지토리의 upsert 한 문장으로만 한다. 여기서 조회한 뒤 값을 계산해 저장하면
  * 같은 사용자의 요청이 겹칠 때 증가분이 사라진다.
  */
@@ -45,6 +52,7 @@ public class MissionProgressUpdater {
 
     private final MissionDefinitionRepository missionDefinitionRepository;
     private final MissionProgressRepository missionProgressRepository;
+    private final LegacyAccrualPolicy legacyAccrualPolicy;
 
     /**
      * 애노테이션이 여기에도 붙어 있어야 한다. 이 오버로드는 같은 빈의 3인자 메서드를 직접 부르는데,
@@ -62,6 +70,11 @@ public class MissionProgressUpdater {
     @Transactional
     public void increase(Long userId, MissionMetric metric, int amount) {
         if (userId == null || metric == null || amount <= 0) {
+            return;
+        }
+
+        // 이 요청은 자동 적립으로 이미 XP 를 받는다. 진행도까지 채우면 나중에 미션으로 한 번 더 받는다.
+        if (metric.isAlsoAccruedByLegacyPath() && legacyAccrualPolicy.accruesForCurrentRequest()) {
             return;
         }
 
