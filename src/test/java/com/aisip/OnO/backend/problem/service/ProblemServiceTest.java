@@ -1220,20 +1220,20 @@ class ProblemServiceTest extends ProblemTestSupport {
         }
 
         @Test
-        @DisplayName("같은 날 SOLVE_IMAGE 를 두 번 올리면 PROBLEM_SOLVE_IMAGE_ALREADY_REGISTERED")
-        void rejectsSecondSolveImageOnSameDay() {
+        @DisplayName("같은 날 SOLVE_IMAGE 를 두 번 올려도 둘 다 저장된다")
+        void allowsSecondSolveImageOnSameDay() {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
             problemService.addImageDataUrls(problem.getId(), owner.getId(), new AddProblemImageUrlsRequest(List.of(
                     new AddProblemImageUrlsRequest.ImageUrlItem("https://s3/s1.png", "SOLVE_IMAGE")
             )));
 
-            assertThatThrownBy(() -> problemService.addImageDataUrls(problem.getId(), owner.getId(),
-                    new AddProblemImageUrlsRequest(List.of(
-                            new AddProblemImageUrlsRequest.ImageUrlItem("https://s3/s2.png", "SOLVE_IMAGE")
-                    ))))
-                    .isInstanceOf(ApplicationException.class)
-                    .extracting(ProblemServiceTest::errorCaseOf)
-                    .isEqualTo(ProblemErrorCase.PROBLEM_SOLVE_IMAGE_ALREADY_REGISTERED);
+            problemService.addImageDataUrls(problem.getId(), owner.getId(), new AddProblemImageUrlsRequest(List.of(
+                    new AddProblemImageUrlsRequest.ImageUrlItem("https://s3/s2.png", "SOLVE_IMAGE")
+            )));
+
+            assertThat(problemImageDataRepository.findAllByProblemId(problem.getId()))
+                    .as("하루에 여러 번 복습할 수 있어야 한다. 중복 보상은 미션 로그 쪽에서 막는다")
+                    .hasSize(2);
         }
 
         @Test

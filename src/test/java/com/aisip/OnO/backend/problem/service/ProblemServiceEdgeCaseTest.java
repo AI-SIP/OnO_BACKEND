@@ -13,6 +13,8 @@ import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
+import com.aisip.OnO.backend.mission.entity.MissionType;
+import com.aisip.OnO.backend.mission.repository.MissionLogRepository;
 import com.aisip.OnO.backend.problem.support.ProblemTestSupport;
 import com.aisip.OnO.backend.problemsolve.entity.AnswerStatus;
 import com.aisip.OnO.backend.problemsolve.entity.ProblemSolve;
@@ -57,6 +59,9 @@ class ProblemServiceEdgeCaseTest extends ProblemTestSupport {
 
     @Autowired
     private ProblemSolveRepository problemSolveRepository;
+
+    @Autowired
+    private MissionLogRepository missionLogRepository;
 
     private User owner;
     private Folder ownerRoot;
@@ -248,23 +253,25 @@ class ProblemServiceEdgeCaseTest extends ProblemTestSupport {
         }
 
         @Test
-        @DisplayName("풀이 이미지를 올리면 저장되고, 같은 날 두 번째는 거절된다")
-        void solveImageIsLimitedToOncePerDay() {
+        @DisplayName("풀이 이미지는 같은 날 여러 번 올릴 수 있고, 보상은 첫 번째만 들어간다")
+        void solveImageHasNoDailyLimitButRewardIsOncePerDay() {
             given(fileUploadService.uploadFileToS3(any())).willReturn("https://s3/solve.png");
             Problem problem = saveProblem(owner.getId(), ownerRoot);
 
             problemService.uploadProblemImages(problem.getId(), owner.getId(),
                     List.of(image), List.of(ProblemImageType.SOLVE_IMAGE.name()));
+            problemService.uploadProblemImages(problem.getId(), owner.getId(),
+                    List.of(image), List.of(ProblemImageType.SOLVE_IMAGE.name()));
 
             assertThat(problemImageDataRepository.findAllByProblemId(problem.getId()))
-                    .singleElement()
-                    .satisfies(saved -> assertThat(saved.getProblemImageType()).isEqualTo(ProblemImageType.SOLVE_IMAGE));
+                    .as("하루에 두 번 복습했으면 사진도 두 장 남아야 한다")
+                    .hasSize(2)
+                    .allSatisfy(saved -> assertThat(saved.getProblemImageType()).isEqualTo(ProblemImageType.SOLVE_IMAGE));
 
-            assertThatThrownBy(() -> problemService.uploadProblemImages(problem.getId(), owner.getId(),
-                    List.of(image), List.of(ProblemImageType.SOLVE_IMAGE.name())))
-                    .isInstanceOf(ApplicationException.class)
-                    .extracting(ProblemServiceEdgeCaseTest::errorCaseOf)
-                    .isEqualTo(ProblemErrorCase.PROBLEM_SOLVE_IMAGE_ALREADY_REGISTERED);
+            assertThat(missionLogRepository.findAllByUserId(owner.getId()))
+                    .as("사진은 여러 장 남아도 XP 는 하루 한 번만 들어간다")
+                    .filteredOn(log -> log.getMissionType() == MissionType.PROBLEM_PRACTICE)
+                    .hasSize(1);
         }
 
         @Test
