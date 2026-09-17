@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.problem.quartz;
 import com.aisip.OnO.backend.practicenote.service.PracticeNotificationJob;
 import com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderJob;
 import com.aisip.OnO.backend.studyroom.quartz.ChallengeNotificationJob;
+import com.aisip.OnO.backend.studyroom.quartz.StudyRoomWeeklyReportJob;
 import com.aisip.OnO.backend.support.IntegrationTestSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -105,6 +106,35 @@ class QuartzJobRegistrationTest extends IntegrationTestSupport {
         }
     }
 
+    @Nested
+    @DisplayName("스터디룸 주간 리포트 잡")
+    class StudyRoomWeeklyReport {
+
+        private final JobKey jobKey = JobKey.jobKey("studyRoomWeeklyReportJob");
+
+        @Test
+        @DisplayName("잡이 스케줄러에 등록돼 있다")
+        void jobIsRegistered() throws Exception {
+            assertThat(scheduler.checkExists(jobKey))
+                    .as("@Bean 으로 선언만 하면 커스텀 SchedulerFactoryBean 이 등록하지 않는다")
+                    .isTrue();
+
+            JobDetail jobDetail = scheduler.getJobDetail(jobKey);
+            assertThat(jobDetail.getJobClass()).isEqualTo(StudyRoomWeeklyReportJob.class);
+            assertThat(jobDetail.isDurable()).isTrue();
+        }
+
+        @Test
+        @DisplayName("서울 시각 매주 월요일 오전 8시 크론 트리거가 붙어 있다")
+        void triggerFiresEveryMondayEightAmSeoul() throws Exception {
+            assertThat(scheduler.checkExists(TriggerKey.triggerKey("studyRoomWeeklyReportTrigger"))).isTrue();
+
+            CronTrigger trigger = cronTriggerOf(jobKey);
+            assertThat(trigger.getCronExpression()).isEqualTo("0 0 8 ? * MON");
+            assertThat(trigger.getTimeZone()).isEqualTo(TimeZone.getTimeZone("Asia/Seoul"));
+        }
+    }
+
     /**
      * 발화 시각이 되면 스케줄러는 자기 JobFactory 로 잡 인스턴스를 만든 뒤 execute 를 부른다.
      * 잡을 빈으로 주입받아 execute 를 직접 부르는 테스트는 이 생성 단계를 건너뛰어, 생성자 주입 잡이
@@ -151,6 +181,18 @@ class QuartzJobRegistrationTest extends IntegrationTestSupport {
             assertThat(job).isInstanceOf(ChallengeNotificationJob.class);
             assertThat(job).extracting("memberRepository").isNotNull();
             assertThat(job).extracting("fcmService").isNotNull();
+        }
+
+        @Test
+        @DisplayName("스케줄러에 등록된 주간 리포트 잡이 의존성이 채워진 채로 만들어진다")
+        void studyRoomWeeklyReportJob() throws Exception {
+            JobDetail registered = scheduler.getJobDetail(JobKey.jobKey("studyRoomWeeklyReportJob"));
+            assertThat(registered).as("등록돼 있어야 발화한다").isNotNull();
+
+            Job job = newJobLikeFiring(registered);
+
+            assertThat(job).isInstanceOf(StudyRoomWeeklyReportJob.class);
+            assertThat(job).extracting("reportService").isNotNull();
         }
 
         @Test
