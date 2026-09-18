@@ -87,6 +87,25 @@ public class FolderService {
         return folder;
     }
 
+    /**
+     * 부모로 삼을 폴더를 공유 잠금(FOR SHARE)으로 읽는다. (#233)
+     *
+     * <p>문제 등록이 폴더를 잠그고 읽는 것과 같은 이유다. 잠금 없이 읽으면 아직 커밋되지 않은 폴더 삭제를
+     * 못 보고 그 폴더 아래에 새 폴더를 만들거나 기존 폴더를 옮긴다. 삭제가 커밋된 뒤에는 삭제된 폴더를
+     * 부모로 가리키는 살아 있는 폴더가 남아, 앱에서 어느 폴더에도 보이지 않는다.
+     *
+     * <p>잠금 조회는 스냅숏이 아니라 최신 행을 읽으므로, 삭제가 먼저 잡았으면 커밋까지 기다렸다가
+     * {@code deleted_at} 이 찍힌 행을 보고 {@code @SQLRestriction} 에 걸려 기존 {@code FOLDER_NOT_FOUND} 가 된다.
+     *
+     * <p>호출자의 트랜잭션 안에서 실행된다.
+     */
+    private Folder findParentFolderForShare(Long folderId, Long userId) {
+        Folder parentFolder = folderRepository.findByIdForShare(folderId)
+                .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
+        validateFolderOwner(parentFolder, userId);
+        return parentFolder;
+    }
+
     @Transactional(readOnly = true)
     public List<FolderThumbnailResponseDto> findAllUserFolderThumbnails(Long userId) {
         List<Folder> folderList = folderRepository.findAllByUserId(userId);
@@ -138,7 +157,7 @@ public class FolderService {
         }
 
         Folder folder = Folder.from(folderRegisterDto, userId);
-        Folder parentFolder = findFolderEntity(folderRegisterDto.parentFolderId(), userId);
+        Folder parentFolder = findParentFolderForShare(folderRegisterDto.parentFolderId(), userId);
 
         folder.updateParentFolder(parentFolder);
         folderRepository.save(folder);
@@ -157,7 +176,7 @@ public class FolderService {
         folder.updateFolderInfo(folderRegisterDto);
 
         if (folderRegisterDto.parentFolderId() != null && folder.getParentFolder() != null) {
-            Folder newParentFolder = findFolderEntity(folderRegisterDto.parentFolderId(), userId);
+            Folder newParentFolder = findParentFolderForShare(folderRegisterDto.parentFolderId(), userId);
             validateNotCyclic(folder, newParentFolder);
 
             folder.updateParentFolder(newParentFolder);
@@ -179,6 +198,8 @@ public class FolderService {
     }
 
     public void deleteAllUserFoldersWithProblems(Long userId) {
+        // 폴더 하나씩 지우는 경로와 같은 이유로 사용자 폴더 전체를 먼저 잡는다. 이 줄보다 앞에 조회를 두면 안 된다. (#233)
+        folderRepository.lockAllByUserId(userId);
 
         problemService.deleteAllUserProblems(userId);
 
