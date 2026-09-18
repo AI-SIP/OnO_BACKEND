@@ -20,11 +20,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -32,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -140,6 +144,99 @@ class FcmServiceTest {
             when(fcmTokenRepository.existsByUserIdAndToken(anyLong(), anyString())).thenReturn(false);
 
             fcmService.registerToken(new FcmTokenRequestDto("token-1"), 1L);
+
+            verifyNoInteractions(firebaseMessaging);
+        }
+    }
+
+    @Nested
+    @DisplayName("토큰 등록 재시도")
+    class RegisterTokenRetry {
+
+        private FcmTokenWriter fcmTokenWriter;
+        private FcmService serviceWithMockedWriter;
+
+        @BeforeEach
+        void setUpMockedWriter() {
+            fcmTokenWriter = mock(FcmTokenWriter.class);
+            serviceWithMockedWriter = new FcmService(fcmTokenRepository, fcmTokenWriter,
+                    firebaseMessaging, meterRegistry, fcmNotificationProducer);
+        }
+
+        private CannotAcquireLockException deadlock() {
+            return new CannotAcquireLockException("Deadlock found when trying to get lock; try restarting transaction");
+        }
+
+        @Test
+        @DisplayName("교착으로 한 번 실패해도 다시 시도해 성공한다 - 예전에는 그대로 500 이 나갔다")
+        void retriesAfterDeadlock() {
+            AtomicInteger calls = new AtomicInteger();
+            doAnswer(invocation -> {
+                if (calls.getAndIncrement() == 0) {
+                    throw deadlock();
+                }
+                return null;
+            }).when(fcmTokenWriter).register(any(), anyLong());
+
+            assertThatCode(() -> serviceWithMockedWriter.registerToken(new FcmTokenRequestDto("token-1"), 1L))
+                    .doesNotThrowAnyException();
+
+            verify(fcmTokenWriter, times(2)).register(any(), anyLong());
+        }
+
+        @Test
+        @DisplayName("중복 키로 한 번 실패해도 다시 시도해 성공한다")
+        void retriesAfterDuplicateKey() {
+            AtomicInteger calls = new AtomicInteger();
+            doAnswer(invocation -> {
+                if (calls.getAndIncrement() == 0) {
+                    throw new DataIntegrityViolationException("Duplicate entry '1-token-1' for key 'fcm_token.idx_fcm_token_user_token'");
+                }
+                return null;
+            }).when(fcmTokenWriter).register(any(), anyLong());
+
+            assertThatCode(() -> serviceWithMockedWriter.registerToken(new FcmTokenRequestDto("token-1"), 1L))
+                    .doesNotThrowAnyException();
+
+            verify(fcmTokenWriter, times(2)).register(any(), anyLong());
+        }
+
+        @Test
+        @DisplayName("계속 실패해도 정해진 횟수까지만 시도한다 - 무한 재시도는 요청 스레드를 붙잡는다")
+        void stopsAfterMaxAttempts() {
+            doThrow(deadlock()).when(fcmTokenWriter).register(any(), anyLong());
+            when(fcmTokenWriter.exists(anyLong(), anyString())).thenReturn(false);
+
+            assertThatThrownBy(() -> serviceWithMockedWriter.registerToken(new FcmTokenRequestDto("token-1"), 1L))
+                    .isInstanceOf(CannotAcquireLockException.class);
+
+            verify(fcmTokenWriter, times(3)).register(any(), anyLong());
+        }
+
+        @Test
+        @DisplayName("끝까지 실패해도 다른 요청이 같은 행을 넣었으면 성공으로 본다")
+        void succeedsWhenAnotherRequestRegisteredTheSameToken() {
+            doThrow(deadlock()).when(fcmTokenWriter).register(any(), anyLong());
+            when(fcmTokenWriter.exists(1L, "token-1")).thenReturn(true);
+
+            assertThatCode(() -> serviceWithMockedWriter.registerToken(new FcmTokenRequestDto("token-1"), 1L))
+                    .doesNotThrowAnyException();
+
+            verify(fcmTokenWriter, times(3)).register(any(), anyLong());
+        }
+
+        @Test
+        @DisplayName("재시도해도 푸시는 보내지 않는다")
+        void neverSendsWhileRetrying() {
+            AtomicInteger calls = new AtomicInteger();
+            doAnswer(invocation -> {
+                if (calls.getAndIncrement() == 0) {
+                    throw deadlock();
+                }
+                return null;
+            }).when(fcmTokenWriter).register(any(), anyLong());
+
+            serviceWithMockedWriter.registerToken(new FcmTokenRequestDto("token-1"), 1L);
 
             verifyNoInteractions(firebaseMessaging);
         }
