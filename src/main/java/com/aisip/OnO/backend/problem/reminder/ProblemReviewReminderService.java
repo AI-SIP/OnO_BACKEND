@@ -119,8 +119,10 @@ public class ProblemReviewReminderService {
         LocalDateTime startOfDay = today.atStartOfDay();
         LocalDateTime endOfDay = today.plusDays(1).atStartOfDay();
 
+        // 오늘 SENT 뿐 아니라 오늘 선점된 SENDING 행이 있는 사용자도 후보에서 뺀다.
+        // 선점이 바로 커밋되므로, 다른 인스턴스가 선점한 직후 폴링이 돌면 SENT 만으로는 중복을 못 막는다.
         List<ProblemReviewReminder> dueRows = repository.findDueReminders(
-                SCHEDULED, now, SENT, startOfDay, endOfDay, PageRequest.of(0, DUE_REMINDER_BATCH_SIZE)
+                SCHEDULED, now, SENT, SENDING, startOfDay, endOfDay, PageRequest.of(0, DUE_REMINDER_BATCH_SIZE)
         );
         if (dueRows.isEmpty()) return;
 

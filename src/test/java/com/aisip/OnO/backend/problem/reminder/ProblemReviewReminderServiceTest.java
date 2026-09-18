@@ -461,6 +461,48 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         }
 
         @Test
+        @DisplayName("같은 사용자의 다른 예약이 SENDING 이면 오늘의 두 번째 알림을 보내지 않는다")
+        void doesNotSendWhileAnotherReminderIsSending() {
+            giveFcmToken(userId, "token-1");
+            ProblemReviewReminder claimed =
+                    saveDueReminder(userId, 15001L, nowInSendWindow().minusMinutes(10));
+            inTransaction(() ->
+                    reminderRepository.tryUpdateStatus(claimed.getId(), SCHEDULED, SENDING, nowInSendWindow()));
+            ProblemReviewReminder second =
+                    saveDueReminder(userId, 15002L, nowInSendWindow().minusMinutes(5));
+
+            service.sendDueReminders(nowInSendWindow());
+
+            verify(fcmService, never()).sendNotificationToAllUserDevice(any(), any());
+            assertThat(reminderRepository.findById(second.getId()).orElseThrow().getStatus())
+                    .as("다른 인스턴스가 선점해 SENDING 으로 커밋한 직후 폴링이 돌면 같은 날 두 번째 푸시가 나간다")
+                    .isEqualTo(SCHEDULED);
+        }
+
+        @Test
+        @DisplayName("SENDING 에 멈춘 행이 stuck 복구로 FAILED 가 되면 같은 사용자의 다음 예약이 나간다")
+        void stuckSendingRowDoesNotBlockUserForever() {
+            giveFcmToken(userId, "token-1");
+            ProblemReviewReminder stuck =
+                    saveDueReminder(userId, 15101L, nowInSendWindow().minusMinutes(30));
+            inTransaction(() ->
+                    reminderRepository.tryUpdateStatus(stuck.getId(), SCHEDULED, SENDING, nowInSendWindow()));
+            inTransaction(() -> entityManager
+                    .createNativeQuery("UPDATE problem_review_reminder SET updated_at = ? WHERE id = ?")
+                    .setParameter(1, nowInSendWindow().minusMinutes(11))
+                    .setParameter(2, stuck.getId())
+                    .executeUpdate());
+            ProblemReviewReminder next =
+                    saveDueReminder(userId, 15102L, nowInSendWindow().minusMinutes(1));
+
+            service.sendDueReminders(nowInSendWindow());
+
+            assertThat(reminderRepository.findById(next.getId()).orElseThrow().getStatus())
+                    .as("SENDING 가드가 stuck 행 하나로 그 사용자를 영구히 막으면 안 된다")
+                    .isEqualTo(SENT);
+        }
+
+        @Test
         @DisplayName("브로커 장애로 한 사용자의 적재가 실패해도 FAILED 로 남기고 다음 사용자를 계속 처리한다")
         void continuesAfterBrokerFailure() {
             BrokerOutageFcm brokerOutage = BrokerOutageFcm.create(transactionManager, 1);
@@ -468,10 +510,10 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
             User otherUser = fixtures.createUser();
             giveFcmToken(userId, "token-1");
             giveFcmToken(otherUser.getId(), "token-2");
-            ProblemReviewReminder mine = saveDueReminder(userId, 13001L, LocalDateTime.now().minusMinutes(1));
-            ProblemReviewReminder others = saveDueReminder(otherUser.getId(), 13002L, LocalDateTime.now().minusMinutes(1));
+            ProblemReviewReminder mine = saveDueReminder(userId, 13001L, nowInSendWindow().minusMinutes(1));
+            ProblemReviewReminder others = saveDueReminder(otherUser.getId(), 13002L, nowInSendWindow().minusMinutes(1));
 
-            service.sendDueReminders(LocalDateTime.now());
+            service.sendDueReminders(nowInSendWindow());
 
             assertThat(brokerOutage.enqueueAttempts())
                     .as("첫 적재가 실패해도 두 번째 사용자까지 적재를 시도해야 한다")
