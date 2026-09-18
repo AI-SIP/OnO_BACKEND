@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.quartz.*;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
@@ -20,21 +19,18 @@ public class ChallengeNotificationScheduler {
     private static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
 
     private final Scheduler scheduler;
+    private final ChallengeNotificationTimePolicy timePolicy;
 
     public void scheduleNotifications(StudyRoomChallenge challenge) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(ZONE);
         LocalDateTime startAt = challenge.getStartAt();
         LocalDateTime endAt = challenge.getEndAt();
 
-        LocalDateTime halfwayAt = startAt.plus(Duration.between(startAt, endAt).dividedBy(2));
-        if (halfwayAt.isAfter(now)) {
-            schedule(challenge, "HALFWAY", halfwayAt);
-        }
+        timePolicy.resolveHalfwayFireAt(startAt, endAt, now)
+                .ifPresent(fireAt -> schedule(challenge, "HALFWAY", fireAt));
 
-        LocalDateTime oneDayBeforeAt = endAt.minusDays(1);
-        if (oneDayBeforeAt.isAfter(now)) {
-            schedule(challenge, "ONE_DAY_LEFT", oneDayBeforeAt);
-        }
+        timePolicy.resolveOneDayLeftFireAt(startAt, endAt, now)
+                .ifPresent(fireAt -> schedule(challenge, "ONE_DAY_LEFT", fireAt));
     }
 
     public void cancelNotifications(Long challengeId) {
