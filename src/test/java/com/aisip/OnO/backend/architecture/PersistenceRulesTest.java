@@ -136,7 +136,6 @@ class PersistenceRulesTest {
                 "com.aisip.OnO.backend.feedback.service.FeedbackService",
                 "com.aisip.OnO.backend.mission.repository.MissionLogRepositoryImpl",
                 "com.aisip.OnO.backend.practicenote.entity.PracticeNote",
-                "com.aisip.OnO.backend.studyroom.quartz.ChallengeNotificationScheduler",
                 "com.aisip.OnO.backend.studyroom.service.StudyRoomChallengeService",
                 "com.aisip.OnO.backend.studyroom.service.StudyRoomInviteService",
                 "com.aisip.OnO.backend.studyroom.service.StudyRoomWeeklyReportService",
