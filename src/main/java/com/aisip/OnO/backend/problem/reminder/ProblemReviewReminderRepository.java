@@ -14,18 +14,33 @@ public interface ProblemReviewReminderRepository extends JpaRepository<ProblemRe
 
     boolean existsByProblemIdAndSequence(Long problemId, int sequence);
 
+    /**
+     * "오늘 이 사용자를 아직 건드리지 않았는가" 로 후보를 고른다.
+     *
+     * <p>SENT 만 보면 선점(SENDING)과 SENT 기록 사이에 창이 생긴다. 선점은 별도 트랜잭션으로 바로
+     * 커밋되므로, 인스턴스 A 가 예약 X 를 SENDING 으로 커밋한 직후 인스턴스 B 가 폴링하면 X 는
+     * SCHEDULED 가 아니라 후보에서 빠지고 그 사용자의 SENT 행도 아직 없어서, 같은 사용자의 다른
+     * 예약 Y 가 하루 두 번째 푸시로 나갔다. 그래서 오늘 선점된 SENDING 행도 "이미 처리함" 으로 센다.
+     *
+     * <p>선점 시각은 {@code tryUpdateStatus} 가 넣는 {@code updatedAt} 이다. SENDING 이 영영 막지는
+     * 않는다 — 10분 넘게 멈춘 행은 stuck 복구가 FAILED 로 넘긴다.
+     */
     @Query("""
             SELECT r FROM ProblemReviewReminder r
             WHERE r.status = :status
               AND r.scheduledAt <= :now
               AND r.deletedAt IS NULL
               AND NOT EXISTS (
-                  SELECT 1 FROM ProblemReviewReminder sent
-                  WHERE sent.userId = r.userId
-                    AND sent.status = :sent
-                    AND sent.sentAt >= :startOfDay
-                    AND sent.sentAt < :endOfDay
-                    AND sent.deletedAt IS NULL
+                  SELECT 1 FROM ProblemReviewReminder handled
+                  WHERE handled.userId = r.userId
+                    AND handled.deletedAt IS NULL
+                    AND (
+                        (handled.status = :sent
+                            AND handled.sentAt >= :startOfDay AND handled.sentAt < :endOfDay)
+                        OR
+                        (handled.status = :sending
+                            AND handled.updatedAt >= :startOfDay AND handled.updatedAt < :endOfDay)
+                    )
               )
               AND EXISTS (
                   SELECT 1 FROM User u
@@ -42,6 +57,7 @@ public interface ProblemReviewReminderRepository extends JpaRepository<ProblemRe
             @Param("status") ProblemReviewReminderStatus status,
             @Param("now") LocalDateTime now,
             @Param("sent") ProblemReviewReminderStatus sent,
+            @Param("sending") ProblemReviewReminderStatus sending,
             @Param("startOfDay") LocalDateTime startOfDay,
             @Param("endOfDay") LocalDateTime endOfDay,
             Pageable pageable
