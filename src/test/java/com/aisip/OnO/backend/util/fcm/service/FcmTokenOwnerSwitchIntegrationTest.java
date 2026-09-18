@@ -10,8 +10,12 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
+import org.springframework.transaction.interceptor.TransactionInterceptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -22,6 +26,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
  *
  * <p>통합 컨텍스트의 {@link FcmService} 는 발송 사고를 막으려고 목으로 바꿔 두었다.
  * 그래서 저장소만 실제 빈을 쓰고 서비스는 여기서 직접 만든다. 발송 의존성은 전부 목이다.
+ * {@code new} 로 만든 객체에는 트랜잭션 애노테이션이 걸리지 않으므로 트랜잭션 인터셉터를 씌운다.
  */
 @DisplayName("FCM 토큰 계정 전환")
 class FcmTokenOwnerSwitchIntegrationTest extends IntegrationTestSupport {
@@ -31,6 +36,13 @@ class FcmTokenOwnerSwitchIntegrationTest extends IntegrationTestSupport {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    /** 등록 트랜잭션 경계는 여기에 있다. 프록시된 실제 빈을 써야 REQUIRES_NEW 가 걸린다. */
+    @Autowired
+    private FcmTokenWriter fcmTokenWriter;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private FirebaseMessaging firebaseMessaging;
     private FcmService realFcmService;
@@ -43,8 +55,14 @@ class FcmTokenOwnerSwitchIntegrationTest extends IntegrationTestSupport {
             jdbcTemplate.update("INSERT INTO fcm_token_seq (next_val) VALUES (1)");
         }
         firebaseMessaging = mock(FirebaseMessaging.class);
-        realFcmService = new FcmService(
-                fcmTokenRepository, firebaseMessaging, new SimpleMeterRegistry(), mock(FcmNotificationProducer.class));
+        FcmService target = new FcmService(
+                fcmTokenRepository, fcmTokenWriter, firebaseMessaging, new SimpleMeterRegistry(),
+                mock(FcmNotificationProducer.class));
+        ProxyFactory proxyFactory = new ProxyFactory(target);
+        proxyFactory.setProxyTargetClass(true);
+        proxyFactory.addAdvice(
+                new TransactionInterceptor(transactionManager, new AnnotationTransactionAttributeSource()));
+        realFcmService = (FcmService) proxyFactory.getProxy();
     }
 
     @Test
