@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.util.quartz;
 
 import org.quartz.spi.JobFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.quartz.JobStoreType;
 import org.springframework.boot.autoconfigure.quartz.QuartzProperties;
 import org.springframework.context.ApplicationContext;
@@ -20,6 +21,25 @@ public class QuartzConfig {
         AutowiringSpringBeanJobFactory jobFactory = new AutowiringSpringBeanJobFactory();
         jobFactory.setApplicationContext(applicationContext);
         return jobFactory;
+    }
+
+    /**
+     * Quartz 스키마 초기화를 직접 맡는다. 자동 구성의 초기화 빈은
+     * {@code @ConditionalOnMissingBean(QuartzDataSourceScriptDatabaseInitializer.class)} 라
+     * 같은 타입인 이 빈이 있으면 물러난다.
+     *
+     * <p>자동 구성 그대로 두면 {@code initialize-schema: always} 인 dev/prod 에서 기동할 때마다
+     * QRTZ_ 테이블을 지우고 다시 만들어, 사용자가 등록한 알림 트리거가 배포마다 사라졌다.
+     * 자세한 내용은 {@link QuartzSchemaInitializer} 주석에 적었다.
+     *
+     * <p>자동 구성과 같은 조건({@code job-store-type: jdbc})에서만 만든다. 메모리 잡스토어를 쓰는
+     * 테스트 프로필에는 QRTZ_ 테이블 자체가 없어야 하므로 초기화 빈도 있으면 안 된다.
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = "spring.quartz", name = "job-store-type", havingValue = "jdbc")
+    public QuartzSchemaInitializer quartzSchemaInitializer(DataSource dataSource,
+                                                           QuartzProperties quartzProperties) {
+        return new QuartzSchemaInitializer(dataSource, quartzProperties);
     }
 
     /**
