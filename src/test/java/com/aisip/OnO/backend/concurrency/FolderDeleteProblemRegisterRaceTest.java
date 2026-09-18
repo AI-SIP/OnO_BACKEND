@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.concurrency;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
 import com.aisip.OnO.backend.folder.service.FolderService;
@@ -131,6 +132,42 @@ class FolderDeleteProblemRegisterRaceTest extends ProblemTestSupport {
             assertThat(aliveProblemCountInFolder(child.getId())).isZero();
             assertNoOrphanProblems();
         }
+
+        @Test
+        @DisplayName("전체 폴더 삭제도 등록이 끝날 때까지 기다렸다가 새로 들어온 문제까지 함께 지운다")
+        void deleteAllWaitsAndRemovesProblemRegisteredMeanwhile() throws Exception {
+            Future<?> registration = holdUntilReleased(() -> problemService.registerProblem(
+                    new ProblemRegisterDto(null, "경합 메모", null, target.getId(), null), user.getId()));
+
+            Future<?> deletion = executor.submit(() -> folderService.deleteAllUserFoldersWithProblems(user.getId()));
+            awaitFolderLockWaitOrDone(deletion);
+            release.countDown();
+
+            registration.get(STEP_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            deletion.get(STEP_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+            assertThat(aliveProblemCountInFolder(target.getId()))
+                    .as("전체 삭제 경로에는 폴더 잠금이 없어서, 삭제 스냅숏 이후 커밋된 문제가 그대로 남았다")
+                    .isZero();
+            assertNoOrphanProblems();
+        }
+
+        @Test
+        @DisplayName("폴더 생성이 부모를 먼저 잡으면 삭제가 기다렸다가 새 폴더까지 함께 지운다")
+        void deleteWaitsAndRemovesFolderCreatedMeanwhile() throws Exception {
+            Future<?> creation = holdUntilReleased(() -> folderService.createFolder(
+                    new FolderRegisterDto("경합 폴더", null, target.getId()), user.getId()));
+
+            Future<?> deletion = executor.submit(
+                    () -> folderService.deleteFoldersWithProblems(user.getId(), List.of(target.getId())));
+            awaitFolderLockWaitOrDone(deletion);
+            release.countDown();
+
+            creation.get(STEP_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            deletion.get(STEP_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+            assertNoOrphanFolders();
+        }
     }
 
     @Nested
@@ -190,6 +227,40 @@ class FolderDeleteProblemRegisterRaceTest extends ProblemTestSupport {
             assertRejectedWithFolderNotFound(move);
             assertThat(aliveProblemCountInFolder(keep.getId())).isEqualTo(1);
             assertNoOrphanProblems();
+        }
+
+        @Test
+        @DisplayName("삭제 중인 폴더 아래에 새 폴더를 만드는 요청은 FOLDER_NOT_FOUND 로 거절된다")
+        void folderCreationUnderDeletedParentIsRejected() throws Exception {
+            Future<?> deletion = holdUntilReleased(
+                    () -> folderService.deleteFoldersWithProblems(user.getId(), List.of(target.getId())));
+
+            Future<Long> creation = executor.submit(() -> folderService.createFolder(
+                    new FolderRegisterDto("경합 폴더", null, target.getId()), user.getId()));
+            awaitFolderLockWaitOrDone(creation);
+            release.countDown();
+
+            deletion.get(STEP_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            assertRejectedWithFolderNotFound(creation);
+            assertNoOrphanFolders();
+        }
+
+        @Test
+        @DisplayName("삭제 중인 폴더 아래로 폴더를 옮기는 요청도 FOLDER_NOT_FOUND 로 거절된다")
+        void folderMoveUnderDeletedParentIsRejected() throws Exception {
+            Folder moving = fixtures.createFolder(user.getId(), "옮길 폴더", rootFolder);
+
+            Future<?> deletion = holdUntilReleased(
+                    () -> folderService.deleteFoldersWithProblems(user.getId(), List.of(target.getId())));
+
+            Future<?> move = executor.submit(() -> folderService.updateFolder(
+                    new FolderRegisterDto("옮길 폴더", moving.getId(), target.getId()), user.getId()));
+            awaitFolderLockWaitOrDone(move);
+            release.countDown();
+
+            deletion.get(STEP_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            assertRejectedWithFolderNotFound(move);
+            assertNoOrphanFolders();
         }
     }
 
@@ -294,6 +365,18 @@ class FolderDeleteProblemRegisterRaceTest extends ProblemTestSupport {
                 """, Long.class, user.getId());
         assertThat(orphanCount)
                 .as("삭제된 폴더를 가리키는 살아 있는 문제")
+                .isZero();
+    }
+
+    private void assertNoOrphanFolders() {
+        Long orphanCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM folder f
+                JOIN folder p ON p.id = f.parent_folder_id
+                WHERE f.user_id = ? AND f.deleted_at IS NULL AND p.deleted_at IS NOT NULL
+                """, Long.class, user.getId());
+        assertThat(orphanCount)
+                .as("삭제된 폴더를 부모로 가리키는 살아 있는 폴더")
                 .isZero();
     }
 }
