@@ -14,10 +14,12 @@ import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.Notification;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -28,6 +30,7 @@ import java.util.stream.Collectors;
 public class FcmService {
 
     private final FcmTokenRepository fcmTokenRepository;
+    private final FcmTokenWriter fcmTokenWriter;
 
     private final FirebaseMessaging firebaseMessaging;
     private final MeterRegistry meterRegistry;
@@ -40,24 +43,41 @@ public class FcmService {
      * <p>같은 기기에서 A 가 로그아웃하고 B 가 로그인하면 같은 토큰으로 등록이 들어온다.
      * 이때 (A, 토큰) 행을 남겨 두면 A 앞으로 가는 알림(댓글 작성자 이름, 미리보기 포함)이 B 기기에 뜬다.
      * 클라이언트가 로그아웃 때 토큰을 해제하지 않으므로, 서버가 등록 시점에 이전 소유자 행을 지운다.
+     * 실제 조회·삭제·삽입은 {@link FcmTokenWriter} 가 독립 트랜잭션으로 수행한다.
      *
-     * <p>{@code token = ? AND user_id <> ?} 로 바로 DELETE 하지 않고 id 로 골라 지운다.
-     * token 단독 인덱스가 없어 조건 DELETE 는 테이블 전체 행에 잠금을 걸고, 그동안 다른 사용자 등록이 막힌다.
-     * 대부분의 등록은 지울 행이 없으니 잠금 없는 조회로 끝난다.
+     * <p>여기서 트랜잭션을 열지 않는 이유가 있다. 삽입은 (user_id, token) 유니크 인덱스와 경쟁하는데,
+     * 실패한 트랜잭션 안에서는 재조회로 복구할 수 없다. 앱이 로그인 직후 등록과 토큰 갱신 등록을 겹쳐 보내면
+     * 두 요청이 모두 "없음" 을 읽고 INSERT 해 뒤엣것이 Duplicate entry 로 떨어졌고, 운영에서 500 이 나갔다.
+     * (Sentry JAVA-SPRING-BOOT-5J, JAVA-SPRING-BOOT-5H)
+     *
+     * <p>같은 토큰을 한 번 더 등록하는 것은 결과 상태가 같은 재시도다. 그래서 중복은 실패가 아니라 성공으로 본다.
+     * 다만 롤백된 트랜잭션은 이전 소유자 행 삭제까지 되돌리므로, 새 트랜잭션에서 한 번 더 등록을 돌려 맞춘다.
      */
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void registerToken(FcmTokenRequestDto fcmTokenRequestDto, Long userId) {
-        List<FcmToken> previousOwnerTokens =
-                fcmTokenRepository.findAllByTokenAndUserIdNot(fcmTokenRequestDto.token(), userId);
-        if (!previousOwnerTokens.isEmpty()) {
-            fcmTokenRepository.deleteAllInBatch(previousOwnerTokens);
-            log.info("FCM token moved to another user - userId: {}, removedPreviousOwnerRows: {}",
-                    userId, previousOwnerTokens.size());
+        try {
+            fcmTokenWriter.register(fcmTokenRequestDto, userId);
+        } catch (DataIntegrityViolationException e) {
+            log.info("FCM token insert lost the race, retrying - userId: {}", userId);
+            registerAfterLosingRace(fcmTokenRequestDto, userId);
         }
+    }
 
-        if(!fcmTokenRepository.existsByUserIdAndToken(userId, fcmTokenRequestDto.token())){
-            FcmToken fcmToken = FcmToken.From(fcmTokenRequestDto, userId);
-            fcmTokenRepository.save(fcmToken);
+    /**
+     * 중복으로 실패한 등록을 새 트랜잭션에서 한 번 더 시도한다.
+     *
+     * <p>이미 행이 있으면 INSERT 없이 이전 소유자 정리만 확인하고 끝난다.
+     * 재시도까지 중복으로 끝났다면 그 짧은 사이에 또 다른 요청이 같은 행을 넣었다는 뜻이므로,
+     * 원하는 상태가 되었는지 확인하고 되었으면 성공으로 본다. 아니면 원래 예외를 그대로 올린다.
+     */
+    private void registerAfterLosingRace(FcmTokenRequestDto fcmTokenRequestDto, Long userId) {
+        try {
+            fcmTokenWriter.register(fcmTokenRequestDto, userId);
+        } catch (DataIntegrityViolationException retryFailure) {
+            if (!fcmTokenWriter.exists(userId, fcmTokenRequestDto.token())) {
+                throw retryFailure;
+            }
+            log.info("FCM token already registered by a concurrent request - userId: {}", userId);
         }
     }
 

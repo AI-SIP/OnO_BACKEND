@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.config.rabbitmq.producer.FcmNotificationProducer;
 import com.aisip.OnO.backend.util.fcm.dto.NotificationRequestDto;
 import com.aisip.OnO.backend.util.fcm.repository.FcmTokenRepository;
 import com.aisip.OnO.backend.util.fcm.service.FcmService;
+import com.aisip.OnO.backend.util.fcm.service.FcmTokenWriter;
 import com.google.firebase.messaging.FirebaseMessaging;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.amqp.AmqpConnectException;
@@ -63,6 +64,7 @@ public final class BrokerOutageFcm {
         });
         FcmService target = new FcmService(
                 mock(FcmTokenRepository.class),
+                mock(FcmTokenWriter.class),
                 mock(FirebaseMessaging.class),
                 new SimpleMeterRegistry(),
                 new FcmNotificationProducer(rabbitTemplate));

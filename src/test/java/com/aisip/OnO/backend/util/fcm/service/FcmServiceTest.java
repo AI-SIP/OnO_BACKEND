@@ -61,7 +61,10 @@ class FcmServiceTest {
         firebaseMessaging = mock(FirebaseMessaging.class);
         fcmNotificationProducer = mock(FcmNotificationProducer.class);
         meterRegistry = new SimpleMeterRegistry();
-        fcmService = new FcmService(fcmTokenRepository, firebaseMessaging, meterRegistry, fcmNotificationProducer);
+        // 등록 트랜잭션을 여는 라이터는 실제 구현을 쓴다. 프록시가 없으므로 트랜잭션은 열리지 않고
+        // 저장소 호출 순서만 그대로 드러난다.
+        fcmService = new FcmService(fcmTokenRepository, new FcmTokenWriter(fcmTokenRepository),
+                firebaseMessaging, meterRegistry, fcmNotificationProducer);
     }
 
     @AfterEach
@@ -89,7 +92,7 @@ class FcmServiceTest {
             fcmService.registerToken(new FcmTokenRequestDto("token-1"), 1L);
 
             ArgumentCaptor<FcmToken> saved = ArgumentCaptor.forClass(FcmToken.class);
-            verify(fcmTokenRepository).save(saved.capture());
+            verify(fcmTokenRepository).saveAndFlush(saved.capture());
             assertThat(saved.getValue().getUserId()).isEqualTo(1L);
             assertThat(saved.getValue().getToken()).isEqualTo("token-1");
         }
@@ -101,7 +104,7 @@ class FcmServiceTest {
 
             fcmService.registerToken(new FcmTokenRequestDto("token-1"), 1L);
 
-            verify(fcmTokenRepository, never()).save(any());
+            verify(fcmTokenRepository, never()).saveAndFlush(any());
         }
 
         @Test
@@ -115,7 +118,7 @@ class FcmServiceTest {
 
             verify(fcmTokenRepository).deleteAllInBatch(List.of(previousOwner));
             ArgumentCaptor<FcmToken> saved = ArgumentCaptor.forClass(FcmToken.class);
-            verify(fcmTokenRepository).save(saved.capture());
+            verify(fcmTokenRepository).saveAndFlush(saved.capture());
             assertThat(saved.getValue().getUserId()).isEqualTo(2L);
         }
 
@@ -128,7 +131,7 @@ class FcmServiceTest {
             fcmService.registerToken(new FcmTokenRequestDto("token-1"), 1L);
 
             verify(fcmTokenRepository, never()).deleteAllInBatch(any());
-            verify(fcmTokenRepository, never()).save(any());
+            verify(fcmTokenRepository, never()).saveAndFlush(any());
         }
 
         @Test
