@@ -15,7 +15,10 @@ name: Smoke Test
 #  - 보낼 수 있는 요청과 요청 수 상한은 스크립트에 고정되어 있다.
 #
 # 필요한 Secrets (없으면 할 수 있는 단계까지만 한다)
-#   SMOKE_PROD_ACCESS_TOKEN_SECRET, SMOKE_PROD_USER_ID, SMOKE_DEV_ACCESS_TOKEN_SECRET, SMOKE_DEV_USER_ID, DISCORD_WEBHOOK_URL
+#   JWT_ACCESS_TOKEN_SECRET, SMOKE_PROD_USER_ID, SMOKE_DEV_USER_ID, DISCORD_WEBHOOK_URL
+#
+#   JWT_ACCESS_TOKEN_SECRET 은 배포 워크플로가 서버에 넘기는 그 키다(ci-dev.yml, ci-prod.yml). 스모크는 같은 키로
+#   토큰을 직접 만들어 쓰기 때문에 값이 같아야 하고, 따로 복사해 두면 키를 바꿀 때 한쪽만 남아 알림이 계속 울린다.
 #
 # workflow_run 과 schedule 은 이 파일이 기본 브랜치(main)에 있어야 동작한다.
 
@@ -124,7 +127,7 @@ jobs:
         env:
           SMOKE_BASE_URL: ${{ steps.plan.outputs.url }}
           SMOKE_LEVEL: ${{ steps.plan.outputs.level }}
-          SMOKE_ACCESS_TOKEN_SECRET: ${{ secrets.SMOKE_PROD_ACCESS_TOKEN_SECRET }}
+          SMOKE_ACCESS_TOKEN_SECRET: ${{ secrets.JWT_ACCESS_TOKEN_SECRET }}
           SMOKE_USER_ID: ${{ secrets.SMOKE_PROD_USER_ID }}
         run: |
           if [ "$SMOKE_LEVEL" = "bootstrap" ]; then
@@ -140,7 +143,7 @@ jobs:
         env:
           SMOKE_BASE_URL: ${{ steps.plan.outputs.url }}
           SMOKE_LEVEL: ${{ steps.plan.outputs.level }}
-          SMOKE_ACCESS_TOKEN_SECRET: ${{ secrets.SMOKE_DEV_ACCESS_TOKEN_SECRET }}
+          SMOKE_ACCESS_TOKEN_SECRET: ${{ secrets.JWT_ACCESS_TOKEN_SECRET }}
           SMOKE_USER_ID: ${{ secrets.SMOKE_DEV_USER_ID }}
         run: |
           if [ "$SMOKE_LEVEL" = "bootstrap" ]; then
