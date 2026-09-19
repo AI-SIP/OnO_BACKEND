@@ -79,7 +79,7 @@ class StudyRoomChallengeCompletionEventTest extends StudyRoomTestSupport {
             assertThat(dto.getValue().body()).as("알림 본문").contains("다 같이 1문제");
             assertThat(dto.getValue().data())
                     .as("알림 데이터")
-                    .containsEntry("type", "CHALLENGE_COMPLETED")
+                    .containsEntry("type", "challenge_completed")
                     .containsEntry("roomId", String.valueOf(challenge.getRoom().getId()));
         }
 

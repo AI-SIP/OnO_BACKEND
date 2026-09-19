@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.problem.repository.ReviewDueSummary;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
+import com.aisip.OnO.backend.util.fcm.NotificationType;
 import com.aisip.OnO.backend.util.fcm.dto.NotificationRequestDto;
 import com.aisip.OnO.backend.util.fcm.service.FcmService;
 import lombok.extern.slf4j.Slf4j;
@@ -78,7 +79,7 @@ public class ReviewDueNotificationJob extends QuartzJobBean {
             if (sendSafely(user.getId(),
                     new NotificationRequestDto("", "오늘의 복습 알림",
                             "오늘 복습할 문제가 " + dueCount + "개 있어요!",
-                            Map.of("type", "review_due")))) {
+                            Map.of("type", NotificationType.REVIEW_DUE)))) {
                 notifiedUserIds.add(user.getId());
             }
         }
@@ -105,7 +106,7 @@ public class ReviewDueNotificationJob extends QuartzJobBean {
             if (sendSafely(user.getId(),
                     new NotificationRequestDto("", "오랜만이에요!",
                             "오답노트를 펼칠 시간이에요. 복습하러 돌아와보세요!",
-                            Map.of("type", "reengagement")))) {
+                            Map.of("type", NotificationType.REENGAGEMENT)))) {
                 notifiedUserIds.add(user.getId());
             }
         }
@@ -132,7 +133,7 @@ public class ReviewDueNotificationJob extends QuartzJobBean {
             if (sendSafely(user.getId(),
                     new NotificationRequestDto("", "오답노트가 기다리고 있어요",
                             "한동안 자리를 비우셨네요. 다시 시작하기 딱 좋은 날이에요!",
-                            Map.of("type", "reengagement_monthly")))) {
+                            Map.of("type", NotificationType.REENGAGEMENT_MONTHLY)))) {
                 notifiedUserIds.add(user.getId());
             }
         }

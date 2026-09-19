@@ -15,6 +15,7 @@ import com.aisip.OnO.backend.studyroom.repository.*;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.exception.UserErrorCase;
 import com.aisip.OnO.backend.user.repository.UserRepository;
+import com.aisip.OnO.backend.util.fcm.NotificationType;
 import com.aisip.OnO.backend.util.fcm.dto.NotificationRequestDto;
 import com.aisip.OnO.backend.util.fcm.service.FcmService;
 import lombok.RequiredArgsConstructor;
@@ -98,7 +99,7 @@ public class StudyRoomSharedProblemService {
         notifyRoomMembers(roomId, userId,
                 user.getName() + "님이 문제를 공유했어요",
                 referenceOrFallback(problem.getReference()),
-                Map.of("type", "SHARED_PROBLEM", "roomId", String.valueOf(roomId), "sharedProblemId", String.valueOf(sharedProblem.getId())));
+                Map.of("type", NotificationType.SHARED_PROBLEM, "roomId", String.valueOf(roomId), "sharedProblemId", String.valueOf(sharedProblem.getId())));
         return toResponse(sharedProblem, List.of(), 0L, userId);
     }
 
@@ -138,7 +139,7 @@ public class StudyRoomSharedProblemService {
             notifyUser(sharerId,
                     "공유 문제에 반응이 달렸어요",
                     user.getName() + "님이 반응을 추가했어요.",
-                    Map.of("type", "SHARED_PROBLEM_REACTION", "roomId", String.valueOf(roomId), "sharedProblemId", String.valueOf(sharedProblemId)));
+                    Map.of("type", NotificationType.SHARED_PROBLEM_REACTION, "roomId", String.valueOf(roomId), "sharedProblemId", String.valueOf(sharedProblemId)));
         }
         return new SharedProblemReactionToggleResponse(sharedProblemId,
                 reactionService.summarizeSharedProblemReactions(reactionRepository.findAllBySharedProblemId(sharedProblemId), userId));

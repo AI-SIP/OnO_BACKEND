@@ -16,6 +16,7 @@ import com.aisip.OnO.backend.studyroom.repository.StudyRoomSharedProblemReposito
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.exception.UserErrorCase;
 import com.aisip.OnO.backend.user.repository.UserRepository;
+import com.aisip.OnO.backend.util.fcm.NotificationType;
 import com.aisip.OnO.backend.util.fcm.dto.NotificationRequestDto;
 import com.aisip.OnO.backend.util.fcm.service.FcmService;
 import lombok.RequiredArgsConstructor;
@@ -90,7 +91,7 @@ public class StudyRoomSharedProblemCommentService {
                 fcmService.sendNotificationToAllUserDevice(sharerId, new NotificationRequestDto(null,
                         "공유 문제에 댓글이 달렸어요",
                         user.getName() + ": " + preview,
-                        Map.of("type", "SHARED_PROBLEM_COMMENT", "roomId", String.valueOf(roomId), "sharedProblemId", String.valueOf(sharedProblemId))));
+                        Map.of("type", NotificationType.SHARED_PROBLEM_COMMENT, "roomId", String.valueOf(roomId), "sharedProblemId", String.valueOf(sharedProblemId))));
             } catch (Exception e) {
                 log.warn("댓글 알림 발송 실패 - userId: {}", sharerId, e);
             }

@@ -8,6 +8,7 @@ import com.aisip.OnO.backend.studyroom.exception.StudyRoomErrorCase;
 import com.aisip.OnO.backend.studyroom.quartz.ChallengeNotificationScheduler;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomChallengeRepository;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomMemberRepository;
+import com.aisip.OnO.backend.util.fcm.NotificationType;
 import com.aisip.OnO.backend.util.fcm.dto.NotificationRequestDto;
 import com.aisip.OnO.backend.util.fcm.service.FcmService;
 import lombok.RequiredArgsConstructor;
@@ -343,7 +344,7 @@ public class StudyRoomChallengeService {
         NotificationRequestDto dto = new NotificationRequestDto(null,
                 "챌린지 달성! 🎉",
                 "'" + challenge.getTitle() + "' 챌린지를 달성했어요!",
-                Map.of("type", "CHALLENGE_COMPLETED", "roomId", String.valueOf(challenge.getRoom().getId())));
+                Map.of("type", NotificationType.CHALLENGE_COMPLETED, "roomId", String.valueOf(challenge.getRoom().getId())));
         members.forEach(member -> {
             try {
                 fcmService.sendNotificationToAllUserDevice(member.getUser().getId(), dto);
