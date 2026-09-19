@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.user.service;
 
+import com.aisip.OnO.backend.auth.repository.RefreshTokenRepository;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import com.aisip.OnO.backend.folder.service.FolderService;
@@ -90,6 +91,8 @@ class UserServiceTest {
     private UserRegistrationWriter registrationWriter;
     @Mock
     private FcmTokenRepository fcmTokenRepository;
+    @Mock
+    private RefreshTokenRepository refreshTokenRepository;
 
     @InjectMocks
     private UserService userService;
@@ -489,7 +492,22 @@ class UserServiceTest {
             verify(problemService).deleteAllUserProblems(USER_ID);
             verify(folderService).deleteAllUserFolders(USER_ID);
             verify(fcmTokenRepository).deleteAllByUserId(USER_ID);
+            verify(refreshTokenRepository).deleteByUserId(USER_ID);
             verify(userRepository).deleteById(USER_ID);
+        }
+
+        @Test
+        @DisplayName("세션 행은 무거운 정리를 모두 끝낸 뒤 지운다")
+        void deletesRefreshTokenAfterHeavyCleanup() {
+            givenExistingUser(User.from(registerDto));
+
+            userService.deleteUserById(USER_ID);
+
+            InOrder inOrder = inOrder(problemService, studyRoomService, refreshTokenRepository, userRepository);
+            inOrder.verify(studyRoomService).leaveAllRoomsForWithdrawal(USER_ID);
+            inOrder.verify(problemService).deleteAllUserProblems(USER_ID);
+            inOrder.verify(refreshTokenRepository).deleteByUserId(USER_ID);
+            inOrder.verify(userRepository).deleteById(USER_ID);
         }
 
         @Test
@@ -513,6 +531,7 @@ class UserServiceTest {
                     .isInstanceOf(ApplicationException.class);
             verify(problemService, never()).deleteAllUserProblems(anyLong());
             verify(studyRoomService, never()).leaveAllRoomsForWithdrawal(anyLong());
+            verify(refreshTokenRepository, never()).deleteByUserId(anyLong());
             verify(userRepository, never()).deleteById(anyLong());
         }
 

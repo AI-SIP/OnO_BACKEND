@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.user.service;
 
 import com.aisip.OnO.backend.admin.dto.AdminUserResponseDto;
+import com.aisip.OnO.backend.auth.repository.RefreshTokenRepository;
 import com.aisip.OnO.backend.folder.service.FolderService;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
 import com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderService;
@@ -80,6 +81,8 @@ public class UserService {
     private final DiscordWebhookNotificationService discordWebhookNotificationService;
 
     private final FcmTokenRepository fcmTokenRepository;
+
+    private final RefreshTokenRepository refreshTokenRepository;
 
     private User findUserEntity(Long userId){
         return userRepository.findById(userId)
@@ -261,6 +264,9 @@ public class UserService {
         folderService.deleteAllUserFolders(userId);
         // 탈퇴 계정 앞으로 발송이 생기면 그 기기를 이어 쓰는 사람에게 알림이 뜬다. 토큰 행을 남기지 않는다.
         fcmTokenRepository.deleteAllByUserId(userId);
+        // 세션 행이 남으면 다른 기기가 갱신에 성공해 유령 로그인 상태가 된다.
+        // 갱신 요청과 같은 행을 다투므로 잠금 구간을 짧게 두려고 무거운 정리를 모두 끝낸 뒤에 지운다.
+        int deletedSessions = refreshTokenRepository.deleteByUserId(userId);
 
         user.maskIdentifierForDeletion(makeDeletedIdentifier(userId));
         userRepository.flush();
@@ -268,7 +274,7 @@ public class UserService {
         userRepository.deleteById(userId);
         userRepository.flush();
 
-        log.info("userId: {} has deleted", userId);
+        log.info("userId: {} has deleted, refresh session rows removed: {}", userId, deletedSessions);
     }
 
     private String makeDeletedIdentifier(Long userId) {
