@@ -484,46 +484,72 @@ class AuthApiTest extends IntegrationTestSupport {
             refresh(victim.path("refreshToken").asText()).andExpect(status().isOk());
         }
 
-        /**
-         * 계약 불일치(현재 동작을 그대로 고정한다).
-         *
-         * <p>CustomAuthenticationEntryPoint 는 요청 URI 가 {@code /api/auth} 로 시작하면
-         * 아무것도 쓰지 않고 반환한다. 그래서 인증 실패한 로그아웃은 401 + 1007 이 아니라
-         * <b>200 + 빈 본문</b>으로 나간다. 프론트는 errorCode 가 없는 응답을 받게 되고,
-         * 이것이 "errorCode: null 인 UnauthorizedException" 관측과 맞물린다.
-         * 수정 지점은 common/auth 패키지라 여기서는 손대지 않고 동작만 못 박는다.
-         */
         @Test
-        @DisplayName("만료된 액세스 토큰으로 로그아웃하면 401 이 아니라 200 빈 본문이 나간다")
-        void expiredAccessTokenLogoutReturnsEmptyOk() throws Exception {
+        @DisplayName("만료된 액세스 토큰으로 로그아웃하면 401 + 1005 로 막고 세션은 남긴다")
+        void expiredAccessTokenLogoutIsRejected() throws Exception {
             JsonNode tokens = signUpGuest();
             String expiredAccessToken = expiredTokenizer.createAccessToken(
                     "1", Map.of("authority", Authority.ROLE_GUEST));
 
-            MvcResult result = mockMvc.perform(post("/api/auth/logout")
+            mockMvc.perform(post("/api/auth/logout")
                             .header("Authorization", expiredAccessToken)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(
                                     new TokenRequestDto(expiredAccessToken, tokens.path("refreshToken").asText()))))
-                    .andExpect(status().isOk())
-                    .andReturn();
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.errorCode").value(AuthErrorCase.ACCESS_TOKEN_EXPIRED.getErrorCode()));
 
-            assertThat(result.getResponse().getContentAsString(StandardCharsets.UTF_8))
-                    .as("본문이 비어 있어 프론트는 errorCode 없이 이 응답을 해석해야 한다")
-                    .isEmpty();
             assertThat(refreshTokenRepository.findByRefreshToken(tokens.path("refreshToken").asText()))
                     .as("인증이 안 됐으므로 컨트롤러까지 가지 못해 세션은 그대로 남는다")
                     .isPresent();
         }
 
         @Test
-        @DisplayName("인증 없이 로그아웃해도 401 이 아니라 200 빈 본문이 나간다")
-        void anonymousLogoutReturnsEmptyOk() throws Exception {
-            MvcResult result = mockMvc.perform(post("/api/auth/logout"))
-                    .andExpect(status().isOk())
-                    .andReturn();
+        @DisplayName("인증 없이 로그아웃하면 401 + 1007 로 막는다")
+        void anonymousLogoutIsRejected() throws Exception {
+            mockMvc.perform(post("/api/auth/logout"))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.errorCode").value(AuthErrorCase.AUTHENTICATION_FAILED.getErrorCode()));
+        }
 
-            assertThat(result.getResponse().getContentAsString(StandardCharsets.UTF_8)).isEmpty();
+        @Test
+        @DisplayName("쓰레기 토큰으로 로그아웃하면 401 + 1009 로 막고 세션은 남긴다")
+        void garbageAccessTokenLogoutIsRejected() throws Exception {
+            JsonNode tokens = signUpGuest();
+
+            mockMvc.perform(post("/api/auth/logout")
+                            .header("Authorization", "Bearer not-a-real-token")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(
+                                    new TokenRequestDto(null, tokens.path("refreshToken").asText()))))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.errorCode").value(AuthErrorCase.INVALID_ACCESS_TOKEN.getErrorCode()));
+
+            assertThat(refreshTokenRepository.findByRefreshToken(tokens.path("refreshToken").asText()))
+                    .as("막지 못하면 토큰 없이 남의 세션을 지울 수 있게 된다")
+                    .isPresent();
+        }
+
+        @Test
+        @DisplayName("Bearer 형식이 아닌 헤더로 로그아웃하면 401 + 1007 로 막는다")
+        void nonBearerHeaderLogoutIsRejected() throws Exception {
+            mockMvc.perform(post("/api/auth/logout").header("Authorization", "garbage"))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.errorCode").value(AuthErrorCase.AUTHENTICATION_FAILED.getErrorCode()));
+        }
+
+        @Test
+        @DisplayName("정상 토큰이면 200 과 함께 세션을 실제로 지운다")
+        void validTokenLogoutClearsSession() throws Exception {
+            JsonNode tokens = signUpGuest();
+            String accessToken = tokens.path("accessToken").asText();
+            String refreshToken = tokens.path("refreshToken").asText();
+
+            logout(accessToken, refreshToken)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data").value("로그아웃 되었습니다."));
+
+            assertThat(refreshTokenRepository.findByRefreshToken(refreshToken)).isEmpty();
         }
     }
 
