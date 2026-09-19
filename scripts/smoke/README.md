@@ -75,13 +75,14 @@ JWT 서명 키, DB 조회가 어긋나도 알 수 없고 배포와 상관없이 
 ## 처음 설정하는 순서
 
 1. **이 파일이 `main` 에 들어가야 한다.** `workflow_run` 과 `schedule` 과 수동 실행 버튼 모두 기본 브랜치의 워크플로 파일로 돈다.
-2. **`SMOKE_PROD_ACCESS_TOKEN_SECRET` 을 등록한다.** 서버의 `jwt.accessToken.secret` 과 같은 값이다. 이것만 있어도 매시 확인이 인증과 DB 조회까지 본다.
+2. **토큰 서명 키는 이미 있는 `JWT_ACCESS_TOKEN_SECRET` 을 그대로 쓴다.** 배포 워크플로가 서버에 넘기는 그 키다(`ci-dev.yml`, `ci-prod.yml`). 스모크가 같은 키로 토큰을 만들기 때문에 따로 등록할 것이 없다. 이 키만 있어도 매시 확인이 인증과 DB 조회까지 본다.
 3. **스모크 계정을 만든다.** Actions 에서 `Smoke Test` 를 `prod`, `bootstrap` 으로 한 번 실행한다. 게스트 가입이라 Discord 에 가입 알림이 한 번 온다.
 4. **실행 결과 요약에 나온 계정 ID 를 `SMOKE_PROD_USER_ID` 에 등록한다.** 이때부터 `read` 와 `full` 이 스모크 계정으로 돈다.
 5. dev 도 같은 방식으로 `SMOKE_DEV_*` 를 등록한다. dev 서버가 켜져 있을 때 한다.
 
-JWT 서명 키를 바꾸면 `SMOKE_*_ACCESS_TOKEN_SECRET` 도 같이 바꿔야 한다. 계정 ID 는 그대로 쓴다.
-이 시크릿은 서버 서명 키 그 자체라 관리자 토큰도 만들 수 있으니 `main` 에서만 쓸 수 있는 GitHub Environment 에 두는 편이 더 안전하다.
+JWT 서명 키를 바꿔도 `JWT_ACCESS_TOKEN_SECRET` 한 곳만 고치면 된다. 스모크용으로 값을 복사해 두면 한쪽만 남아 서버는 멀쩡한데 알림만 계속 울린다.
+계정 ID 는 키를 바꿔도 그대로 쓴다.
+이 키는 서버 서명 키 그 자체라 관리자 토큰도 만들 수 있으니, `main` 에서만 쓸 수 있는 GitHub Environment 에 두는 편이 더 안전하다.
 
 ## 실패했을 때 읽는 법
 
