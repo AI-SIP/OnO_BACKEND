@@ -3,7 +3,9 @@ package com.aisip.OnO.backend.auth.service;
 import com.aisip.OnO.backend.auth.dto.TokenRequestDto;
 import com.aisip.OnO.backend.auth.dto.TokenResponseDto;
 import com.aisip.OnO.backend.auth.entity.Authority;
+import com.aisip.OnO.backend.auth.exception.AuthErrorCase;
 import com.aisip.OnO.backend.auth.repository.RefreshTokenRepository;
+import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.support.IntegrationTestSupport;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.entity.User;
@@ -22,6 +24,7 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 소셜 로그인 → 토큰 발급 → 저장 → 갱신까지 실제 MySQL 위에서 왕복시킨다.
@@ -218,6 +221,58 @@ class UserAuthServiceIntegrationTest extends IntegrationTestSupport {
             jwtTokenService.logout(tokens.getAccessToken(), userId, tokens.getRefreshToken());
 
             assertThat(refreshTokenRepository.findByRefreshToken(tokens.getRefreshToken())).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("탈퇴 후 세션")
+    class WithdrawalSession {
+
+        @Test
+        @DisplayName("탈퇴하면 남은 리프레시 토큰으로 갱신할 수 없다")
+        void rejectsRefreshAfterWithdrawal() {
+            TokenResponseDto tokens = userAuthService.signUpMemberUser(socialLogin("google-sub-withdraw", "GOOGLE"));
+            Long userId = jwtTokenizer.getUserIdFromRefreshToken(tokens.getRefreshToken());
+
+            userService.deleteUserById(userId);
+
+            assertThatThrownBy(() -> userAuthService.refreshAccessToken(
+                    new TokenRequestDto(tokens.getAccessToken(), tokens.getRefreshToken())))
+                    .as("갱신이 성공하면 앱이 탈퇴한 계정으로 로그인 상태에 들어가 화면이 비어버린다")
+                    .isInstanceOf(ApplicationException.class)
+                    .extracting(e -> ((ApplicationException) e).getErrorCase())
+                    .isEqualTo(AuthErrorCase.REFRESH_TOKEN_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("탈퇴하면 기기별로 쌓인 세션 행이 모두 사라진다")
+        void removesEveryDeviceSessionOnWithdrawal() {
+            TokenResponseDto phone = userAuthService.signUpMemberUser(socialLogin("google-sub-withdraw-devices", "GOOGLE"));
+            TokenResponseDto tablet = userAuthService.signUpMemberUser(socialLogin("google-sub-withdraw-devices", "GOOGLE"));
+            Long userId = jwtTokenizer.getUserIdFromRefreshToken(phone.getRefreshToken());
+            assertThat(refreshTokenRepository.count()).isEqualTo(2);
+
+            userService.deleteUserById(userId);
+
+            assertThat(refreshTokenRepository.findByRefreshToken(phone.getRefreshToken())).isEmpty();
+            assertThat(refreshTokenRepository.findByRefreshToken(tablet.getRefreshToken())).isEmpty();
+            assertThat(refreshTokenRepository.count())
+                    .as("한 기기만 지우면 다른 기기가 계속 갱신에 성공한다")
+                    .isZero();
+        }
+
+        @Test
+        @DisplayName("탈퇴는 다른 사용자의 세션을 건드리지 않는다")
+        void keepsOtherUserSession() {
+            TokenResponseDto leaver = userAuthService.signUpMemberUser(socialLogin("google-sub-withdraw-me", "GOOGLE"));
+            TokenResponseDto stayer = userAuthService.signUpMemberUser(socialLogin("google-sub-withdraw-other", "GOOGLE"));
+
+            userService.deleteUserById(jwtTokenizer.getUserIdFromRefreshToken(leaver.getRefreshToken()));
+
+            assertThat(refreshTokenRepository.findByRefreshToken(stayer.getRefreshToken())).isPresent();
+            assertThatCode(() -> userAuthService.refreshAccessToken(
+                    new TokenRequestDto(stayer.getAccessToken(), stayer.getRefreshToken())))
+                    .doesNotThrowAnyException();
         }
     }
 }
