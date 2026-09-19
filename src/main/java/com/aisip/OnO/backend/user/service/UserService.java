@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.user.service;
 
 import com.aisip.OnO.backend.admin.dto.AdminUserResponseDto;
 import com.aisip.OnO.backend.auth.repository.RefreshTokenRepository;
+import com.aisip.OnO.backend.auth.service.JwtTokenService;
 import com.aisip.OnO.backend.folder.service.FolderService;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
 import com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderService;
@@ -83,6 +84,7 @@ public class UserService {
     private final FcmTokenRepository fcmTokenRepository;
 
     private final RefreshTokenRepository refreshTokenRepository;
+    private final JwtTokenService jwtTokenService;
 
     private User findUserEntity(Long userId){
         return userRepository.findById(userId)
@@ -275,6 +277,26 @@ public class UserService {
         userRepository.flush();
 
         log.info("userId: {} has deleted, refresh session rows removed: {}", userId, deletedSessions);
+        // 탈퇴해도 이미 나간 액세스 토큰은 만료 전(최대 30분)까지 살아 있다. 그 사이에 FCM 토큰 등록처럼
+        // 사용자 존재를 확인하지 않는 요청이 들어오면 방금 지운 fcm_token 행이 되살아난다. (#300)
+        blacklistAccessTokensAfterCommit(userId);
+    }
+
+    /**
+     * 커밋 이후에 막는다. 삭제가 롤백됐는데 토큰을 먼저 막아 버리면
+     * 계정은 멀쩡한데 재로그인으로도 못 푸는 사용자가 생긴다.
+     */
+    private void blacklistAccessTokensAfterCommit(Long userId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            jwtTokenService.blacklistUserAccessTokens(userId);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                jwtTokenService.blacklistUserAccessTokens(userId);
+            }
+        });
     }
 
     private String makeDeletedIdentifier(Long userId) {
