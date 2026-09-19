@@ -50,6 +50,19 @@ import org.springframework.transaction.annotation.Transactional;
  * 행이 사라지면 그 지표들이 통째로 0 이 된다. 중복 방지 판정도 설정과 무관하게 돈다.
  * <b>자동 적립이 도는 요청에서는 미션 진행도가 오르지 않는다.</b> 같은 행동으로 적립과 미션 보상을
  * 둘 다 받지 않게 하기 위해서다. 진행도를 막는 것은 {@link MissionProgressUpdater} 가 한다.
+ *
+ * <p><b>중복 방지는 요청이 어느 경로인가에 따라 보는 범위가 다르다.</b> 자동 적립이 도는 요청은
+ * <b>실제로 적립된 행만</b> 보고, 진행도를 올리는 요청은 지금처럼 모든 행을 본다
+ * ({@code MissionLogRepositoryCustom} 의 {@code accruedOnly}).
+ *
+ * <p>가르는 이유는 같은 계정을 두 기기에서 쓰는 사용자 때문이다(#318). 신버전 요청이 남긴 행을
+ * 구버전 요청의 중복 방지가 그대로 세면, 그 활동은 적립으로도(행에 막혀서) 진행도로도
+ * (구버전이라 막혀서) 남지 않아 <b>어느 쪽으로도 XP 가 들어오지 않는다.</b> 반대로 양쪽 판정을 함께 풀면
+ * 신버전만 쓰는 사용자가 앱을 열 때마다 출석 진행도가 다시 오르므로, 푸는 것은 적립 쪽 하나뿐이다.
+ *
+ * <p>대신 두 기기를 번갈아 쓰면 <b>같은 대상에 대해 한 번은 적립, 한 번은 진행도가 따로 잡힌다.</b>
+ * 기기마다 따로 한 활동이라 요청 하나가 두 경로로 받는 것은 아니다. 활동을 통째로 잃는 것보다 낫다고 보고
+ * 받아들인 값이다.
  */
 @Service
 @RequiredArgsConstructor
@@ -92,7 +105,8 @@ public class MissionLogService {
 
     public void registerLoginMission(Long userId) {
         User user = lockUser(userId);
-        boolean alreadyLogin = missionLogRepository.alreadyLogin(userId);
+        boolean accrues = legacyAccrualPolicy.accruesForCurrentRequest();
+        boolean alreadyLogin = missionLogRepository.alreadyLogin(userId, accrues);
 
         if(!alreadyLogin) {
             MissionRegisterDto missionRegisterDto = MissionRegisterDto
@@ -101,7 +115,7 @@ public class MissionLogService {
                     .missionType(MissionType.USER_LOGIN)
                     .build();
 
-            MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
+            MissionLog missionLog = MissionLog.from(missionRegisterDto, user, accrues);
             missionLogRepository.save(missionLog);
 
             addPointToUser(user, missionLog);
@@ -114,7 +128,9 @@ public class MissionLogService {
 
     public void registerProblemWriteMission(Long userId) {
         User user = lockUser(userId);
-        boolean alreadyWriteMoreThanThreeProblems = missionLogRepository.alreadyWriteProblemsTodayMoreThan3(userId);
+        boolean accrues = legacyAccrualPolicy.accruesForCurrentRequest();
+        boolean alreadyWriteMoreThanThreeProblems =
+                missionLogRepository.alreadyWriteProblemsTodayMoreThan3(userId, accrues);
 
         if(!alreadyWriteMoreThanThreeProblems) {
             MissionRegisterDto missionRegisterDto = MissionRegisterDto
@@ -123,7 +139,7 @@ public class MissionLogService {
                     .missionType(MissionType.PROBLEM_WRITE)
                     .build();
 
-            MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
+            MissionLog missionLog = MissionLog.from(missionRegisterDto, user, accrues);
             missionLogRepository.save(missionLog);
 
             addPointToUser(user, missionLog);
@@ -132,7 +148,8 @@ public class MissionLogService {
 
     public void registerProblemWriteMissionBatch(Long userId, int count) {
         User user = lockUser(userId);
-        long todayCount = missionLogRepository.countProblemWritesToday(userId);
+        boolean accrues = legacyAccrualPolicy.accruesForCurrentRequest();
+        long todayCount = missionLogRepository.countProblemWritesToday(userId, accrues);
         int toCreate = (int) Math.min(count, Math.max(0, 3 - todayCount));
         if (toCreate == 0) return;
 
@@ -142,7 +159,7 @@ public class MissionLogService {
                 .build();
 
         for (int i = 0; i < toCreate; i++) {
-            MissionLog log = MissionLog.from(dto, user);
+            MissionLog log = MissionLog.from(dto, user, accrues);
             missionLogRepository.save(log);
             addPointToUser(user, log);
         }
@@ -150,7 +167,8 @@ public class MissionLogService {
 
     public void registerProblemPracticeMission(Long userId, Long problemId) {
         User user = lockUser(userId);
-        boolean alreadyPracticeProblem = missionLogRepository.alreadyPracticeProblem(problemId);
+        boolean accrues = legacyAccrualPolicy.accruesForCurrentRequest();
+        boolean alreadyPracticeProblem = missionLogRepository.alreadyPracticeProblem(problemId, accrues);
 
         if(!alreadyPracticeProblem) {
             MissionRegisterDto missionRegisterDto = MissionRegisterDto
@@ -160,7 +178,7 @@ public class MissionLogService {
                     .referenceId(problemId)
                     .build();
 
-            MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
+            MissionLog missionLog = MissionLog.from(missionRegisterDto, user, accrues);
             missionLogRepository.save(missionLog);
 
             addPointToUser(user, missionLog);
@@ -169,7 +187,8 @@ public class MissionLogService {
 
     public void registerNotePracticeMission(Long userId, Long practiceNoteId) {
         User user = lockUser(userId);
-        boolean alreadyPracticeNote = missionLogRepository.alreadyPracticeNote(practiceNoteId);
+        boolean accrues = legacyAccrualPolicy.accruesForCurrentRequest();
+        boolean alreadyPracticeNote = missionLogRepository.alreadyPracticeNote(practiceNoteId, accrues);
 
         if(!alreadyPracticeNote) {
             MissionRegisterDto missionRegisterDto = MissionRegisterDto
@@ -179,7 +198,7 @@ public class MissionLogService {
                     .referenceId(practiceNoteId)
                     .build();
 
-            MissionLog missionLog = MissionLog.from(missionRegisterDto, user);
+            MissionLog missionLog = MissionLog.from(missionRegisterDto, user, accrues);
             missionLogRepository.save(missionLog);
 
             addPointToUser(user, missionLog);
@@ -197,7 +216,8 @@ public class MissionLogService {
      * 중복 방지 판정은 그대로 돈다. 진행도 증가는 반대로 적립하는 요청에서만 막힌다.
      *
      * <p>하루 200점 상한은 이 경로에만 있는 규칙이다. 미션 보상은 {@link MissionRewardGranter} 가
-     * 따로 지급하고 상한을 타지 않는다.
+     * 따로 지급하고 상한을 타지 않는다. 상한이 보는 {@code getPointSumToday} 는 적립이 돈 행만 센다.
+     * 적립하지 않은 요청의 행은 {@code point} 가 0 이라 저절로 빠진다.
      */
     private Long addPointToUser(User user, MissionLog missionLog) {
         // 비상 스위치가 꺼졌거나 미션을 받을 수 있는 앱이면 보상 경로 하나만 남긴다.
