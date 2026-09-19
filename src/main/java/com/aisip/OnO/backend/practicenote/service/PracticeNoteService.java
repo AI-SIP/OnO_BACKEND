@@ -60,6 +60,8 @@ public class PracticeNoteService {
 
     private final CustomEmojiValidator customEmojiValidator;
 
+    private final PracticeNotificationWeekDayPolicy weekDayPolicy;
+
     private PracticeNote getPracticeEntity(Long practiceId, Long userId){
 
         PracticeNote practiceNote = practiceNoteRepository.findById(practiceId)
@@ -214,16 +216,26 @@ public class PracticeNoteService {
     }
 
     /**
-     * 주간 반복 알림에 요일이 하나도 없으면 400 으로 거절한다.
+     * 주간 반복 알림에 요일이 하나도 없으면 <b>신버전 앱 요청만</b> 400 으로 거절한다.
      *
-     * <p>스케줄러도 같은 검증을 하지만, 요청을 받은 자리에서 먼저 막아야 복습노트 저장이나
-     * 기존 Quartz 잡 삭제가 아예 일어나지 않는다. Quartz 잡 삭제는 이 트랜잭션과 함께
-     * 롤백되지 않기 때문이다.
+     * <p>이 검증이 요청 진입부에 있는 이유는 복습노트 저장이나 기존 Quartz 잡 삭제가 아예 일어나지
+     * 않아야 하기 때문이다. Quartz 잡 삭제는 이 트랜잭션과 함께 롤백되지 않는다.
+     *
+     * <p>구버전 요청은 예전처럼 통과시킨다. 요일이 빈 주간 반복은 스케줄러의 크론 변환에서
+     * 매일 발송으로 저장된다. 구버전 앱에는 요일을 고르라는 검증이 없어서, 여기서 막으면
+     * 그 사용자는 복습 세트를 영영 수정할 수 없다. 판정 기준은
+     * {@link PracticeNotificationWeekDayPolicy} 한 곳에 있다.
      */
     private void validatePracticeNotification(PracticeNotificationRegisterDto practiceNotification) {
-        if (practiceNotification != null && practiceNotification.isWeeklyWithoutWeekDays()) {
+        if (practiceNotification == null || !practiceNotification.isWeeklyWithoutWeekDays()) {
+            return;
+        }
+
+        if (weekDayPolicy.requiresWeekDays()) {
             throw new ApplicationException(PracticeNoteErrorCase.PRACTICE_NOTIFICATION_WEEK_DAYS_REQUIRED);
         }
+
+        log.info("요일 없는 주간 반복 알림을 구버전 앱 요청으로 보고 매일 발송으로 저장한다");
     }
 
     private <T> List<T> nullSafe(List<T> values) {

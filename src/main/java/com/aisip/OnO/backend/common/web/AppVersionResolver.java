@@ -44,4 +44,21 @@ public class AppVersionResolver {
         HttpServletRequest request = servletAttributes.getRequest();
         return AppVersion.parse(request.getHeader(APP_VERSION_HEADER));
     }
+
+    /**
+     * 이번 요청이 {@code rawThreshold} 와 같거나 높은 버전의 앱에서 왔는가.
+     *
+     * <p><b>모르면 아니라고 답한다.</b> 헤더가 없거나, 읽을 수 없는 값이거나, 애초에 HTTP 요청이 아닌
+     * 자리에서 불렸으면 전부 구버전으로 본다. 기준값을 읽지 못했을 때도 같다. 설정 오타 하나로
+     * 모든 요청이 갑자기 신버전 취급을 받는 것보다, 아무도 신버전이 아닌 쪽이 되돌리기 쉽다.
+     *
+     * <p>버전으로 동작을 가르는 곳이 늘어날 때 이 판정을 각자 들고 있으면 "모르면 구버전" 이라는
+     * 규칙이 곳곳에서 조금씩 달라진다. 비교만 여기에 두고, <b>기준 버전과 그래서 무엇이 달라지는가는
+     * 각 도메인이 정한다.</b> 그래야 한 도메인의 설정이 다른 도메인의 동작을 끌고 가지 않는다.
+     */
+    public boolean isAtLeast(String rawThreshold) {
+        return AppVersion.parse(rawThreshold)
+                .flatMap(threshold -> resolve().map(requested -> requested.isAtLeast(threshold)))
+                .orElse(false);
+    }
 }
