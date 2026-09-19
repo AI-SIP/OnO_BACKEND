@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 public interface ProblemReviewReminderRepository extends JpaRepository<ProblemReviewReminder, Long> {
@@ -107,12 +108,34 @@ public interface ProblemReviewReminderRepository extends JpaRepository<ProblemRe
             @Param("stuckBefore") LocalDateTime stuckBefore
     );
 
-    @Modifying
-    @Query("UPDATE ProblemReviewReminder r SET r.status = :canceled WHERE r.problemId = :problemId AND r.status IN :pendingStatuses AND r.deletedAt IS NULL")
-    int cancelByProblem(
+    /**
+     * 취소할 예약의 ID 만 먼저 읽는다. 잠금을 잡지 않는 일반 조회다. (#319)
+     *
+     * @see #cancelByIdIn
+     */
+    @Query("SELECT r.id FROM ProblemReviewReminder r WHERE r.problemId = :problemId AND r.status IN :pendingStatuses AND r.deletedAt IS NULL")
+    List<Long> findPendingIdsByProblem(
             @Param("problemId") Long problemId,
-            @Param("canceled") ProblemReviewReminderStatus canceled,
             @Param("pendingStatuses") List<ProblemReviewReminderStatus> pendingStatuses
+    );
+
+    /**
+     * 예약을 <b>기본 키로</b> 취소한다. (#319)
+     *
+     * <p>예전에는 {@code WHERE problem_id = ?} 로 한 번에 UPDATE 했다. 그러면 REPEATABLE READ 에서
+     * {@code uq_problem_review_reminder_seq(problem_id, sequence)} 를 범위로 훑으면서 next-key lock 이
+     * 마지막 일치 항목 뒤의 <b>갭까지</b> 잡는다. {@code problem_id} 는 계속 커지므로 그 갭은 대개
+     * supremum(인덱스 끝) 이고, 그러면 <b>그 뒤에 등록되는 모든 문제</b>의 예약 INSERT 가
+     * 사용자와 무관하게 전부 막힌다. 문제 등록은 커밋 직후 예약을 넣기 때문에
+     * ({@code scheduleForNewProblems}), 폴더 하나 지우는 동안 다른 계정의 등록까지 잠금 대기에 걸렸다.
+     *
+     * <p>기본 키 등치 조회는 {@code REC_NOT_GAP} 이라 갭을 잡지 않는다.
+     */
+    @Modifying
+    @Query("UPDATE ProblemReviewReminder r SET r.status = :canceled WHERE r.id IN :ids")
+    int cancelByIdIn(
+            @Param("ids") Collection<Long> ids,
+            @Param("canceled") ProblemReviewReminderStatus canceled
     );
 
     @Modifying

@@ -36,10 +36,14 @@ public interface FolderRepository extends JpaRepository<Folder, Long>, FolderRep
     List<Folder> findAllByIdInForShare(@Param("folderIds") Collection<Long> folderIds);
 
     /**
-     * 폴더 삭제 전에 사용자의 폴더 전체를 배타 잠금(FOR UPDATE)으로 잡는다. (#233)
+     * 전체 폴더 삭제 전에 사용자의 폴더 전체를 배타 잠금(FOR UPDATE)으로 잡는다. (#233)
      *
-     * <p>삭제할 폴더만이 아니라 사용자 폴더 전체를 잡는 이유는 하위 폴더 때문이다. 하위 폴더 목록은
-     * 잠그기 전에는 알 수 없고, 하위 폴더로 들어오는 등록도 막아야 한다.
+     * <p><b>폴더를 골라 지우는 경로는 이걸 쓰지 않는다.</b> 사용자 폴더 전체를 잡으면 삭제와 아무 상관 없는
+     * 폴더로 들어오는 등록까지 전부 줄을 서고, 기다리는 요청이 커넥션을 하나씩 물고 있어서
+     * 커넥션 풀이 바닥난다. 그러면 다른 사용자의 요청까지 커넥션을 못 받고 죽는다. (#319)
+     * 그쪽은 {@link #lockAllByIdIn} 과 {@link #lockAllByParentFolderIdIn} 으로 삭제 대상 서브트리만 잡는다.
+     *
+     * <p>여기는 어차피 사용자 폴더 전부가 삭제 대상이라 범위를 줄일 것이 없다. 계정 정리 때만 타는 드문 경로다.
      *
      * <p><b>반드시 트랜잭션의 첫 조회여야 한다.</b> REPEATABLE READ 는 첫 일반 조회 시점에 스냅숏을 만든다.
      * 잠금보다 먼저 일반 조회를 하면, 잠금을 기다리는 동안 커밋된 등록이 그 스냅숏에 보이지 않아
@@ -48,6 +52,28 @@ public interface FolderRepository extends JpaRepository<Folder, Long>, FolderRep
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select f from Folder f where f.userId = :userId")
     List<Folder> lockAllByUserId(@Param("userId") Long userId);
+
+    /**
+     * 삭제 대상 폴더를 기본 키로 배타 잠금(FOR UPDATE)한다. (#319)
+     *
+     * <p>{@link #lockAllByUserId} 와 달리 {@code idx_folder_user_id} 등치 스캔을 타지 않아
+     * next-key lock 의 갭이 인접 사용자 구간까지 덮지 않는다. 기본 키 등치 조회는 {@code REC_NOT_GAP} 이다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select f from Folder f where f.id in :folderIds")
+    List<Folder> lockAllByIdIn(@Param("folderIds") Collection<Long> folderIds);
+
+    /**
+     * 주어진 폴더들의 바로 아래 하위 폴더를 배타 잠금(FOR UPDATE)으로 읽는다. (#319)
+     *
+     * <p>삭제 대상 서브트리를 한 단계씩 내려가며 잠그는 데 쓴다. <b>일반 조회로 내려가면 안 된다.</b>
+     * 일반 조회는 그 시점의 스냅숏을 고정하므로, 아직 잠그지 못한 하위 폴더에 그 뒤로 커밋된
+     * 문제나 폴더가 보이지 않아 #233 의 고아 데이터가 그대로 돌아온다. 잠금 조회는 스냅숏이 아니라
+     * 최신 행을 읽는다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select f from Folder f where f.parentFolder.id in :parentFolderIds")
+    List<Folder> lockAllByParentFolderIdIn(@Param("parentFolderIds") Collection<Long> parentFolderIds);
 
     /**
      * 훈장 '정리의 신' 판정용. <b>루트 폴더는 빼고</b> 센다.

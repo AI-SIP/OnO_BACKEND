@@ -74,9 +74,21 @@ public class ProblemReviewReminderService {
         }
     }
 
+    /**
+     * 문제 삭제로 남은 예약을 취소한다.
+     *
+     * <p>취소 대상을 먼저 읽고 기본 키로 UPDATE 한다. {@code problem_id} 조건으로 바로 UPDATE 하면
+     * next-key lock 이 인덱스 끝의 갭까지 잡아서, 폴더 삭제가 커밋될 때까지 다른 계정의 문제 등록이
+     * 전부 예약 INSERT 에서 막혔다. (#319, {@link ProblemReviewReminderRepository#cancelByIdIn})
+     */
     @Transactional
     public void cancelPendingByProblem(Long problemId) {
-        int count = repository.cancelByProblem(problemId, CANCELED, PENDING_STATUSES);
+        List<Long> pendingIds = repository.findPendingIdsByProblem(problemId, PENDING_STATUSES);
+        if (pendingIds.isEmpty()) {
+            return;
+        }
+
+        int count = repository.cancelByIdIn(pendingIds, CANCELED);
         if (count > 0) {
             log.info("[ReviewReminder] 문제 삭제로 알림 취소 - problemId: {}, {}건", problemId, count);
         }

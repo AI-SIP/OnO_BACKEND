@@ -87,7 +87,7 @@ class ProblemReviewReminderSenderTest extends ProblemTestSupport {
         @DisplayName("취소된 행도 선점되지 않는다")
         void doesNotSendCanceledRow() {
             ProblemReviewReminder reminder = saveReminder(LocalDateTime.now().minusHours(1));
-            inTransaction(() -> reminderRepository.cancelByProblem(reminder.getProblemId(), CANCELED, List.of(SCHEDULED)));
+            inTransaction(() -> reminderRepository.cancelByIdIn(List.of(reminder.getId()), CANCELED));
 
             sender.send(reminder, LocalDateTime.now());
 
