@@ -54,7 +54,9 @@ class AuthenticationFailureResponseTest {
                 "/grafana/d/board",
                 "/prometheus",
                 "/prometheus/metrics",
-                "/api/auth/login",
+                "/api/auth/signup/guest",
+                "/api/auth/signup/member",
+                "/api/auth/refresh",
                 "/",
                 "/robots.txt",
                 "/home",
@@ -149,20 +151,42 @@ class AuthenticationFailureResponseTest {
                     .contains(AuthErrorCase.AUTHENTICATION_FAILED.getMessage());
         }
 
-        @Test
-        @DisplayName("접두사만 비슷한 경로는 공개 경로로 보지 않는다")
-        void doesNotTreatLookalikePathAsPublic() throws Exception {
+        @ParameterizedTest(name = "{0}")
+        @ValueSource(strings = {
+                "/api/auth/logout",
+                "/api/authorization-test",
+                "/apis/auth",
+                "/grafanas",
+                "/prometheus-admin",
+                "/swagger-uix",
+                "/loginx"
+        })
+        @DisplayName("공개 경로와 접두사만 비슷한 경로는 401 로 막는다")
+        void doesNotTreatLookalikePathAsPublic(String uri) throws Exception {
             MockHttpServletResponse response = new MockHttpServletResponse();
 
-            entryPoint.commence(request("/api/authorization-test"), response, authenticationException);
+            entryPoint.commence(request(uri), response, authenticationException);
 
             assertThat(response.getStatus())
-                    .as("/api/auth 로 시작하는 경로 규칙은 현재 접두사 매칭이다")
-                    .isEqualTo(200);
+                    .as("%s 가 공개로 새면 인증 실패가 빈 200 으로 나간다", uri)
+                    .isEqualTo(401);
+            assertThat(body(response).get("errorCode").asInt())
+                    .isEqualTo(AuthErrorCase.AUTHENTICATION_FAILED.getErrorCode());
+        }
 
-            MockHttpServletResponse other = new MockHttpServletResponse();
-            entryPoint.commence(request("/apis/auth"), other, authenticationException);
-            assertThat(other.getStatus()).isEqualTo(401);
+        @Test
+        @DisplayName("로그아웃은 실패 사유를 그대로 실어 401 로 응답한다")
+        void logoutCarriesFailureReason() throws Exception {
+            MockHttpServletRequest request = request("/api/auth/logout");
+            request.setAttribute(JwtTokenFilter.AUTH_ERROR_CASE_ATTRIBUTE, AuthErrorCase.ACCESS_TOKEN_EXPIRED);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            entryPoint.commence(request, response, authenticationException);
+
+            assertThat(response.getStatus()).isEqualTo(401);
+            assertThat(body(response).get("errorCode").asInt())
+                    .as("만료 사유가 살아야 앱이 갱신 후 다시 로그아웃을 시도한다")
+                    .isEqualTo(AuthErrorCase.ACCESS_TOKEN_EXPIRED.getErrorCode());
         }
     }
 
