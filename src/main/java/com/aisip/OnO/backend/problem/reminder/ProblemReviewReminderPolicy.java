@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.problem.reminder;
 
+import com.aisip.OnO.backend.util.fcm.NotificationType;
 import com.aisip.OnO.backend.util.fcm.dto.NotificationRequestDto;
 import org.springframework.stereotype.Component;
 
@@ -60,7 +61,7 @@ public class ProblemReviewReminderPolicy {
         String body = hasContent ? NOTIFICATION_BODY_DEFAULT : NOTIFICATION_BODY_FALLBACK;
 
         Map<String, String> data = Map.of(
-                "type", "problem_review_reminder",
+                "type", NotificationType.PROBLEM_REVIEW_REMINDER,
                 "problemId", String.valueOf(reminder.getProblemId()),
                 "sequence", String.valueOf(reminder.getSequence()),
                 "intervalDays", String.valueOf(reminder.getIntervalDays())

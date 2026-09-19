@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.practicenote.service;
 
+import com.aisip.OnO.backend.util.fcm.NotificationType;
 import com.aisip.OnO.backend.util.fcm.dto.NotificationRequestDto;
 import com.aisip.OnO.backend.util.fcm.service.FcmService;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +32,9 @@ public class PracticeNotificationJob extends QuartzJobBean {
                         "User Token",
                         "오답노트를 복습할 시간이예요!",
                         practiceTitle + " 복습 세트를 공부할 시간입니다!",
-                        Map.of("practiceId", String.valueOf(practiceId))
+                        // type 이 없으면 앱이 분기하지 못해 알림을 눌러도 아무 화면이 열리지 않는다.
+                        Map.of("type", NotificationType.PRACTICE_NOTE_REMINDER,
+                                "practiceId", String.valueOf(practiceId))
                 )
         );
     }

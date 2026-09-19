@@ -73,7 +73,7 @@ class StudyRoomQuartzJobTest extends StudyRoomTestSupport {
             assertThat(dto.getValue().body()).as("알림 본문").contains("복습 챌린지").contains("절반");
             assertThat(dto.getValue().data())
                     .as("알림 데이터")
-                    .containsEntry("type", "CHALLENGE_NOTIFICATION")
+                    .containsEntry("type", "challenge_notification")
                     .containsEntry("roomId", String.valueOf(fixture.roomId()));
         }
 
