@@ -1,9 +1,7 @@
 
 package com.aisip.OnO.backend.practicenote.service;
 
-import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNotificationRegisterDto;
-import com.aisip.OnO.backend.practicenote.exception.PracticeNoteErrorCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.*;
@@ -16,8 +14,6 @@ public class PracticeNotificationScheduler {
     private final Scheduler scheduler;
 
     public void schedulePracticeNotification(Long userId, Long practiceId, String practiceTitle, PracticeNotificationRegisterDto dto) {
-        validateNotification(dto);
-
         try {
             JobDetail jobDetail = JobBuilder.newJob(PracticeNotificationJob.class)
                     .withIdentity("practice-" + practiceId, "practice-reminder")
@@ -44,10 +40,6 @@ public class PracticeNotificationScheduler {
     }
 
     public void updateNotification(Long userId, Long practiceId, String title, PracticeNotificationRegisterDto dto) {
-        // 잡을 지운 뒤에 검증에 걸리면 기존 알림만 사라진다. Quartz 잡 삭제는 서비스 트랜잭션과
-        // 함께 롤백되지 않으므로, 지우기 전에 먼저 막는다.
-        validateNotification(dto);
-
         deleteNotification(practiceId);
         schedulePracticeNotification(userId, practiceId, title, dto);
     }
@@ -61,18 +53,6 @@ public class PracticeNotificationScheduler {
         }
     }
 
-    /**
-     * 주간 반복인데 요일이 비어 있으면 거절한다.
-     *
-     * <p>예전에는 이 요청이 아래 크론 변환의 매일 폴백으로 흘러가, 사용자가 고르지도 않은
-     * 매일 알림이 등록됐다. 잘못된 요청이라는 신호 없이 동작만 달라지는 쪽이 더 나쁘다.
-     */
-    private void validateNotification(PracticeNotificationRegisterDto dto) {
-        if (dto.isWeeklyWithoutWeekDays()) {
-            throw new ApplicationException(PracticeNoteErrorCase.PRACTICE_NOTIFICATION_WEEK_DAYS_REQUIRED);
-        }
-    }
-
     private String convertDtoToCron(PracticeNotificationRegisterDto dto) {
         int hour = dto.hour();
         int minute = dto.minute();
@@ -80,9 +60,8 @@ public class PracticeNotificationScheduler {
         if ("daily".equalsIgnoreCase(dto.repeatType())) {
             // 매일 지정된 시각에 실행
             return String.format("0 %d %d ? * *", minute, hour);
-        } else if ("weekly".equalsIgnoreCase(dto.repeatType())) {
+        } else if ("weekly".equalsIgnoreCase(dto.repeatType()) && !dto.isWeeklyWithoutWeekDays()) {
             // 선택한 요일에만 지정된 시각에 실행 (e.g. MON,WED,FRI)
-            // 요일이 비어 있는 경우는 validateNotification 이 이미 걸러 냈다.
             String dayString = dto.weekDays().stream()
                     .map(this::convertDayToQuartz)
                     .reduce((a, b) -> a + "," + b)
@@ -91,8 +70,12 @@ public class PracticeNotificationScheduler {
             return String.format("0 %d %d ? * %s", minute, hour, dayString);
         }
 
-        // daily/weekly 가 아닌 값(null 포함)은 지금처럼 매일로 둔다.
-        // 구버전 앱이 repeatType 을 비워 보내는 경우까지 여기서 막으면 기존 알림이 통째로 끊긴다.
+        // 매일 폴백. 여기로 오는 경우는 둘이다.
+        // 1) daily/weekly 가 아닌 값(null 포함). 구버전 앱이 repeatType 을 비워 보낸다.
+        // 2) 주간 반복인데 요일이 비어 있는 구버전 앱 요청. 신버전 요청은 진입부인
+        //    PracticeNoteService 에서 이미 400 으로 걸러지고 여기까지 오지 않는다.
+        //    구버전 앱에는 요일을 고르라는 검증이 없어서, 여기서 막으면 그 사용자는
+        //    복습 세트를 저장할 수도 수정할 수도 없다. 예전 서버와 같게 매일로 저장한다.
         return String.format("0 %d %d ? * *", minute, hour);
     }
 

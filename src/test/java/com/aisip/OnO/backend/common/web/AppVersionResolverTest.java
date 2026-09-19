@@ -79,6 +79,47 @@ class AppVersionResolverTest {
         }
     }
 
+    @Test
+    @DisplayName("기준 버전과 같거나 높으면 참이다")
+    void isAtLeastWhenHeaderMeetsThreshold() {
+        bindRequestWithHeader("4.0.0+70");
+
+        assertThat(resolver.isAtLeast("4.0.0")).isTrue();
+        assertThat(resolver.isAtLeast("3.9.9")).isTrue();
+    }
+
+    @Test
+    @DisplayName("기준 버전보다 낮으면 거짓이다")
+    void isAtLeastFalseBelowThreshold() {
+        bindRequestWithHeader("3.6.0+67");
+
+        assertThat(resolver.isAtLeast("4.0.0")).isFalse();
+    }
+
+    @Test
+    @DisplayName("헤더가 없거나 읽을 수 없거나 HTTP 요청이 아니면 전부 거짓이다")
+    void isAtLeastFalseWhenVersionUnknown() {
+        // 버전으로 동작을 가르는 쪽의 규칙이 "모르면 구버전" 이라 세 경우가 같은 답이어야 한다.
+        bindRequestWithHeader(null);
+        assertThat(resolver.isAtLeast("4.0.0")).isFalse();
+
+        bindRequestWithHeader("abc");
+        assertThat(resolver.isAtLeast("4.0.0")).isFalse();
+
+        RequestContextHolder.resetRequestAttributes();
+        assertThat(resolver.isAtLeast("4.0.0")).isFalse();
+    }
+
+    @Test
+    @DisplayName("기준값을 읽을 수 없으면 아무도 신버전이 아니다")
+    void isAtLeastFalseWhenThresholdUnparsable() {
+        // 설정 오타 하나로 모든 요청이 갑자기 신버전 취급을 받으면 안 된다.
+        bindRequestWithHeader("9.9.9+999");
+
+        assertThat(resolver.isAtLeast("사.영.영")).isFalse();
+        assertThat(resolver.isAtLeast("")).isFalse();
+    }
+
     private void bindRequestWithHeader(String appVersion) {
         MockHttpServletRequest request = new MockHttpServletRequest();
         if (appVersion != null) {

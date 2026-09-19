@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.practicenote.integration;
 
 import com.aisip.OnO.backend.common.emoji.CustomEmojiErrorCase;
+import com.aisip.OnO.backend.common.web.AppVersionResolver;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteCompleteRequestDto;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNoteDeleteRequestDto;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.util.List;
 
@@ -34,6 +36,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @DisplayName("복습노트 API")
 class PracticeNoteIntegrationTest extends PracticeNoteTestSupport {
+
+    /** 요일을 고르게 강제하는 앱. 프론트가 보내는 형식 그대로다. */
+    private static final String NEW_APP_VERSION = "4.0.0+70";
+
+    /** 그 검증이 없는 구버전 앱. */
+    private static final String LEGACY_APP_VERSION = "3.6.0+67";
 
     private Long userId;
     private Long otherUserId;
@@ -197,25 +205,6 @@ class PracticeNoteIntegrationTest extends PracticeNoteTestSupport {
         }
 
         @Test
-        @DisplayName("주간 반복인데 요일이 비어 있으면 400 이고 아무것도 저장하지 않는다")
-        void rejectsWeeklyNotificationWithoutWeekDays() throws Exception {
-            String body = objectMapper.writeValueAsString(new PracticeNoteRegisterDto(
-                    null, "요일 없는 주간 복습", List.of(), weeklyNotification(List.of())));
-
-            mockMvc.perform(post("/api/practiceNotes")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(body))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.errorCode")
-                            .value(PracticeNoteErrorCase.PRACTICE_NOTIFICATION_WEEK_DAYS_REQUIRED.getErrorCode()));
-
-            // 예전에는 매일 발송으로 되돌아가 복습노트까지 그대로 만들어졌다.
-            assertThat(practiceNoteRepository.findAllByUserId(userId)).isEmpty();
-            verify(practiceNotificationScheduler, never())
-                    .schedulePracticeNotification(any(), any(), any(), any());
-        }
-
-        @Test
         @DisplayName("다른 사용자의 문제로는 만들 수 없다")
         void rejectsOtherUserProblem() throws Exception {
             Folder otherUserFolder = fixtures.createRootFolder(otherUserId);
@@ -363,28 +352,6 @@ class PracticeNoteIntegrationTest extends PracticeNoteTestSupport {
         }
 
         @Test
-        @DisplayName("주간 반복인데 요일이 비어 있으면 400 이고 기존 알림을 건드리지 않는다")
-        void rejectsWeeklyNotificationWithoutWeekDays() throws Exception {
-            PracticeNote practiceNote = savePracticeNote(userId, "복습", List.of(), dailyNotification());
-            String body = objectMapper.writeValueAsString(new PracticeNoteUpdateDto(
-                    practiceNote.getId(), "요일 없는 주간", List.of(), List.of(), weeklyNotification(List.of())));
-
-            mockMvc.perform(patch("/api/practiceNotes")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(body))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.errorCode")
-                            .value(PracticeNoteErrorCase.PRACTICE_NOTIFICATION_WEEK_DAYS_REQUIRED.getErrorCode()));
-
-            PracticeNote unchanged = practiceNoteRepository.findById(practiceNote.getId()).orElseThrow();
-            assertThat(unchanged.getTitle()).isEqualTo("복습");
-            assertThat(unchanged.getPracticeNotification().getRepeatType()).isEqualTo("daily");
-            // Quartz 잡 삭제는 트랜잭션과 함께 롤백되지 않는다. 아예 호출되면 안 된다.
-            verify(practiceNotificationScheduler, never()).updateNotification(any(), any(), any(), any());
-            verify(practiceNotificationScheduler, never()).deleteNotification(any());
-        }
-
-        @Test
         @DisplayName("다른 사용자의 복습노트는 수정할 수 없다")
         void rejectsOtherUserPracticeNote() throws Exception {
             PracticeNote practiceNote = savePracticeNote(userId, "내 복습", List.of());
@@ -488,5 +455,130 @@ class PracticeNoteIntegrationTest extends PracticeNoteTestSupport {
             mockMvc.perform(delete("/api/practiceNotes/all"))
                     .andExpect(status().isUnauthorized());
         }
+    }
+
+    /**
+     * 요일 없는 주간 반복 알림을 <b>앱 버전으로 가른다.</b>
+     *
+     * <p>신버전 앱은 요일을 고르게 강제하므로 이 조합을 만들 수 없다. 구버전 앱에는 그 검증이 없어서
+     * 사용자가 "매주" 만 고른 저장이 그대로 올라오고, 예전 서버는 매일 발송으로 받아 줬다. 그래서 운영 DB 에
+     * 요일이 빈 주간 알림 행이 이미 있고, 그 복습 세트를 연 구버전 사용자는 제목만 바꿔도 계속 400 을 받는다.
+     * 앱을 올리기 전에는 빠져나갈 길이 없다.
+     *
+     * <p>헤더가 없는 요청은 구버전이다. 스토어에 나간 빌드가 헤더를 보내지 않는다.
+     *
+     * <p>구버전 요청이 매일 크론으로 변환되는지는 {@code PracticeNotificationSchedulerTest} 가 본다.
+     * 여기서는 요청이 통과해 저장되고 스케줄러까지 그 설정 그대로 닿는지를 본다.
+     */
+    @Nested
+    @DisplayName("요일 없는 주간 반복 알림은 앱 버전으로 가른다")
+    class WeekDaysRequiredByAppVersion {
+
+        @Test
+        @DisplayName("신버전 앱의 등록 요청은 400 이고 아무것도 저장하지 않는다")
+        void rejectsRegisterFromNewApp() throws Exception {
+            String body = objectMapper.writeValueAsString(new PracticeNoteRegisterDto(
+                    null, "요일 없는 주간 복습", List.of(), weeklyNotification(List.of())));
+
+            mockMvc.perform(fromApp(post("/api/practiceNotes"), NEW_APP_VERSION)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode")
+                            .value(PracticeNoteErrorCase.PRACTICE_NOTIFICATION_WEEK_DAYS_REQUIRED.getErrorCode()));
+
+            assertThat(practiceNoteRepository.findAllByUserId(userId)).isEmpty();
+            verify(practiceNotificationScheduler, never())
+                    .schedulePracticeNotification(any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("구버전 앱의 등록 요청은 예전처럼 받아 준다")
+        void acceptsRegisterFromLegacyApp() throws Exception {
+            registersWeeklyWithoutWeekDays(LEGACY_APP_VERSION);
+        }
+
+        @Test
+        @DisplayName("헤더가 없는 등록 요청도 구버전으로 보고 받아 준다")
+        void acceptsRegisterWithoutAppVersionHeader() throws Exception {
+            registersWeeklyWithoutWeekDays(null);
+        }
+
+        @Test
+        @DisplayName("신버전 앱의 수정 요청은 400 이고 기존 알림을 건드리지 않는다")
+        void rejectsUpdateFromNewApp() throws Exception {
+            PracticeNote practiceNote = savePracticeNote(userId, "복습", List.of(), dailyNotification());
+            String body = objectMapper.writeValueAsString(new PracticeNoteUpdateDto(
+                    practiceNote.getId(), "요일 없는 주간", List.of(), List.of(), weeklyNotification(List.of())));
+
+            mockMvc.perform(fromApp(patch("/api/practiceNotes"), NEW_APP_VERSION)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode")
+                            .value(PracticeNoteErrorCase.PRACTICE_NOTIFICATION_WEEK_DAYS_REQUIRED.getErrorCode()));
+
+            PracticeNote unchanged = practiceNoteRepository.findById(practiceNote.getId()).orElseThrow();
+            assertThat(unchanged.getTitle()).isEqualTo("복습");
+            assertThat(unchanged.getPracticeNotification().getRepeatType()).isEqualTo("daily");
+            // Quartz 잡 삭제는 트랜잭션과 함께 롤백되지 않는다. 아예 호출되면 안 된다.
+            verify(practiceNotificationScheduler, never()).updateNotification(any(), any(), any(), any());
+            verify(practiceNotificationScheduler, never()).deleteNotification(any());
+        }
+
+        @Test
+        @DisplayName("구버전 앱의 수정 요청은 예전처럼 받아 준다")
+        void acceptsUpdateFromLegacyApp() throws Exception {
+            updatesWeeklyWithoutWeekDays(LEGACY_APP_VERSION);
+        }
+
+        @Test
+        @DisplayName("헤더가 없는 수정 요청도 구버전으로 보고 받아 준다")
+        void acceptsUpdateWithoutAppVersionHeader() throws Exception {
+            updatesWeeklyWithoutWeekDays(null);
+        }
+
+        private void registersWeeklyWithoutWeekDays(String appVersion) throws Exception {
+            String body = objectMapper.writeValueAsString(new PracticeNoteRegisterDto(
+                    null, "요일 없는 주간 복습", List.of(), weeklyNotification(List.of())));
+
+            String response = mockMvc.perform(fromApp(post("/api/practiceNotes"), appVersion)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString();
+
+            Number practiceNoteId = JsonPath.read(response, "$.data");
+            assertThat(practiceNoteRepository.findById(practiceNoteId.longValue()))
+                    .isPresent()
+                    .hasValueSatisfying(saved ->
+                            assertThat(saved.getPracticeNotification().getRepeatType()).isEqualTo("weekly"));
+            verify(practiceNotificationScheduler).schedulePracticeNotification(
+                    userId, practiceNoteId.longValue(), "요일 없는 주간 복습", weeklyNotification(List.of()));
+        }
+
+        private void updatesWeeklyWithoutWeekDays(String appVersion) throws Exception {
+            PracticeNote practiceNote = savePracticeNote(userId, "복습", List.of(), dailyNotification());
+            String body = objectMapper.writeValueAsString(new PracticeNoteUpdateDto(
+                    practiceNote.getId(), "요일 없는 주간", List.of(), List.of(), weeklyNotification(List.of())));
+
+            mockMvc.perform(fromApp(patch("/api/practiceNotes"), appVersion)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isOk());
+
+            PracticeNote updated = practiceNoteRepository.findById(practiceNote.getId()).orElseThrow();
+            assertThat(updated.getTitle()).isEqualTo("요일 없는 주간");
+            assertThat(updated.getPracticeNotification().getRepeatType()).isEqualTo("weekly");
+            verify(practiceNotificationScheduler).updateNotification(
+                    userId, practiceNote.getId(), "요일 없는 주간", weeklyNotification(List.of()));
+        }
+    }
+
+    /** {@code null} 이면 헤더를 아예 붙이지 않는다. 헤더를 안 보내는 구버전 앱이다. */
+    private MockHttpServletRequestBuilder fromApp(MockHttpServletRequestBuilder request, String appVersion) {
+        return appVersion == null
+                ? request
+                : request.header(AppVersionResolver.APP_VERSION_HEADER, appVersion);
     }
 }
