@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.user.service;
 
 import com.aisip.OnO.backend.auth.repository.RefreshTokenRepository;
+import com.aisip.OnO.backend.auth.service.JwtTokenService;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import com.aisip.OnO.backend.folder.service.FolderService;
@@ -93,6 +94,8 @@ class UserServiceTest {
     private FcmTokenRepository fcmTokenRepository;
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
+    @Mock
+    private JwtTokenService jwtTokenService;
 
     @InjectMocks
     private UserService userService;
@@ -545,6 +548,30 @@ class UserServiceTest {
             userService.deleteUserById(USER_ID);
 
             verify(s3DeleteProducer).sendDeleteMessage("https://cdn.test.ono/profile.png", USER_ID);
+        }
+
+        /**
+         * 이걸 빼면 탈퇴한 계정의 액세스 토큰이 만료 전까지 살아 있어서, 사용자 존재를 확인하지 않는
+         * 엔드포인트(POST /api/fcm/token)가 방금 지운 fcm_token 행을 다시 넣는다. (#300)
+         */
+        @Test
+        @DisplayName("탈퇴하면 그 사용자 앞으로 나간 액세스 토큰을 막는다")
+        void blacklistsIssuedAccessTokens() {
+            givenExistingUser(User.from(registerDto));
+
+            userService.deleteUserById(USER_ID);
+
+            verify(jwtTokenService).blacklistUserAccessTokens(USER_ID);
+        }
+
+        @Test
+        @DisplayName("없는 사용자면 토큰을 막지 않는다")
+        void doesNotBlacklistWhenUserIsMissing() {
+            given(userRepository.findById(404L)).willReturn(Optional.empty());
+
+            assertThatThrownBy(() -> userService.deleteUserById(404L))
+                    .isInstanceOf(ApplicationException.class);
+            verify(jwtTokenService, never()).blacklistUserAccessTokens(anyLong());
         }
     }
 

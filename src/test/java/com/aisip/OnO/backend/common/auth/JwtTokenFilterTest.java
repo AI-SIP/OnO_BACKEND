@@ -275,6 +275,41 @@ class JwtTokenFilterTest {
             assertThat(chain.getRequest()).isNotNull();
         }
 
+        /**
+         * 탈퇴한 계정의 토큰은 서명도 만료도 멀쩡하다. 토큰 문자열 블랙리스트는 탈퇴 요청에 실린
+         * 그 한 장밖에 못 막으므로, 사용자 단위로 한 번 더 본다. 이게 없으면 사용자 존재를 확인하지
+         * 않는 엔드포인트(POST /api/fcm/token)가 최대 30분간 200 으로 동작한다. (#300)
+         */
+        @Test
+        @DisplayName("탈퇴한 사용자의 토큰은 INVALID_ACCESS_TOKEN 이다")
+        void marksWithdrawnUserToken() throws Exception {
+            givenValidToken(9L, Authority.ROLE_MEMBER);
+            given(redisTokenService.isUserBlacklisted(9L)).willReturn(true);
+            MockHttpServletRequest request = requestWith("Bearer " + VALID_TOKEN);
+
+            MockFilterChain chain = doFilter(request);
+
+            assertThat(errorAttribute(request)).isEqualTo(AuthErrorCase.INVALID_ACCESS_TOKEN);
+            assertThat(SecurityContextHolder.getContext().getAuthentication())
+                    .as("탈퇴한 계정으로 인증되면 지운 데이터가 되살아난다")
+                    .isNull();
+            assertThat(chain.getRequest()).as("체인은 항상 이어져야 한다").isNotNull();
+        }
+
+        @Test
+        @DisplayName("탈퇴하지 않은 사용자는 그대로 인증된다")
+        void keepsAuthenticationForLivingUser() throws Exception {
+            givenValidToken(9L, Authority.ROLE_MEMBER);
+            given(redisTokenService.isUserBlacklisted(9L)).willReturn(false);
+            MockHttpServletRequest request = requestWith("Bearer " + VALID_TOKEN);
+
+            doFilter(request);
+
+            assertThat(errorAttribute(request)).isNull();
+            assertThat(SecurityContextHolder.getContext().getAuthentication().getPrincipal())
+                    .isEqualTo(9L);
+        }
+
         @Test
         @DisplayName("만료된 토큰은 ACCESS_TOKEN_EXPIRED 다 - 프론트의 갱신 트리거")
         void marksExpiredToken() throws Exception {

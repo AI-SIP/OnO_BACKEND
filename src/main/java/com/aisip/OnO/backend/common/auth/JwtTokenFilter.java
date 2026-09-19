@@ -76,11 +76,24 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                     return;
                 }
 
-                // 3. 인증 정보 설정
+                // 3. 클레임 해석
                 Claims claims = jwtTokenizer.getClaimsFromAccessToken(accessToken);
                 Long userId = Long.valueOf(claims.getSubject());
                 Authority authority = Authority.valueOf(claims.get("authority", String.class));
 
+                // 4. 탈퇴한 계정인지 확인
+                // 액세스 토큰은 서명과 만료만으로 통과하므로, 탈퇴한 뒤에도 만료 전(최대 30분)까지는
+                // 사용자 존재를 확인하지 않는 엔드포인트가 그대로 동작한다. 실제로 탈퇴 계정의 토큰으로
+                // POST /api/fcm/token 이 200 이 나면서 지웠던 fcm_token 행이 되살아났다(#300).
+                // 매 요청마다 DB 로 사용자 존재를 확인하는 대신, 탈퇴 시점에 사용자 단위 블랙리스트를
+                // 심어 두고 여기서 확인한다. 아래 블랙리스트 조회와 같은 Redis 경로라 DB 부하가 늘지 않는다.
+                if (redisTokenService.isUserBlacklisted(userId)) {
+                    request.setAttribute(AUTH_ERROR_CASE_ATTRIBUTE, AuthErrorCase.INVALID_ACCESS_TOKEN);
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+
+                // 5. 인증 정보 설정
                 List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(authority.name()));
 
                 UsernamePasswordAuthenticationToken authentication =
