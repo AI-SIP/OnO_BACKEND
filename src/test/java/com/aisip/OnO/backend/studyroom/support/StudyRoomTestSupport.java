@@ -172,9 +172,14 @@ public abstract class StudyRoomTestSupport extends IntegrationTestSupport {
 
     // ─────────────────────────── 챌린지 ───────────────────────────
 
-    /** 지금 시작해 7일 뒤 끝나는 개인 문제 등록 챌린지. */
+    /** 지금 시작해 7일 뒤 끝나는 개인 문제 등록 챌린지. 작성자는 방장이다. */
     protected StudyRoomChallenge saveChallenge(StudyRoom room, int targetValue) {
-        return saveChallenge(room, "챌린지", StudyRoomChallengeType.INDIVIDUAL,
+        return saveChallenge(room, room.getHostUserId(), targetValue);
+    }
+
+    /** 작성자를 지정한 챌린지. 삭제 권한 조합 검증에 쓴다. */
+    protected StudyRoomChallenge saveChallenge(StudyRoom room, Long createdByUserId, int targetValue) {
+        return saveChallenge(room, createdByUserId, "챌린지", StudyRoomChallengeType.INDIVIDUAL,
                 StudyRoomChallengeMetric.PROBLEM_COUNT, null, null, targetValue,
                 LocalDateTime.now().minusHours(1), LocalDateTime.now().plusDays(7));
     }
@@ -183,8 +188,17 @@ public abstract class StudyRoomTestSupport extends IntegrationTestSupport {
                                                StudyRoomChallengeMetric metric, StudyRoomChallengePeriod period,
                                                Integer periodDays, int targetValue,
                                                LocalDateTime startAt, LocalDateTime endAt) {
+        return saveChallenge(room, room.getHostUserId(), title, type, metric, period, periodDays, targetValue,
+                startAt, endAt);
+    }
+
+    protected StudyRoomChallenge saveChallenge(StudyRoom room, Long createdByUserId, String title,
+                                               StudyRoomChallengeType type,
+                                               StudyRoomChallengeMetric metric, StudyRoomChallengePeriod period,
+                                               Integer periodDays, int targetValue,
+                                               LocalDateTime startAt, LocalDateTime endAt) {
         return challengeRepository.saveAndFlush(StudyRoomChallenge.create(
-                room, title, type, metric, period, periodDays, targetValue, startAt, endAt));
+                room, createdByUserId, title, type, metric, period, periodDays, targetValue, startAt, endAt));
     }
 
     // ─────────────────────────── 공유 문제 / 댓글 ───────────────────────────

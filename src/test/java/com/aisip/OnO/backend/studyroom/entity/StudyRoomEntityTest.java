@@ -221,7 +221,7 @@ class StudyRoomEntityTest {
         @DisplayName("생성 직후 상태는 항상 IN_PROGRESS 이고 완료 시각은 비어 있다")
         void createStartsInProgress() {
             LocalDateTime startAt = LocalDateTime.now();
-            StudyRoomChallenge challenge = StudyRoomChallenge.create(room, "챌린지",
+            StudyRoomChallenge challenge = StudyRoomChallenge.create(room, room.getHostUserId(), "챌린지",
                     StudyRoomChallengeType.INDIVIDUAL, StudyRoomChallengeMetric.PROBLEM_COUNT,
                     null, null, 5, startAt, startAt.plusDays(7));
 
@@ -256,10 +256,10 @@ class StudyRoomEntityTest {
         @DisplayName("period 를 쓰면 periodDays 없이, periodDays 를 쓰면 period 없이 저장된다")
         void periodAndPeriodDaysAreMutuallyExclusiveByConstruction() {
             LocalDateTime startAt = LocalDateTime.now();
-            StudyRoomChallenge weekly = StudyRoomChallenge.create(room, "주간", StudyRoomChallengeType.GROUP,
+            StudyRoomChallenge weekly = StudyRoomChallenge.create(room, room.getHostUserId(), "주간", StudyRoomChallengeType.GROUP,
                     StudyRoomChallengeMetric.PRACTICE_COUNT, StudyRoomChallengePeriod.WEEKLY, null, 3,
                     startAt, startAt.plusDays(21));
-            StudyRoomChallenge custom = StudyRoomChallenge.create(room, "3일 주기", StudyRoomChallengeType.GROUP,
+            StudyRoomChallenge custom = StudyRoomChallenge.create(room, room.getHostUserId(), "3일 주기", StudyRoomChallengeType.GROUP,
                     StudyRoomChallengeMetric.PRACTICE_COUNT, null, 3, 3,
                     startAt, startAt.plusDays(21));
 
@@ -273,7 +273,7 @@ class StudyRoomEntityTest {
         @DisplayName("기간이 0일인 챌린지(시작=종료)도 엔티티 수준에서는 만들어진다")
         void zeroLengthPeriodIsAcceptedByEntity() {
             LocalDateTime at = LocalDateTime.now();
-            StudyRoomChallenge challenge = StudyRoomChallenge.create(room, "0일", StudyRoomChallengeType.INDIVIDUAL,
+            StudyRoomChallenge challenge = StudyRoomChallenge.create(room, room.getHostUserId(), "0일", StudyRoomChallengeType.INDIVIDUAL,
                     StudyRoomChallengeMetric.PROBLEM_COUNT, null, null, 1, at, at);
 
             assertThat(challenge.getStartAt())
@@ -283,7 +283,7 @@ class StudyRoomEntityTest {
 
         private StudyRoomChallenge inProgressChallenge() {
             LocalDateTime startAt = LocalDateTime.now();
-            return StudyRoomChallenge.create(room, "챌린지", StudyRoomChallengeType.INDIVIDUAL,
+            return StudyRoomChallenge.create(room, room.getHostUserId(), "챌린지", StudyRoomChallengeType.INDIVIDUAL,
                     StudyRoomChallengeMetric.PROBLEM_COUNT, null, null, 5, startAt, startAt.plusDays(7));
         }
     }

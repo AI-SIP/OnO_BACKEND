@@ -83,7 +83,8 @@ public final class StudyRoomDtos {
                                     Integer periodDays, Integer targetValue,
                                     LocalDateTime startAt, LocalDateTime endAt, String status,
                                     List<ChallengeMemberProgressResponse> memberProgress,
-                                    Integer groupCurrent) {
+                                    Integer groupCurrent,
+                                    Long createdByUserId, boolean canDelete) {
     }
 
     public record ChallengeMemberProgressResponse(Long userId, String name, String profileImageUrl, int current, boolean cleared) {
