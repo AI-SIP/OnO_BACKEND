@@ -24,6 +24,16 @@ public class StudyRoomChallenge extends BaseEntity {
     @JoinColumn(name = "room_id", nullable = false)
     private StudyRoom room;
 
+    /**
+     * 챌린지를 만든 사용자.
+     *
+     * <p>{@code StudyRoom.hostUserId} 와 같이 FK 없는 식별자로 둔다. 사용자 탈퇴는 소프트 삭제라
+     * 행이 남지만, 방장 식별자와 같은 방식을 쓰는 편이 이 도메인 안에서 일관된다.
+     * 기존 행은 V46 마이그레이션에서 방장으로 채웠다(그때까지 방장만 지울 수 있었다).
+     */
+    @Column(name = "created_by_user_id", nullable = false)
+    private Long createdByUserId;
+
     @Column(nullable = false, length = 40)
     private String title;
 
@@ -58,12 +68,14 @@ public class StudyRoomChallenge extends BaseEntity {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
-    public static StudyRoomChallenge create(StudyRoom room, String title, StudyRoomChallengeType type,
+    public static StudyRoomChallenge create(StudyRoom room, Long createdByUserId, String title,
+                                            StudyRoomChallengeType type,
                                             StudyRoomChallengeMetric metric, StudyRoomChallengePeriod period,
                                             Integer periodDays, Integer targetValue,
                                             LocalDateTime startAt, LocalDateTime endAt) {
         return StudyRoomChallenge.builder()
                 .room(room)
+                .createdByUserId(createdByUserId)
                 .title(title)
                 .type(type)
                 .metric(metric)
@@ -74,6 +86,11 @@ public class StudyRoomChallenge extends BaseEntity {
                 .endAt(endAt)
                 .status(StudyRoomChallengeStatus.IN_PROGRESS)
                 .build();
+    }
+
+    /** 이 챌린지를 만든 사용자인지 확인한다. */
+    public boolean isCreatedBy(Long userId) {
+        return userId != null && userId.equals(createdByUserId);
     }
 
     public void updateStatus(StudyRoomChallengeStatus status) {

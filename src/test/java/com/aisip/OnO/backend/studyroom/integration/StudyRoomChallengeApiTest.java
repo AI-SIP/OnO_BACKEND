@@ -9,11 +9,18 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.quartz.Scheduler;
+import org.quartz.SchedulerException;
+import org.quartz.TriggerKey;
+import org.quartz.impl.matchers.GroupMatcher;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -26,6 +33,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class StudyRoomChallengeApiTest extends StudyRoomTestSupport {
 
     private static final LocalDateTime NOW = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+
+    @Autowired
+    private Scheduler scheduler;
 
     @Nested
     @DisplayName("생성")
@@ -44,9 +54,13 @@ class StudyRoomChallengeApiTest extends StudyRoomTestSupport {
                     .andExpect(jsonPath("$.data.type").value("individual"))
                     .andExpect(jsonPath("$.data.metric").value("problem_count"))
                     .andExpect(jsonPath("$.data.status").value("in_progress"))
-                    .andExpect(jsonPath("$.data.targetValue").value(10));
+                    .andExpect(jsonPath("$.data.targetValue").value(10))
+                    .andExpect(jsonPath("$.data.createdByUserId").value(fixture.member().getId()))
+                    .andExpect(jsonPath("$.data.canDelete").value(true));
 
             assertThat(challengeRepository.findAll()).as("저장된 챌린지").hasSize(1);
+            assertThat(challengeRepository.findAll().get(0).getCreatedByUserId())
+                    .as("저장된 작성자").isEqualTo(fixture.member().getId());
         }
 
         @Test
@@ -293,6 +307,29 @@ class StudyRoomChallengeApiTest extends StudyRoomTestSupport {
         }
 
         @Test
+        @DisplayName("canDelete 는 작성자 본인과 방장에게만 true 다")
+        void canDeleteIsTrueOnlyForCreatorAndHost() throws Exception {
+            RoomFixture fixture = createRoomWithMemberAndOutsider();
+            User otherMember = fixtures.createUser("otherMember");
+            addMember(fixture.room(), otherMember);
+            StudyRoomChallenge challenge = saveChallenge(fixture.room(), fixture.member().getId(), 5);
+
+            authenticateAs(fixture.member().getId());
+            mockMvc.perform(get("/api/study-room/{roomId}/challenges", fixture.roomId()))
+                    .andExpect(jsonPath("$.data[0].createdByUserId").value(fixture.member().getId()))
+                    .andExpect(jsonPath("$.data[0].canDelete").value(true));
+
+            authenticateAs(fixture.host().getId());
+            mockMvc.perform(get("/api/study-room/{roomId}/challenges", fixture.roomId()))
+                    .andExpect(jsonPath("$.data[0].canDelete").value(true));
+
+            authenticateAs(otherMember.getId());
+            mockMvc.perform(get("/api/study-room/{roomId}/challenges", fixture.roomId()))
+                    .andExpect(jsonPath("$.data[0].challengeId").value(challenge.getId()))
+                    .andExpect(jsonPath("$.data[0].canDelete").value(false));
+        }
+
+        @Test
         @DisplayName("아직 시작 전인 챌린지도 in_progress 로 조회된다")
         void notYetStartedChallengeIsInProgress() throws Exception {
             RoomFixture fixture = createRoomWithMemberAndOutsider();
@@ -473,10 +510,10 @@ class StudyRoomChallengeApiTest extends StudyRoomTestSupport {
     class DeleteChallenge {
 
         @Test
-        @DisplayName("방장은 챌린지를 삭제할 수 있다")
-        void hostCanDelete() throws Exception {
+        @DisplayName("방장은 다른 멤버가 만든 챌린지도 삭제할 수 있다")
+        void hostCanDeleteChallengeCreatedByMember() throws Exception {
             RoomFixture fixture = createRoomWithMemberAndOutsider();
-            StudyRoomChallenge challenge = saveChallenge(fixture.room(), 5);
+            StudyRoomChallenge challenge = saveChallenge(fixture.room(), fixture.member().getId(), 5);
             authenticateAs(fixture.host().getId());
 
             mockMvc.perform(delete("/api/study-room/{roomId}/challenges/{challengeId}",
@@ -487,10 +524,41 @@ class StudyRoomChallengeApiTest extends StudyRoomTestSupport {
         }
 
         @Test
-        @DisplayName("일반 멤버는 챌린지를 삭제할 수 없다")
-        void memberCannotDelete() throws Exception {
+        @DisplayName("일반 멤버도 자기가 만든 챌린지는 삭제할 수 있다")
+        void creatorCanDeleteOwnChallenge() throws Exception {
             RoomFixture fixture = createRoomWithMemberAndOutsider();
-            StudyRoomChallenge challenge = saveChallenge(fixture.room(), 5);
+            StudyRoomChallenge challenge = saveChallenge(fixture.room(), fixture.member().getId(), 5);
+            authenticateAs(fixture.member().getId());
+
+            mockMvc.perform(delete("/api/study-room/{roomId}/challenges/{challengeId}",
+                            fixture.roomId(), challenge.getId()))
+                    .andExpect(status().isOk());
+
+            assertThat(challengeRepository.findById(challenge.getId())).as("작성자가 지운 챌린지").isEmpty();
+        }
+
+        @Test
+        @DisplayName("남이 만든 챌린지는 같은 방 멤버라도 삭제할 수 없다")
+        void otherMemberCannotDeleteChallenge() throws Exception {
+            RoomFixture fixture = createRoomWithMemberAndOutsider();
+            User otherMember = fixtures.createUser("otherMember");
+            addMember(fixture.room(), otherMember);
+            StudyRoomChallenge challenge = saveChallenge(fixture.room(), fixture.member().getId(), 5);
+            authenticateAs(otherMember.getId());
+
+            mockMvc.perform(delete("/api/study-room/{roomId}/challenges/{challengeId}",
+                            fixture.roomId(), challenge.getId()))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode").value(10003));
+
+            assertThat(challengeRepository.findById(challenge.getId())).as("남아 있는 챌린지").isPresent();
+        }
+
+        @Test
+        @DisplayName("방장이 만든 챌린지는 일반 멤버가 삭제할 수 없다")
+        void memberCannotDeleteHostChallenge() throws Exception {
+            RoomFixture fixture = createRoomWithMemberAndOutsider();
+            StudyRoomChallenge challenge = saveChallenge(fixture.room(), fixture.host().getId(), 5);
             authenticateAs(fixture.member().getId());
 
             mockMvc.perform(delete("/api/study-room/{roomId}/challenges/{challengeId}",
@@ -499,6 +567,26 @@ class StudyRoomChallengeApiTest extends StudyRoomTestSupport {
                     .andExpect(jsonPath("$.errorCode").value(10003));
 
             assertThat(challengeRepository.findById(challenge.getId())).as("남아 있는 챌린지").isPresent();
+        }
+
+        @Test
+        @DisplayName("삭제하면 등록된 Quartz 알림 트리거도 함께 사라진다")
+        void deleteCancelsNotificationTriggers() throws Exception {
+            RoomFixture fixture = createRoomWithMemberAndOutsider();
+            authenticateAs(fixture.member().getId());
+            create(fixture.roomId(), request("알림 달린 챌린지", "individual", "problem_count",
+                    null, null, 10, null, NOW.plusDays(7)))
+                    .andExpect(status().isCreated());
+            Long challengeId = challengeRepository.findAll().get(0).getId();
+            assertThat(scheduledTriggerKeys(challengeId))
+                    .as("생성 직후 등록된 트리거")
+                    .isNotEmpty();
+
+            mockMvc.perform(delete("/api/study-room/{roomId}/challenges/{challengeId}",
+                            fixture.roomId(), challengeId))
+                    .andExpect(status().isOk());
+
+            assertThat(scheduledTriggerKeys(challengeId)).as("삭제 후 남은 트리거").isEmpty();
         }
 
         @Test
@@ -555,5 +643,12 @@ class StudyRoomChallengeApiTest extends StudyRoomTestSupport {
         return mockMvc.perform(post("/api/study-room/{roomId}/challenges", roomId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)));
+    }
+
+    /** 챌린지 하나에 걸린 알림 트리거 키. 스케줄러는 테스트 프로파일에서 메모리 저장소로 돈다. */
+    private Set<TriggerKey> scheduledTriggerKeys(Long challengeId) throws SchedulerException {
+        return scheduler.getTriggerKeys(GroupMatcher.triggerGroupEquals("CHALLENGE_NOTIFICATION")).stream()
+                .filter(key -> key.getName().startsWith("challenge-" + challengeId + "-"))
+                .collect(Collectors.toSet());
     }
 }

@@ -485,7 +485,7 @@ class StudyRoomChallengeServiceTest {
                                          LocalDateTime startAt, LocalDateTime endAt) {
         StudyRoom room = StudyRoom.create("스터디룸", 1L);
         setField(room, "id", ROOM_ID);
-        StudyRoomChallenge challenge = StudyRoomChallenge.create(room, "챌린지", type, metric,
+        StudyRoomChallenge challenge = StudyRoomChallenge.create(room, room.getHostUserId(), "챌린지", type, metric,
                 period, periodDays, targetValue, startAt, endAt);
         setField(challenge, "id", USER_SEQUENCE.incrementAndGet());
         return challenge;

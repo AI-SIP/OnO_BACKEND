@@ -45,8 +45,9 @@ public class StudyRoomChallengeService {
     public List<ChallengeResponse> getChallenges(Long roomId, Long userId) {
         accessService.validateMember(roomId, userId);
         List<StudyRoomMember> members = memberRepository.findAllWithUserByRoomId(roomId);
+        Viewer viewer = viewer(userId, members);
         return challengeRepository.findAllByRoomIdOrderByEndAtAsc(roomId).stream()
-                .map(challenge -> toResponse(challenge, members, true))
+                .map(challenge -> toResponse(challenge, members, true, viewer))
                 .sorted(Comparator.comparing((ChallengeResponse r) -> "in_progress".equals(r.status()) ? 0 : 1)
                         .thenComparing(Comparator.comparing(ChallengeResponse::endAt).reversed()))
                 .toList();
@@ -67,6 +68,7 @@ public class StudyRoomChallengeService {
         StudyRoom room = accessService.getRoomOrThrow(roomId);
         StudyRoomChallenge challenge = challengeRepository.save(StudyRoomChallenge.create(
                 room,
+                userId,
                 request.title().trim(),
                 parseEnum(request.type(), StudyRoomChallengeType.class),
                 parseEnum(request.metric(), StudyRoomChallengeMetric.class),
@@ -77,25 +79,51 @@ public class StudyRoomChallengeService {
                 request.endAt()
         ));
         notificationScheduler.scheduleNotifications(challenge);
-        return toResponse(challenge, memberRepository.findAllWithUserByRoomId(roomId), true);
+        List<StudyRoomMember> members = memberRepository.findAllWithUserByRoomId(roomId);
+        return toResponse(challenge, members, true, viewer(userId, members));
     }
 
+    /**
+     * 챌린지를 지운다. 방장은 방 안의 모든 챌린지를, 일반 멤버는 자기가 만든 챌린지만 지울 수 있다.
+     *
+     * <p>비멤버는 챌린지가 있는지조차 알려 주지 않으려고 멤버 검증을 먼저 한다(403 10002).
+     * 그 다음 챌린지를 찾고(404 10009), 마지막에 방장이거나 작성자인지를 본다(403 10003).
+     */
     @Transactional
     public void deleteChallenge(Long roomId, Long challengeId, Long userId) {
-        accessService.validateHost(roomId, userId);
+        StudyRoomMember member = accessService.getMemberOrThrow(roomId, userId);
         StudyRoomChallenge challenge = challengeRepository.findByIdAndRoomId(challengeId, roomId)
                 .orElseThrow(() -> new ApplicationException(StudyRoomErrorCase.CHALLENGE_NOT_FOUND));
+        if (!canDelete(challenge, member.getRole() == StudyRoomMemberRole.HOST, userId)) {
+            throw new ApplicationException(StudyRoomErrorCase.STUDY_ROOM_HOST_ONLY);
+        }
         notificationScheduler.cancelNotifications(challengeId);
         challengeRepository.delete(challenge);
     }
 
+    /** 이미 읽어 둔 멤버 목록에서 방장 여부를 뽑는다. 응답을 만들 때마다 멤버를 다시 조회하지 않는다. */
+    private Viewer viewer(Long userId, List<StudyRoomMember> members) {
+        boolean isHost = members.stream()
+                .anyMatch(member -> member.getRole() == StudyRoomMemberRole.HOST
+                        && userId.equals(member.getUser().getId()));
+        return new Viewer(userId, isHost);
+    }
+
+    private boolean canDelete(StudyRoomChallenge challenge, boolean isHost, Long userId) {
+        return isHost || challenge.isCreatedBy(userId);
+    }
+
+    /** 응답을 받아 보는 사용자. 삭제 버튼 노출 조건을 서버에서 계산하려고 들고 다닌다. */
+    private record Viewer(Long userId, boolean isHost) {}
+
     private void refreshRoomChallengeStatuses(Long roomId) {
         List<StudyRoomMember> members = memberRepository.findAllWithUserByRoomId(roomId);
         challengeRepository.findAllByRoomIdOrderByEndAtAsc(roomId)
-                .forEach(challenge -> toResponse(challenge, members, true));
+                .forEach(challenge -> toResponse(challenge, members, true, null));
     }
 
-    private ChallengeResponse toResponse(StudyRoomChallenge challenge, List<StudyRoomMember> members, boolean persistStatus) {
+    private ChallengeResponse toResponse(StudyRoomChallenge challenge, List<StudyRoomMember> members,
+                                         boolean persistStatus, Viewer viewer) {
         List<Long> userIds = members.stream().map(member -> member.getUser().getId()).toList();
         AggregationRange range = resolveAggregationRange(challenge, LocalDateTime.now());
         LocalDate streakBaseDate = min(LocalDate.now(), challenge.getEndAt().toLocalDate());
@@ -156,7 +184,9 @@ public class StudyRoomChallengeService {
                 challenge.getEndAt(),
                 toApiValue(status.name()),
                 memberProgress,
-                groupCurrent
+                groupCurrent,
+                challenge.getCreatedByUserId(),
+                viewer != null && canDelete(challenge, viewer.isHost(), viewer.userId())
         );
     }
 
