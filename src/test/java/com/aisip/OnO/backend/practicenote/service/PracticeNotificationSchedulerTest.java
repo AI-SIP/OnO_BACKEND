@@ -1,6 +1,8 @@
 package com.aisip.OnO.backend.practicenote.service;
 
+import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.practicenote.dto.PracticeNotificationRegisterDto;
+import com.aisip.OnO.backend.practicenote.exception.PracticeNoteErrorCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -25,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -89,12 +92,35 @@ class PracticeNotificationSchedulerTest {
         }
 
         @Test
-        @DisplayName("주간 반복인데 요일이 비어 있으면 매일로 되돌아간다")
-        void weeklyWithoutWeekDaysFallsBackToDaily() throws Exception {
-            String cron = scheduleAndCaptureCron(
-                    new PracticeNotificationRegisterDto(7, 7, 0, "weekly", List.of()));
+        @DisplayName("주간 반복인데 요일이 비어 있으면 400 으로 거절한다")
+        void weeklyWithoutWeekDaysIsRejected() throws Exception {
+            PracticeNotificationRegisterDto dto =
+                    new PracticeNotificationRegisterDto(7, 7, 0, "weekly", List.of());
 
-            assertThat(cron).isEqualTo("0 0 7 ? * *");
+            assertThatThrownBy(() ->
+                    notificationScheduler.schedulePracticeNotification(USER_ID, PRACTICE_ID, "복습 세트", dto))
+                    .isInstanceOf(ApplicationException.class)
+                    .extracting(e -> ((ApplicationException) e).getErrorCase())
+                    .isEqualTo(PracticeNoteErrorCase.PRACTICE_NOTIFICATION_WEEK_DAYS_REQUIRED);
+
+            // 매일 발송으로 되돌아가던 폴백이 없어야 한다. 잡 자체가 등록되면 안 된다.
+            verify(quartzScheduler, never()).addJob(any(), anyBoolean());
+            verify(quartzScheduler, never()).scheduleJob(any(Trigger.class));
+        }
+
+        @Test
+        @DisplayName("주간 반복인데 요일이 null 이어도 400 으로 거절한다")
+        void weeklyWithNullWeekDaysIsRejected() throws Exception {
+            PracticeNotificationRegisterDto dto =
+                    new PracticeNotificationRegisterDto(7, 7, 0, "WEEKLY", null);
+
+            assertThatThrownBy(() ->
+                    notificationScheduler.schedulePracticeNotification(USER_ID, PRACTICE_ID, "복습 세트", dto))
+                    .isInstanceOf(ApplicationException.class)
+                    .extracting(e -> ((ApplicationException) e).getErrorCase())
+                    .isEqualTo(PracticeNoteErrorCase.PRACTICE_NOTIFICATION_WEEK_DAYS_REQUIRED);
+
+            verify(quartzScheduler, never()).addJob(any(), anyBoolean());
         }
 
         @Test
@@ -166,6 +192,23 @@ class PracticeNotificationSchedulerTest {
             assertThatThrownBy(() -> notificationScheduler.deleteNotification(PRACTICE_ID))
                     .isInstanceOf(RuntimeException.class)
                     .hasMessage("알림 삭제 실패");
+        }
+
+        @Test
+        @DisplayName("갱신이 요일 없는 주간 반복이면 기존 잡을 지우기 전에 거절한다")
+        void updateNotificationRejectsBeforeDeleting() throws Exception {
+            PracticeNotificationRegisterDto dto =
+                    new PracticeNotificationRegisterDto(7, 21, 0, "weekly", List.of());
+
+            assertThatThrownBy(() ->
+                    notificationScheduler.updateNotification(USER_ID, PRACTICE_ID, "복습 세트", dto))
+                    .isInstanceOf(ApplicationException.class)
+                    .extracting(e -> ((ApplicationException) e).getErrorCase())
+                    .isEqualTo(PracticeNoteErrorCase.PRACTICE_NOTIFICATION_WEEK_DAYS_REQUIRED);
+
+            // Quartz 삭제는 서비스 트랜잭션과 함께 롤백되지 않는다. 지우고 나서 실패하면
+            // 사용자가 쓰던 알림만 사라진다.
+            verify(quartzScheduler, never()).deleteJob(any());
         }
 
         @Test

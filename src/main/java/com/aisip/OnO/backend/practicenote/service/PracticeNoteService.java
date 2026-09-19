@@ -71,6 +71,8 @@ public class PracticeNoteService {
 
     public Long registerPractice(PracticeNoteRegisterDto practiceNoteRegisterDto, Long userId) {
 
+        validatePracticeNotification(practiceNoteRegisterDto.practiceNotification());
+
         PracticeNote practiceNote = PracticeNote.from(practiceNoteRegisterDto, userId);
         practiceNoteRepository.save(practiceNote);
 
@@ -160,6 +162,8 @@ public class PracticeNoteService {
         Long practiceId = practiceNoteUpdateDto.practiceNoteId();
         PracticeNote practiceNote = getPracticeEntity(practiceId, userId);
 
+        validatePracticeNotification(practiceNoteUpdateDto.practiceNotification());
+
         practiceNote.updateTitle(practiceNoteUpdateDto.practiceTitle());
 
         practiceNote.updateNotification(PracticeNotification.from(practiceNoteUpdateDto.practiceNotification()));
@@ -207,6 +211,19 @@ public class PracticeNoteService {
         }
 
         log.info("practiceId: {} has deleted", practiceId);
+    }
+
+    /**
+     * 주간 반복 알림에 요일이 하나도 없으면 400 으로 거절한다.
+     *
+     * <p>스케줄러도 같은 검증을 하지만, 요청을 받은 자리에서 먼저 막아야 복습노트 저장이나
+     * 기존 Quartz 잡 삭제가 아예 일어나지 않는다. Quartz 잡 삭제는 이 트랜잭션과 함께
+     * 롤백되지 않기 때문이다.
+     */
+    private void validatePracticeNotification(PracticeNotificationRegisterDto practiceNotification) {
+        if (practiceNotification != null && practiceNotification.isWeeklyWithoutWeekDays()) {
+            throw new ApplicationException(PracticeNoteErrorCase.PRACTICE_NOTIFICATION_WEEK_DAYS_REQUIRED);
+        }
     }
 
     private <T> List<T> nullSafe(List<T> values) {

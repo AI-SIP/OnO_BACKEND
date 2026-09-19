@@ -22,6 +22,8 @@ import org.springframework.http.MediaType;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -178,6 +180,42 @@ class PracticeNoteIntegrationTest extends PracticeNoteTestSupport {
         }
 
         @Test
+        @DisplayName("주간 반복은 고른 요일 그대로 스케줄을 건다")
+        void registersWeeklyNotification() throws Exception {
+            String body = objectMapper.writeValueAsString(new PracticeNoteRegisterDto(
+                    null, "주간 복습", List.of(), weeklyNotification(List.of(1, 3, 5))));
+
+            String response = mockMvc.perform(post("/api/practiceNotes")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString();
+
+            Number practiceNoteId = JsonPath.read(response, "$.data");
+            verify(practiceNotificationScheduler).schedulePracticeNotification(
+                    userId, practiceNoteId.longValue(), "주간 복습", weeklyNotification(List.of(1, 3, 5)));
+        }
+
+        @Test
+        @DisplayName("주간 반복인데 요일이 비어 있으면 400 이고 아무것도 저장하지 않는다")
+        void rejectsWeeklyNotificationWithoutWeekDays() throws Exception {
+            String body = objectMapper.writeValueAsString(new PracticeNoteRegisterDto(
+                    null, "요일 없는 주간 복습", List.of(), weeklyNotification(List.of())));
+
+            mockMvc.perform(post("/api/practiceNotes")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode")
+                            .value(PracticeNoteErrorCase.PRACTICE_NOTIFICATION_WEEK_DAYS_REQUIRED.getErrorCode()));
+
+            // 예전에는 매일 발송으로 되돌아가 복습노트까지 그대로 만들어졌다.
+            assertThat(practiceNoteRepository.findAllByUserId(userId)).isEmpty();
+            verify(practiceNotificationScheduler, never())
+                    .schedulePracticeNotification(any(), any(), any(), any());
+        }
+
+        @Test
         @DisplayName("다른 사용자의 문제로는 만들 수 없다")
         void rejectsOtherUserProblem() throws Exception {
             Folder otherUserFolder = fixtures.createRootFolder(otherUserId);
@@ -322,6 +360,28 @@ class PracticeNoteIntegrationTest extends PracticeNoteTestSupport {
 
             assertThat(practiceNoteRepository.findById(practiceNote.getId()).orElseThrow().getTitle())
                     .isEqualTo("제목만 변경");
+        }
+
+        @Test
+        @DisplayName("주간 반복인데 요일이 비어 있으면 400 이고 기존 알림을 건드리지 않는다")
+        void rejectsWeeklyNotificationWithoutWeekDays() throws Exception {
+            PracticeNote practiceNote = savePracticeNote(userId, "복습", List.of(), dailyNotification());
+            String body = objectMapper.writeValueAsString(new PracticeNoteUpdateDto(
+                    practiceNote.getId(), "요일 없는 주간", List.of(), List.of(), weeklyNotification(List.of())));
+
+            mockMvc.perform(patch("/api/practiceNotes")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode")
+                            .value(PracticeNoteErrorCase.PRACTICE_NOTIFICATION_WEEK_DAYS_REQUIRED.getErrorCode()));
+
+            PracticeNote unchanged = practiceNoteRepository.findById(practiceNote.getId()).orElseThrow();
+            assertThat(unchanged.getTitle()).isEqualTo("복습");
+            assertThat(unchanged.getPracticeNotification().getRepeatType()).isEqualTo("daily");
+            // Quartz 잡 삭제는 트랜잭션과 함께 롤백되지 않는다. 아예 호출되면 안 된다.
+            verify(practiceNotificationScheduler, never()).updateNotification(any(), any(), any(), any());
+            verify(practiceNotificationScheduler, never()).deleteNotification(any());
         }
 
         @Test
