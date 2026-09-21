@@ -103,6 +103,25 @@ class AdminStudyRoomControllerTest extends AdminTestSupport {
         }
 
         @Test
+        @DisplayName("게스트가 만든 방과 게스트가 남긴 활동은 요약 카드에서 빠지고, 목록에는 남는다")
+        void excludesGuestFromOverview() throws Exception {
+            User guest = createGuestUser();
+            StudyRoom guestRoom = saveStudyRoom("게스트 방", guest);
+            shareProblem(guestRoom, guest, saveProblem(guest.getId(), null, "메모"), "같이 풀어요");
+            addFeed(guestRoom, guest, "PRACTICE_COMPLETED", "{}", LocalDateTime.now());
+
+            MvcResult result = mockMvc.perform(get("/admin/study-rooms")).andExpect(status().isOk()).andReturn();
+
+            Overview overview = (Overview) result.getModelAndView().getModel().get("overview");
+            assertThat(overview.totalRooms()).isZero();
+            assertThat(overview.totalMembers()).isZero();
+            assertThat(overview.sharedProblems()).isZero();
+            assertThat(overview.activeRoomsThisWeek()).isZero();
+            assertThat(roomsOf(result)).as("목록은 집계가 아니라서 게스트 방도 보여 준다")
+                    .extracting(RoomRow::id).containsExactly(guestRoom.getId());
+        }
+
+        @Test
         @DisplayName("방마다 방장 이름, 멤버, 공유 문제, 댓글, 챌린지, 최근 활동을 집계한다")
         void aggregatesRoomActivity() throws Exception {
             StudyRoom room = saveStudyRoom("고3 수학방", host);

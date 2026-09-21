@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+
+import static com.aisip.OnO.backend.admin.repository.AdminSqlFilters.excludeTestUsers;
 /**
  * 관리자 학습 기록 화면 전용 조회.
  *
@@ -128,7 +130,7 @@ public class AdminLearningQueryRepository {
                 FROM problem p
                 LEFT JOIN problem_analysis pa ON pa.problem_id = p.id AND pa.deleted_at IS NULL
                 WHERE p.deleted_at IS NULL
-                """;
+                """ + excludeTestUsers("p.user_id");
         return jdbc.queryForObject(sql, new MapSqlParameterSource("todayStart", today.atStartOfDay()),
                 (rs, i) -> new ProblemSummary(
                         rs.getLong("total"),
@@ -305,7 +307,7 @@ public class AdminLearningQueryRepository {
                        COALESCE(SUM(s.reflection IS NOT NULL AND s.reflection <> ''), 0) AS with_reflection
                 FROM problem_solve s
                 WHERE s.deleted_at IS NULL
-                """ + solveWhere(filter, params);
+                """ + solveWhere(filter, params) + summaryUserFilter(filter, "s.user_id");
         return jdbc.queryForObject(sql, params, (rs, i) -> {
             double avg = rs.getDouble("avg_time");
             Double averageTime = rs.wasNull() ? null : avg;
@@ -321,8 +323,20 @@ public class AdminLearningQueryRepository {
         });
     }
 
+    /** 요약 카드의 오늘 복습 수. 목록 건수와 달리 게스트와 관리자 계정은 세지 않는다. */
     public long countSolvesOn(LocalDate date) {
-        return countSolves(new Filter(date, null, null));
+        Filter filter = new Filter(date, null, null);
+        MapSqlParameterSource params = new MapSqlParameterSource();
+        return queryLong("SELECT COUNT(*) FROM problem_solve s WHERE s.deleted_at IS NULL"
+                + solveWhere(filter, params) + excludeTestUsers("s.user_id"), params);
+    }
+
+    /**
+     * 요약 카드에서 게스트와 관리자 계정을 뺀다. 특정 유저로 걸러 보고 있을 때는 그 유저의 기록을 보려는 것이라
+     * 빼지 않는다. 빼면 게스트 한 명을 골랐을 때 목록에는 기록이 있는데 요약은 0 으로 나온다.
+     */
+    private static String summaryUserFilter(Filter filter, String userIdColumn) {
+        return filter.userId() != null ? "" : excludeTestUsers(userIdColumn);
     }
 
     private String solveWhere(Filter filter, MapSqlParameterSource params) {
@@ -448,7 +462,7 @@ public class AdminLearningQueryRepository {
                        COALESCE(SUM(n.practice_count), 0) AS total_practice_count
                 FROM practice_note n
                 WHERE n.deleted_at IS NULL
-                """;
+                """ + excludeTestUsers("n.user_id");
         return jdbc.queryForObject(sql, new MapSqlParameterSource(), (rs, i) -> new NoteSummary(
                 rs.getLong("total"),
                 rs.getLong("with_notification"),

@@ -30,16 +30,12 @@ public final class AdminUserRows {
     ) {
     }
 
-    /** 유저 목록 위의 요약. 검색 조건과 상관없이 전체 기준이다. */
+    /** 유저 목록 위의 요약. 검색 조건과 상관없이 전체 기준이고, 게스트와 관리자 계정은 세지 않는다. */
     public record Summary(
             long totalUsers,
             long todaySignups,
-            long guestUsers,
             long activeUsersLast7Days
     ) {
-        public double guestRate() {
-            return totalUsers == 0 ? 0.0 : (double) guestUsers * 100 / totalUsers;
-        }
     }
 
     public record Profile(

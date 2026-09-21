@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+
+import static com.aisip.OnO.backend.admin.repository.AdminSqlFilters.excludeTestUsers;
 /**
  * 관리자 스터디룸 화면 전용 조회.
  *
@@ -45,22 +47,33 @@ public class AdminStudyRoomQueryRepository {
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
 
+    /** 목록 위 요약 카드. 게스트와 관리자 계정이 만들거나 남긴 것은 세지 않는다. */
     public Overview overview(LocalDateTime weekStart) {
         return jdbc.queryForObject("""
                 SELECT
-                  (SELECT COUNT(*) FROM study_room r WHERE r.deleted_at IS NULL) AS total_rooms,
+                  (SELECT COUNT(*) FROM study_room r WHERE r.deleted_at IS NULL
+                   """ + excludeTestUsers("r.host_user_id") + """
+                  ) AS total_rooms,
                   (SELECT COUNT(DISTINCT f.room_id) FROM study_room_feed f
                      JOIN study_room r ON r.id = f.room_id AND r.deleted_at IS NULL
-                    WHERE f.deleted_at IS NULL AND f.created_at >= :weekStart) AS active_rooms,
+                    WHERE f.deleted_at IS NULL AND f.created_at >= :weekStart
+                   """ + excludeTestUsers("f.user_id") + """
+                  ) AS active_rooms,
                   (SELECT COUNT(*) FROM study_room_member m
                      JOIN study_room r ON r.id = m.room_id AND r.deleted_at IS NULL
-                    WHERE m.deleted_at IS NULL) AS total_members,
+                    WHERE m.deleted_at IS NULL
+                   """ + excludeTestUsers("m.user_id") + """
+                  ) AS total_members,
                   (SELECT COUNT(*) FROM study_room_shared_problem sp
                      JOIN study_room r ON r.id = sp.room_id AND r.deleted_at IS NULL
-                    WHERE sp.deleted_at IS NULL) AS shared_problems,
+                    WHERE sp.deleted_at IS NULL
+                   """ + excludeTestUsers("sp.shared_by_user_id") + """
+                  ) AS shared_problems,
                   (SELECT COUNT(*) FROM study_room_challenge c
                      JOIN study_room r ON r.id = c.room_id AND r.deleted_at IS NULL
-                    WHERE c.deleted_at IS NULL AND c.status = 'IN_PROGRESS') AS in_progress_challenges
+                    WHERE c.deleted_at IS NULL AND c.status = 'IN_PROGRESS'
+                   """ + excludeTestUsers("c.created_by_user_id") + """
+                  ) AS in_progress_challenges
                 """, new MapSqlParameterSource("weekStart", weekStart), (rs, i) -> new Overview(
                 rs.getLong("total_rooms"),
                 rs.getLong("active_rooms"),

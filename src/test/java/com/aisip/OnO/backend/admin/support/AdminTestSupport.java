@@ -85,6 +85,11 @@ public abstract class AdminTestSupport extends IntegrationTestSupport {
         )));
     }
 
+    /** 게스트 계정. 관리자 집계는 게스트가 남긴 데이터를 세지 않아서, 그걸 확인할 때 쓴다. */
+    protected User createGuestUser() {
+        return userRepository.save(com.aisip.OnO.backend.support.TestUsers.create("GUEST", "게스트", "guest"));
+    }
+
     protected Problem saveProblem(Long userId, Folder folder, String memo) {
         Problem problem = Problem.from(
                 new ProblemRegisterDto(null, memo, null, folder == null ? null : folder.getId(), null),

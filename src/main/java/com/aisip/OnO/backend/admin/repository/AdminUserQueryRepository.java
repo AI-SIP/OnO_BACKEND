@@ -20,6 +20,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+
+import static com.aisip.OnO.backend.admin.repository.AdminSqlFilters.countedUser;
+import static com.aisip.OnO.backend.admin.repository.AdminSqlFilters.excludeTestUsers;
 /**
  * 관리자 유저 화면 전용 읽기 쿼리.
  *
@@ -121,13 +124,14 @@ public class AdminUserQueryRepository {
         return jdbc.queryForObject("""
                 SELECT COUNT(*) AS total,
                        COALESCE(SUM(created_at >= :todayStart), 0) AS today,
-                       COALESCE(SUM(UPPER(platform) = 'GUEST'), 0) AS guests,
                        (SELECT COUNT(DISTINCT user_id) FROM mission_log
-                         WHERE deleted_at IS NULL AND mission_type = 0 AND created_at >= :weekStart) AS active7
+                         WHERE deleted_at IS NULL AND mission_type = 0 AND created_at >= :weekStart
+                         """ + excludeTestUsers("user_id") + """
+                       ) AS active7
                 FROM `user`
                 WHERE deleted_at IS NULL
-                """, params, (rs, i) -> new AdminUserRows.Summary(
-                rs.getLong("total"), rs.getLong("today"), rs.getLong("guests"), rs.getLong("active7")));
+                """ + countedUser(null), params, (rs, i) -> new AdminUserRows.Summary(
+                rs.getLong("total"), rs.getLong("today"), rs.getLong("active7")));
     }
 
     private String searchCondition(String q, String platform) {

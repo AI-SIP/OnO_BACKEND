@@ -64,7 +64,6 @@ public class AdminStatsService {
 
         return new UserStats(
                 statsQueryRepository.countUsers(),
-                statsQueryRepository.countGuestUsers(),
                 statsQueryRepository.countNotificationEnabledUsers(),
                 statsQueryRepository.countUsersWithFcmToken(),
                 new Metric(sum(daily.newUsers()), statsQueryRepository.countSignups(previous.start(), previous.end())),

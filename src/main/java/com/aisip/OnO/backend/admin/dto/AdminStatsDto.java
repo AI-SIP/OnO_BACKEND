@@ -100,7 +100,6 @@ public final class AdminStatsDto {
 
     public record UserStats(
             long totalUsers,
-            long guestUsers,
             long notificationEnabledUsers,
             long fcmUsers,
             Metric signups,
@@ -113,10 +112,6 @@ public final class AdminStatsDto {
             Retention d7,
             List<LabelCount> signupsByPlatform
     ) {
-
-        public double guestRate() {
-            return totalUsers == 0 ? 0.0 : guestUsers * 100.0 / totalUsers;
-        }
 
         public double notificationEnabledRate() {
             return totalUsers == 0 ? 0.0 : notificationEnabledUsers * 100.0 / totalUsers;

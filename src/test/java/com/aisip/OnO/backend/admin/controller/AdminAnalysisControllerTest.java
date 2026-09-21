@@ -98,6 +98,32 @@ class AdminAnalysisControllerTest extends AdminTestSupport {
         }
 
         @Test
+        @DisplayName("게스트와 관리자 계정이 남긴 데이터는 모든 지표에서 빠진다")
+        void excludesGuestAndAdminFromEveryMetric() throws Exception {
+            User member = fixtures.createUser();
+            User guest = createGuestUser();
+            saveMissionLog(member, MissionType.USER_LOGIN, null);
+            saveMissionLog(guest, MissionType.USER_LOGIN, null);
+            saveSolve(member, AnswerStatus.CORRECT, LocalDateTime.now());
+            saveSolve(guest, AnswerStatus.WRONG, LocalDateTime.now());
+
+            MvcResult result = analysis(TODAY, TODAY);
+
+            UserStats users = attr(result, "userStats", UserStats.class);
+            LearningStats learning = attr(result, "learningStats", LearningStats.class);
+            assertThat(users.totalUsers()).as("관리자와 게스트는 전체 유저에 넣지 않는다").isEqualTo(1);
+            assertThat(users.signups().value()).isEqualTo(1.0);
+            assertThat(users.activeUsers().value()).isEqualTo(1.0);
+            assertThat(users.signupsByPlatform()).extracting(AdminStatsDto.LabelCount::label)
+                    .doesNotContain("GUEST", "ADMIN");
+            assertThat(learning.totalProblems()).isEqualTo(1);
+            assertThat(learning.solves().value()).isEqualTo(1.0);
+            assertThat(learning.wrong()).as("게스트가 남긴 오답은 정답률 계산에서도 빠진다").isZero();
+            assertThat(dailyMap(result, "dailyActiveUsers").get(TODAY)).isEqualTo(1L);
+            assertThat(dailyMap(result, "dailyNewUsers").get(TODAY)).isEqualTo(1L);
+        }
+
+        @Test
         @DisplayName("기간을 지정하지 않으면 최근 30일을 보고, 직전 비교 기간도 30일이다")
         void defaultsToLastThirtyDays() throws Exception {
             mockMvc.perform(get("/admin/analysis"))

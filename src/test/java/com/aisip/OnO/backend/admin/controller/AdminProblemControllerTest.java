@@ -199,6 +199,22 @@ class AdminProblemControllerTest extends AdminTestSupport {
         }
 
         @Test
+        @DisplayName("게스트가 등록한 문제는 요약 숫자에서 빠지지만 목록에는 나온다")
+        void excludesGuestFromSummary() throws Exception {
+            User guest = createGuestUser();
+            Problem guestProblem = saveProblem(guest.getId(), null, "게스트");
+            saveAnalysis(guestProblem, "FAILED", null);
+            saveProblem(owner.getId(), folder, "회원");
+
+            MvcResult result = mockMvc.perform(get("/admin/problems")).andExpect(status().isOk()).andReturn();
+
+            ProblemSummary summary = (ProblemSummary) attribute(result, "summary");
+            assertThat(summary.total()).isEqualTo(1L);
+            assertThat(summary.failed()).isZero();
+            assertThat(problemsOf(result)).extracting(ProblemRow::problemId).contains(guestProblem.getId());
+        }
+
+        @Test
         @DisplayName("모르는 status 값은 500 대신 필터 없이 보여준다")
         void ignoresUnknownStatus() throws Exception {
             saveProblem(owner.getId(), folder, "문제");

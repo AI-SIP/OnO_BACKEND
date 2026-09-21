@@ -16,6 +16,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+
+import static com.aisip.OnO.backend.admin.repository.AdminSqlFilters.countedUser;
+import static com.aisip.OnO.backend.admin.repository.AdminSqlFilters.excludeTestUsers;
 /**
  * 관리자 성장 화면(미션, 업적, 치장) 전용 조회.
  *
@@ -26,7 +29,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AdminGrowthQueryRepository {
 
-    private static final String LIVE_USER = "u.deleted_at IS NULL AND (u.platform IS NULL OR u.platform <> 'ADMIN')";
+    /** 집계에 넣을 유저. 탈퇴한 계정과 게스트, 관리자 계정은 뺀다. */
+    private static final String LIVE_USER = "u.deleted_at IS NULL" + countedUser("u");
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -152,6 +156,7 @@ public class AdminGrowthQueryRepository {
                   COALESCE(SUM(CASE WHEN mp.claimed_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS total_claimed
                 FROM mission_definition d
                 LEFT JOIN mission_progress mp ON mp.mission_id = d.id AND mp.deleted_at IS NULL
+                """ + excludeTestUsers("mp.user_id") + """
                 WHERE d.deleted_at IS NULL
                 GROUP BY d.id, d.code, d.title, d.description, d.category, d.metric, d.target,
                          d.reward_type, d.reward_value, d.active, d.sort_order
@@ -187,14 +192,14 @@ public class AdminGrowthQueryRepository {
         return count("""
                 SELECT COUNT(*) FROM mission_progress
                 WHERE deleted_at IS NULL AND completed_at >= :from AND completed_at < :to
-                """, new MapSqlParameterSource().addValue("from", from).addValue("to", to));
+                """ + excludeTestUsers("user_id"), new MapSqlParameterSource().addValue("from", from).addValue("to", to));
     }
 
     public long countMissionsClaimedBetween(LocalDateTime from, LocalDateTime to) {
         return count("""
                 SELECT COUNT(*) FROM mission_progress
                 WHERE deleted_at IS NULL AND claimed_at >= :from AND claimed_at < :to
-                """, new MapSqlParameterSource().addValue("from", from).addValue("to", to));
+                """ + excludeTestUsers("user_id"), new MapSqlParameterSource().addValue("from", from).addValue("to", to));
     }
 
     /** 날짜별 완료 건수와 수령 건수. 두 시각이 다른 날일 수 있어 따로 센다. */
@@ -206,6 +211,7 @@ public class AdminGrowthQueryRepository {
         jdbc.query("""
                 SELECT DATE(completed_at) AS d, COUNT(*) AS c FROM mission_progress
                 WHERE deleted_at IS NULL AND completed_at >= :from AND completed_at < :to
+                """ + excludeTestUsers("user_id") + """
                 GROUP BY DATE(completed_at)
                 """, params, rs -> {
             result.computeIfAbsent(rs.getObject("d", LocalDate.class), k -> new long[2])[0] = rs.getLong("c");
@@ -213,6 +219,7 @@ public class AdminGrowthQueryRepository {
         jdbc.query("""
                 SELECT DATE(claimed_at) AS d, COUNT(*) AS c FROM mission_progress
                 WHERE deleted_at IS NULL AND claimed_at >= :from AND claimed_at < :to
+                """ + excludeTestUsers("user_id") + """
                 GROUP BY DATE(claimed_at)
                 """, params, rs -> {
             result.computeIfAbsent(rs.getObject("d", LocalDate.class), k -> new long[2])[1] = rs.getLong("c");
@@ -227,6 +234,7 @@ public class AdminGrowthQueryRepository {
                 SELECT mission_type, COUNT(*) AS c, COALESCE(SUM(point), 0) AS p
                 FROM mission_log
                 WHERE deleted_at IS NULL AND created_at >= :since
+                """ + excludeTestUsers("user_id") + """
                 GROUP BY mission_type
                 """, new MapSqlParameterSource("since", since), rs -> {
             byType.put(rs.getInt("mission_type"), new long[]{rs.getLong("c"), rs.getLong("p")});

@@ -18,6 +18,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.aisip.OnO.backend.admin.repository.AdminSqlFilters.countedUser;
+import static com.aisip.OnO.backend.admin.repository.AdminSqlFilters.excludeTestUsers;
+
 /**
  * 관리자 통계와 홈 화면 전용 조회.
  *
@@ -27,6 +30,8 @@ import java.util.Map;
  *
  * <p>소프트 삭제를 쓰는 테이블은 엔티티의 {@code @SQLRestriction} 이 여기에는 적용되지 않으므로
  * {@code deleted_at IS NULL} 을 직접 붙인다.
+ *
+ * <p>숫자를 세는 쿼리는 모두 게스트와 관리자 계정을 뺀다({@link AdminSqlFilters}). 최근 목록은 그대로 둔다.
  */
 @Repository
 @RequiredArgsConstructor
@@ -44,6 +49,7 @@ public class AdminStatsQueryRepository {
         return daily("""
                 SELECT DATE(created_at) d, COUNT(DISTINCT user_id) c FROM mission_log
                 WHERE mission_type = :login AND deleted_at IS NULL AND created_at >= :start AND created_at < :end
+                """ + excludeTestUsers("user_id") + """
                 GROUP BY DATE(created_at)
                 """, start, end, range(start, end).addValue("login", USER_LOGIN));
     }
@@ -74,10 +80,14 @@ public class AdminStatsQueryRepository {
         return daily("""
                 SELECT d, SUM(c) c FROM (
                     SELECT DATE(created_at) d, COUNT(*) c FROM study_room_shared_problem
-                    WHERE deleted_at IS NULL AND created_at >= :start AND created_at < :end GROUP BY DATE(created_at)
+                    WHERE deleted_at IS NULL AND created_at >= :start AND created_at < :end
+                    """ + excludeTestUsers("shared_by_user_id") + """
+                    GROUP BY DATE(created_at)
                     UNION ALL
                     SELECT DATE(created_at) d, COUNT(*) c FROM study_room_shared_problem_comment
-                    WHERE deleted_at IS NULL AND created_at >= :start AND created_at < :end GROUP BY DATE(created_at)
+                    WHERE deleted_at IS NULL AND created_at >= :start AND created_at < :end
+                    """ + excludeTestUsers("author_id") + """
+                    GROUP BY DATE(created_at)
                 ) t GROUP BY d
                 """, start, end, range(start, end));
     }
@@ -85,16 +95,12 @@ public class AdminStatsQueryRepository {
     // ---------- 사용자 ----------
 
     public long countUsers() {
-        return count("SELECT COUNT(*) FROM `user` WHERE deleted_at IS NULL", new MapSqlParameterSource());
-    }
-
-    public long countGuestUsers() {
-        return count("SELECT COUNT(*) FROM `user` WHERE deleted_at IS NULL AND UPPER(platform) = 'GUEST'",
+        return count("SELECT COUNT(*) FROM `user` WHERE deleted_at IS NULL" + countedUser(null),
                 new MapSqlParameterSource());
     }
 
     public long countNotificationEnabledUsers() {
-        return count("SELECT COUNT(*) FROM `user` WHERE deleted_at IS NULL AND notification_enabled = 1",
+        return count("SELECT COUNT(*) FROM `user` WHERE deleted_at IS NULL AND notification_enabled = 1" + countedUser(null),
                 new MapSqlParameterSource());
     }
 
@@ -103,7 +109,7 @@ public class AdminStatsQueryRepository {
                 SELECT COUNT(DISTINCT f.user_id) FROM fcm_token f
                 JOIN `user` u ON u.id = f.user_id AND u.deleted_at IS NULL
                 WHERE f.deleted_at IS NULL
-                """, new MapSqlParameterSource());
+                """ + countedUser("u"), new MapSqlParameterSource());
     }
 
     public long countSignups(LocalDate start, LocalDate end) {
@@ -114,6 +120,7 @@ public class AdminStatsQueryRepository {
         return labelCounts("""
                 SELECT UPPER(COALESCE(platform, '알 수 없음')) label, COUNT(*) c FROM `user`
                 WHERE deleted_at IS NULL AND created_at >= :start AND created_at < :end
+                """ + countedUser(null) + """
                 GROUP BY UPPER(COALESCE(platform, '알 수 없음')) ORDER BY c DESC
                 """, range(start, end));
     }
@@ -123,7 +130,7 @@ public class AdminStatsQueryRepository {
         return count("""
                 SELECT COUNT(DISTINCT user_id) FROM mission_log
                 WHERE mission_type = :login AND deleted_at IS NULL AND created_at >= :start AND created_at < :end
-                """, range(start, end).addValue("login", USER_LOGIN));
+                """ + excludeTestUsers("user_id"), range(start, end).addValue("login", USER_LOGIN));
     }
 
     /**
@@ -153,9 +160,8 @@ public class AdminStatsQueryRepository {
                              AND m.created_at < DATE(u.created_at) + INTERVAL (:offset + 1) DAY
                        )), 0) retained
                 FROM `user` u
-                WHERE u.deleted_at IS NULL AND UPPER(COALESCE(u.platform, '')) <> 'ADMIN'
-                  AND u.created_at >= :start AND u.created_at < :end
-                """, params, (rs, i) -> new Retention(rs.getLong("cohort"), rs.getLong("retained")));
+                WHERE u.deleted_at IS NULL AND u.created_at >= :start AND u.created_at < :end
+                """ + countedUser("u"), params, (rs, i) -> new Retention(rs.getLong("cohort"), rs.getLong("retained")));
     }
 
     public List<LabelCount> levelDistribution() {
@@ -169,7 +175,8 @@ public class AdminStatsQueryRepository {
                        END label,
                        COUNT(*) c
                 FROM `user`
-                WHERE deleted_at IS NULL AND UPPER(COALESCE(platform, '')) <> 'ADMIN'
+                WHERE deleted_at IS NULL
+                """ + countedUser(null) + """
                 GROUP BY label
                 ORDER BY MIN(COALESCE(total_study_level, 1))
                 """, new MapSqlParameterSource());
@@ -178,7 +185,8 @@ public class AdminStatsQueryRepository {
     // ---------- 학습 ----------
 
     public long countAll(String table) {
-        return count("SELECT COUNT(*) FROM " + table + " WHERE deleted_at IS NULL", new MapSqlParameterSource());
+        return count("SELECT COUNT(*) FROM " + table + " WHERE deleted_at IS NULL" + testUserFilter(table),
+                new MapSqlParameterSource());
     }
 
     public long countProblems(LocalDate start, LocalDate end) {
@@ -189,7 +197,7 @@ public class AdminStatsQueryRepository {
         return count("""
                 SELECT COUNT(DISTINCT user_id) FROM problem
                 WHERE deleted_at IS NULL AND created_at >= :start AND created_at < :end
-                """, range(start, end));
+                """ + excludeTestUsers("user_id"), range(start, end));
     }
 
     public long countSolves(LocalDate start, LocalDate end) {
@@ -200,7 +208,7 @@ public class AdminStatsQueryRepository {
         return count("""
                 SELECT COUNT(DISTINCT user_id) FROM problem_solve
                 WHERE deleted_at IS NULL AND practiced_at >= :start AND practiced_at < :end
-                """, range(start, end));
+                """ + excludeTestUsers("user_id"), range(start, end));
     }
 
     public Map<String, Long> solvesByAnswerStatus(LocalDate start, LocalDate end) {
@@ -208,6 +216,7 @@ public class AdminStatsQueryRepository {
         labelCounts("""
                 SELECT COALESCE(answer_status, 'UNKNOWN') label, COUNT(*) c FROM problem_solve
                 WHERE deleted_at IS NULL AND practiced_at >= :start AND practiced_at < :end
+                """ + excludeTestUsers("user_id") + """
                 GROUP BY COALESCE(answer_status, 'UNKNOWN')
                 """, range(start, end)).forEach(row -> result.put(row.label(), row.count()));
         return result;
@@ -218,7 +227,7 @@ public class AdminStatsQueryRepository {
                 SELECT AVG(time_spent_seconds) FROM problem_solve
                 WHERE deleted_at IS NULL AND time_spent_seconds IS NOT NULL AND time_spent_seconds > 0
                   AND practiced_at >= :start AND practiced_at < :end
-                """, range(start, end), Double.class);
+                """ + excludeTestUsers("user_id"), range(start, end), Double.class);
     }
 
     public long countSolvesWithReflection(LocalDate start, LocalDate end) {
@@ -226,7 +235,7 @@ public class AdminStatsQueryRepository {
                 SELECT COUNT(*) FROM problem_solve
                 WHERE deleted_at IS NULL AND reflection IS NOT NULL AND TRIM(reflection) <> ''
                   AND practiced_at >= :start AND practiced_at < :end
-                """, range(start, end));
+                """ + excludeTestUsers("user_id"), range(start, end));
     }
 
     public long countSolveMoods(LocalDate start, LocalDate end) {
@@ -234,7 +243,7 @@ public class AdminStatsQueryRepository {
                 SELECT COUNT(*) FROM problem_solve
                 WHERE deleted_at IS NULL AND mood_emoji_key IS NOT NULL
                   AND practiced_at >= :start AND practiced_at < :end
-                """, range(start, end));
+                """ + excludeTestUsers("user_id"), range(start, end));
     }
 
     public long countPracticeNotes(LocalDate start, LocalDate end) {
@@ -246,12 +255,12 @@ public class AdminStatsQueryRepository {
         return count("""
                 SELECT COUNT(*) FROM mission_log
                 WHERE mission_type = :notePractice AND deleted_at IS NULL AND created_at >= :start AND created_at < :end
-                """, range(start, end).addValue("notePractice", NOTE_PRACTICE));
+                """ + excludeTestUsers("user_id"), range(start, end).addValue("notePractice", NOTE_PRACTICE));
     }
 
     public long countInRange(String table, String column, LocalDate start, LocalDate end) {
         return count("SELECT COUNT(*) FROM " + table + " WHERE deleted_at IS NULL AND "
-                + column + " >= :start AND " + column + " < :end", range(start, end));
+                + column + " >= :start AND " + column + " < :end" + testUserFilter(table), range(start, end));
     }
 
     // ---------- AI 분석 ----------
@@ -261,6 +270,7 @@ public class AdminStatsQueryRepository {
                 SELECT COALESCE(pa.status, 'UNKNOWN') label, COUNT(*) c FROM problem_analysis pa
                 JOIN problem p ON p.id = pa.problem_id AND p.deleted_at IS NULL
                 WHERE pa.deleted_at IS NULL
+                """ + excludeTestUsers("p.user_id") + """
                 GROUP BY COALESCE(pa.status, 'UNKNOWN') ORDER BY c DESC
                 """, new MapSqlParameterSource());
     }
@@ -271,6 +281,7 @@ public class AdminStatsQueryRepository {
                 SELECT COALESCE(pa.status, 'UNKNOWN') label, COUNT(*) c FROM problem_analysis pa
                 JOIN problem p ON p.id = pa.problem_id AND p.deleted_at IS NULL
                 WHERE pa.deleted_at IS NULL AND p.created_at >= :start AND p.created_at < :end
+                """ + excludeTestUsers("p.user_id") + """
                 GROUP BY COALESCE(pa.status, 'UNKNOWN') ORDER BY c DESC
                 """, range(start, end));
     }
@@ -281,6 +292,7 @@ public class AdminStatsQueryRepository {
                 JOIN problem p ON p.id = pa.problem_id AND p.deleted_at IS NULL
                 WHERE pa.deleted_at IS NULL AND pa.subject IS NOT NULL AND TRIM(pa.subject) <> ''
                   AND p.created_at >= :start AND p.created_at < :end
+                """ + excludeTestUsers("p.user_id") + """
                 GROUP BY pa.subject ORDER BY c DESC LIMIT :limit
                 """, range(start, end).addValue("limit", limit));
     }
@@ -297,6 +309,7 @@ public class AdminStatsQueryRepository {
                 FROM mission_progress mp
                 LEFT JOIN mission_definition d ON d.id = mp.mission_id
                 WHERE mp.deleted_at IS NULL AND mp.completed_at >= :start AND mp.completed_at < :end
+                """ + excludeTestUsers("mp.user_id") + """
                 GROUP BY mp.mission_id, d.title ORDER BY c DESC LIMIT :limit
                 """, range(start, end).addValue("limit", limit));
     }
@@ -306,6 +319,7 @@ public class AdminStatsQueryRepository {
         return labelCounts("""
                 SELECT achievement_key label, COUNT(*) c FROM user_achievement
                 WHERE earned_at >= :start AND earned_at < :end
+                """ + excludeTestUsers("user_id") + """
                 GROUP BY achievement_key ORDER BY c DESC
                 """, range(start, end));
     }
@@ -314,7 +328,8 @@ public class AdminStatsQueryRepository {
         return count("""
                 SELECT COUNT(DISTINCT l.user_id) FROM user_cosmetic_loadout l
                 JOIN `user` u ON u.id = l.user_id AND u.deleted_at IS NULL
-                """, new MapSqlParameterSource());
+                WHERE 1 = 1
+                """ + countedUser("u"), new MapSqlParameterSource());
     }
 
     // ---------- 스터디룸 ----------
@@ -329,7 +344,7 @@ public class AdminStatsQueryRepository {
         return count("""
                 SELECT COUNT(*) FROM study_room_challenge
                 WHERE deleted_at IS NULL AND status = 'COMPLETED' AND completed_at >= :start AND completed_at < :end
-                """, range(start, end));
+                """ + excludeTestUsers("created_by_user_id"), range(start, end));
     }
 
     /** 실패한 챌린지에는 완료 시각이 없어서 마감 시각으로 기간을 가른다. */
@@ -337,7 +352,7 @@ public class AdminStatsQueryRepository {
         return count("""
                 SELECT COUNT(*) FROM study_room_challenge
                 WHERE deleted_at IS NULL AND status = 'FAILED' AND end_at >= :start AND end_at < :end
-                """, range(start, end));
+                """ + excludeTestUsers("created_by_user_id"), range(start, end));
     }
 
     // ---------- 참여 상위 유저 ----------
@@ -354,6 +369,7 @@ public class AdminStatsQueryRepository {
         return jdbc.query("SELECT t.user_id, u.name, u.email, COUNT(*) c FROM " + table + " t "
                         + "LEFT JOIN `user` u ON u.id = t.user_id "
                         + "WHERE t.deleted_at IS NULL AND t." + column + " >= :start AND t." + column + " < :end "
+                        + excludeTestUsers("t.user_id")
                         + "GROUP BY t.user_id, u.name, u.email ORDER BY c DESC LIMIT :limit",
                 range(start, end).addValue("limit", limit),
                 (rs, i) -> new RankRow(rs.getLong("user_id"), rs.getString("name"), rs.getString("email"), rs.getLong("c")));
@@ -410,8 +426,25 @@ public class AdminStatsQueryRepository {
     private Map<LocalDate, Long> dailyCount(String table, String column, LocalDate start, LocalDate end) {
         return daily("SELECT DATE(" + column + ") d, COUNT(*) c FROM " + table
                         + " WHERE deleted_at IS NULL AND " + column + " >= :start AND " + column + " < :end"
+                        + testUserFilter(table)
                         + " GROUP BY DATE(" + column + ")",
                 start, end, range(start, end));
+    }
+
+    /** 테이블마다 누가 남긴 행인지 가리키는 컬럼이 달라서, 이름으로 골라 게스트와 관리자 조건을 붙인다. */
+    private static String testUserFilter(String table) {
+        return switch (table) {
+            case "`user`" -> countedUser(null);
+            case "problem", "problem_solve", "practice_note", "mission_progress", "mission_log", "folder", "tag",
+                 "fcm_token", "learning_calendar_mood", "study_room_member", "study_room_feed",
+                 "study_room_shared_problem_reaction", "study_room_shared_problem_comment_reaction",
+                 "study_room_feed_reaction", "user_achievement" -> excludeTestUsers("user_id");
+            case "study_room" -> excludeTestUsers("host_user_id");
+            case "study_room_shared_problem" -> excludeTestUsers("shared_by_user_id");
+            case "study_room_shared_problem_comment" -> excludeTestUsers("author_id");
+            case "study_room_challenge" -> excludeTestUsers("created_by_user_id");
+            default -> throw new IllegalArgumentException("유저 컬럼을 모르는 테이블: " + table);
+        };
     }
 
     /** 기록이 없는 날도 0 으로 채운다. 날짜가 비면 차트 선이 끊기고 표에서 날짜가 빠진다. */

@@ -191,6 +191,21 @@ class AdminGrowthControllerTest extends AdminTestSupport {
         }
 
         @Test
+        @DisplayName("게스트가 받은 업적은 집계에서 빠진다")
+        void excludesGuestAchievements() throws Exception {
+            User guest = createGuestUser();
+            earn(user, Achievement.FIRST_STEP, LocalDateTime.now());
+            earn(guest, Achievement.FIRST_STEP, LocalDateTime.now());
+
+            MvcResult result = mockMvc.perform(get("/admin/achievements")).andReturn();
+
+            AchievementOverview overview = (AchievementOverview) modelOf(result).get("overview");
+            assertThat(overview.totalEarned()).as("게스트가 받은 업적은 세지 않는다").isEqualTo(1);
+            assertThat(overview.usersWithAny()).isEqualTo(1);
+            assertThat(overview.totalUsers()).as("게스트는 분모에도 넣지 않는다").isEqualTo(1);
+        }
+
+        @Test
         @DisplayName("지금 enum 에 없는 키가 저장돼 있어도 화면이 열린다")
         void toleratesUnknownKey() throws Exception {
             jdbcTemplate.update("INSERT INTO user_achievement (user_id, achievement_key, earned_at) VALUES (?, 'removed_medal', NOW())",

@@ -81,9 +81,26 @@ class AdminUserControllerTest extends AdminTestSupport {
             assertThat(pager.endItem()).isZero();
             assertThat(pager.previousUrl()).isNull();
             assertThat(pager.nextUrl()).isNull();
-            assertThat(((AdminUserRows.Summary) modelOf(result, "summary")).guestRate())
-                    .as("유저가 0명일 때 비율을 0으로 나누면 화면이 깨진다")
-                    .isZero();
+            assertThat(((AdminUserRows.Summary) modelOf(result, "summary")).totalUsers()).isZero();
+        }
+
+        @Test
+        @DisplayName("요약 숫자에서 게스트와 관리자는 빠지지만 목록에는 모두 나온다")
+        void excludesGuestFromSummary() throws Exception {
+            User member = fixtures.createUser();
+            User guest = createGuestUser();
+            saveMissionLog(member, com.aisip.OnO.backend.mission.entity.MissionType.USER_LOGIN, null);
+            saveMissionLog(guest, com.aisip.OnO.backend.mission.entity.MissionType.USER_LOGIN, null);
+
+            MvcResult result = mockMvc.perform(get("/admin/users")).andExpect(status().isOk()).andReturn();
+
+            AdminUserRows.Summary summary = (AdminUserRows.Summary) modelOf(result, "summary");
+            assertThat(summary.totalUsers()).isEqualTo(1);
+            assertThat(summary.todaySignups()).isEqualTo(1);
+            assertThat(summary.activeUsersLast7Days()).isEqualTo(1);
+            assertThat(result.getModelAndView().getModel().get("totalUsers"))
+                    .as("목록은 집계가 아니라서 관리자와 게스트도 센다")
+                    .isEqualTo(3L);
         }
 
         @Test
@@ -247,8 +264,8 @@ class AdminUserControllerTest extends AdminTestSupport {
                     .andReturn();
 
             AdminUserRows.Summary summary = (AdminUserRows.Summary) modelOf(result, "summary");
-            assertThat(summary.totalUsers()).isEqualTo(2L);
-            assertThat(summary.todaySignups()).isEqualTo(2L);
+            assertThat(summary.totalUsers()).as("관리자 계정은 세지 않는다").isEqualTo(1L);
+            assertThat(summary.todaySignups()).isEqualTo(1L);
             assertThat(summary.activeUsersLast7Days()).isEqualTo(1L);
         }
 

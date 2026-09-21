@@ -75,6 +75,27 @@ class AdminControllerTest extends AdminTestSupport {
     }
 
     @Test
+    @DisplayName("홈의 오늘 숫자에는 게스트가 남긴 가입, 출석, 오답노트, 복습이 들어가지 않는다")
+    void excludesGuestFromTodayNumbers() throws Exception {
+        User guest = createGuestUser();
+        Problem guestProblem = saveProblem(guest.getId(), null, "게스트");
+        problemSolveRepository.save(ProblemSolve.create(
+                guestProblem, guest.getId(), LocalDateTime.now(), AnswerStatus.CORRECT, null, null, null, null));
+        saveMissionLog(guest, MissionType.USER_LOGIN, null);
+
+        MvcResult result = mockMvc.perform(get("/admin/main")).andExpect(status().isOk()).andReturn();
+
+        AdminStatsService.Home home = (AdminStatsService.Home) result.getModelAndView().getModel().get("home");
+        assertThat(home.signups().value()).as("관리자와 게스트 가입은 세지 않는다").isZero();
+        assertThat(home.activeUsers().value()).isZero();
+        assertThat(home.problems().value()).isZero();
+        assertThat(home.solves().value()).isZero();
+        assertThat(home.recentProblems()).extracting(AdminStatsDto.RecentProblem::problemId)
+                .as("최근 목록은 집계가 아니라서 게스트 것도 그대로 보여 준다")
+                .contains(guestProblem.getId());
+    }
+
+    @Test
     @DisplayName("이미지 뷰어는 넘겨받은 url 을 그대로 모델에 담는다")
     void putsImageUrlIntoModel() throws Exception {
         mockMvc.perform(get("/admin/user/image/view").param("url", "https://cdn.test.ono/problem/1.png"))
