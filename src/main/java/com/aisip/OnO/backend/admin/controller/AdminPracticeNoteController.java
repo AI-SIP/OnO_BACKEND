@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,9 @@ import java.util.stream.Collectors;
 @Controller
 @RequestMapping("/admin")
 public class AdminPracticeNoteController {
+
+    /** 서비스 기준 시간대. 인자 없는 now() 는 서버 기본 시간대를 따라 하루가 밀릴 수 있다. */
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     /** 복습노트 상세에서 보여 줄 최근 복습 기록 수. */
     private static final int RECENT_SOLVE_LIMIT = 50;
@@ -124,7 +128,7 @@ public class AdminPracticeNoteController {
         model.addAttribute("size", selectedSize);
         model.addAttribute("pager", AdminPager.of(request, "page", selectedPage, selectedSize, total));
         model.addAttribute("summary", learningQueryRepository.summarizeSolves(filter));
-        model.addAttribute("todaySolveCount", learningQueryRepository.countSolvesOn(LocalDate.now()));
+        model.addAttribute("todaySolveCount", learningQueryRepository.countSolvesOn(LocalDate.now(KST)));
         model.addAttribute("answerStatuses", AnswerStatus.values());
         addFilterAttributes(model, date, userId, selectedStatus);
 

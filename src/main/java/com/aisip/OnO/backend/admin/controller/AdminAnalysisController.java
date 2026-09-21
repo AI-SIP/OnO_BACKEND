@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -25,6 +26,9 @@ import java.util.stream.Collectors;
 @Controller
 @RequestMapping("/admin")
 public class AdminAnalysisController {
+
+    /** 서비스 기준 시간대. 인자 없는 now() 는 서버 기본 시간대를 따라 하루가 밀릴 수 있다. */
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     private final UserService userService;
     private final MissionLogService missionLogService;
@@ -42,7 +46,7 @@ public class AdminAnalysisController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             Model model
     ) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(KST);
         LocalDate selectedStartDate = startDate != null ? startDate : today.minusDays(29);
         LocalDate selectedEndDate = endDate != null ? endDate : today;
 

@@ -16,6 +16,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 @Slf4j
@@ -23,6 +24,9 @@ import java.util.List;
 @Controller
 @RequestMapping("/admin")
 public class AdminUserController {
+
+    /** 서비스 기준 시간대. 인자 없는 now() 는 서버 기본 시간대를 따라 하루가 밀릴 수 있다. */
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     /** 한 페이지에 너무 많이 요청하면 집계 쿼리가 운영 DB 를 오래 붙잡는다. */
     private static final int MAX_PAGE_SIZE = 500;
@@ -53,7 +57,7 @@ public class AdminUserController {
         List<AdminUserRows.ListRow> users = adminUserQueryRepository.findUsers(
                 keyword, selectedPlatform, sortBy, direction, (long) selectedPage * selectedSize, selectedSize);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(KST);
         model.addAttribute("summary", adminUserQueryRepository.summarize(today.atStartOfDay(), today.minusDays(6).atStartOfDay()));
         model.addAttribute("platforms", adminUserQueryRepository.findPlatforms());
         model.addAttribute("users", users);
@@ -122,7 +126,7 @@ public class AdminUserController {
         if (loginDatesDesc.isEmpty()) {
             return 0;
         }
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(KST);
         LocalDate expected = loginDatesDesc.get(0);
         if (expected.isBefore(today.minusDays(1))) {
             return 0;
