@@ -98,6 +98,8 @@ services:
       DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       SENTRY_DSN: ${SENTRY_DSN}
+      # sentry-java 기본값(1)로 되돌린다. 자세한 이유는 docker-compose.prod.yml 참고
+      SENTRY_EXCEPTIONRESOLVERORDER: "1"
       ADMIN_IDENTIFIER: ${ADMIN_IDENTIFIER}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
@@ -129,6 +131,9 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
+      # dev 는 회귀 확인 용도라 prod 보다 짧게 둔다 (기본값은 15일)
+      - --storage.tsdb.retention.time=30d
+      - --storage.tsdb.retention.size=5GB
       - --web.external-url=${PROMETHEUS_DEV_EXTERNAL_URL:-http://localhost:9091}
       - --web.route-prefix=${PROMETHEUS_DEV_ROUTE_PREFIX:-/}
     ports:

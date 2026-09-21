@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.mission.repository;
 import com.aisip.OnO.backend.mission.entity.MissionType;
 import com.aisip.OnO.backend.user.entity.User;
 import com.querydsl.core.Tuple;
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.DateExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberExpression;
@@ -13,7 +14,6 @@ import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -29,17 +29,28 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
 
     @Override
     public boolean alreadyWriteProblemsTodayMoreThan3(Long userId) {
-        return countProblemWritesToday(userId) >= 3;
+        return alreadyWriteProblemsTodayMoreThan3(userId, false);
+    }
+
+    @Override
+    public boolean alreadyWriteProblemsTodayMoreThan3(Long userId, boolean accruedOnly) {
+        return countProblemWritesToday(userId, accruedOnly) >= 3;
     }
 
     @Override
     public long countProblemWritesToday(Long userId) {
+        return countProblemWritesToday(userId, false);
+    }
+
+    @Override
+    public long countProblemWritesToday(Long userId, boolean accruedOnly) {
         Long count = queryFactory
                 .select(missionLog.count())
                 .from(missionLog)
                 .where(missionLog.missionType.eq(MissionType.PROBLEM_WRITE)
                         .and(missionLog.user.id.eq(userId))
-                        .and(missionLog.createdAt.between(getStartOfToday(), getEndOfToday()))
+                        .and(createdToday())
+                        .and(accrued(accruedOnly))
                 )
                 .fetchOne();
 
@@ -48,39 +59,71 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
 
     @Override
     public boolean alreadyPracticeProblem(Long problemId){
+        return alreadyPracticeProblem(problemId, false);
+    }
+
+    @Override
+    public boolean alreadyPracticeProblem(Long problemId, boolean accruedOnly){
 
         return queryFactory
                 .selectOne()
                 .from(missionLog)
                 .where(missionLog.missionType.eq(MissionType.PROBLEM_PRACTICE)
                         .and(missionLog.referenceId.eq(problemId))
-                        .and(missionLog.createdAt.between(getStartOfToday(), getEndOfToday()))
+                        .and(createdToday())
+                        .and(accrued(accruedOnly))
                 )
                 .fetchFirst() != null;
     }
 
     @Override
     public boolean alreadyPracticeNote(Long practiceNoteId){
+        return alreadyPracticeNote(practiceNoteId, false);
+    }
+
+    @Override
+    public boolean alreadyPracticeNote(Long practiceNoteId, boolean accruedOnly){
         return queryFactory
                 .selectOne()
                 .from(missionLog)
                 .where(missionLog.missionType.eq(MissionType.NOTE_PRACTICE)
                         .and(missionLog.referenceId.eq(practiceNoteId))
-                        .and(missionLog.createdAt.between(getStartOfToday(), getEndOfToday()))
+                        .and(createdToday())
+                        .and(accrued(accruedOnly))
                 )
                 .fetchFirst() != null;
     }
 
     @Override
     public boolean alreadyLogin(Long userId){
+        return alreadyLogin(userId, false);
+    }
+
+    @Override
+    public boolean alreadyLogin(Long userId, boolean accruedOnly){
         return queryFactory
                 .selectOne()
                 .from(missionLog)
                 .where(missionLog.missionType.eq(MissionType.USER_LOGIN)
                         .and(missionLog.user.id.eq(userId))
-                        .and(missionLog.createdAt.between(getStartOfToday(), getEndOfToday()))
+                        .and(createdToday())
+                        .and(accrued(accruedOnly))
                 )
                 .fetchFirst() != null;
+    }
+
+    /**
+     * "실제로 적립된 행만" 조건. {@code accruedOnly} 가 아니면 조건을 붙이지 않는다.
+     *
+     * <p>{@code null} 을 돌려주면 QueryDSL 이 그 항을 통째로 빼므로, 기존 판정의 쿼리가 그대로 남는다.
+     * 적립된 행은 {@code point} 에 정가가 들어 있고, 적립이 돌지 않은 요청의 행은 0 이다
+     * ({@code MissionLog.point}).
+     *
+     * <p>옛 행은 적립 여부와 무관하게 정가가 들어 있어 전부 "적립된 행"으로 잡힌다.
+     * 덜 주는 쪽이 아니라 지금과 같게 두는 쪽이라 안전하다.
+     */
+    private BooleanExpression accrued(boolean accruedOnly) {
+        return accruedOnly ? missionLog.point.gt(0L) : null;
     }
 
     @Override
@@ -88,7 +131,7 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
         Long result = queryFactory
                 .select(missionLog.point.sum())
                 .from(missionLog)
-                .where(missionLog.createdAt.between(getStartOfToday(), getEndOfToday())
+                .where(createdToday()
                         .and(missionLog.user.id.eq(userId)))
                 .fetchOne();
 
@@ -116,7 +159,7 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
                 .select(createdDate, activeUserCount)
                 .from(missionLog)
                 .where(missionLog.missionType.eq(MissionType.USER_LOGIN)
-                        .and(missionLog.createdAt.between(startDate.atStartOfDay(), endDate.atTime(LocalTime.MAX)))
+                        .and(createdBetweenDates(startDate, endDate))
                 )
                 .groupBy(createdDate)
                 .fetch();
@@ -139,25 +182,33 @@ public class MissionLogRepositoryImpl implements MissionLogRepositoryCustom {
 
     @Override
     public java.util.List<User> getActiveUsersByDate(LocalDate date) {
-        LocalDateTime startOfDay = date.atStartOfDay();
-        LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
-
         return queryFactory
                 .select(missionLog.user)
                 .distinct()
                 .from(missionLog)
                 .where(missionLog.missionType.eq(MissionType.USER_LOGIN)
-                        .and(missionLog.createdAt.between(startOfDay, endOfDay))
+                        .and(createdBetweenDates(date, date))
                 )
                 .fetch();
     }
 
-    private LocalDateTime getStartOfToday() {
-        return LocalDate.now().atStartOfDay();
+    /**
+     * "오늘 안에 만들어졌는가" 조건.
+     *
+     * <p>예전에는 {@code between(오늘 00:00, 오늘 23:59:59.999999999)} 를 썼는데,
+     * MySQL DATETIME(6) 은 마이크로초까지만 저장하므로 끝값이 반올림되어 <b>다음 날 00:00:00 이 되고</b>
+     * BETWEEN 은 양끝을 포함하므로 자정 정각에 만들어진 기록이 전날에도 오늘로 잡혔다.
+     * 그 경우 자정에 로그인한 사용자는 전날 출석이 이미 있는 것으로 판정돼 보상을 잃는다.
+     * 반열림 구간 {@code [오늘 00:00, 내일 00:00)} 으로 바꿔 경계를 한 번만 세도록 한다.
+     */
+    private BooleanExpression createdToday() {
+        return createdBetweenDates(LocalDate.now(), LocalDate.now());
     }
 
-    private LocalDateTime getEndOfToday() {
-        return LocalDate.now().atTime(LocalTime.MAX);
+    /** {@code [startDate 00:00, endDate+1일 00:00)} 반열림 구간. */
+    private BooleanExpression createdBetweenDates(LocalDate startDate, LocalDate endDate) {
+        return missionLog.createdAt.goe(startDate.atStartOfDay())
+                .and(missionLog.createdAt.lt(endDate.plusDays(1).atStartOfDay()));
     }
 
     private LocalDate toLocalDate(Object value) {

@@ -18,11 +18,12 @@ public enum StudyRoomErrorCase implements ErrorCase {
     ALREADY_MEMBER(409, 10008, "이미 참여 중인 스터디룸입니다."),
     CHALLENGE_NOT_FOUND(404, 10009, "챌린지를 찾을 수 없습니다."),
     CHALLENGE_LIMIT_EXCEEDED(409, 10010, "진행 중인 챌린지 수를 초과했습니다."),
-    SESSION_ALREADY_ACTIVE(409, 10011, "이미 진행 중인 공부 세션이 있습니다."),
-    SESSION_NOT_FOUND(404, 10012, "공부 세션을 찾을 수 없습니다."),
+    // 삭제된 번호 10011, 10012, 10015 는 다른 의미로 재사용하지 않는다.
+    // 운영 중인 4.0.0 앱이 이 번호를 옛 문구로 매핑하고 있다 (OnO_FRONT lib/Util/ErrorMessageMapper.dart:120-129).
+    // 10011, 10012 는 공부 세션 기능과 함께 지웠다.
     SHARED_PROBLEM_NOT_FOUND(404, 10013, "공유 문제를 찾을 수 없습니다."),
     REPORT_NOT_FOUND(404, 10014, "주간 리포트를 찾을 수 없습니다."),
-    INVALID_REACTION_EMOJI(400, 10015, "허용되지 않은 반응입니다."),
+    // 10015 는 리액션 이모지 검증이 CustomEmojiErrorCase.INVALID_EMOJI_KEY(11001) 로 옮겨가 지웠다. 재사용 금지.
     INVALID_STUDY_ROOM_REQUEST(400, 10016, "스터디룸 요청 값이 올바르지 않습니다."),
     SHARED_PROBLEM_COMMENT_NOT_FOUND(404, 10017, "공유 문제 댓글을 찾을 수 없습니다."),
     INVALID_SHARED_PROBLEM_COMMENT(400, 10018, "공유 문제 댓글 내용이 올바르지 않습니다."),

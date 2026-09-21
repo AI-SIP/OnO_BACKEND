@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.problem.controller;
 import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.problem.dto.AddProblemImageUrlsRequest;
+import com.aisip.OnO.backend.problem.dto.UpdateProblemImageDataRequest;
 import com.aisip.OnO.backend.problem.dto.ProblemAnalysisResponseDto;
 import com.aisip.OnO.backend.problem.dto.ReviewDueResponseDto;
 import com.aisip.OnO.backend.problem.dto.ProblemDeleteRequestDto;
@@ -238,6 +239,23 @@ public class ProblemController {
         problemService.deleteAllUserProblems(userId);
 
         return CommonResponse.success("유저의 모든 문제가 삭제되었습니다.");
+    }
+
+    // ✅ 문제 이미지 URL 수정 (Flutter 문제 수정 플로우)
+    @PatchMapping("/imageData")
+    public CommonResponse<Void> updateProblemImageData(
+            @Validated @RequestBody UpdateProblemImageDataRequest request
+    ) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Long problemId = request.problemId();
+        AddProblemImageUrlsRequest converted = new AddProblemImageUrlsRequest(
+                request.imageDataDtoList().stream()
+                        .map(item -> new AddProblemImageUrlsRequest.ImageUrlItem(item.imageUrl(), item.problemImageType()))
+                        .toList()
+        );
+        problemService.addImageDataUrls(problemId, userId, converted);
+        problemService.analysisProblem(problemId, userId);
+        return CommonResponse.success(null);
     }
 
     // ✅ 문제 이미지 데이터 삭제

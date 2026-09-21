@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.studyroom.quartz;
 
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomMemberRepository;
+import com.aisip.OnO.backend.util.fcm.NotificationType;
 import com.aisip.OnO.backend.util.fcm.dto.NotificationRequestDto;
 import com.aisip.OnO.backend.util.fcm.service.FcmService;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +38,7 @@ public class ChallengeNotificationJob implements Job {
         }
 
         NotificationRequestDto dto = new NotificationRequestDto(null, title, body,
-                Map.of("type", "CHALLENGE_NOTIFICATION", "roomId", String.valueOf(roomId)));
+                Map.of("type", NotificationType.CHALLENGE_NOTIFICATION, "roomId", String.valueOf(roomId)));
 
         memberRepository.findAllWithUserByRoomId(roomId).forEach(member -> {
             try {

@@ -1,12 +1,17 @@
 package com.aisip.OnO.backend.problemsolve.service;
 
+import com.aisip.OnO.backend.common.emoji.CustomEmojiValidator;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.mission.entity.MissionMetric;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
+import com.aisip.OnO.backend.mission.service.MissionProgressUpdater;
+import com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderService;
 import com.aisip.OnO.backend.util.redis.StreakCacheService;
 import com.aisip.OnO.backend.problem.service.ReviewIntervalCalculator;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveRegisterDto;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveResponseDto;
 import com.aisip.OnO.backend.problemsolve.dto.ProblemSolveUpdateDto;
+import com.aisip.OnO.backend.problemsolve.entity.AnswerStatus;
 import com.aisip.OnO.backend.problemsolve.entity.ProblemSolve;
 import com.aisip.OnO.backend.problemsolve.entity.ProblemSolveImageData;
 import com.aisip.OnO.backend.problemsolve.exception.ProblemSolveErrorCase;
@@ -27,6 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -45,11 +52,14 @@ public class ProblemSolveService {
     private final ProblemSolveImageDataRepository problemSolveImageDataRepository;
     private final ProblemRepository problemRepository;
     private final MissionLogService missionLogService;
+    private final MissionProgressUpdater missionProgressUpdater;
     private final FileUploadService fileUploadService;
     private final S3DeleteProducer s3DeleteProducer;
     private final ObjectMapper objectMapper;
     private final StreakCacheService streakCacheService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ProblemReviewReminderService reminderService;
+    private final CustomEmojiValidator customEmojiValidator;
     @Qualifier("s3UploadExecutor")
     private final Executor s3UploadExecutor;
 
@@ -101,12 +111,21 @@ public class ProblemSolveService {
 
     @Transactional
     public Long createProblemSolve(ProblemSolveRegisterDto dto, Long userId) {
+        // problemId 가 없으면 findById(null) 이 InvalidDataAccessApiUsageException 으로 터져 500 이 나간다.
+        // answerStatus 가 없으면 복습 주기 계산에서 NPE, 저장 시 not-null 위반으로 역시 500 이다.
+        if (dto == null || dto.problemId() == null || dto.answerStatus() == null) {
+            throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_INVALID_INPUT);
+        }
+
         Problem problem = problemRepository.findById(dto.problemId())
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
         if (!Objects.equals(problem.getUserId(), userId)) {
             throw new ApplicationException(ProblemErrorCase.PROBLEM_USER_UNMATCHED);
         }
+
+        // 이모지는 선택 사항이라 null 은 허용하고, 값이 있으면 화이트리스트에 있는 키인지만 본다.
+        customEmojiValidator.validateNullable(dto.moodEmojiKey());
 
         // improvements를 JSON 문자열로 변환
         String improvementsJson = null;
@@ -119,19 +138,29 @@ public class ProblemSolveService {
             }
         }
 
+        // practicedAt 은 not-null 컬럼이다. 앱이 값을 안 보내면 "지금 푼 것"으로 본다.
+        LocalDateTime practicedAt = dto.practicedAt() != null
+                ? dto.practicedAt()
+                : LocalDateTime.now(ZoneId.of("Asia/Seoul"));
+
         ProblemSolve problemSolve = ProblemSolve.create(
                 problem,
                 userId,
-                dto.practicedAt(),
+                practicedAt,
                 dto.answerStatus(),
                 dto.reflection(),
                 improvementsJson,
-                dto.timeSpentSeconds()
+                dto.timeSpentSeconds(),
+                dto.moodEmojiKey()
         );
 
         problemSolveRepository.save(problemSolve);
         streakCacheService.evict(userId);
         missionLogService.registerProblemPracticeMission(userId, problem.getId());
+        missionProgressUpdater.increase(userId, MissionMetric.SOLVE_RECORDED);
+        if (dto.answerStatus() == AnswerStatus.CORRECT) {
+            missionProgressUpdater.increase(userId, MissionMetric.SOLVE_CORRECT);
+        }
 
         ReviewIntervalCalculator.ReviewSchedule schedule = ReviewIntervalCalculator.calculate(
                 dto.answerStatus(),
@@ -142,6 +171,8 @@ public class ProblemSolveService {
         eventPublisher.publishEvent(new StudyRoomActivityEvent(
                 userId, StudyRoomFeedEventType.PRACTICE_COMPLETED, java.util.Map.of()));
 
+        reminderService.skipDuePendingByProblemSolve(userId, dto.problemId(), practicedAt);
+
         log.info("userId: {} created problem solve: {}, nextReviewAt: {}, mastered: {}",
                 userId, problemSolve.getId(), schedule.nextReviewAt(), schedule.isMastered());
 
@@ -150,6 +181,10 @@ public class ProblemSolveService {
 
     @Transactional
     public void uploadProblemSolveImages(Long problemSolveId, Long userId, List<MultipartFile> images) {
+        if (images == null) {
+            throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_INVALID_INPUT);
+        }
+
         ProblemSolve problemSolve = problemSolveRepository.findById(problemSolveId)
                 .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND));
 
@@ -182,6 +217,10 @@ public class ProblemSolveService {
 
     @Transactional
     public void addImageUrls(Long problemSolveId, Long userId, List<String> imageUrls) {
+        if (imageUrls == null) {
+            throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_INVALID_INPUT);
+        }
+
         ProblemSolve problemSolve = problemSolveRepository.findById(problemSolveId)
                 .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND));
         if (!Objects.equals(problemSolve.getUserId(), userId)) {
@@ -200,12 +239,20 @@ public class ProblemSolveService {
 
     @Transactional
     public void updateProblemSolve(ProblemSolveUpdateDto dto, Long userId) {
+        // problemSolveId 가 없으면 findById(null) 이 500 으로, answerStatus 가 없으면
+        // not-null 컬럼 위반으로 500 이 난다. 둘 다 클라이언트 입력 오류다.
+        if (dto == null || dto.problemSolveId() == null || dto.answerStatus() == null) {
+            throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_INVALID_INPUT);
+        }
+
         ProblemSolve problemSolve = problemSolveRepository.findById(dto.problemSolveId())
                 .orElseThrow(() -> new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND));
 
         if (!Objects.equals(problemSolve.getUserId(), userId)) {
             throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_USER_UNMATCHED);
         }
+
+        customEmojiValidator.validateNullable(dto.moodEmojiKey());
 
         // improvements를 JSON 문자열로 변환
         String improvementsJson = null;
@@ -222,7 +269,8 @@ public class ProblemSolveService {
                 dto.answerStatus(),
                 dto.reflection(),
                 improvementsJson,
-                dto.timeSpentSeconds()
+                dto.timeSpentSeconds(),
+                dto.moodEmojiKey()
         );
 
         log.info("userId: {} updated problem solve: {}", userId, problemSolve.getId());

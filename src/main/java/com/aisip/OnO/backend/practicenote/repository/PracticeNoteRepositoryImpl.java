@@ -87,11 +87,18 @@ public class PracticeNoteRepositoryImpl implements PracticeNoteRepositoryCustom 
                 .execute();
     }
 
+    /**
+     * 썸네일 응답에는 문제 매핑이 필요 없다.
+     *
+     * <p>예전에는 여기서도 {@code problemPracticeNoteMappingList} 를 fetch join 했는데,
+     * 컬렉션 fetch join 과 limit 을 같이 쓰면 Hibernate 가 limit 을 SQL 이 아니라 메모리에서 적용한다
+     * (HHH90003004). 즉 커서 페이징인데도 사용자의 복습노트와 매핑을 전부 읽어 온 뒤 잘라 냈다.
+     * 무한 스크롤 API 에서 페이지 크기와 무관하게 전체를 읽는 셈이라 fetch join 을 걷어냈다.
+     */
     @Override
     public List<PracticeNote> findPracticeNotesByUserWithCursor(Long userId, Long cursor, int size) {
         var query = queryFactory
                 .selectFrom(practiceNote)
-                .leftJoin(practiceNote.problemPracticeNoteMappingList, problemPracticeNoteMapping).fetchJoin()
                 .where(practiceNote.userId.eq(userId));
 
         // 커서가 있으면 해당 ID 이후부터 조회

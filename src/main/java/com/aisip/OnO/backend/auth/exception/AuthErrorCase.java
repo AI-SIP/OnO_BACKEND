@@ -10,7 +10,7 @@ public enum AuthErrorCase implements ErrorCase {
 
     INVALID_REFRESH_TOKEN(400, 1001, "유효하지 않은 리프레시토큰입니다."),
 
-    REFRESH_TOKEN_NOT_FOUND(404, 1002, "리프레시 토큰 정보를 찾을 수 없습니다."),
+    REFRESH_TOKEN_NOT_FOUND(401, 1002, "리프레시 토큰 정보를 찾을 수 없습니다."),
 
     INVALID_AUTHORITY(400, 1003, "유효하지 않은 권한입니다."),
 

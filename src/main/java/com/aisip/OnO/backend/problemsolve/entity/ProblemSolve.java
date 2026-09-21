@@ -49,6 +49,10 @@ public class ProblemSolve extends BaseEntity {
 
     private Integer timeSpentSeconds;
 
+    // 이번 복습이 어땠는지 남기는 이모지. CustomEmojiValidator 화이트리스트 키이고, 안 고를 수도 있어 nullable 이다.
+    @Column(name = "mood_emoji_key", length = 80)
+    private String moodEmojiKey;
+
     @Column(nullable = false)
     @Builder.Default
     private Boolean migratedFromLegacy = false;
@@ -59,7 +63,7 @@ public class ProblemSolve extends BaseEntity {
 
     public static ProblemSolve create(Problem problem, Long userId, LocalDateTime practicedAt,
                                       AnswerStatus answerStatus, String reflection, String improvements,
-                                      Integer timeSpentSeconds) {
+                                      Integer timeSpentSeconds, String moodEmojiKey) {
         return ProblemSolve.builder()
                 .problem(problem)
                 .userId(userId)
@@ -68,6 +72,7 @@ public class ProblemSolve extends BaseEntity {
                 .reflection(reflection)
                 .improvements(improvements)
                 .timeSpentSeconds(timeSpentSeconds)
+                .moodEmojiKey(moodEmojiKey)
                 .migratedFromLegacy(false)
                 .build();
     }
@@ -88,10 +93,11 @@ public class ProblemSolve extends BaseEntity {
     }
 
     public void updateSolve(AnswerStatus answerStatus, String reflection, String improvements,
-                            Integer timeSpentSeconds) {
+                            Integer timeSpentSeconds, String moodEmojiKey) {
         this.answerStatus = answerStatus;
         this.reflection = reflection;
         this.improvements = improvements;
         this.timeSpentSeconds = timeSpentSeconds;
+        this.moodEmojiKey = moodEmojiKey;
     }
 }

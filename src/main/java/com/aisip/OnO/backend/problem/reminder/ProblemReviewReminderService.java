@@ -1,0 +1,175 @@
+package com.aisip.OnO.backend.problem.reminder;
+
+import com.aisip.OnO.backend.problem.event.ProblemCreatedEvent;
+import com.aisip.OnO.backend.util.fcm.service.FcmService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import static com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderStatus.*;
+import static org.springframework.transaction.annotation.Propagation.REQUIRES_NEW;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class ProblemReviewReminderService {
+
+    private static final int STUCK_TIMEOUT_MINUTES = 10;
+    private static final int DUE_REMINDER_BATCH_SIZE = 500;
+    private static final int OVERDUE_EXPIRE_DAYS = 3;
+    private static final List<ProblemReviewReminderStatus> PENDING_STATUSES = List.of(SCHEDULED, SENDING);
+
+    private final ProblemReviewReminderRepository repository;
+    private final ProblemReviewReminderPolicy policy;
+    private final FcmService fcmService;
+    private final ProblemReviewReminderSender sender;
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = REQUIRES_NEW)
+    public void handleProblemCreated(ProblemCreatedEvent event) {
+        try {
+            scheduleForNewProblems(event.userId(), event.problems());
+        } catch (Exception e) {
+            log.error("[ReviewReminder] 자동 알림 예약 실패 - userId: {}", event.userId(), e);
+        }
+    }
+
+    @Transactional(propagation = REQUIRES_NEW)
+    public void scheduleForNewProblems(Long userId, List<ProblemCreatedEvent.ProblemData> problems) {
+        List<Integer> intervals = policy.getIntervals();
+        List<ProblemReviewReminder> reminders = new ArrayList<>();
+
+        for (ProblemCreatedEvent.ProblemData data : problems) {
+            for (int i = 0; i < intervals.size(); i++) {
+                int sequence = i + 1;
+                int intervalDays = intervals.get(i);
+                if (repository.existsByProblemIdAndSequence(data.problemId(), sequence)) {
+                    continue;
+                }
+                LocalDateTime scheduledAt = policy.calculateScheduledAt(data.createdAt(), intervalDays);
+                reminders.add(ProblemReviewReminder.create(
+                        userId, data.problemId(), data.memo(), data.reference(),
+                        sequence, intervalDays, scheduledAt
+                ));
+            }
+        }
+
+        if (!reminders.isEmpty()) {
+            repository.saveAll(reminders);
+            log.info("[ReviewReminder] 자동 알림 예약 생성 - userId: {}, 문제 {}개, row {}개",
+                    userId, problems.size(), reminders.size());
+        }
+    }
+
+    /**
+     * 문제 삭제로 남은 예약을 취소한다.
+     *
+     * <p>취소 대상을 먼저 읽고 기본 키로 UPDATE 한다. {@code problem_id} 조건으로 바로 UPDATE 하면
+     * next-key lock 이 인덱스 끝의 갭까지 잡아서, 폴더 삭제가 커밋될 때까지 다른 계정의 문제 등록이
+     * 전부 예약 INSERT 에서 막혔다. (#319, {@link ProblemReviewReminderRepository#cancelByIdIn})
+     */
+    @Transactional
+    public void cancelPendingByProblem(Long problemId) {
+        List<Long> pendingIds = repository.findPendingIdsByProblem(problemId, PENDING_STATUSES);
+        if (pendingIds.isEmpty()) {
+            return;
+        }
+
+        int count = repository.cancelByIdIn(pendingIds, CANCELED);
+        if (count > 0) {
+            log.info("[ReviewReminder] 문제 삭제로 알림 취소 - problemId: {}, {}건", problemId, count);
+        }
+    }
+
+    @Transactional
+    public void refreshSnapshot(Long problemId, String memo, String reference) {
+        repository.refreshSnapshot(problemId, memo, reference, SCHEDULED);
+    }
+
+    @Transactional
+    public void skipDuePendingByProblemSolve(Long userId, Long problemId, LocalDateTime practicedAt) {
+        int count = repository.skipDuePendingByProblem(problemId, SKIPPED_BY_COMPLETION, SCHEDULED, practicedAt);
+        if (count > 0) {
+            log.info("[ReviewReminder] 복습 완료로 due 알림 skip - userId: {}, problemId: {}, {}건",
+                    userId, problemId, count);
+        }
+    }
+
+    @Transactional
+    public void cancelAllByUser(Long userId) {
+        int count = repository.cancelAllByUser(userId, CANCELED, PENDING_STATUSES);
+        if (count > 0) {
+            log.info("[ReviewReminder] 사용자 탈퇴로 알림 취소 - userId: {}, {}건", userId, count);
+        }
+    }
+
+    public void sendDueReminders(LocalDateTime now) {
+        recoverStuckRows(now);
+        expireOverdueRows(now);
+
+        // 예약 시각을 창 안으로 맞춰 두어도 밀린 예약은 창 밖에서 due 가 된다.
+        // 특히 자정에 "오늘 보낸 것" 판정이 리셋되는 순간 가장 오래된 밀린 예약이
+        // 바로 조건을 만족해, 밀린 것이 있는 사용자는 매일 새벽에 푸시를 받게 된다.
+        if (!policy.isWithinSendWindow(now)) {
+            return;
+        }
+
+        LocalDate today = now.toLocalDate();
+        LocalDateTime startOfDay = today.atStartOfDay();
+        LocalDateTime endOfDay = today.plusDays(1).atStartOfDay();
+
+        // 오늘 SENT 뿐 아니라 오늘 선점된 SENDING 행이 있는 사용자도 후보에서 뺀다.
+        // 선점이 바로 커밋되므로, 다른 인스턴스가 선점한 직후 폴링이 돌면 SENT 만으로는 중복을 못 막는다.
+        List<ProblemReviewReminder> dueRows = repository.findDueReminders(
+                SCHEDULED, now, SENT, SENDING, startOfDay, endOfDay, PageRequest.of(0, DUE_REMINDER_BATCH_SIZE)
+        );
+        if (dueRows.isEmpty()) return;
+
+        Map<Long, List<ProblemReviewReminder>> byUser = dueRows.stream()
+                .collect(Collectors.groupingBy(ProblemReviewReminder::getUserId));
+
+        for (Map.Entry<Long, List<ProblemReviewReminder>> entry : byUser.entrySet()) {
+            ProblemReviewReminder candidate = entry.getValue().stream()
+                    .min(Comparator.comparing(ProblemReviewReminder::getScheduledAt))
+                    .orElseThrow();
+            sender.send(candidate, now);
+        }
+    }
+
+    /**
+     * 기한이 한참 지난 예약을 접는다.
+     *
+     * <p>하루에 한 건만 나가므로 같은 날 due 가 겹치면 나머지는 {@code SCHEDULED} 로 남는다.
+     * 이걸 정리하지 않으면 영원히 밀린 채로 남아 매일 한 건씩 나가게 된다.
+     * 사흘이 지난 복습 알림은 지금 보내도 의미가 없으니 보내지 않는다.
+     */
+    private void expireOverdueRows(LocalDateTime now) {
+        LocalDateTime expireBefore = now.minusDays(OVERDUE_EXPIRE_DAYS);
+        int expired = repository.expireOverdueRows(SCHEDULED, EXPIRED, expireBefore, now);
+        if (expired > 0) {
+            log.info("[ReviewReminder] 기한이 지난 예약 만료: {}건", expired);
+        }
+    }
+
+    private void recoverStuckRows(LocalDateTime now) {
+        LocalDateTime stuckBefore = now.minusMinutes(STUCK_TIMEOUT_MINUTES);
+        int recovered = repository.recoverStuckRows(SENDING, FAILED, stuckBefore);
+        if (recovered > 0) {
+            log.warn("[ReviewReminder] SENDING stuck row 복구: {}건", recovered);
+        }
+    }
+
+}

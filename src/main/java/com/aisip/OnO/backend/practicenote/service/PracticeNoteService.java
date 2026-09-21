@@ -60,6 +60,8 @@ public class PracticeNoteService {
 
     private final CustomEmojiValidator customEmojiValidator;
 
+    private final PracticeNotificationWeekDayPolicy weekDayPolicy;
+
     private PracticeNote getPracticeEntity(Long practiceId, Long userId){
 
         PracticeNote practiceNote = practiceNoteRepository.findById(practiceId)
@@ -70,6 +72,8 @@ public class PracticeNoteService {
     }
 
     public Long registerPractice(PracticeNoteRegisterDto practiceNoteRegisterDto, Long userId) {
+
+        validatePracticeNotification(practiceNoteRegisterDto.practiceNotification());
 
         PracticeNote practiceNote = PracticeNote.from(practiceNoteRegisterDto, userId);
         practiceNoteRepository.save(practiceNote);
@@ -149,7 +153,8 @@ public class PracticeNoteService {
         customEmojiValidator.validateNullable(moodEmojiKey);
         practiceNote.updatePracticeNoteCount(moodEmojiKey);
 
-        // 복습노트 사용 미션 등록
+        // 복습노트 사용 미션 등록. 세트 완료 미션 진행도도 이 안에서 함께 오른다.
+        // 여기서 따로 올리면 같은 세트를 반복 완료하는 것만으로 주간 세트 미션이 채워진다.
         missionLogService.registerNotePracticeMission(userId, practiceId);
 
         log.info("practiceId: {} count has updated", practiceId);
@@ -159,21 +164,19 @@ public class PracticeNoteService {
         Long practiceId = practiceNoteUpdateDto.practiceNoteId();
         PracticeNote practiceNote = getPracticeEntity(practiceId, userId);
 
+        validatePracticeNotification(practiceNoteUpdateDto.practiceNotification());
+
         practiceNote.updateTitle(practiceNoteUpdateDto.practiceTitle());
 
         practiceNote.updateNotification(PracticeNotification.from(practiceNoteUpdateDto.practiceNotification()));
 
-        if (!practiceNoteUpdateDto.addProblemIdList().isEmpty()) {
-            practiceNoteUpdateDto.addProblemIdList().forEach(problemId -> {
-                addProblemToPractice(practiceNote, problemId, userId);
-            });
-        }
+        // 요청 본문에 두 리스트가 아예 없으면 null 이 들어온다. 예전에는 isEmpty() 를 바로 불러
+        // NullPointerException 이 나면서 수정 요청이 500 으로 떨어졌다.
+        nullSafe(practiceNoteUpdateDto.addProblemIdList())
+                .forEach(problemId -> addProblemToPractice(practiceNote, problemId, userId));
 
-        if (!practiceNoteUpdateDto.removeProblemIdList().isEmpty()) {
-            practiceNoteUpdateDto.removeProblemIdList().forEach(problemId -> {
-                deletePracticeNoteMapping(practiceNote, problemId);
-            });
-        }
+        nullSafe(practiceNoteUpdateDto.removeProblemIdList())
+                .forEach(problemId -> deletePracticeNoteMapping(practiceNote, problemId));
 
         if (practiceNoteUpdateDto.practiceNotification() != null) {
             practiceNotificationScheduler.updateNotification(userId, practiceId, practiceNote.getTitle(), practiceNoteUpdateDto.practiceNotification());
@@ -200,7 +203,43 @@ public class PracticeNoteService {
         problemPracticeNoteMappingList.forEach(ProblemPracticeNoteMapping::removeMappingFromProblemAndPractice);
 
         practiceNoteRepository.deleteById(practiceId);
+
+        // 복습노트가 사라졌는데 Quartz 잡이 남아 있으면, 지운 복습노트 이름으로 복습 알림이 계속 발송된다.
+        // 다만 스케줄러 문제로 복습노트 삭제(회원 탈퇴 포함) 자체가 실패하면 안 되므로 삭제 실패는 로그로만 남긴다.
+        try {
+            practiceNotificationScheduler.deleteNotification(practiceId);
+        } catch (RuntimeException e) {
+            log.error("practiceId: {} 복습 알림 스케줄 삭제 실패", practiceId, e);
+        }
+
         log.info("practiceId: {} has deleted", practiceId);
+    }
+
+    /**
+     * 주간 반복 알림에 요일이 하나도 없으면 <b>신버전 앱 요청만</b> 400 으로 거절한다.
+     *
+     * <p>이 검증이 요청 진입부에 있는 이유는 복습노트 저장이나 기존 Quartz 잡 삭제가 아예 일어나지
+     * 않아야 하기 때문이다. Quartz 잡 삭제는 이 트랜잭션과 함께 롤백되지 않는다.
+     *
+     * <p>구버전 요청은 예전처럼 통과시킨다. 요일이 빈 주간 반복은 스케줄러의 크론 변환에서
+     * 매일 발송으로 저장된다. 구버전 앱에는 요일을 고르라는 검증이 없어서, 여기서 막으면
+     * 그 사용자는 복습 세트를 영영 수정할 수 없다. 판정 기준은
+     * {@link PracticeNotificationWeekDayPolicy} 한 곳에 있다.
+     */
+    private void validatePracticeNotification(PracticeNotificationRegisterDto practiceNotification) {
+        if (practiceNotification == null || !practiceNotification.isWeeklyWithoutWeekDays()) {
+            return;
+        }
+
+        if (weekDayPolicy.requiresWeekDays()) {
+            throw new ApplicationException(PracticeNoteErrorCase.PRACTICE_NOTIFICATION_WEEK_DAYS_REQUIRED);
+        }
+
+        log.info("요일 없는 주간 반복 알림을 구버전 앱 요청으로 보고 매일 발송으로 저장한다");
+    }
+
+    private <T> List<T> nullSafe(List<T> values) {
+        return values == null ? List.of() : values;
     }
 
     public void deletePractices(Long userId, List<Long> practiceIdList) {

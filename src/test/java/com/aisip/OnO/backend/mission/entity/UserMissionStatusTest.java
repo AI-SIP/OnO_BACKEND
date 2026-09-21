@@ -1,0 +1,463 @@
+package com.aisip.OnO.backend.mission.entity;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * 레벨·경험치 전이 규칙의 단위 테스트.
+ *
+ * <p>공식이 두 개다.
+ * <ul>
+ *   <li>개별 능력치: 레벨 n → n+1 에 {@code 10 + (n-1) * 10} 점 필요, <b>레벨 20에서 멈춤</b></li>
+ *   <li>총 학습 레벨: 개별 필요치의 4배(= 40 × 레벨), <b>레벨 20에서 멈춤</b></li>
+ * </ul>
+ * 사용자에게 보이는 숫자라 한 칸만 어긋나도 바로 문의가 들어온다.
+ *
+ * <p>두 상한은 서로 맞물려 있다. {@link CapAlignment} 를 참고.
+ */
+@DisplayName("UserMissionStatus")
+class UserMissionStatusTest {
+
+    /** 신규 가입자와 같은 상태(모든 능력치 레벨 1, 포인트 0). */
+    private UserMissionStatus newcomer() {
+        return new UserMissionStatus(1L, 0L, 1L, 0L, 1L, 0L, 1L, 0L, 1L, 0L);
+    }
+
+    @Nested
+    @DisplayName("개별 능력치 레벨업")
+    class AbilityLevelUp {
+
+        @ParameterizedTest(name = "{0}점을 받으면 레벨 {1}, 잔여 {2}점")
+        @CsvSource({
+                "  0,  1,   0",
+                "  9,  1,   9",
+                " 10,  2,   0",
+                " 11,  2,   1",
+                " 15,  2,   5",
+                " 29,  2,  19",
+                " 30,  3,   0",
+                " 60,  4,   0",
+                "100,  5,   0"
+        })
+        @DisplayName("누적 경험치에 따라 레벨과 잔여 포인트가 정해진다")
+        void levelsUpByThreshold(long gained, long expectedLevel, long expectedPoint) {
+            UserMissionStatus status = newcomer();
+
+            status.gainAttendancePoint(gained);
+
+            assertThat(status.getAttendanceLevel()).isEqualTo(expectedLevel);
+            assertThat(status.getAttendancePoint()).isEqualTo(expectedPoint);
+        }
+
+        @Test
+        @DisplayName("한 번에 여러 레벨을 올릴 수 있다")
+        void levelsUpMultipleTimesInOneGain() {
+            UserMissionStatus status = newcomer();
+
+            status.gainAttendancePoint(30L);
+
+            assertThat(status.getAttendanceLevel())
+                    .as("10점(1→2) + 20점(2→3) = 30점이면 두 단계 올라야 한다")
+                    .isEqualTo(3L);
+            assertThat(status.getAttendancePoint()).isZero();
+        }
+
+        @Test
+        @DisplayName("필요 경험치와 정확히 같은 점수면 레벨이 오른다")
+        void levelsUpOnExactThreshold() {
+            UserMissionStatus status = newcomer();
+
+            status.gainAttendancePoint(9L);
+            assertThat(status.getAttendanceLevel()).as("1점 모자라면 오르지 않는다").isEqualTo(1L);
+
+            status.gainAttendancePoint(1L);
+            assertThat(status.getAttendanceLevel()).isEqualTo(2L);
+            assertThat(status.getAttendancePoint()).isZero();
+        }
+
+        @Test
+        @DisplayName("0점을 받아도 레벨과 포인트는 그대로다")
+        void gainingZeroChangesNothing() {
+            UserMissionStatus status = newcomer();
+            status.gainAttendancePoint(7L);
+
+            status.gainAttendancePoint(0L);
+
+            assertThat(status.getAttendanceLevel()).isEqualTo(1L);
+            assertThat(status.getAttendancePoint()).isEqualTo(7L);
+            assertThat(status.getTotalStudyPoint()).isEqualTo(7L);
+        }
+
+        @Test
+        @DisplayName("능력치는 서로 독립이다 - 출석 경험치가 다른 능력치를 올리지 않는다")
+        void abilitiesAreIndependent() {
+            UserMissionStatus status = newcomer();
+
+            status.gainAttendancePoint(50L);
+
+            assertThat(status.getAttendanceLevel()).isGreaterThan(1L);
+            assertThat(status.getNoteWriteLevel()).isEqualTo(1L);
+            assertThat(status.getNoteWritePoint()).isZero();
+            assertThat(status.getProblemPracticeLevel()).isEqualTo(1L);
+            assertThat(status.getNotePracticeLevel()).isEqualTo(1L);
+        }
+
+        @Test
+        @DisplayName("나머지 세 능력치도 필요 경험치와 정확히 같은 점수에서 레벨이 오른다")
+        void everyAbilityLevelsUpOnExactThreshold() {
+            // 출석에만 임계치 경계 테스트가 있어서, 나머지 셋은 >= 를 > 로 바꿔도 아무도 못 잡았다.
+            // 미션 보상이 바로 이 메서드들로 XP 를 넣는다.
+            UserMissionStatus noteWrite = newcomer();
+            noteWrite.gainNoteWritePoint(9L);
+            assertThat(noteWrite.getNoteWriteLevel()).as("1점 모자라면 오르지 않는다").isEqualTo(1L);
+            noteWrite.gainNoteWritePoint(1L);
+            assertThat(noteWrite.getNoteWriteLevel()).as("딱 10점이면 오른다").isEqualTo(2L);
+            assertThat(noteWrite.getNoteWritePoint()).isZero();
+
+            UserMissionStatus problemPractice = newcomer();
+            problemPractice.gainProblemPracticePoint(9L);
+            assertThat(problemPractice.getProblemPracticeLevel()).isEqualTo(1L);
+            problemPractice.gainProblemPracticePoint(1L);
+            assertThat(problemPractice.getProblemPracticeLevel()).isEqualTo(2L);
+            assertThat(problemPractice.getProblemPracticePoint()).isZero();
+
+            UserMissionStatus notePractice = newcomer();
+            notePractice.gainNotePracticePoint(9L);
+            assertThat(notePractice.getNotePracticeLevel()).isEqualTo(1L);
+            notePractice.gainNotePracticePoint(1L);
+            assertThat(notePractice.getNotePracticeLevel()).isEqualTo(2L);
+            assertThat(notePractice.getNotePracticePoint()).isZero();
+        }
+
+        @Test
+        @DisplayName("두 번째 임계치도 정확히 같은 점수에서 오른다")
+        void levelsUpOnExactSecondThreshold() {
+            // 레벨 2→3 은 20점이다. 첫 임계치만 재면 공식의 (level - 1) * 10 이 흔들려도 안 잡힌다.
+            UserMissionStatus noteWrite = newcomer();
+            noteWrite.gainNoteWritePoint(10L);
+
+            noteWrite.gainNoteWritePoint(19L);
+            assertThat(noteWrite.getNoteWriteLevel()).as("1점 모자라면 레벨 2 그대로").isEqualTo(2L);
+
+            noteWrite.gainNoteWritePoint(1L);
+            assertThat(noteWrite.getNoteWriteLevel()).as("딱 20점이면 레벨 3").isEqualTo(3L);
+            assertThat(noteWrite.getNoteWritePoint()).isZero();
+        }
+
+        @Test
+        @DisplayName("총 학습 레벨도 필요 경험치와 정확히 같은 점수에서 오른다")
+        void totalStudyLevelsUpOnExactThreshold() {
+            // 총 학습 레벨 1→2 는 40점이다. 미션 보상 응답의 leveledUp 이 이 값으로 갈린다.
+            UserMissionStatus status = newcomer();
+
+            status.gainNoteWritePoint(39L);
+            assertThat(status.getTotalStudyLevel()).as("1점 모자라면 오르지 않는다").isEqualTo(1L);
+
+            status.gainNoteWritePoint(1L);
+            assertThat(status.getTotalStudyLevel()).as("딱 40점이면 오른다").isEqualTo(2L);
+        }
+
+        @Test
+        @DisplayName("네 능력치 모두 같은 공식을 쓴다")
+        void everyAbilityUsesSameFormula() {
+            UserMissionStatus attendance = newcomer();
+            UserMissionStatus noteWrite = newcomer();
+            UserMissionStatus problemPractice = newcomer();
+            UserMissionStatus notePractice = newcomer();
+
+            attendance.gainAttendancePoint(35L);
+            noteWrite.gainNoteWritePoint(35L);
+            problemPractice.gainProblemPracticePoint(35L);
+            notePractice.gainNotePracticePoint(35L);
+
+            assertThat(attendance.getAttendanceLevel()).isEqualTo(3L);
+            assertThat(noteWrite.getNoteWriteLevel()).isEqualTo(3L);
+            assertThat(problemPractice.getProblemPracticeLevel()).isEqualTo(3L);
+            assertThat(notePractice.getNotePracticeLevel()).isEqualTo(3L);
+            assertThat(attendance.getAttendancePoint()).isEqualTo(5L);
+            assertThat(noteWrite.getNoteWritePoint()).isEqualTo(5L);
+        }
+    }
+
+    @Nested
+    @DisplayName("총 학습 레벨")
+    class TotalStudyLevel {
+
+        @Test
+        @DisplayName("어떤 능력치로 얻은 경험치든 총 학습 포인트에 합산된다")
+        void accumulatesPointsFromEveryAbility() {
+            UserMissionStatus status = newcomer();
+
+            status.gainAttendancePoint(5L);
+            status.gainNoteWritePoint(5L);
+            status.gainProblemPracticePoint(5L);
+            status.gainNotePracticePoint(5L);
+
+            assertThat(status.getTotalStudyLevel()).isEqualTo(1L);
+            assertThat(status.getTotalStudyPoint()).isEqualTo(20L);
+        }
+
+        @ParameterizedTest(name = "총 {0}점이면 총 학습 레벨 {1}, 잔여 {2}점")
+        @CsvSource({
+                " 39, 1, 39",
+                " 40, 2,  0",
+                " 41, 2,  1",
+                "120, 3,  0",
+                "240, 4,  0"
+        })
+        @DisplayName("총 학습 레벨은 개별 필요 경험치의 4배마다 오른다")
+        void levelsUpAtFourTimesThreshold(long gained, long expectedLevel, long expectedPoint) {
+            UserMissionStatus status = newcomer();
+
+            status.gainAttendancePoint(gained);
+
+            assertThat(status.getTotalStudyLevel()).isEqualTo(expectedLevel);
+            assertThat(status.getTotalStudyPoint()).isEqualTo(expectedPoint);
+        }
+
+        @Test
+        @DisplayName("총 학습 레벨은 20에서 멈추고 그 뒤 경험치는 그대로 쌓인다")
+        void stopsAtLevelTwenty() {
+            UserMissionStatus status = new UserMissionStatus(1L, 0L, 1L, 0L, 1L, 0L, 1L, 0L, 19L, 0L);
+
+            status.gainAttendancePoint(760L);
+            assertThat(status.getTotalStudyLevel())
+                    .as("레벨 19→20 에 필요한 760점(40 × 19)을 채우면 20이 된다")
+                    .isEqualTo(20L);
+            assertThat(status.getTotalStudyPoint()).isZero();
+
+            status.gainAttendancePoint(10_000L);
+
+            assertThat(status.getTotalStudyLevel())
+                    .as("상한을 넘겨 21레벨이 되면 해금표에 없는 레벨이 표시된다")
+                    .isEqualTo(20L);
+            assertThat(status.getTotalStudyPoint())
+                    .as("상한 이후 경험치는 사라지지 않고 그대로 누적된다")
+                    .isEqualTo(10_000L);
+        }
+
+        @Test
+        @DisplayName("상한이 15 였다면 멈췄을 자리를 그대로 지나간다")
+        void passesThroughTheOldCap() {
+            UserMissionStatus status = new UserMissionStatus(1L, 0L, 1L, 0L, 1L, 0L, 1L, 0L, 15L, 0L);
+
+            // 15→20 에 필요한 합은 40 x (15+16+17+18+19) = 3,400 이다.
+            status.gainAttendancePoint(3_400L);
+
+            assertThat(status.getTotalStudyLevel())
+                    .as("여기서 15 에 멈추면 총 학습 16·18·19·20 자리의 치장이 영영 안 열린다")
+                    .isEqualTo(20L);
+            assertThat(status.getTotalStudyPoint()).isZero();
+        }
+
+        @Test
+        @DisplayName("개별 능력치도 총 학습과 같은 레벨에서 멈춘다")
+        void abilityLevelStopsAtTheSameCap() {
+            UserMissionStatus status = newcomer();
+
+            status.gainAttendancePoint(100_000L);
+
+            assertThat(status.getAttendanceLevel())
+                    .as("상한이 없으면 내부 레벨만 무한정 올라 응답에서 잘린 레벨과 갈린다")
+                    .isEqualTo(UserMissionStatus.MAX_ABILITY_LEVEL);
+            assertThat(status.getTotalStudyLevel()).isEqualTo(UserMissionStatus.MAX_TOTAL_STUDY_LEVEL);
+        }
+    }
+
+    /**
+     * 능력치 상한과 총 학습 상한의 대응.
+     *
+     * <p>이번에 어긋난 자리다. 총 학습만 15 에서 20 으로 올리고 능력치는 15 에 뒀더니,
+     * 능력치 넷을 다 채워도(4 x 1,050 = 4,200점) 총 학습은 15 에서 멈췄다.
+     * 그 위 구간은 능력치 넷이 Lv.15 에 멈춘 채로 총 학습만 혼자 오르는, 스탯창이 죽은 화면이었다.
+     *
+     * <p>"능력치 넷을 다 채우면 총 학습이 몇이 되는가" 를 아무도 검증하지 않아서 그냥 지나갔다.
+     * 여기서 그 관계를 못 박는다.
+     */
+    @Nested
+    @DisplayName("능력치 상한과 총 학습 상한의 대응")
+    class CapAlignment {
+
+        @Test
+        @DisplayName("두 상한은 같은 값이다")
+        void bothCapsAreTheSameNumber() {
+            assertThat(UserMissionStatus.MAX_ABILITY_LEVEL)
+                    .as("한쪽만 움직이면 능력치 만렙과 총 학습 만렙이 서로 다른 지점이 된다")
+                    .isEqualTo(UserMissionStatus.MAX_TOTAL_STUDY_LEVEL);
+        }
+
+        @Test
+        @DisplayName("능력치 넷을 한 단계씩 만렙까지 올리면 총 학습도 정확히 만렙에서 끝난다")
+        void fourMaxedAbilitiesLandExactlyOnTotalStudyCap() {
+            UserMissionStatus status = newcomer();
+
+            // 레벨 L → L+1 에 필요한 10L 점씩만 넣는다. 한 점도 남기지 않고 딱 만렙까지 올린다.
+            for (long level = 1; level < UserMissionStatus.MAX_ABILITY_LEVEL; level++) {
+                long needed = 10 * level;
+                status.gainAttendancePoint(needed);
+                status.gainNoteWritePoint(needed);
+                status.gainProblemPracticePoint(needed);
+                status.gainNotePracticePoint(needed);
+            }
+
+            assertThat(status.getAttendanceLevel()).isEqualTo(UserMissionStatus.MAX_ABILITY_LEVEL);
+            assertThat(status.getNoteWriteLevel()).isEqualTo(UserMissionStatus.MAX_ABILITY_LEVEL);
+            assertThat(status.getProblemPracticeLevel()).isEqualTo(UserMissionStatus.MAX_ABILITY_LEVEL);
+            assertThat(status.getNotePracticeLevel()).isEqualTo(UserMissionStatus.MAX_ABILITY_LEVEL);
+            assertThat(status.getAttendancePoint()).isZero();
+            assertThat(status.getNoteWritePoint()).isZero();
+            assertThat(status.getProblemPracticePoint()).isZero();
+            assertThat(status.getNotePracticePoint()).isZero();
+
+            assertThat(status.getTotalStudyLevel())
+                    .as("능력치 넷이 다 만렙인데 총 학습이 그 아래면 스탯창이 죽은 것처럼 보인다")
+                    .isEqualTo(UserMissionStatus.MAX_TOTAL_STUDY_LEVEL);
+            assertThat(status.getTotalStudyPoint())
+                    .as("모자라도 남아도 두 상한이 어긋난 것이다")
+                    .isZero();
+        }
+
+        @Test
+        @DisplayName("능력치 만렙까지 필요한 경험치 넷 몫이 총 학습 만렙까지 필요한 경험치와 같다")
+        void requiredPointsMatchAcrossBothCaps() {
+            long n = UserMissionStatus.MAX_ABILITY_LEVEL;
+
+            // 능력치 1 → N 누적: sum(10L, L=1..N-1) = 5N(N-1). N=20 이면 1,900
+            long perAbility = 5 * n * (n - 1);
+            // 총 학습 1 → N 누적: sum(40L, L=1..N-1) = 20N(N-1). N=20 이면 7,600
+            long totalStudy = 20 * n * (n - 1);
+
+            assertThat(perAbility).isEqualTo(1_900L);
+            assertThat(totalStudy).isEqualTo(7_600L);
+            assertThat(perAbility * 4)
+                    .as("총 학습 임계값이 능력치 임계값의 4배라 넷 몫과 정확히 맞아떨어져야 한다")
+                    .isEqualTo(totalStudy);
+        }
+
+        @Test
+        @DisplayName("만렙에 닿으면 레벨은 멈추고 포인트만 쌓인다")
+        void keepsAccumulatingPointsAfterCap() {
+            UserMissionStatus status = newcomer();
+
+            status.gainAttendancePoint(1_900L);
+            assertThat(status.getAttendanceLevel())
+                    .as("1 → 20 에 필요한 누적은 5 x 20 x 19 = 1,900 이다")
+                    .isEqualTo(20L);
+            assertThat(status.getAttendancePoint()).isZero();
+
+            status.gainAttendancePoint(10_000L);
+
+            assertThat(status.getAttendanceLevel())
+                    .as("상한을 넘겨 21레벨이 되면 해금표에 없는 레벨이 표시된다")
+                    .isEqualTo(20L);
+            assertThat(status.getAttendancePoint())
+                    .as("상한 이후 경험치는 사라지지 않고 그대로 누적된다")
+                    .isEqualTo(10_000L);
+        }
+
+        @Test
+        @DisplayName("상한이 15 였다면 멈췄을 자리를 능력치도 그대로 지나간다")
+        void abilityPassesThroughTheOldCap() {
+            UserMissionStatus status = newcomer();
+
+            // 15 → 20 에 능력치가 더 받아야 하는 양은 10 x (15+16+17+18+19) = 850 이다.
+            status.gainAttendancePoint(1_050L + 850L);
+
+            assertThat(status.getAttendanceLevel())
+                    .as("여기서 15 에 멈추면 능력치 넷을 다 채워도 총 학습이 15 에서 멈춘다")
+                    .isEqualTo(20L);
+            assertThat(status.getAttendancePoint()).isZero();
+        }
+
+        @Test
+        @DisplayName("넷 중 하나만 만렙이면 총 학습은 아직 만렙이 아니다")
+        void oneMaxedAbilityIsNotEnough() {
+            UserMissionStatus status = newcomer();
+
+            status.gainAttendancePoint(1_900L);
+
+            assertThat(status.getAttendanceLevel()).isEqualTo(20L);
+            assertThat(status.getTotalStudyLevel())
+                    .as("한 능력치만으로 총 학습이 만렙이 되면 나머지 셋이 의미를 잃는다")
+                    .isLessThan(UserMissionStatus.MAX_TOTAL_STUDY_LEVEL);
+        }
+    }
+
+    @Nested
+    @DisplayName("관리자 수동 설정")
+    class ManualOverride {
+
+        @Test
+        @DisplayName("능력치별로 레벨과 포인트를 직접 덮어쓴다")
+        void overwritesLevelAndPoint() {
+            UserMissionStatus status = newcomer();
+
+            status.setAttendanceLevel(9L, 3L);
+            status.setNoteWriteLevel(8L, 2L);
+            status.setProblemPracticeLevel(7L, 1L);
+            status.setNotePracticeLevel(6L, 0L);
+            status.setTotalStudyLevel(5L, 4L);
+
+            assertThat(status.getAttendanceLevel()).isEqualTo(9L);
+            assertThat(status.getAttendancePoint()).isEqualTo(3L);
+            assertThat(status.getNoteWriteLevel()).isEqualTo(8L);
+            assertThat(status.getProblemPracticeLevel()).isEqualTo(7L);
+            assertThat(status.getNotePracticeLevel()).isEqualTo(6L);
+            assertThat(status.getTotalStudyLevel()).isEqualTo(5L);
+            assertThat(status.getTotalStudyPoint()).isEqualTo(4L);
+        }
+
+        @Test
+        @DisplayName("수동으로 올린 레벨 위에서도 경험치 획득이 이어진다")
+        void keepsGainingFromOverriddenLevel() {
+            UserMissionStatus status = newcomer();
+            status.setAttendanceLevel(5L, 0L);
+
+            status.gainAttendancePoint(50L);
+
+            assertThat(status.getAttendanceLevel())
+                    .as("레벨 5→6 에 필요한 경험치는 50점이다")
+                    .isEqualTo(6L);
+            assertThat(status.getAttendancePoint()).isZero();
+        }
+    }
+
+    @Nested
+    @DisplayName("미션 종류별 보상")
+    class MissionReward {
+
+        @Test
+        @DisplayName("미션 종류마다 정해진 포인트와 능력치가 붙어 있다")
+        void mapsMissionTypeToPointAndAbility() {
+            assertThat(MissionType.USER_LOGIN.getPoint()).isEqualTo(15L);
+            assertThat(MissionType.USER_LOGIN.getAbilityType()).isEqualTo(MissionType.AbilityType.ATTENDANCE);
+            assertThat(MissionType.PROBLEM_WRITE.getPoint()).isEqualTo(10L);
+            assertThat(MissionType.PROBLEM_WRITE.getAbilityType()).isEqualTo(MissionType.AbilityType.NOTE_WRITE);
+            assertThat(MissionType.PROBLEM_PRACTICE.getPoint()).isEqualTo(5L);
+            assertThat(MissionType.PROBLEM_PRACTICE.getAbilityType()).isEqualTo(MissionType.AbilityType.PROBLEM_PRACTICE);
+            assertThat(MissionType.NOTE_PRACTICE.getPoint()).isEqualTo(15L);
+            assertThat(MissionType.NOTE_PRACTICE.getAbilityType()).isEqualTo(MissionType.AbilityType.NOTE_PRACTICE);
+        }
+
+        /**
+         * {@code MissionLog.missionType} 에는 {@code @Enumerated} 가 없어 ORDINAL 로 저장된다.
+         * 즉 <b>enum 선언 순서를 바꾸거나 중간에 상수를 끼워 넣으면 이미 저장된 모든 미션 기록의 종류가 바뀐다.</b>
+         * 순서를 건드리는 변경이 조용히 지나가지 않도록 현재 순서를 고정한다.
+         */
+        @Test
+        @DisplayName("MissionType 선언 순서는 DB 에 저장된 값이므로 바뀌면 안 된다")
+        void pinsOrdinalOrder() {
+            assertThat(MissionType.values())
+                    .containsExactly(
+                            MissionType.USER_LOGIN,
+                            MissionType.PROBLEM_WRITE,
+                            MissionType.PROBLEM_PRACTICE,
+                            MissionType.NOTE_PRACTICE);
+        }
+    }
+}

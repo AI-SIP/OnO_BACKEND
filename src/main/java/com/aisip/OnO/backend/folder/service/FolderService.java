@@ -74,7 +74,7 @@ public class FolderService {
         return toFolderResponseDto(folder, problemIdList);
     }
 
-    @Transactional(readOnly = true)
+    // 호출자의 트랜잭션 안에서 실행된다. private 에 붙인 @Transactional 은 프록시가 가로채지 못해 무효다.
     private Folder findFolderEntity(Long folderId) {
         return folderRepository.findById(folderId)
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
@@ -85,6 +85,25 @@ public class FolderService {
         Folder folder = findFolderEntity(folderId);
         validateFolderOwner(folder, userId);
         return folder;
+    }
+
+    /**
+     * 부모로 삼을 폴더를 공유 잠금(FOR SHARE)으로 읽는다. (#233)
+     *
+     * <p>문제 등록이 폴더를 잠그고 읽는 것과 같은 이유다. 잠금 없이 읽으면 아직 커밋되지 않은 폴더 삭제를
+     * 못 보고 그 폴더 아래에 새 폴더를 만들거나 기존 폴더를 옮긴다. 삭제가 커밋된 뒤에는 삭제된 폴더를
+     * 부모로 가리키는 살아 있는 폴더가 남아, 앱에서 어느 폴더에도 보이지 않는다.
+     *
+     * <p>잠금 조회는 스냅숏이 아니라 최신 행을 읽으므로, 삭제가 먼저 잡았으면 커밋까지 기다렸다가
+     * {@code deleted_at} 이 찍힌 행을 보고 {@code @SQLRestriction} 에 걸려 기존 {@code FOLDER_NOT_FOUND} 가 된다.
+     *
+     * <p>호출자의 트랜잭션 안에서 실행된다.
+     */
+    private Folder findParentFolderForShare(Long folderId, Long userId) {
+        Folder parentFolder = folderRepository.findByIdForShare(folderId)
+                .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
+        validateFolderOwner(parentFolder, userId);
+        return parentFolder;
     }
 
     @Transactional(readOnly = true)
@@ -130,8 +149,15 @@ public class FolderService {
     }
 
     public Long createFolder(FolderRegisterDto folderRegisterDto, Long userId) {
+        // parentFolderId 가 없으면 findById(null) 이 IllegalArgumentException 을 던져 500 으로 나갔다.
+        // 루트 폴더는 initializeDefaultFoldersIfAbsent 만 만들 수 있으므로, 부모 없는 생성 요청은
+        // 잘못된 요청으로 보고 다른 "부모 폴더를 찾을 수 없음"과 같은 응답을 준다.
+        if (folderRegisterDto.parentFolderId() == null) {
+            throw new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND);
+        }
+
         Folder folder = Folder.from(folderRegisterDto, userId);
-        Folder parentFolder = findFolderEntity(folderRegisterDto.parentFolderId(), userId);
+        Folder parentFolder = findParentFolderForShare(folderRegisterDto.parentFolderId(), userId);
 
         folder.updateParentFolder(parentFolder);
         folderRepository.save(folder);
@@ -150,7 +176,8 @@ public class FolderService {
         folder.updateFolderInfo(folderRegisterDto);
 
         if (folderRegisterDto.parentFolderId() != null && folder.getParentFolder() != null) {
-            Folder newParentFolder = findFolderEntity(folderRegisterDto.parentFolderId(), userId);
+            Folder newParentFolder = findParentFolderForShare(folderRegisterDto.parentFolderId(), userId);
+            validateNotCyclic(folder, newParentFolder);
 
             folder.updateParentFolder(newParentFolder);
         }
@@ -159,8 +186,8 @@ public class FolderService {
     }
 
     public void deleteFoldersWithProblems(Long userId, List<Long> folderIds) {
-        // 삭제할 모든 폴더의 ID 조회 (하위 폴더 포함)
-        Set<Long> allFolderIds = getAllFolderIdsIncludingSubFolders(userId, folderIds);
+        // 삭제 대상 서브트리를 잠그면서 하위 폴더까지 모은다. 이 줄보다 앞에 조회를 두면 안 된다. (#233, #319)
+        Set<Long> allFolderIds = lockSubtreeAndCollectFolderIds(userId, folderIds);
 
         problemService.deleteAllByFolderIds(userId, allFolderIds);
 
@@ -168,42 +195,91 @@ public class FolderService {
     }
 
     public void deleteAllUserFoldersWithProblems(Long userId) {
+        // 폴더 하나씩 지우는 경로와 같은 이유로 사용자 폴더 전체를 먼저 잡는다. 이 줄보다 앞에 조회를 두면 안 된다. (#233)
+        folderRepository.lockAllByUserId(userId);
 
         problemService.deleteAllUserProblems(userId);
 
         deleteAllUserFolders(userId);
     }
 
-    public Set<Long> getAllFolderIdsIncludingSubFolders(Long userId, List<Long> folderIds) {
-        Set<Long> allFolderIds = new HashSet<>();
+    /**
+     * 삭제 대상 폴더와 그 하위 폴더 전부를 배타 잠금으로 잡으면서 ID 를 모은다. (#233, #319)
+     *
+     * <p><b>호출자의 트랜잭션에서 가장 먼저 실행돼야 한다.</b> 여기서 쓰는 조회는 전부 잠금 조회라
+     * REPEATABLE READ 스냅숏을 고정하지 않는다. 그래서 잠금을 다 잡은 뒤에 일어나는 일반 조회가
+     * "잠금을 잡은 시점 이후" 를 보게 되고, 잠금을 기다리다 커밋된 등록도 삭제 대상에 들어온다.
+     * 이 앞에 일반 조회를 한 줄이라도 두면 그 순간 스냅숏이 박혀 #233 의 고아 문제가 되살아난다.
+     *
+     * <p>한 단계씩 내려가도 빠지는 폴더는 없다. 어떤 폴더 아래에 새 폴더를 만들거나 옮기려면
+     * {@link #findParentFolderForShare} 로 그 부모를 공유 잠금해야 하는데, 우리가 배타 잠금을 쥔 뒤에는
+     * 그쪽이 기다렸다가 삭제된 부모를 보고 거절된다. 아직 안 잠근 단계에서 먼저 들어온 생성은
+     * 우리가 그 부모를 잠그려고 기다리는 동안 커밋되고, 그다음 잠금 조회가 최신 행을 읽어 잡아낸다.
+     *
+     * <p>사용자 폴더 전체를 잡던 예전 방식({@code lockAllByUserId})은 삭제와 무관한 폴더로 들어오는
+     * 등록까지 줄 세웠고, 기다리는 요청이 커넥션을 문 채로 풀을 바닥내 다른 사용자까지 죽였다. (#319)
+     */
+    private Set<Long> lockSubtreeAndCollectFolderIds(Long userId, List<Long> folderIds) {
+        if (folderIds == null || folderIds.isEmpty()) {
+            return Set.of();
+        }
 
+        Map<Long, Folder> lockedTargets = folderRepository.lockAllByIdIn(new LinkedHashSet<>(folderIds)).stream()
+                .collect(Collectors.toMap(Folder::getId, folder -> folder));
+
+        // 검증 순서는 예전과 같게 요청받은 순서대로 본다. 없음 → 소유자 불일치 → 루트 순이다.
         for (Long folderId : folderIds) {
-            Folder folder = findFolderEntity(folderId, userId);
-
+            Folder folder = lockedTargets.get(folderId);
+            if (folder == null) {
+                throw new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND);
+            }
+            validateFolderOwner(folder, userId);
             if (folder.getParentFolder() == null) {
                 throw new ApplicationException(FolderErrorCase.ROOT_FOLDER_CANNOT_REMOVE);
             }
-            allFolderIds.add(folder.getId());
-            allFolderIds.addAll(getSubFolderIdsRecursive(folder));
+        }
+
+        // 이미 잠근 폴더는 다시 타고 들어가지 않는다. 부모-자식에 순환이 남아 있어도(과거 데이터) 한 번만 훑는다.
+        Set<Long> allFolderIds = new LinkedHashSet<>(lockedTargets.keySet());
+        Collection<Long> currentLevel = new ArrayList<>(allFolderIds);
+
+        while (!currentLevel.isEmpty()) {
+            List<Long> nextLevel = new ArrayList<>();
+            for (Folder subFolder : folderRepository.lockAllByParentFolderIdIn(currentLevel)) {
+                if (allFolderIds.add(subFolder.getId())) {
+                    nextLevel.add(subFolder.getId());
+                }
+            }
+            currentLevel = nextLevel;
         }
 
         return allFolderIds;
     }
 
-    private Set<Long> getSubFolderIdsRecursive(Folder folder) {
-        Set<Long> subFolderIds = new HashSet<>();
+    /**
+     * 폴더를 자기 자신이나 자기 하위 폴더 아래로 옮기려는 요청을 막는다.
+     *
+     * <p>막지 않으면 트리에 순환이 생겨 폴더 삭제(하위 폴더 재귀 수집)와 앱의 폴더 탐색이
+     * 무한 루프에 빠진다. 새 부모에서 루트 방향으로 거슬러 올라가며 자기 자신이 나오는지 본다.
+     */
+    private void validateNotCyclic(Folder folder, Folder newParentFolder) {
+        Set<Long> visitedFolderIds = new HashSet<>();
+        Folder ancestor = newParentFolder;
 
-        for (Folder subFolder : folder.getSubFolderList()) {
-            subFolderIds.add(subFolder.getId());
-            subFolderIds.addAll(getSubFolderIdsRecursive(subFolder));
+        while (ancestor != null && visitedFolderIds.add(ancestor.getId())) {
+            if (Objects.equals(ancestor.getId(), folder.getId())) {
+                throw new ApplicationException(FolderErrorCase.INVALID_PARENT_FOLDER);
+            }
+            ancestor = ancestor.getParentFolder();
         }
-
-        return subFolderIds;
     }
 
     private void deleteAllByFolderIds(Collection<Long> folderIds) {
-        List<Folder> foldersToDelete = folderRepository.findAllById(folderIds);
-        folderRepository.deleteAll(foldersToDelete);
+        if (folderIds.isEmpty()) {
+            return;
+        }
+
+        folderRepository.softDeleteAllByIdIn(folderIds);
     }
 
     public void deleteAllUserFolders(Long userId) {

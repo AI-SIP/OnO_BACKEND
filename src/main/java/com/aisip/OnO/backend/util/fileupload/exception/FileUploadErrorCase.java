@@ -14,7 +14,9 @@ public enum FileUploadErrorCase implements ErrorCase {
 
     INVALID_IMAGE_FILE(400, 2003, "이미지 파일 형식이 올바르지 않습니다."),
 
-    FILE_SIZE_EXCEEDED(400, 2004, "파일 최대 용량을 초과했습니다.");
+    FILE_SIZE_EXCEEDED(400, 2004, "파일 최대 용량을 초과했습니다."),
+
+    UPLOAD_RATE_LIMIT_EXCEEDED(429, 2005, "하루에 올릴 수 있는 이미지 개수를 초과했습니다.");
 
     private final Integer httpStatusCode;
     private final Integer errorCode;

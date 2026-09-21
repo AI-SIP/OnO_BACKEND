@@ -1,0 +1,144 @@
+name: Test
+
+# main / develop 으로 합치기 전에 반드시 통과해야 하는 게이트.
+# 기존 ci-dev / ci-prod 는 workflow_dispatch 수동 실행이고 `-x test` 로 테스트를 건너뛴다.
+# 배포 파이프라인은 그대로 두고, 검증만 이 워크플로가 책임진다.
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+# 같은 PR에 연달아 푸시하면 앞선 실행은 취소한다.
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  test:
+    name: 격리 환경 테스트
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # 테스트 프로필은 DB/Redis/RabbitMQ 를 전부 Testcontainers 로 띄우므로
+      # 외부 인프라도, 시크릿도 필요 없다. 다만 FcmConfig 의 @PostConstruct 가
+      # 키 파일을 읽지 못하면 컨텍스트가 뜨지 않아 더미 파일만 만들어 준다.
+      # (실제 발송은 IntegrationTestSupport 에서 FcmService 를 목으로 잡아 차단한다)
+      - name: Create dummy FirebaseAdminKey.json
+        run: |
+          cat > src/test/resources/FirebaseAdminKey.json <<'JSON'
+          {
+            "type": "authorized_user",
+            "client_id": "test-client-id",
+            "client_secret": "test-client-secret",
+            "refresh_token": "test-refresh-token"
+          }
+          JSON
+
+      # docker-java 는 기본으로 API v1.32 를 쓰는데 최신 엔진은 이를 거부한다.
+      # 러너에 실제로 올라간 엔진의 API 버전을 그대로 넘긴다.
+      - name: Resolve Docker API version
+        run: |
+          echo "DOCKER_API_VERSION=$(docker version --format '{{.Server.APIVersion}}')" >> "$GITHUB_ENV"
+          docker version --format 'Docker Engine {{.Server.Version}} / API {{.Server.APIVersion}}'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run tests
+        run: ./gradlew test jacocoTestReport --no-daemon
+
+      # 커버리지 하한선(라인 85% / 분기 70%) 검사. 테스트 없이 코드만 늘면 여기서 걸린다.
+      # 테스트가 실패해도 커버리지 요약은 보이도록 always() 로 둔다.
+      - name: Verify coverage floor
+        if: always()
+        run: ./gradlew jacocoTestCoverageVerification --no-daemon
+
+      # 뮤테이션 테스트는 PR 마다 돌리기에는 느려서 여기서는 돌리지 않는다.
+      # 로컬에서 `./gradlew pitest` 로 실행하고, 결과는 build/reports/pitest/index.html 에서 본다.
+      # 커버리지가 "그 줄이 실행됐다"만 말하는 것과 달리
+      # 뮤테이션 점수는 "코드가 틀렸을 때 테스트가 실패하는가"를 측정한다.
+
+      - name: Summarize results
+        if: always()
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import glob, re, os
+
+          total = failed = skipped = 0
+          failures = []
+          for path in glob.glob('build/test-results/test/*.xml'):
+              head = open(path, encoding='utf-8', errors='replace').read(4000)
+              m = re.search(r'tests="(\d+)"[^>]*skipped="(\d+)" failures="(\d+)" errors="(\d+)"', head)
+              if not m:
+                  continue
+              total += int(m.group(1))
+              skipped += int(m.group(2))
+              failed += int(m.group(3)) + int(m.group(4))
+
+          for path in glob.glob('build/test-results/test/*.xml'):
+              body = open(path, encoding='utf-8', errors='replace').read()
+              for case in re.finditer(r'<testcase name="([^"]+)"[^>]*?>(.*?)(?=<testcase|</testsuite)', body, re.S):
+                  if '<failure' in case.group(2) or '<error' in case.group(2):
+                      failures.append(case.group(1))
+
+          print('## 테스트 결과\n')
+          print(f'- 전체 **{total}**개, 실패 **{failed}**개, 건너뜀 {skipped}개\n')
+          if failures:
+              print('### 실패한 테스트\n')
+              for name in failures[:50]:
+                  print(f'- {name}')
+              if len(failures) > 50:
+                  print(f'- 외 {len(failures) - 50}건')
+              print()
+
+          report = 'build/reports/jacoco/test/jacocoTestReport.xml'
+          if os.path.exists(report):
+              xml = open(report, encoding='utf-8').read()
+              tail = xml[xml.rfind('</package>'):]
+              print('## 커버리지\n')
+              print('| 지표 | 커버 | 전체 | 비율 |')
+              print('|---|---:|---:|---:|')
+              labels = {'INSTRUCTION': '명령어', 'BRANCH': '분기', 'LINE': '라인', 'METHOD': '메서드', 'CLASS': '클래스'}
+              for c in re.finditer(r'<counter type="(\w+)" missed="(\d+)" covered="(\d+)"', tail):
+                  kind, missed, covered = c.group(1), int(c.group(2)), int(c.group(3))
+                  if kind not in labels:
+                      continue
+                  every = missed + covered
+                  ratio = f'{100 * covered / every:.1f}%' if every else '-'
+                  print(f'| {labels[kind]} | {covered} | {every} | {ratio} |')
+          PY
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: build/reports/tests/test
+          retention-days: 14
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: build/reports/jacoco/test
+          retention-days: 14

@@ -1,489 +1,568 @@
 package com.aisip.OnO.backend.folder.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
-import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
 import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.exception.FolderErrorCase;
-import com.aisip.OnO.backend.folder.repository.FolderRepository;
-import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
-import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
-import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
+import com.aisip.OnO.backend.folder.support.FolderTestSupport;
 import com.aisip.OnO.backend.problem.entity.Problem;
-import com.aisip.OnO.backend.problem.entity.ProblemImageData;
-import com.aisip.OnO.backend.problem.entity.ProblemImageType;
-import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
-import com.aisip.OnO.backend.problem.repository.ProblemRepository;
-import com.aisip.OnO.backend.problem.service.ProblemService;
-import org.junit.jupiter.api.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.context.ActiveProfiles;
+import com.aisip.OnO.backend.user.entity.User;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doNothing;
 
-@SpringBootTest
-@ActiveProfiles("test")
-class FolderServiceTest {
+@DisplayName("FolderService")
+class FolderServiceTest extends FolderTestSupport {
 
-    @Autowired
-    private FolderService folderService;
-
-    @Autowired
-    private FolderRepository folderRepository;
-
-    @Autowired
-    private ProblemService problemService;
-
-    @Autowired
-    private ProblemRepository problemRepository;
-
-    @Autowired
-    private ProblemImageDataRepository problemImageDataRepository;
-
-    @MockBean
-    private FileUploadService fileUploadService;
-
-    private final Long userId = 1L;
-
-    private List<ProblemResponseDto> problemList;
-
-    private List<Folder> folderList;
+    private Long userId;
+    private Long otherUserId;
+    private FolderTree tree;
 
     @BeforeEach
-    void setUp() {
-        problemList = new ArrayList<>();
-        folderList = new ArrayList<>();
+    void setUpFolders() {
+        User user = fixtures.createUser();
+        User otherUser = fixtures.createOtherUser();
+        userId = user.getId();
+        otherUserId = otherUser.getId();
+        tree = createFolderTree(userId);
+    }
 
+    @Nested
+    @DisplayName("폴더 조회")
+    class FindFolder {
 
-        /*
-           0
-        /    \
-        1     2
-        | \   |
-        3, 4  5
-         */
-        Folder rootFolder = Folder.from(
-                new FolderRegisterDto(
-                        "rootFolder",
-                        null,
-                        null
-                ),
-                null,
-                1L
-        );
-        folderRepository.save(rootFolder);
-        folderList.add(rootFolder);
+        @Test
+        @DisplayName("루트 폴더를 조회하면 하위 폴더와 문제 목록이 함께 내려온다")
+        void findRootFolderReturnsSubFoldersAndProblems() {
+            List<Problem> rootProblems = saveProblems(userId, tree.root(), 2);
+            saveProblems(userId, tree.notebookA(), 3);
 
-        for (int i = 0; i < 5; i++) {
-            Folder folder = Folder.from(
-                    new FolderRegisterDto(
-                            "folder " + i,
-                            null,
-                            (long) i / 2
-                    ),
-                    folderList.get(i / 2),
-                    userId
-            );
-            folder.updateParentFolder(folderList.get(i / 2));
-            folderRepository.save(folder);
-            folderList.add(folder);
+            FolderResponseDto response = folderService.findRootFolder(userId);
+
+            assertThat(response.folderId()).as("루트 폴더 id").isEqualTo(tree.root().getId());
+            assertThat(response.parentFolder()).as("루트는 부모가 없다").isNull();
+            assertThat(response.subFolderList())
+                    .as("루트의 하위 폴더 (조회 순서는 보장되지 않는다)")
+                    .extracting(FolderThumbnailResponseDto::folderId)
+                    .containsExactlyInAnyOrder(tree.notebookA().getId(), tree.notebookB().getId());
+            assertThat(response.subFolderList())
+                    .filteredOn(dto -> dto.folderId().equals(tree.notebookA().getId()))
+                    .singleElement()
+                    .extracting(FolderThumbnailResponseDto::problemCount)
+                    .as("하위 폴더 썸네일의 문제 수")
+                    .isEqualTo(3L);
+            assertThat(response.problemIdList())
+                    .as("루트 폴더에 직접 담긴 문제")
+                    .containsExactlyInAnyOrderElementsOf(rootProblems.stream().map(Problem::getId).toList());
         }
 
-        for (int i = 0; i < 12; i++) {
-            Folder targetFolder = folderList.get(i / 2);
+        @Test
+        @DisplayName("루트 폴더가 없는 사용자는 FOLDER_NOT_FOUND 예외를 받는다")
+        void findRootFolderWithoutRootFolderThrows() {
+            assertThatThrownBy(() -> folderService.findRootFolder(otherUserId))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(FolderErrorCase.FOLDER_NOT_FOUND.getMessage());
+        }
 
-            Problem problem = Problem.from(
-                            new ProblemRegisterDto(
-                                    null,
-                                    "memo" + i,
-                                    "reference" + i,
-                                    targetFolder.getId(),
-                                    LocalDateTime.now()
-                            ),
-                            userId
-                    );
-            problem.updateFolder(targetFolder);
-            problemRepository.save(problem);
+        @Test
+        @DisplayName("중간 폴더를 조회하면 부모 썸네일과 하위 폴더가 함께 내려온다")
+        void findFolderReturnsParentAndSubFolders() {
+            saveProblems(userId, tree.root(), 2);
+            List<Problem> notebookProblems = saveProblems(userId, tree.notebookA(), 1);
 
-            for (int j = 1; j <= 3; j++){
-                ProblemImageDataRegisterDto problemImageDataRegisterDto = new ProblemImageDataRegisterDto(
-                        (long) i,
-                        "http://example.com/problemId/" + i + "/image" + j,
-                        ProblemImageType.valueOf(j)
-                );
+            FolderResponseDto response = folderService.findFolder(tree.notebookA().getId(), userId);
 
-                ProblemImageData imageData = ProblemImageData.from(problemImageDataRegisterDto);
-                imageData.updateProblem(problem);
-                problemImageDataRepository.save(imageData);
+            assertThat(response.folderId()).isEqualTo(tree.notebookA().getId());
+            assertThat(response.parentFolder().folderId()).as("부모 폴더 id").isEqualTo(tree.root().getId());
+            assertThat(response.parentFolder().problemCount()).as("부모 폴더의 문제 수").isEqualTo(2L);
+            assertThat(response.subFolderList())
+                    .extracting(FolderThumbnailResponseDto::folderId)
+                    .containsExactlyInAnyOrder(tree.leafA1().getId(), tree.leafA2().getId());
+            assertThat(response.problemIdList())
+                    .containsExactly(notebookProblems.get(0).getId());
+        }
+
+        @Test
+        @DisplayName("최하위 폴더는 하위 폴더 목록이 비어 있다")
+        void findLeafFolderHasNoSubFolders() {
+            FolderResponseDto response = folderService.findFolder(tree.leafA1().getId(), userId);
+
+            assertThat(response.subFolderList()).isEmpty();
+            assertThat(response.problemIdList()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 폴더를 조회하면 FOLDER_NOT_FOUND 예외가 발생한다")
+        void findFolderNotFound() {
+            Long missingFolderId = nonExistentFolderId();
+
+            assertThatThrownBy(() -> folderService.findFolder(missingFolderId, userId))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(FolderErrorCase.FOLDER_NOT_FOUND.getMessage());
+        }
+
+        @Test
+        @DisplayName("폴더 엔티티 조회도 소유자 검증을 거친다")
+        void findFolderEntityValidatesOwner() {
+            Folder folder = folderService.findFolderEntity(tree.notebookA().getId(), userId);
+
+            assertThat(folder.getId()).isEqualTo(tree.notebookA().getId());
+            assertThat(folder.getName()).isEqualTo("공책 A");
+        }
+    }
+
+    @Nested
+    @DisplayName("폴더 목록 조회")
+    class FindFolderList {
+
+        @Test
+        @DisplayName("썸네일 목록은 본인 폴더만 문제 수와 함께 돌려준다")
+        void findAllUserFolderThumbnails() {
+            saveProblems(userId, tree.leafA1(), 2);
+            Folder otherUserFolder = fixtures.createRootFolder(otherUserId);
+            saveProblems(otherUserId, otherUserFolder, 5);
+
+            List<FolderThumbnailResponseDto> thumbnails = folderService.findAllUserFolderThumbnails(userId);
+
+            assertThat(thumbnails)
+                    .as("다른 사용자의 폴더는 섞이지 않는다")
+                    .extracting(FolderThumbnailResponseDto::folderId)
+                    .containsExactlyInAnyOrderElementsOf(idsOf(tree.all()));
+            assertThat(thumbnails)
+                    .filteredOn(dto -> dto.folderId().equals(tree.leafA1().getId()))
+                    .singleElement()
+                    .extracting(FolderThumbnailResponseDto::problemCount)
+                    .isEqualTo(2L);
+        }
+
+        @Test
+        @DisplayName("폴더가 하나도 없는 사용자의 썸네일 목록은 빈 리스트다")
+        void findAllUserFolderThumbnailsForUserWithoutFolders() {
+            assertThat(folderService.findAllUserFolderThumbnails(otherUserId)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("전체 폴더 상세 목록은 id 오름차순이며 부모·하위 폴더 정보를 담는다")
+        void findAllUserFolders() {
+            saveProblems(userId, tree.notebookB(), 1);
+
+            List<FolderResponseDto> folders = folderService.findAllUserFolders(userId);
+
+            assertThat(folders)
+                    .extracting(FolderResponseDto::folderId)
+                    .as("id 오름차순 정렬")
+                    .containsExactlyElementsOf(idsOf(tree.all()));
+
+            FolderResponseDto root = folders.get(0);
+            assertThat(root.parentFolder()).isNull();
+            assertThat(root.subFolderList())
+                    .extracting(FolderThumbnailResponseDto::folderId)
+                    .containsExactlyInAnyOrder(tree.notebookA().getId(), tree.notebookB().getId());
+            assertThat(root.subFolderList())
+                    .filteredOn(dto -> dto.folderId().equals(tree.notebookB().getId()))
+                    .singleElement()
+                    .extracting(FolderThumbnailResponseDto::problemCount)
+                    .isEqualTo(1L);
+
+            FolderResponseDto leaf = folders.get(folders.size() - 1);
+            assertThat(leaf.subFolderList()).isEmpty();
+            assertThat(leaf.parentFolder().folderId()).isEqualTo(tree.notebookB().getId());
+        }
+
+        @Test
+        @DisplayName("폴더가 없는 사용자의 상세 목록은 빈 리스트다")
+        void findAllUserFoldersForUserWithoutFolders() {
+            assertThat(folderService.findAllUserFolders(otherUserId)).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("커서 페이징")
+    class CursorPaging {
+
+        @Test
+        @DisplayName("하위 폴더 커서 조회는 size 만큼 끊어 주고 다음 커서를 알려준다")
+        void findSubFoldersWithCursor() {
+            CursorPageResponse<FolderThumbnailResponseDto> firstPage =
+                    folderService.findSubFoldersWithCursor(tree.notebookA().getId(), userId, null, 1);
+
+            assertThat(firstPage.content()).hasSize(1);
+            assertThat(firstPage.hasNext()).as("leafA2 가 남아 있다").isTrue();
+            assertThat(firstPage.nextCursor()).isEqualTo(firstPage.content().get(0).folderId());
+
+            CursorPageResponse<FolderThumbnailResponseDto> secondPage =
+                    folderService.findSubFoldersWithCursor(tree.notebookA().getId(), userId, firstPage.nextCursor(), 1);
+
+            assertThat(secondPage.content())
+                    .extracting(FolderThumbnailResponseDto::folderId)
+                    .containsExactly(tree.leafA2().getId());
+            assertThat(secondPage.hasNext()).isFalse();
+            assertThat(secondPage.nextCursor()).isNull();
+        }
+
+        @Test
+        @DisplayName("하위 폴더가 없으면 빈 페이지를 돌려준다")
+        void findSubFoldersWithCursorForLeafFolder() {
+            CursorPageResponse<FolderThumbnailResponseDto> page =
+                    folderService.findSubFoldersWithCursor(tree.leafA1().getId(), userId, null, 20);
+
+            assertThat(page.content()).isEmpty();
+            assertThat(page.hasNext()).isFalse();
+            assertThat(page.nextCursor()).isNull();
+        }
+
+        @Test
+        @DisplayName("다른 사용자의 폴더로 하위 폴더 커서 조회를 하면 예외가 발생한다")
+        void findSubFoldersWithCursorForOtherUserFolder() {
+            assertThatThrownBy(() -> folderService.findSubFoldersWithCursor(tree.notebookA().getId(), otherUserId, null, 20))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(FolderErrorCase.FOLDER_USER_UNMATCHED.getMessage());
+        }
+
+        @Test
+        @DisplayName("전체 폴더 썸네일 커서 조회는 본인 폴더만 페이지로 끊어 준다")
+        void findAllUserFolderThumbnailsWithCursor() {
+            fixtures.createRootFolder(otherUserId);
+
+            CursorPageResponse<FolderThumbnailResponseDto> firstPage =
+                    folderService.findAllUserFolderThumbnailsWithCursor(userId, null, 4);
+
+            assertThat(firstPage.content()).hasSize(4);
+            assertThat(firstPage.hasNext()).isTrue();
+
+            CursorPageResponse<FolderThumbnailResponseDto> secondPage =
+                    folderService.findAllUserFolderThumbnailsWithCursor(userId, firstPage.nextCursor(), 4);
+
+            assertThat(secondPage.content()).hasSize(2);
+            assertThat(secondPage.hasNext()).isFalse();
+            assertThat(secondPage.content())
+                    .extracting(FolderThumbnailResponseDto::folderId)
+                    .as("다른 사용자의 폴더는 페이지에 들어오지 않는다")
+                    .isSubsetOf(idsOf(tree.all()));
+        }
+    }
+
+    @Nested
+    @DisplayName("기본 폴더 초기화")
+    class InitializeDefaultFolders {
+
+        @Test
+        @DisplayName("루트가 없으면 책장과 공책을 만든다")
+        void createsRootAndDefaultSubFolder() {
+            folderService.initializeDefaultFoldersIfAbsent(otherUserId);
+
+            Optional<Folder> root = folderRepository.findRootFolder(otherUserId);
+            assertThat(root).isPresent();
+            assertThat(root.get().getName()).isEqualTo("책장");
+            assertThat(root.get().getSubFolderList())
+                    .singleElement()
+                    .extracting(Folder::getName)
+                    .isEqualTo("공책");
+        }
+
+        @Test
+        @DisplayName("여러 번 호출해도 기본 폴더를 중복 생성하지 않는다")
+        void isIdempotent() {
+            folderService.initializeDefaultFoldersIfAbsent(otherUserId);
+            folderService.initializeDefaultFoldersIfAbsent(otherUserId);
+            folderService.initializeDefaultFoldersIfAbsent(otherUserId);
+
+            assertThat(folderRepository.findAllByUserId(otherUserId))
+                    .as("책장 + 공책 두 개만 있어야 한다")
+                    .hasSize(2);
+        }
+    }
+
+    @Nested
+    @DisplayName("폴더 생성")
+    class CreateFolder {
+
+        @Test
+        @DisplayName("부모 폴더 아래에 폴더를 만든다")
+        void createFolderUnderParent() {
+            Long folderId = folderService.createFolder(
+                    new FolderRegisterDto("새 공책", null, tree.root().getId()), userId);
+
+            Folder created = folderRepository.findById(folderId).orElseThrow();
+            assertThat(created.getName()).isEqualTo("새 공책");
+            assertThat(created.getUserId()).isEqualTo(userId);
+            assertThat(folderRepository.findFolderWithDetailsByFolderId(folderId).orElseThrow().getParentFolder().getId())
+                    .isEqualTo(tree.root().getId());
+        }
+
+        @Test
+        @DisplayName("깊게 중첩된 폴더도 만들 수 있다")
+        void createDeeplyNestedFolder() {
+            Folder parent = tree.leafA1();
+            for (int depth = 0; depth < 5; depth++) {
+                Long folderId = folderService.createFolder(
+                        new FolderRegisterDto("깊이 " + depth, null, parent.getId()), userId);
+                parent = folderRepository.findById(folderId).orElseThrow();
             }
 
-            ProblemResponseDto problemResponseDto = ProblemResponseDto.from(problem);
-            problemList.add(problemResponseDto);
+            assertThat(folderRepository.findAllByUserId(userId))
+                    .as("기존 6개 + 새로 만든 5개")
+                    .hasSize(11);
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 부모 폴더를 지정하면 FOLDER_NOT_FOUND 예외가 발생한다")
+        void createFolderWithMissingParent() {
+            FolderRegisterDto registerDto = new FolderRegisterDto("새 공책", null, nonExistentFolderId());
+
+            assertThatThrownBy(() -> folderService.createFolder(registerDto, userId))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(FolderErrorCase.FOLDER_NOT_FOUND.getMessage());
+        }
+
+        @Test
+        @DisplayName("부모 폴더 id 가 없으면 FOLDER_NOT_FOUND 예외가 발생한다")
+        void createFolderWithNullParent() {
+            FolderRegisterDto registerDto = new FolderRegisterDto("새 공책", null, null);
+
+            assertThatThrownBy(() -> folderService.createFolder(registerDto, userId))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(FolderErrorCase.FOLDER_NOT_FOUND.getMessage());
+        }
+
+        @Test
+        @DisplayName("다른 사용자의 폴더를 부모로 지정하면 FOLDER_USER_UNMATCHED 예외가 발생한다")
+        void createFolderUnderOtherUserFolder() {
+            Folder otherUserFolder = fixtures.createRootFolder(otherUserId);
+            FolderRegisterDto registerDto = new FolderRegisterDto("남의 폴더 아래", null, otherUserFolder.getId());
+
+            assertThatThrownBy(() -> folderService.createFolder(registerDto, userId))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(FolderErrorCase.FOLDER_USER_UNMATCHED.getMessage());
         }
     }
 
-    @AfterEach
-    void tearDown() {
-        problemRepository.deleteAll();
-        problemRepository.deleteAll();
-        folderRepository.deleteAll();
+    @Nested
+    @DisplayName("폴더 수정")
+    class UpdateFolder {
 
-        problemList.clear();
-        folderList.clear();
-    }
+        @Test
+        @DisplayName("폴더 이름을 바꾼다")
+        void updateFolderName() {
+            folderService.updateFolder(
+                    new FolderRegisterDto("바뀐 이름", tree.notebookA().getId(), null), userId);
 
-    @Test
-    void findRootFolder() {
-        //given
-        Long folderId = folderList.get(0).getId();
+            assertThat(folderRepository.findById(tree.notebookA().getId()).orElseThrow().getName())
+                    .isEqualTo("바뀐 이름");
+        }
 
-        //when
-        FolderResponseDto folderResponseDto = folderService.findRootFolder(userId);
+        @Test
+        @DisplayName("이름이 null 이면 기존 이름을 유지한다")
+        void updateFolderWithNullNameKeepsName() {
+            folderService.updateFolder(
+                    new FolderRegisterDto(null, tree.leafA1().getId(), tree.notebookB().getId()), userId);
 
-        //then
-        assertThat(folderResponseDto.folderId()).isEqualTo(folderList.get(0).getId());
-        assertThat(folderResponseDto.folderName()).isEqualTo(folderList.get(0).getName());
-        assertThat(folderResponseDto.parentFolder()).isNull();
-        assertThat(folderResponseDto.subFolderList().get(0).folderId()).isEqualTo(folderList.get(1).getId());
-        assertThat(folderResponseDto.subFolderList().get(0).problemCount()).isEqualTo((long) folderList.get(1).getProblemList().size());
-        assertThat(folderResponseDto.subFolderList().get(1).folderId()).isEqualTo(folderList.get(2).getId());
-        assertThat(folderResponseDto.subFolderList().get(1).problemCount()).isEqualTo((long) folderList.get(2).getProblemList().size());
-        assertThat(folderResponseDto.problemIdList().get(0)).isEqualTo(problemList.get(0).problemId());
-        assertThat(folderResponseDto.problemIdList().get(1)).isEqualTo(problemList.get(1).problemId());
-    }
+            Folder updated = folderRepository.findFolderWithDetailsByFolderId(tree.leafA1().getId()).orElseThrow();
+            assertThat(updated.getName()).isEqualTo("단원 A-1");
+            assertThat(updated.getParentFolder().getId()).isEqualTo(tree.notebookB().getId());
+        }
 
-    @Test
-    @DisplayName("folderId를 사용해 특정 폴더 response dto 조회하기 테스트")
-    void findFolder() {
-        //given
-        Long parentFolderId = folderList.get(0).getId();
-        Long folderId = folderList.get(1).getId();
+        @Test
+        @DisplayName("루트 폴더는 수정할 수 없다")
+        void rootFolderCannotBeUpdated() {
+            FolderRegisterDto registerDto = new FolderRegisterDto("루트 이름 변경", tree.root().getId(), null);
 
-        //when
-        FolderResponseDto folderResponseDto = folderService.findFolder(folderId, userId);
+            assertThatThrownBy(() -> folderService.updateFolder(registerDto, userId))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(FolderErrorCase.ROOT_FOLDER_CANNOT_UPDATE.getMessage());
+        }
 
-        //then
-        assertThat(folderResponseDto.folderId()).isEqualTo(folderList.get(1).getId());
-        assertThat(folderResponseDto.folderName()).isEqualTo(folderList.get(1).getName());
-        assertThat(folderResponseDto.parentFolder().folderId()).isEqualTo(parentFolderId);
-        assertThat(folderResponseDto.parentFolder().problemCount()).isEqualTo((long) folderList.get(0).getProblemList().size());
-        assertThat(folderResponseDto.subFolderList().get(0).folderId()).isEqualTo(folderList.get(3).getId());
-        assertThat(folderResponseDto.subFolderList().get(0).problemCount()).isEqualTo((long) folderList.get(3).getProblemList().size());
-        assertThat(folderResponseDto.subFolderList().get(1).folderId()).isEqualTo(folderList.get(4).getId());
-        assertThat(folderResponseDto.subFolderList().get(1).problemCount()).isEqualTo((long) folderList.get(4).getProblemList().size());
-        assertThat(folderResponseDto.problemIdList().get(0)).isEqualTo(problemList.get(2).problemId());
-        assertThat(folderResponseDto.problemIdList().get(1)).isEqualTo(problemList.get(3).problemId());
-    }
+        @Test
+        @DisplayName("부모 폴더를 옮기면 이전 부모에서 빠지고 새 부모에 붙는다")
+        void moveFolderToAnotherParent() {
+            folderService.updateFolder(
+                    new FolderRegisterDto(null, tree.notebookA().getId(), tree.notebookB().getId()), userId);
 
-    @Test
-    @DisplayName("다른 유저의 폴더 조회 시 예외")
-    void findFolder_OtherUserFolder() {
-        Folder otherUserFolder = folderRepository.save(Folder.from(
-                new FolderRegisterDto("other folder", null, null),
-                2L
-        ));
+            Folder moved = folderRepository.findFolderWithDetailsByFolderId(tree.notebookA().getId()).orElseThrow();
+            assertThat(moved.getParentFolder().getId()).isEqualTo(tree.notebookB().getId());
 
-        assertThatThrownBy(() -> folderService.findFolder(otherUserFolder.getId(), userId))
-                .isInstanceOf(ApplicationException.class)
-                .hasMessageContaining(FolderErrorCase.FOLDER_USER_UNMATCHED.getMessage());
-    }
+            Folder oldParent = folderRepository.findFolderWithDetailsByFolderId(tree.root().getId()).orElseThrow();
+            assertThat(oldParent.getSubFolderList())
+                    .extracting(Folder::getId)
+                    .as("루트에는 공책 B 만 남는다")
+                    .containsExactly(tree.notebookB().getId());
+        }
 
-    @Test
-    @DisplayName("folderId를 사용해 특정 폴더 엔티티 조회하기 테스트")
-    void findFolderEntity() {
-        //given
-        Long folderId = folderList.get(0).getId();
+        @Test
+        @DisplayName("존재하지 않는 폴더를 수정하면 FOLDER_NOT_FOUND 예외가 발생한다")
+        void updateMissingFolder() {
+            FolderRegisterDto registerDto = new FolderRegisterDto("이름", nonExistentFolderId(), null);
 
-        //when
-        Folder folder = folderService.findFolderEntity(folderId, userId);
+            assertThatThrownBy(() -> folderService.updateFolder(registerDto, userId))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(FolderErrorCase.FOLDER_NOT_FOUND.getMessage());
+        }
 
-        //then
-        assertThat(folder.getId()).isEqualTo(folderList.get(0).getId());
-        assertThat(folder.getName()).isEqualTo(folderList.get(0).getName());
-        assertThat(folder.getParentFolder()).isEqualTo(folderList.get(0).getParentFolder());
-    }
+        @Test
+        @DisplayName("존재하지 않는 폴더로 옮기면 FOLDER_NOT_FOUND 예외가 발생한다")
+        void moveFolderToMissingParent() {
+            FolderRegisterDto registerDto = new FolderRegisterDto(null, tree.leafA1().getId(), nonExistentFolderId());
 
-    @Test
-    @DisplayName("특정 유저의 모든 폴더 썸네일 조회하기 테스트")
-    void findAllUserFolderThumbnails() {
-        //given
+            assertThatThrownBy(() -> folderService.updateFolder(registerDto, userId))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(FolderErrorCase.FOLDER_NOT_FOUND.getMessage());
+        }
 
-        //when
-        List<FolderThumbnailResponseDto> folderThumbnailResponseDtoList = folderService.findAllUserFolderThumbnails(userId);
+        @Test
+        @DisplayName("자기 자신을 부모로 지정하면 INVALID_PARENT_FOLDER 예외가 발생한다")
+        void folderCannotBeItsOwnParent() {
+            Long folderId = tree.notebookA().getId();
+            FolderRegisterDto registerDto = new FolderRegisterDto(null, folderId, folderId);
 
-        //then
-        for (int i = 0; i < folderThumbnailResponseDtoList.size(); i++) {
-            assertThat(folderThumbnailResponseDtoList.get(i).folderId()).isEqualTo(folderList.get(i).getId());
-            assertThat(folderThumbnailResponseDtoList.get(i).folderName()).isEqualTo(folderList.get(i).getName());
-            assertThat(folderThumbnailResponseDtoList.get(i).problemCount()).isEqualTo((long) folderList.get(i).getProblemList().size());
+            assertThatThrownBy(() -> folderService.updateFolder(registerDto, userId))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(FolderErrorCase.INVALID_PARENT_FOLDER.getMessage());
+
+            assertThat(folderRepository.findFolderWithDetailsByFolderId(folderId).orElseThrow().getParentFolder().getId())
+                    .as("부모는 그대로 유지된다")
+                    .isEqualTo(tree.root().getId());
+        }
+
+        @Test
+        @DisplayName("자기 하위 폴더를 부모로 지정하면 순환이 생기므로 예외가 발생한다")
+        void folderCannotBeMovedUnderItsOwnDescendant() {
+            FolderRegisterDto registerDto =
+                    new FolderRegisterDto(null, tree.notebookA().getId(), tree.leafA1().getId());
+
+            assertThatThrownBy(() -> folderService.updateFolder(registerDto, userId))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(FolderErrorCase.INVALID_PARENT_FOLDER.getMessage());
+        }
+
+        @Test
+        @DisplayName("다른 사용자의 폴더는 수정할 수 없다")
+        void cannotUpdateOtherUserFolder() {
+            FolderRegisterDto registerDto = new FolderRegisterDto("남의 폴더", tree.notebookA().getId(), null);
+
+            assertThatThrownBy(() -> folderService.updateFolder(registerDto, otherUserId))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(FolderErrorCase.FOLDER_USER_UNMATCHED.getMessage());
+        }
+
+        @Test
+        @DisplayName("다른 사용자의 폴더 아래로는 옮길 수 없다")
+        void cannotMoveFolderUnderOtherUserFolder() {
+            Folder otherUserFolder = fixtures.createRootFolder(otherUserId);
+            FolderRegisterDto registerDto =
+                    new FolderRegisterDto(null, tree.leafA1().getId(), otherUserFolder.getId());
+
+            assertThatThrownBy(() -> folderService.updateFolder(registerDto, userId))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(FolderErrorCase.FOLDER_USER_UNMATCHED.getMessage());
         }
     }
 
-    @Test
-    @DisplayName("특정 유저의 모든 폴더 조회하기 테스트")
-    void findAllUserFolders() {
-        //given
+    @Nested
+    @DisplayName("폴더 삭제")
+    class DeleteFolder {
 
-        //when
-        List<FolderResponseDto> userFolderList = folderService.findAllUserFolders(userId);
+        @Test
+        @DisplayName("폴더를 지우면 하위 폴더와 그 안의 문제까지 함께 사라진다")
+        void deleteFolderRemovesSubTreeAndProblems() {
+            saveProblems(userId, tree.notebookA(), 2);
+            saveProblems(userId, tree.leafA1(), 3);
+            List<Problem> keptProblems = saveProblems(userId, tree.notebookB(), 1);
 
-        //then
-        assertThat(userFolderList.size()).isEqualTo(folderList.size());
-        for (int i = 0; i < userFolderList.size(); i++) {
-            assertThat(userFolderList.get(i).folderId()).isEqualTo(folderList.get(i).getId());
-            assertThat(userFolderList.get(i).folderName()).isEqualTo(folderList.get(i).getName());
-            if (i == 0) {
-                assertThat(userFolderList.get(i).parentFolder()).isNull();
-            } else{
-                assertThat(userFolderList.get(i).parentFolder().folderId()).isEqualTo(folderList.get(i).getParentFolder().getId());
-            }
+            folderService.deleteFoldersWithProblems(userId, List.of(tree.notebookA().getId()));
 
-            if (i < 3) {
-                assertThat(userFolderList.get(i).subFolderList().get(0).folderId()).isEqualTo(folderList.get(i).getSubFolderList().get(0).getId());
-            } else{
-                assertThat(userFolderList.get(i).subFolderList()).isEmpty();
-            }
+            assertThat(folderRepository.findAllByUserId(userId))
+                    .extracting(Folder::getId)
+                    .as("공책 A 서브트리만 사라진다")
+                    .containsExactlyInAnyOrder(tree.root().getId(), tree.notebookB().getId(), tree.leafB1().getId());
+            assertThat(problemRepository.findAllByUserId(userId))
+                    .extracting(Problem::getId)
+                    .as("남은 문제는 공책 B 의 문제뿐")
+                    .containsExactly(keptProblems.get(0).getId());
         }
-    }
 
-    @Test
-    @DisplayName("초기 폴더 보장 - 루트가 없으면 루트와 기본 하위 폴더 생성")
-    void initializeDefaultFoldersIfAbsent_CreateRootAndDefaultSubFolder() {
-        Long newUserId = 999L;
+        @Test
+        @DisplayName("최상위 폴더를 모두 지우면 루트만 남는다")
+        void deleteAllTopLevelFolders() {
+            saveProblems(userId, tree.leafA1(), 2);
+            saveProblems(userId, tree.leafB1(), 2);
 
-        folderService.initializeDefaultFoldersIfAbsent(newUserId);
+            folderService.deleteFoldersWithProblems(
+                    userId, List.of(tree.notebookA().getId(), tree.notebookB().getId()));
 
-        Optional<Folder> optionalRoot = folderRepository.findRootFolder(newUserId);
-        assertThat(optionalRoot).isPresent();
-        assertThat(optionalRoot.get().getName()).isEqualTo("책장");
-        assertThat(optionalRoot.get().getSubFolderList()).hasSize(1);
-        assertThat(optionalRoot.get().getSubFolderList().get(0).getName()).isEqualTo("공책");
-    }
+            assertThat(folderRepository.findAllByUserId(userId))
+                    .extracting(Folder::getId)
+                    .containsExactly(tree.root().getId());
+        }
 
-    @Test
-    @DisplayName("초기 폴더 보장 - 이미 기본 하위 폴더가 있으면 중복 생성하지 않음")
-    void initializeDefaultFoldersIfAbsent_NoDuplicateSubFolder() {
-        Long newUserId = 1000L;
-        Folder root = folderRepository.save(Folder.from(
-                new FolderRegisterDto("책장", null, null),
-                newUserId
-        ));
-        Folder defaultSubFolder = Folder.from(
-                new FolderRegisterDto("공책", null, root.getId()),
-                newUserId
-        );
-        defaultSubFolder.updateParentFolder(root);
-        folderRepository.save(defaultSubFolder);
+        @Test
+        @DisplayName("루트 폴더는 삭제할 수 없고 아무 폴더도 지워지지 않는다")
+        void rootFolderCannotBeDeleted() {
+            List<Long> deleteIds = List.of(tree.root().getId());
 
-        folderService.initializeDefaultFoldersIfAbsent(newUserId);
-        folderService.initializeDefaultFoldersIfAbsent(newUserId);
+            assertThatThrownBy(() -> folderService.deleteFoldersWithProblems(userId, deleteIds))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(FolderErrorCase.ROOT_FOLDER_CANNOT_REMOVE.getMessage());
 
-        Optional<Folder> optionalRoot = folderRepository.findFolderWithDetailsByFolderId(root.getId());
-        assertThat(optionalRoot).isPresent();
-        assertThat(optionalRoot.get().getSubFolderList()).hasSize(1);
-        assertThat(optionalRoot.get().getSubFolderList().get(0).getName()).isEqualTo("공책");
-    }
+            assertThat(folderRepository.findAllByUserId(userId)).hasSize(6);
+        }
 
-    @Test
-    @DisplayName("폴더 생성 테스트 - 정상 등록")
-    void createFolder_FolderExists() {
-        //given
-        Long parentFolderId = folderList.get(folderList.size() - 1).getId();
-        String folderName = "new folder";
-        FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
-                folderName,
-                null,
-                parentFolderId
-        );
+        @Test
+        @DisplayName("존재하지 않는 폴더를 지우면 FOLDER_NOT_FOUND 예외가 발생한다")
+        void deleteMissingFolder() {
+            List<Long> deleteIds = List.of(nonExistentFolderId());
 
-        //when
-        folderService.createFolder(folderRegisterDto, userId);
-        Optional<Folder> optionalParentFolder = folderRepository.findFolderWithDetailsByFolderId(parentFolderId);
-        assertThat(optionalParentFolder.isPresent()).isTrue();
+            assertThatThrownBy(() -> folderService.deleteFoldersWithProblems(userId, deleteIds))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(FolderErrorCase.FOLDER_NOT_FOUND.getMessage());
+        }
 
-        Folder parentFolder = optionalParentFolder.get();
-        assertThat(parentFolder.getSubFolderList().size()).isEqualTo(1);
-        assertThat(parentFolder.getSubFolderList().get(0).getName()).isEqualTo(folderName);
-    }
+        @Test
+        @DisplayName("다른 사용자의 폴더는 삭제할 수 없다")
+        void cannotDeleteOtherUserFolder() {
+            List<Long> deleteIds = List.of(tree.notebookA().getId());
 
-    @Test
-    @DisplayName("폴더 생성 테스트 - 부모 폴더가 존재하지 않는 경우")
-    void createFolder_FolderNotExists() {
-        //given
-        Long parentFolderId = 200L;
-        FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
-                "new folder",
-                null,
-                parentFolderId
-        );
+            assertThatThrownBy(() -> folderService.deleteFoldersWithProblems(otherUserId, deleteIds))
+                    .isInstanceOf(ApplicationException.class)
+                    .hasMessageContaining(FolderErrorCase.FOLDER_USER_UNMATCHED.getMessage());
 
-        //when & then
-        assertThatThrownBy(() -> folderService.createFolder(folderRegisterDto, userId))
-                .isInstanceOf(ApplicationException.class)
-                .hasMessageContaining(FolderErrorCase.FOLDER_NOT_FOUND.getMessage());
-    }
+            assertThat(folderRepository.findAllByUserId(userId)).hasSize(6);
+        }
 
-    @Test
-    @DisplayName("다른 유저의 부모 폴더에 폴더 생성 시 예외")
-    void createFolder_OtherUserParentFolder() {
-        Folder otherUserParentFolder = folderRepository.save(Folder.from(
-                new FolderRegisterDto("other parent", null, null),
-                2L
-        ));
-        FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
-                "new folder",
-                null,
-                otherUserParentFolder.getId()
-        );
+        @Test
+        @DisplayName("빈 삭제 목록은 아무것도 지우지 않는다")
+        void deleteWithEmptyListDoesNothing() {
+            folderService.deleteFoldersWithProblems(userId, List.of());
 
-        assertThatThrownBy(() -> folderService.createFolder(folderRegisterDto, userId))
-                .isInstanceOf(ApplicationException.class)
-                .hasMessageContaining(FolderErrorCase.FOLDER_USER_UNMATCHED.getMessage());
-    }
+            assertThat(folderRepository.findAllByUserId(userId)).hasSize(6);
+        }
 
-    @Test
-    @DisplayName("폴더 수정 테스트 - 폴더 이름 수정")
-    void updateFolder_FolderName() {
-        //given
-        Long folderId = folderList.get(1).getId();
-        String updateFolderName = "new folder name";
-        FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
-                updateFolderName,
-                folderId,
-                null
-        );
+        @Test
+        @DisplayName("전체 삭제는 본인 폴더와 문제만 지우고 다른 사용자 데이터는 남긴다")
+        void deleteAllUserFoldersWithProblems() {
+            saveProblems(userId, tree.notebookA(), 2);
+            Folder otherUserFolder = fixtures.createRootFolder(otherUserId);
+            saveProblems(otherUserId, otherUserFolder, 2);
 
-        //when
-        folderService.updateFolder(folderRegisterDto, userId);
+            folderService.deleteAllUserFoldersWithProblems(userId);
 
-        //then
-        Optional<Folder> optionalFolder = folderRepository.findById(folderId);
-        assertThat(optionalFolder.isPresent()).isTrue();
-
-        Folder folder = optionalFolder.get();
-        assertThat(folder.getName()).isEqualTo(updateFolderName);
-    }
-
-    @Test
-    @DisplayName("폴더 수정 테스트 - 부모 폴더 수정")
-    void updateFolder_ParentFolder() {
-        //given
-        Long oldParentFolderId = folderList.get(0).getId();
-        Long folderId = folderList.get(1).getId();
-        Long newParentFolderId = folderList.get(2).getId();
-        FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
-                null,
-                folderId,
-                newParentFolderId
-        );
-
-        folderService.updateFolder(folderRegisterDto, userId);
-
-        Optional<Folder> optionalOldParentFolder = folderRepository.findFolderWithDetailsByFolderId(oldParentFolderId);
-        Optional<Folder> optionalFolder = folderRepository.findFolderWithDetailsByFolderId(folderId);
-        Optional<Folder> optionalNewParentFolder = folderRepository.findFolderWithDetailsByFolderId(newParentFolderId);
-
-        assertThat(optionalOldParentFolder.isPresent()).isTrue();
-        assertThat(optionalFolder.isPresent()).isTrue();
-        assertThat(optionalNewParentFolder.isPresent()).isTrue();
-
-        Folder oldParentFolder = optionalOldParentFolder.get();
-        Folder folder = optionalFolder.get();
-        Folder newParentFolder = optionalNewParentFolder.get();
-
-        assertThat(oldParentFolder.getSubFolderList().size()).isEqualTo(1);
-        assertThat(folder.getParentFolder().getId()).isEqualTo(newParentFolderId);
-        assertThat(newParentFolder.getSubFolderList().size()).isEqualTo(2);
-    }
-
-    @Test
-    @DisplayName("폴더 수정 테스트 - 부모 폴더가 존재하지 않을 경우")
-    void updateFolder_ParentFolderNotExist() {
-        //given
-        Long folderId = folderList.get(1).getId();
-        Long newParentFolderId = 100L;
-        FolderRegisterDto folderRegisterDto = new FolderRegisterDto(
-                null,
-                folderId,
-                newParentFolderId
-        );
-
-        //when & then
-        assertThatThrownBy(() -> folderService.updateFolder(folderRegisterDto, userId))
-                .isInstanceOf(ApplicationException.class)
-                .hasMessageContaining(FolderErrorCase.FOLDER_NOT_FOUND.getMessage());
-    }
-
-    @Test
-    @DisplayName("폴더 삭제 테스트 - 루트 폴더 삭제 시 예외")
-    void deleteFolders_rootFolder() {
-        List<Long> folderIdList = List.of(folderList.get(0).getId());
-        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
-
-        // when & then
-        assertThatThrownBy(() -> folderService.deleteFoldersWithProblems(userId, folderIdList))
-                .isInstanceOf(ApplicationException.class)
-                .hasMessageContaining(FolderErrorCase.ROOT_FOLDER_CANNOT_REMOVE.getMessage());
-
-        assertThat(folderRepository.findAllByUserId(userId).size()).isEqualTo(folderList.size());
-    }
-
-    @Test
-    @DisplayName("폴더 삭제 테스트 - 루트 폴더 제외 최상위 폴더 모두 삭제")
-    void deleteFolders_AllParentFolder() {
-        // given
-        List<Long> folderIdList = List.of(folderList.get(1).getId(), folderList.get(2).getId());
-        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
-
-        // when
-        folderService.deleteFoldersWithProblems(userId, folderIdList);
-
-        // then
-        assertThat(folderRepository.findAllByUserId(userId).size()).isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("폴더 삭제 테스트 - 특정 중간 폴더 삭제")
-    void deleteFolders_InternalFolder() {
-        // given
-        List<Long> folderIdList = List.of(folderList.get(1).getId());
-        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
-
-        // when
-        folderService.deleteFoldersWithProblems(userId, folderIdList);
-
-        // then
-        assertThat(folderRepository.findAllByUserId(userId).size()).isEqualTo(3);
-
-        Optional<Folder> optionalRootFolder = folderRepository.findFolderWithDetailsByFolderId(folderList.get(0).getId());
-        assertThat(optionalRootFolder.isPresent()).isTrue();
-
-        Folder rootFolder = optionalRootFolder.get();
-        assertThat(rootFolder.getSubFolderList().size()).isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("폴더 삭제 테스트 - 유저의 모든 폴더 삭제")
-    void deleteFolders_AllUserFolders() {
-        // given
-        doNothing().when(fileUploadService).deleteImageFileFromS3(anyString());
-
-        // when
-        folderService.deleteAllUserFolders(userId);
-
-        // then
-        assertThat(folderRepository.findAllByUserId(userId)).isEmpty();
+            assertThat(folderRepository.findAllByUserId(userId)).isEmpty();
+            assertThat(problemRepository.findAllByUserId(userId)).isEmpty();
+            assertThat(folderRepository.findAllByUserId(otherUserId))
+                    .as("다른 사용자 폴더는 그대로")
+                    .hasSize(1);
+            assertThat(problemRepository.findAllByUserId(otherUserId))
+                    .as("다른 사용자 문제도 그대로")
+                    .hasSize(2);
+        }
     }
 }

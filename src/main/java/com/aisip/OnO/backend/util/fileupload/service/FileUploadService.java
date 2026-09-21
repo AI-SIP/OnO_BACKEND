@@ -138,11 +138,27 @@ public class FileUploadService {
     }
 
     private String createFileName(MultipartFile file) {
-        String originalFilename = file.getOriginalFilename();
-        String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        String extension = resolveExtension(file.getOriginalFilename());
 
         String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
         return "image/" + datePath + "/" + UUID.randomUUID() + extension;
+    }
+
+    /**
+     * 확장자가 없는 파일명이 들어오면 예전에는 substring(-1) 로 StringIndexOutOfBoundsException 이 나
+     * 그대로 500 이 됐다. 잘못된 업로드 요청은 400 으로 돌려준다.
+     */
+    private String resolveExtension(String originalFilename) {
+        if (originalFilename == null || originalFilename.isBlank()) {
+            throw new ApplicationException(FileUploadErrorCase.INVALID_IMAGE_FILE);
+        }
+
+        int separatorIndex = originalFilename.lastIndexOf(".");
+        if (separatorIndex < 0 || separatorIndex == originalFilename.length() - 1) {
+            throw new ApplicationException(FileUploadErrorCase.INVALID_IMAGE_FILE);
+        }
+
+        return originalFilename.substring(separatorIndex);
     }
 
     private String createFileNameForPresigned(String contentType) {

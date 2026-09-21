@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.config.rabbitmq.consumer;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.config.rabbitmq.RabbitMQConfig;
+import com.aisip.OnO.backend.config.rabbitmq.RabbitRetryAttempts;
 import com.aisip.OnO.backend.config.rabbitmq.message.ProblemAnalysisMessage;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.problem.service.ProblemAnalysisFailureService;
@@ -11,7 +12,11 @@ import com.aisip.OnO.backend.util.webhook.DiscordWebhookNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * GPT 문제 분석 메시지 Consumer
@@ -34,8 +39,17 @@ public class ProblemAnalysisConsumer {
      */
     @RabbitListener(queues = RabbitMQConfig.GPT_ANALYSIS_QUEUE, concurrency = "1-2")
     public void handleAnalysisMessage(ProblemAnalysisMessage message) {
-        log.info("RabbitMQ message received - queue: {}, operation: {}, problemId: {}, messageRetryCount: {}",
-                RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", message.getProblemId(), message.getRetryCount());
+        log.info("RabbitMQ message received - queue: {}, operation: {}, problemId: {}, attempt: {}/{}",
+                RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", message.getProblemId(),
+                RabbitRetryAttempts.currentAttempt(), RabbitRetryAttempts.MAX_ATTEMPTS);
+
+        // problemId 없는 메시지는 재시도해도 조회 자체가 불가능하다. 재시도/DLQ 알림 없이 종료(ACK).
+        if (message.getProblemId() == null) {
+            log.warn("RabbitMQ message skipped - queue: {}, operation: {}, outcome: {}, attempt: {}/{}",
+                    RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", "problem_id_missing",
+                    RabbitRetryAttempts.currentAttempt(), RabbitRetryAttempts.MAX_ATTEMPTS);
+            return;
+        }
 
         try {
             // 실제 GPT 분석 수행
@@ -45,30 +59,30 @@ public class ProblemAnalysisConsumer {
                     RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", "success", message.getProblemId());
 
         } catch (NonRetryableAnalysisException e) {
-            log.warn("RabbitMQ message skipped - queue: {}, operation: {}, outcome: {}, problemId: {}, messageRetryCount: {}, reason: {}",
+            log.warn("RabbitMQ message skipped - queue: {}, operation: {}, outcome: {}, problemId: {}, attempt: {}/{}, reason: {}",
                     RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", "non_retryable_failure",
-                    message.getProblemId(), message.getRetryCount(), e.getMessage());
+                    message.getProblemId(), RabbitRetryAttempts.currentAttempt(), RabbitRetryAttempts.MAX_ATTEMPTS, e.getMessage());
             // 상태는 Service에서 FAILED로 업데이트됨. 재큐잉 없이 종료(ACK)
             return;
         } catch (ApplicationException e) {
             if (e.getErrorCase() == ProblemErrorCase.PROBLEM_NOT_FOUND
                     || e.getErrorCase() == ProblemErrorCase.PROBLEM_ANALYSIS_NOT_FOUND) {
-                log.warn("RabbitMQ message skipped - queue: {}, operation: {}, outcome: {}, problemId: {}, messageRetryCount: {}",
+                log.warn("RabbitMQ message skipped - queue: {}, operation: {}, outcome: {}, problemId: {}, attempt: {}/{}",
                         RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", "resource_not_found",
-                        message.getProblemId(), message.getRetryCount());
+                        message.getProblemId(), RabbitRetryAttempts.currentAttempt(), RabbitRetryAttempts.MAX_ATTEMPTS);
                 return;
             }
 
-            log.error("RabbitMQ message failed - queue: {}, operation: {}, outcome: {}, problemId: {}, messageRetryCount: {}, error: {}",
+            log.error("RabbitMQ message failed - queue: {}, operation: {}, outcome: {}, problemId: {}, attempt: {}/{}, error: {}",
                     RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", "failure",
-                    message.getProblemId(), message.getRetryCount(), e.getMessage());
+                    message.getProblemId(), RabbitRetryAttempts.currentAttempt(), RabbitRetryAttempts.MAX_ATTEMPTS, e.getMessage());
 
             // 예외를 던지면 RabbitMQ가 자동으로 재시도 or DLQ로 전송
             throw new RuntimeException("GPT 문제 분석 실패: " + message.getProblemId(), e);
         } catch (Exception e) {
-            log.error("RabbitMQ message failed - queue: {}, operation: {}, outcome: {}, problemId: {}, messageRetryCount: {}, error: {}",
+            log.error("RabbitMQ message failed - queue: {}, operation: {}, outcome: {}, problemId: {}, attempt: {}/{}, error: {}",
                     RabbitMQConfig.GPT_ANALYSIS_QUEUE, "problem_analysis", "failure",
-                    message.getProblemId(), message.getRetryCount(), e.getMessage());
+                    message.getProblemId(), RabbitRetryAttempts.currentAttempt(), RabbitRetryAttempts.MAX_ATTEMPTS, e.getMessage());
 
             // 예외를 던지면 RabbitMQ가 자동으로 재시도 or DLQ로 전송
             throw new RuntimeException("GPT 문제 분석 실패: " + message.getProblemId(), e);
@@ -81,20 +95,23 @@ public class ProblemAnalysisConsumer {
      * - Discord 알림 전송하여 관리자에게 수동 처리 요청
      */
     @RabbitListener(queues = RabbitMQConfig.GPT_ANALYSIS_DLQ)
-    public void handleAnalysisDLQ(ProblemAnalysisMessage message) {
-        log.error("RabbitMQ message moved to DLQ - queue: {}, operation: {}, outcome: {}, problemId: {}, messageRetryCount: {}",
+    public void handleAnalysisDLQ(ProblemAnalysisMessage message,
+            @Header(name = RabbitRetryAttempts.X_DEATH_HEADER, required = false) List<Map<String, ?>> xDeath) {
+        String attempts = RabbitRetryAttempts.describeDeadLetter(xDeath, RabbitMQConfig.GPT_ANALYSIS_QUEUE);
+
+        log.error("RabbitMQ message moved to DLQ - queue: {}, operation: {}, outcome: {}, problemId: {}, attempts: {}",
                 RabbitMQConfig.GPT_ANALYSIS_DLQ, "problem_analysis", "dlq",
-                message.getProblemId(), message.getRetryCount());
+                message.getProblemId(), attempts);
 
         // Discord 알림 전송
         String errorTitle = String.format("🚨 GPT 문제 분석 최종 실패 (DLQ)");
         String errorDetails = String.format(
-                "**Queue:** %s\n**Operation:** %s\n**Problem ID:** %d\n**Message Retry Count:** %d\n\n" +
+                "**Queue:** %s\n**Operation:** %s\n**Problem ID:** %d\n**Attempts:** %s\n\n" +
                 "모든 재시도가 실패했습니다. 문제를 확인하고 수동으로 재분석을 요청해주세요.",
                 RabbitMQConfig.GPT_ANALYSIS_DLQ,
                 "problem_analysis",
                 message.getProblemId(),
-                message.getRetryCount()
+                attempts
         );
 
         // DLQ 도달 = 모든 재시도 소진. PROCESSING 고착 방지를 위해 FAILED로 전이

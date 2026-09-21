@@ -1,283 +1,298 @@
 package com.aisip.OnO.backend.practicenote.repository;
 
-import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.entity.Folder;
-import com.aisip.OnO.backend.folder.repository.FolderRepository;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNoteRegisterDto;
-import com.aisip.OnO.backend.practicenote.dto.PracticeNotificationRegisterDto;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
-import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
-import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
+import com.aisip.OnO.backend.practicenote.support.PracticeNoteTestSupport;
 import com.aisip.OnO.backend.problem.entity.Problem;
-import com.aisip.OnO.backend.problem.entity.ProblemImageData;
-import com.aisip.OnO.backend.problem.entity.ProblemImageType;
-import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
-import com.aisip.OnO.backend.problem.repository.ProblemRepository;
-import jakarta.persistence.EntityManager;
-import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
-import org.springframework.transaction.annotation.Transactional;
+import com.aisip.OnO.backend.user.entity.User;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
+import java.time.LocalTime;
 import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
-@ActiveProfiles("test")
-@Transactional
-@ExtendWith(SpringExtension.class)
-class PracticeNoteRepositoryTest {
+@DisplayName("PracticeNoteRepository")
+class PracticeNoteRepositoryTest extends PracticeNoteTestSupport {
 
-    @Autowired
-    private ProblemRepository problemRepository;
-
-    @Autowired
-    private ProblemImageDataRepository problemImageDataRepository;
-
-    @Autowired
-    private PracticeNoteRepository practiceNoteRepository;
-
-    @Autowired
-    private ProblemPracticeNoteMappingRepository problemPracticeNoteMappingRepository;
-
-    @Autowired
-    private FolderRepository folderRepository;
-
-    @Autowired
-    private EntityManager em;
-
-    private final Long userId = 1L;
-
-    private List<Problem> problemList;
-
-    private List<PracticeNote> practiceNoteList;
+    private Long userId;
+    private Long otherUserId;
+    private List<Problem> problems;
 
     @BeforeEach
-    void setUp() {
-        Folder rootFolder = folderRepository.save(Folder.from(
-                new FolderRegisterDto(
-                        "rootFolder",
-                        null,
-                        null
-                ),
-                null,
-                1L
-        ));
+    void setUpFixtures() {
+        User user = fixtures.createUser();
+        User otherUser = fixtures.createOtherUser();
+        userId = user.getId();
+        otherUserId = otherUser.getId();
+        Folder folder = fixtures.createRootFolder(userId);
+        problems = saveProblems(userId, folder, 5);
+    }
 
-        /*
-        problem 0 ~ 3 -> practice 0번과 mapping
-        problem 4 ~ 7 -> practice 1번과 mapping
-        problem 8 ~ 11 -> practice 2번과 mapping
-         */
-        problemList = new ArrayList<>();
-        for (int i = 0; i < 12; i++) {
-            Problem problem = problemRepository.save(
-                    Problem.from(
-                            new ProblemRegisterDto(
-                                    null,
-                                    "memo" + i,
-                                    "reference" + i,
-                                    rootFolder.getId(),
-                                    LocalDateTime.now()
-                            ),
-                            userId
-                    )
-            );
-            problem.updateFolder(rootFolder);
+    @Nested
+    @DisplayName("사용자별 조회")
+    class FindByUser {
 
-            List<ProblemImageData> imageDataList = new ArrayList<>();
-            for (int j = 1; j <= 3; j++){
-                ProblemImageDataRegisterDto problemImageDataRegisterDto = new ProblemImageDataRegisterDto(
-                        (long) i,
-                        "http://example.com/problemId/" + i + "/image" + j,
-                        ProblemImageType.valueOf(j)
-                );
+        @Test
+        @DisplayName("본인의 복습노트만 조회된다")
+        void findAllByUserId() {
+            PracticeNote mine = savePracticeNote(userId, "내 복습", problems.subList(0, 2));
+            PracticeNote others = savePracticeNote(otherUserId, "남의 복습", List.of());
 
-                ProblemImageData imageData = ProblemImageData.from(problemImageDataRegisterDto);
-                imageData.updateProblem(problem);
-            }
-            problemImageDataRepository.saveAll(imageDataList);
-            problem.updateImageDataList(imageDataList);
-
-            problemList.add(problem);
+            assertThat(practiceNoteRepository.findAllByUserId(userId))
+                    .extracting(PracticeNote::getId)
+                    .containsExactly(mine.getId())
+                    .doesNotContain(others.getId());
         }
 
-        practiceNoteList = new ArrayList<>();
-        for(int i = 0; i < 3; i++){
-            List<Long> problemIdList = new ArrayList<>();
-            for(int j = 0; j < 4; j++){
-                problemIdList.add(problemList.get(i * 4 + j).getId());
-            }
-            PracticeNote practiceNote = practiceNoteRepository.save(
-                    PracticeNote.from(
-                            new PracticeNoteRegisterDto(
-                                    null,
-                                    "practiceNote" + i,
-                                    problemIdList,
-                                    new PracticeNotificationRegisterDto(1, 9, 0, "NONE", null)
-                            ),
-                            userId
-                    )
-            );
+        @Test
+        @DisplayName("본인의 복습노트 id 만 조회된다")
+        void findAllPracticeIdsByUserId() {
+            PracticeNote first = savePracticeNote(userId, "복습 1", List.of());
+            PracticeNote second = savePracticeNote(userId, "복습 2", List.of());
+            savePracticeNote(otherUserId, "남의 복습", List.of());
 
-
-            for(int j = 0; j < 4; j++){
-                ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from();
-                problemPracticeNoteMapping.addMappingToProblemAndPractice(problemList.get(i * 4 + j), practiceNote);
-                problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
-            }
-
-            practiceNoteList.add(practiceNote);
+            assertThat(practiceNoteRepository.findAllPracticeIdsByUserId(userId))
+                    .containsExactlyInAnyOrder(first.getId(), second.getId());
         }
 
-        // problem 0번에 대해서만 practiceNote 1, 2번과 추가 매핑
-        for(int i = 1; i < 3; i++) {
-            ProblemPracticeNoteMapping problemPracticeNoteMapping = ProblemPracticeNoteMapping.from();
-            problemPracticeNoteMapping.addMappingToProblemAndPractice(problemList.get(0), practiceNoteList.get(i));
+        @Test
+        @DisplayName("복습노트가 없으면 빈 결과를 준다")
+        void findAllByUserIdWithoutPracticeNotes() {
+            assertThat(practiceNoteRepository.findAllByUserId(otherUserId)).isEmpty();
+            assertThat(practiceNoteRepository.findAllPracticeIdsByUserId(otherUserId)).isEmpty();
+        }
 
-            problemPracticeNoteMappingRepository.save(problemPracticeNoteMapping);
+        @Test
+        @DisplayName("상세 조회는 문제 매핑까지 함께 가져오고 id 오름차순으로 준다")
+        void findAllUserPracticeNotesWithDetails() {
+            PracticeNote first = savePracticeNote(userId, "복습 1", problems.subList(0, 2));
+            PracticeNote second = savePracticeNote(userId, "복습 2", problems.subList(2, 5));
+            savePracticeNote(otherUserId, "남의 복습", List.of());
+
+            List<PracticeNote> practiceNotes = practiceNoteRepository.findAllUserPracticeNotesWithDetails(userId);
+
+            assertThat(practiceNotes)
+                    .extracting(PracticeNote::getId)
+                    .containsExactly(first.getId(), second.getId());
+            assertThat(practiceNotes.get(0).getProblemPracticeNoteMappingList())
+                    .as("fetch join 이라 트랜잭션 밖에서도 매핑에 접근할 수 있다")
+                    .hasSize(2);
+            assertThat(practiceNotes.get(1).getProblemPracticeNoteMappingList()).hasSize(3);
+        }
+
+        @Test
+        @DisplayName("단건 상세 조회도 매핑을 함께 가져온다")
+        void findPracticeNoteWithDetails() {
+            PracticeNote practiceNote = savePracticeNote(userId, "복습", problems.subList(0, 3));
+
+            assertThat(practiceNoteRepository.findPracticeNoteWithDetails(practiceNote.getId()))
+                    .isPresent()
+                    .hasValueSatisfying(found ->
+                            assertThat(found.getProblemPracticeNoteMappingList()).hasSize(3));
+            assertThat(practiceNoteRepository.findPracticeNoteWithDetails(nonExistentPracticeNoteId())).isEmpty();
         }
     }
 
-    @AfterEach
-    void tearDown() {
-        problemImageDataRepository.deleteAll();
-        problemRepository.deleteAll();
-        problemPracticeNoteMappingRepository.deleteAll();
-        practiceNoteRepository.deleteAll();
+    @Nested
+    @DisplayName("문제 매핑")
+    class ProblemMapping {
 
-        problemList.clear();
-        practiceNoteList.clear();
-    }
+        @Test
+        @DisplayName("복습노트에 이미 담긴 문제인지 확인한다")
+        void checkProblemAlreadyMatchingWithPractice() {
+            PracticeNote practiceNote = savePracticeNote(userId, "복습", problems.subList(0, 1));
 
-    @Test
-    @DisplayName("문제가 복습 노트에 존재하는지 체크 - 존재할 경우")
-    void checkProblemAlreadyMatchingWithPracticeTest_Exist() {
-        // given
-        Long practiceId = practiceNoteList.get(0).getId();
-        Long problemId = problemList.get(0).getId();
+            assertThat(practiceNoteRepository
+                    .checkProblemAlreadyMatchingWithPractice(practiceNote.getId(), problems.get(0).getId()))
+                    .isTrue();
+            assertThat(practiceNoteRepository
+                    .checkProblemAlreadyMatchingWithPractice(practiceNote.getId(), problems.get(1).getId()))
+                    .isFalse();
+        }
 
-        // when
-        boolean alreadyMatching = practiceNoteRepository.checkProblemAlreadyMatchingWithPractice(practiceId, problemId);
+        @Test
+        @DisplayName("문제 id 목록은 중복 없이 오름차순으로 나온다")
+        void findProblemIdListByPracticeNoteId() {
+            PracticeNote practiceNote = savePracticeNote(userId, "복습", problems.subList(0, 3));
 
-        // then
-        Assertions.assertTrue(alreadyMatching);
-    }
+            assertThat(practiceNoteRepository.findProblemIdListByPracticeNoteId(practiceNote.getId()))
+                    .containsExactlyElementsOf(problemIdsOf(problems.subList(0, 3)));
+        }
 
-    @Test
-    @DisplayName("문제가 복습 노트에 존재하는지 체크 - 존재하지 않을 경우")
-    void checkProblemAlreadyMatchingWithPracticeTest_NotExist() {
-        // given
-        Long practiceId = practiceNoteList.get(0).getId();
-        Long problemId = problemList.get(problemList.size() - 1).getId();
+        @Test
+        @DisplayName("문제가 없는 복습노트는 빈 목록을 준다")
+        void findProblemIdListForEmptyPracticeNote() {
+            PracticeNote practiceNote = savePracticeNote(userId, "복습", List.of());
 
-        // when
-        boolean alreadyMatching = practiceNoteRepository.checkProblemAlreadyMatchingWithPractice(practiceId, problemId);
+            assertThat(practiceNoteRepository.findProblemIdListByPracticeNoteId(practiceNote.getId())).isEmpty();
+        }
 
-        // then
-        Assertions.assertFalse(alreadyMatching);
-    }
+        @Test
+        @DisplayName("문제 id 와 복습노트 id 로 매핑 한 건을 찾는다")
+        void findMappingByProblemAndPracticeNote() {
+            PracticeNote practiceNote = savePracticeNote(userId, "복습", problems.subList(0, 1));
 
-    @Test
-    @DisplayName("복습 노트 상세 정보 조회")
-    void findPracticeNoteWithDetailsTest(){
-        // given
-        PracticeNote practiceNote = practiceNoteList.get(0);
-        Long practiceId = practiceNote.getId();
+            assertThat(problemPracticeNoteMappingRepository
+                    .findProblemPracticeNoteMappingByProblemIdAndPracticeNoteId(
+                            problems.get(0).getId(), practiceNote.getId()))
+                    .isPresent();
+            assertThat(problemPracticeNoteMappingRepository
+                    .findProblemPracticeNoteMappingByProblemIdAndPracticeNoteId(
+                            problems.get(1).getId(), practiceNote.getId()))
+                    .isEmpty();
+        }
 
-        // when
-        Optional<PracticeNote> optionalPracticeNote = practiceNoteRepository.findPracticeNoteWithDetails(practiceId);
-        assertThat(optionalPracticeNote.isPresent()).isTrue();
+        @Test
+        @DisplayName("복습노트별 문제 수를 집계한다")
+        void countProblemsByPracticeNoteIds() {
+            PracticeNote first = savePracticeNote(userId, "복습 1", problems.subList(0, 2));
+            PracticeNote second = savePracticeNote(userId, "복습 2", problems.subList(2, 5));
+            PracticeNote empty = savePracticeNote(userId, "빈 복습", List.of());
 
-        PracticeNote targetPracticeNote = optionalPracticeNote.get();
+            Map<Long, Long> counts = practiceNoteRepository
+                    .countProblemsByPracticeNoteIds(List.of(first.getId(), second.getId(), empty.getId())).stream()
+                    .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
 
-        // then
-        assertThat(practiceNote.getId()).isEqualTo(targetPracticeNote.getId());
-        assertThat(practiceNote.getTitle()).isEqualTo(targetPracticeNote.getTitle());
-        assertThat(practiceNote.getProblemPracticeNoteMappingList().size()).isEqualTo(4);
-        assertThat(practiceNote.getProblemPracticeNoteMappingList().size()).isEqualTo(targetPracticeNote.getProblemPracticeNoteMappingList().size());
-    }
-
-    @Test
-    @DisplayName("복습 노트 상세 정보 조회")
-    void findProblemIdListByPracticeNoteIdTest(){
-        // given
-        PracticeNote practiceNote = practiceNoteList.get(0);
-        Long practiceId = practiceNote.getId();
-
-        // when
-        List<Long> problemIdList = practiceNoteRepository.findProblemIdListByPracticeNoteId(practiceId);
-
-        // then
-        assertThat(practiceNote.getProblemPracticeNoteMappingList().size()).isEqualTo(4);
-        assertThat(practiceNote.getProblemPracticeNoteMappingList().size()).isEqualTo(problemIdList.size());
-        for(int i = 0; i< problemIdList.size(); i++){
-            assertThat(problemIdList).contains(problemList.get(i).getId());
+            assertThat(counts.get(first.getId())).isEqualTo(2L);
+            assertThat(counts.get(second.getId())).isEqualTo(3L);
+            assertThat(counts)
+                    .as("문제가 없는 복습노트는 집계에 포함되지 않는다")
+                    .doesNotContainKey(empty.getId());
         }
     }
 
-    @Test
-    @DisplayName("특정 문제를 특정 복습 노트에서 제거")
-    void deleteProblemFromPracticeTest(){
-        // given
-        PracticeNote practiceNote = practiceNoteList.get(0);
-        Long practiceId = practiceNote.getId();
-        Long problemId = problemList.get(0).getId();
+    @Nested
+    @DisplayName("매핑 삭제")
+    class DeleteMapping {
 
-        // when
-        assertThat(problemPracticeNoteMappingRepository.findProblemPracticeNoteMappingByProblemIdAndPracticeNoteId(problemId, practiceId)).isNotEmpty();
-        practiceNoteRepository.deleteProblemFromPractice(practiceId, problemId);
+        @Test
+        @DisplayName("특정 복습노트에서 문제 하나를 뺀다")
+        void deleteProblemFromPractice() {
+            PracticeNote first = savePracticeNote(userId, "복습 1", problems.subList(0, 2));
+            PracticeNote second = savePracticeNote(userId, "복습 2", problems.subList(0, 2));
 
-        // then
-        assertThat(problemPracticeNoteMappingRepository.findProblemPracticeNoteMappingByProblemIdAndPracticeNoteId(problemId, practiceId)).isEmpty();
+            inTransaction(() ->
+                    practiceNoteRepository.deleteProblemFromPractice(first.getId(), problems.get(0).getId()));
+
+            assertThat(practiceNoteRepository.findProblemIdListByPracticeNoteId(first.getId()))
+                    .containsExactly(problems.get(1).getId());
+            assertThat(practiceNoteRepository.findProblemIdListByPracticeNoteId(second.getId()))
+                    .as("다른 복습노트의 매핑은 그대로")
+                    .hasSize(2);
+        }
+
+        @Test
+        @DisplayName("모든 복습노트에서 문제 하나를 뺀다")
+        void deleteProblemFromAllPractice() {
+            PracticeNote first = savePracticeNote(userId, "복습 1", problems.subList(0, 2));
+            PracticeNote second = savePracticeNote(userId, "복습 2", problems.subList(0, 3));
+
+            inTransaction(() -> practiceNoteRepository.deleteProblemFromAllPractice(problems.get(0).getId()));
+
+            assertThat(practiceNoteRepository.findProblemIdListByPracticeNoteId(first.getId()))
+                    .containsExactly(problems.get(1).getId());
+            assertThat(practiceNoteRepository.findProblemIdListByPracticeNoteId(second.getId()))
+                    .containsExactlyElementsOf(problemIdsOf(problems.subList(1, 3)));
+        }
+
+        @Test
+        @DisplayName("여러 문제의 매핑을 한 번에 뺀다")
+        void deleteProblemsFromAllPractice() {
+            PracticeNote practiceNote = savePracticeNote(userId, "복습", problems.subList(0, 4));
+
+            inTransaction(() -> practiceNoteRepository.deleteProblemsFromAllPractice(
+                    List.of(problems.get(0).getId(), problems.get(2).getId())));
+
+            assertThat(practiceNoteRepository.findProblemIdListByPracticeNoteId(practiceNote.getId()))
+                    .containsExactly(problems.get(1).getId(), problems.get(3).getId());
+        }
+
+        @Test
+        @DisplayName("복습노트의 모든 매핑을 조회한다")
+        void findAllByPracticeNoteId() {
+            PracticeNote practiceNote = savePracticeNote(userId, "복습", problems.subList(0, 3));
+
+            assertThat(problemPracticeNoteMappingRepository.findAllByPracticeNoteId(practiceNote.getId()))
+                    .extracting(ProblemPracticeNoteMapping::getId)
+                    .hasSize(3);
+        }
     }
 
-    @Test
-    @DisplayName("해당 문제를 모두 복습 노트에서 제거")
-    void deleteProblemFromAllPracticeTest(){
-        // given
-        Long problemId = problemList.get(0).getId();
+    @Nested
+    @DisplayName("커서 기반 조회")
+    class CursorQuery {
 
-        // when
-        for(int i = 0; i< practiceNoteList.size(); i++){
-            assertThat(problemPracticeNoteMappingRepository.findProblemPracticeNoteMappingByProblemIdAndPracticeNoteId(problemId, practiceNoteList.get(i).getId())).isNotEmpty();
+        @Test
+        @DisplayName("문제가 여러 개 매핑돼 있어도 복습노트 단위로 페이지를 끊는다")
+        void findPracticeNotesByUserWithCursor() {
+            PracticeNote first = savePracticeNote(userId, "복습 1", problems.subList(0, 3));
+            PracticeNote second = savePracticeNote(userId, "복습 2", problems.subList(1, 4));
+            PracticeNote third = savePracticeNote(userId, "복습 3", problems.subList(2, 5));
+            savePracticeNote(otherUserId, "남의 복습", List.of());
+
+            List<PracticeNote> firstPage = practiceNoteRepository.findPracticeNotesByUserWithCursor(userId, null, 2);
+
+            assertThat(firstPage)
+                    .as("hasNext 판단을 위해 size + 1 개를 준다")
+                    .extracting(PracticeNote::getId)
+                    .containsExactly(first.getId(), second.getId(), third.getId());
+
+            List<PracticeNote> secondPage =
+                    practiceNoteRepository.findPracticeNotesByUserWithCursor(userId, second.getId(), 2);
+
+            assertThat(secondPage)
+                    .extracting(PracticeNote::getId)
+                    .containsExactly(third.getId());
         }
 
-        practiceNoteRepository.deleteProblemFromAllPractice(problemId);
+        @Test
+        @DisplayName("커서가 마지막 복습노트면 빈 결과를 준다")
+        void findPracticeNotesByUserWithCursorAtEnd() {
+            PracticeNote practiceNote = savePracticeNote(userId, "복습", List.of());
 
-        // then
-        for(int i = 0; i< practiceNoteList.size(); i++){
-            assertThat(problemPracticeNoteMappingRepository.findProblemPracticeNoteMappingByProblemIdAndPracticeNoteId(problemId, practiceNoteList.get(i).getId())).isEmpty();
+            assertThat(practiceNoteRepository.findPracticeNotesByUserWithCursor(userId, practiceNote.getId(), 10))
+                    .isEmpty();
         }
-
     }
 
-    @Test
-    @DisplayName("문제 리스트를 받아 해당 문제들을 모든 복습 노트에서 제거")
-    void deleteProblemsFromAllPracticeTest(){
-        // given
-        PracticeNote practiceNote = practiceNoteList.get(0);
-        Long practiceId = practiceNote.getId();
-        List<Long> problemIdList = new ArrayList<>();
-        for(int i = 0; i < practiceNote.getProblemPracticeNoteMappingList().size(); i++){
-            problemIdList.add(problemList.get(i).getId());
+    @Nested
+    @DisplayName("통계 집계")
+    class Statistics {
+
+        @Test
+        @DisplayName("기간 내 생성된 복습노트 수를 센다")
+        void countByCreatedAtBetween() {
+            savePracticeNote(userId, "복습 1", List.of());
+            savePracticeNote(otherUserId, "복습 2", List.of());
+
+            LocalDateTime from = LocalDate.now().minusDays(1).atStartOfDay();
+            LocalDateTime to = LocalDate.now().atTime(LocalTime.MAX);
+
+            assertThat(practiceNoteRepository.countByCreatedAtBetween(from, to)).isEqualTo(2L);
+            assertThat(practiceNoteRepository.countByCreatedAtBetween(
+                    from.minusDays(10), from.minusDays(9)))
+                    .isZero();
         }
 
-        // when
-        practiceNoteRepository.deleteProblemsFromAllPractice(problemIdList);
+        @Test
+        @DisplayName("일자별 생성 수를 집계한다")
+        void countDailyPracticeNotes() {
+            savePracticeNote(userId, "복습 1", List.of());
+            savePracticeNote(userId, "복습 2", List.of());
 
-        // then
-        for(int i = 0; i < problemIdList.size(); i++){
-            assertThat(problemPracticeNoteMappingRepository.findProblemPracticeNoteMappingByProblemIdAndPracticeNoteId(problemIdList.get(i), practiceId)).isEmpty();
+            List<Object[]> rows = practiceNoteRepository.countDailyPracticeNotes(
+                    LocalDate.now().minusDays(1).atStartOfDay(), LocalDate.now().atTime(LocalTime.MAX));
+
+            assertThat(rows).singleElement().satisfies(row -> assertThat((Long) row[1]).isEqualTo(2L));
         }
     }
 }

@@ -1,0 +1,17 @@
+{
+  "data": {
+    "equipped": {
+      "BACKGROUND": "bg_spring",
+      "BADGE": "badge_leaf_star",
+      "BAG": "back_backpack_navy",
+      "EFFECT": "effect_petals",
+      "FACE": "glasses_round",
+      "FRAME": "frame_spring",
+      "NECK": "scarf",
+      "OUTFIT": "outfit_cardigan"
+    },
+    "unequippedSlots": [
+      "HEAD"
+    ]
+  }
+}

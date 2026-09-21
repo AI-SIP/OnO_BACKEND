@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.common.aop;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.common.exception.HandledFailure;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterThrowing;
@@ -17,6 +18,14 @@ class LoggingAspect {
             throwing = "ex")
     public void logAfterThrowing(JoinPoint joinPoint, Throwable ex) {
         if (ex instanceof ApplicationException) {
+            return;
+        }
+
+        // 호출한 쪽이 이미 처리하는 실패는 여기서 error 로 올리지 않는다
+        if (ex instanceof HandledFailure) {
+            log.warn("Handled service failure - method: {}, reason: {}",
+                    joinPoint.getSignature().toShortString(),
+                    ex.getMessage());
             return;
         }
 

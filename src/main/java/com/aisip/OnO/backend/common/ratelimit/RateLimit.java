@@ -10,4 +10,7 @@ import java.lang.annotation.Target;
 public @interface RateLimit {
     String key();
     int limitPerDay() default 20;
+
+    /** 한도 초과 시 어떤 오류로 알릴지. 기본값을 두지 않아 붙일 때 반드시 고르게 한다. */
+    RateLimitScope scope();
 }

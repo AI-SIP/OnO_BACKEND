@@ -2,9 +2,11 @@ package com.aisip.OnO.backend.admin.controller;
 
 import com.aisip.OnO.backend.admin.dto.AdminStudyRoomDetailDto;
 import com.aisip.OnO.backend.admin.dto.AdminStudyRoomSummaryDto;
+import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoom;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomChallenge;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomMember;
+import com.aisip.OnO.backend.studyroom.exception.StudyRoomErrorCase;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomChallengeRepository;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomMemberRepository;
 import com.aisip.OnO.backend.studyroom.repository.StudyRoomRepository;
@@ -40,8 +42,14 @@ public class AdminStudyRoomController {
             @RequestParam(defaultValue = "20") int size,
             Model model
     ) {
+        // 쿼리 파라미터는 사용자 입력이다. page 가 음수이거나 size 가 0 이하면
+        // PageRequest.of 가 IllegalArgumentException 을 던져 관리자 화면이 500 이 됐다.
+        // 다른 관리자 목록 화면과 같은 방식으로 유효 범위에 맞춰 보정한다.
+        int selectedPage = Math.max(page, 0);
+        int selectedSize = Math.max(size, 1);
+
         Page<StudyRoom> pageResult = studyRoomRepository.findAll(
-                PageRequest.of(page, size, Sort.by("createdAt").descending()));
+                PageRequest.of(selectedPage, selectedSize, Sort.by("createdAt").descending()));
 
         List<Long> roomIds = pageResult.stream().map(StudyRoom::getId).toList();
 
@@ -60,12 +68,12 @@ public class AdminStudyRoomController {
 
         model.addAttribute("rooms", rooms);
         model.addAttribute("totalCount", pageResult.getTotalElements());
-        model.addAttribute("currentPage", page);
+        model.addAttribute("currentPage", selectedPage);
         model.addAttribute("totalPages", pageResult.getTotalPages());
-        model.addAttribute("size", size);
+        model.addAttribute("size", selectedSize);
 
         int blockSize = 10;
-        int blockStart = (page / blockSize) * blockSize;
+        int blockStart = (selectedPage / blockSize) * blockSize;
         int blockEnd = Math.min(blockStart + blockSize - 1, pageResult.getTotalPages() - 1);
         model.addAttribute("pageBlockStart", blockStart);
         model.addAttribute("pageBlockEnd", Math.max(blockEnd, blockStart));
@@ -77,8 +85,10 @@ public class AdminStudyRoomController {
 
     @GetMapping("/{id}")
     public String detail(@PathVariable Long id, Model model) {
+        // IllegalArgumentException 은 GlobalExceptionHandler 의 마지막 Exception 핸들러로 떨어져
+        // 500 + Discord 에러 알림이 됐다. 없는 리소스 조회는 404 다.
         StudyRoom room = studyRoomRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("스터디룸을 찾을 수 없습니다: " + id));
+                .orElseThrow(() -> new ApplicationException(StudyRoomErrorCase.STUDY_ROOM_NOT_FOUND));
 
         List<StudyRoomMember> members = studyRoomMemberRepository.findAllWithUserByRoomId(id);
         List<StudyRoomChallenge> challenges = studyRoomChallengeRepository.findAllByRoomIdOrderByEndAtAsc(id);

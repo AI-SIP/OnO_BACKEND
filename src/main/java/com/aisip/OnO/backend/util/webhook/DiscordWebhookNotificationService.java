@@ -19,6 +19,7 @@ public class DiscordWebhookNotificationService {
     private final DiscordWebhookProducer discordWebhookProducer;
     private final Map<String, Instant> lastSentAtByDedupKey = new ConcurrentHashMap<>();
     private static final Duration ERROR_NOTIFICATION_DEDUP_WINDOW = Duration.ofMinutes(5);
+    private static final int DEDUP_KEY_CAPACITY = 1000;
 
     /**
      * 에러 발생 시 Discord로 알림 전송
@@ -89,10 +90,28 @@ public class DiscordWebhookNotificationService {
      * RabbitMQ를 통해 Discord Webhook 메시지를 비동기 전송합니다.
      */
     private void publishToQueue(DiscordWebhookPayload payload, String dedupKey) {
-        discordWebhookProducer.send(payload, dedupKey);
-        if (dedupKey != null) {
-            lastSentAtByDedupKey.put(dedupKey, Instant.now());
+        try {
+            discordWebhookProducer.send(payload, dedupKey);
+            if (dedupKey != null) {
+                lastSentAtByDedupKey.put(dedupKey, Instant.now());
+                evictExpiredDedupKeysIfNeeded();
+            }
+        } catch (Exception e) {
+            // 이 서비스는 GlobalExceptionHandler 의 에러 처리 도중에도 호출된다.
+            // 여기서 예외가 새어 나가면 원래 에러 응답이 알림 실패로 덮여버리므로 삼킨다.
+            log.warn("Discord 알림 발행 실패 - reason: {}", e.getMessage());
         }
+    }
+
+    /**
+     * dedup 맵은 무한히 커질 수 있으므로 일정 크기를 넘으면 만료된 항목을 정리한다.
+     */
+    private void evictExpiredDedupKeysIfNeeded() {
+        if (lastSentAtByDedupKey.size() <= DEDUP_KEY_CAPACITY) {
+            return;
+        }
+        Instant threshold = Instant.now().minus(ERROR_NOTIFICATION_DEDUP_WINDOW);
+        lastSentAtByDedupKey.entrySet().removeIf(entry -> entry.getValue().isBefore(threshold));
     }
 
     private void publishToQueue(DiscordWebhookPayload payload) {

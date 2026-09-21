@@ -47,8 +47,13 @@ if grep -q '^/AGENTS\.md$' .gitignore; then
   error "AGENTS.md is ignored; shared agent guidance should be trackable"
 fi
 
+# src/test/resources/application-test.yml 은 예외다. CI 테스트가 이 파일로 Testcontainers 환경을 띄워서
+# 커밋해야 하고(ddf9c69), 값은 전부 테스트 전용 더미라 운영 설정과 겹치지 않는다.
+# 아래 secret_hits 검사는 이 파일에도 그대로 적용된다.
 tracked_secret_files="$(
-  git ls-files | grep -E '(^|/)(\.env(\..*)?|FirebaseAdminKey\.json|application(-(dev|prod|local|test))?\.ya?ml|application(-(dev|prod|local|test))?\.properties)$' || true
+  git ls-files \
+    | grep -E '(^|/)(\.env(\..*)?|FirebaseAdminKey\.json|application(-(dev|prod|local|test))?\.ya?ml|application(-(dev|prod|local|test))?\.properties)$' \
+    | grep -v -x 'src/test/resources/application-test\.yml' || true
 )"
 
 if [ -n "$tracked_secret_files" ]; then

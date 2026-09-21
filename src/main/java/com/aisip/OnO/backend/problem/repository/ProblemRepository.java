@@ -12,8 +12,14 @@ public interface ProblemRepository extends JpaRepository<Problem, Long>, Problem
 
     Long countByUserId(Long userId);
 
-    @Query("SELECT p FROM Problem p WHERE p.userId = :userId AND p.nextReviewAt <= :today ORDER BY p.nextReviewAt ASC")
-    List<Problem> findReviewDueProblems(@Param("userId") Long userId, @Param("today") LocalDate today);
+    @Query("""
+            SELECT new com.aisip.OnO.backend.problem.repository.ReviewDueProblemProjection(
+                p.id, p.memo, p.reference, p.nextReviewAt, p.reviewInterval, p.consecutiveCorrectCount)
+            FROM Problem p
+            WHERE p.userId = :userId AND p.nextReviewAt <= :today
+            ORDER BY p.nextReviewAt ASC
+            """)
+    List<ReviewDueProblemProjection> findReviewDueProblems(@Param("userId") Long userId, @Param("today") LocalDate today);
 
     @Query("SELECT p.userId as userId, COUNT(p) as dueCount FROM Problem p WHERE p.nextReviewAt <= :today GROUP BY p.userId")
     List<ReviewDueSummary> findReviewDueSummaryByDate(@Param("today") LocalDate today);

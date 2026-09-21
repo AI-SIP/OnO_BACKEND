@@ -1,0 +1,96 @@
+# 로컬 개발용 인프라 (MySQL / Redis / RabbitMQ).
+#
+# 그동안 MySQL만 컴포즈로 뜨고 Redis·RabbitMQ 는 docker run 으로 따로 띄워져 있었다.
+# 그래서 `docker compose ps` 에 셋이 같이 안 잡히고, 매번 `docker ps` 로 눈으로 확인해야 했다.
+# 셋을 한 파일로 묶고 전부 헬스체크를 달아 상태를 한 번에 볼 수 있게 한다.
+#
+# 포트는 application-local.yml 이 기대하는 값과 맞췄다 (MySQL 3306 / Redis 6380 / RabbitMQ 5673).
+# 비밀번호는 .env 에서 읽는다. .env 는 gitignore 되어 있고 이 파일에는 값을 적지 않는다.
+#
+#   make up       띄우기 (healthy 될 때까지 대기)
+#   make status   셋 다 살아있는지 한눈에
+#   make down     내리기 (데이터는 남는다)
+#
+# 주의: 이 파일은 프로젝트 이름을 따로 지정하지 않는다. 디렉터리명(backend)이 그대로
+# 프로젝트명이 되어야 기존 MySQL 볼륨 backend_mysql_data 를 그대로 이어받는다.
+# 테스트는 이 컨테이너들을 쓰지 않는다. Testcontainers 가 별도 컨테이너를 띄운다.
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: ono-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?".env 에 MYSQL_ROOT_PASSWORD 가 필요하다"}
+      MYSQL_DATABASE: ono_db
+      TZ: Asia/Seoul
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+09:00
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - ono-local
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: ono-redis
+    restart: unless-stopped
+    # 로컬 앱은 6380 을 본다. 컨테이너 안은 표준 6379 그대로 둔다.
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - ono-local
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: ono-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?".env 에 RABBITMQ_PASSWORD 가 필요하다"}
+      TZ: Asia/Seoul
+    ports:
+      - "5673:5672"    # AMQP
+      - "15673:15672"  # 관리 UI  http://localhost:15673
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - ono-local
+
+networks:
+  ono-local:
+    driver: bridge
+
+volumes:
+  # 기존에 쓰던 볼륨을 그대로 지정한다. 이름을 바꾸면 개발 DB 데이터가 사라진다.
+  mysql_data:
+    name: backend_mysql_data
+  redis_data:
+    name: ono_local_redis_data
+  rabbitmq_data:
+    name: ono_local_rabbitmq_data

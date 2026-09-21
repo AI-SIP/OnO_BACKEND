@@ -1,0 +1,64 @@
+package com.aisip.OnO.backend.common.web;
+
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.Optional;
+import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+/**
+ * 지금 처리 중인 HTTP 요청의 {@code X-App-Version} 헤더를 읽는다.
+ *
+ * <p>프론트가 모든 요청에 {@code 4.0.0+70} 꼴로 붙인다(AI-SIP/OnO_FRONT#214).
+ * <b>버전을 못 읽으면 프론트는 헤더를 아예 보내지 않는다.</b> 빈 문자열이나 {@code unknown} 은 오지 않는다.
+ *
+ * <p><b>왜 인자로 넘기지 않고 요청 스코프에서 꺼내는가.</b> 이 값이 필요한 곳은
+ * {@code MissionLogService.addPointToUser} 한 군데인데, 거기까지 가는 길이
+ * 컨트롤러 → {@code ProblemService}/{@code PracticeNoteService}/{@code ProblemSolveService} → 적립 으로
+ * 서너 단계다. 버전을 인자로 물려 내리면 그 경로의 메서드 시그니처가 전부 바뀌고, 적립과 아무 상관 없는
+ * 중간 호출부까지 버전을 들고 다녀야 한다. 읽는 곳이 하나뿐인 값 때문에 호출 경로 전체를 오염시킬 이유가 없다.
+ *
+ * <p><b>왜 필터나 인터셉터 + 요청 스코프 빈을 새로 두지 않는가.</b> {@code FrameworkServlet} 이 요청마다
+ * {@code RequestContextHolder} 를 채우고 끝나면 지운다. 헤더를 읽기만 하면 되는 일에 등록 순서와
+ * 생명주기를 가진 컴포넌트를 하나 더 얹을 이유가 없다. MockMvc 도 같은 경로를 타기 때문에
+ * 통합 테스트에서 실제 헤더가 서비스까지 닿는지 그대로 확인된다.
+ *
+ * <p><b>HTTP 요청이 없는 곳에서 불려도 터지지 않는다.</b> 요청이 없으면 예외를 던지는
+ * {@code currentRequestAttributes()} 대신 {@code getRequestAttributes()} 를 쓴다. 지금 적립을 부르는
+ * 경로는 전부 HTTP 요청 안이지만(Quartz 잡 5종과 RabbitMQ 소비자 4종 어디에서도 적립을 부르지 않는다),
+ * 나중에 배치나 비동기 경로가 하나 늘어도 조용히 "모르는 버전" 으로 떨어져야 한다.
+ * {@code @Async} 스레드처럼 요청 컨텍스트가 물려지지 않는 자리도 마찬가지다.
+ */
+@Component
+public class AppVersionResolver {
+
+    public static final String APP_VERSION_HEADER = "X-App-Version";
+
+    public Optional<AppVersion> resolve() {
+        RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
+        if (!(attributes instanceof ServletRequestAttributes servletAttributes)) {
+            return Optional.empty();
+        }
+
+        HttpServletRequest request = servletAttributes.getRequest();
+        return AppVersion.parse(request.getHeader(APP_VERSION_HEADER));
+    }
+
+    /**
+     * 이번 요청이 {@code rawThreshold} 와 같거나 높은 버전의 앱에서 왔는가.
+     *
+     * <p><b>모르면 아니라고 답한다.</b> 헤더가 없거나, 읽을 수 없는 값이거나, 애초에 HTTP 요청이 아닌
+     * 자리에서 불렸으면 전부 구버전으로 본다. 기준값을 읽지 못했을 때도 같다. 설정 오타 하나로
+     * 모든 요청이 갑자기 신버전 취급을 받는 것보다, 아무도 신버전이 아닌 쪽이 되돌리기 쉽다.
+     *
+     * <p>버전으로 동작을 가르는 곳이 늘어날 때 이 판정을 각자 들고 있으면 "모르면 구버전" 이라는
+     * 규칙이 곳곳에서 조금씩 달라진다. 비교만 여기에 두고, <b>기준 버전과 그래서 무엇이 달라지는가는
+     * 각 도메인이 정한다.</b> 그래야 한 도메인의 설정이 다른 도메인의 동작을 끌고 가지 않는다.
+     */
+    public boolean isAtLeast(String rawThreshold) {
+        return AppVersion.parse(rawThreshold)
+                .flatMap(threshold -> resolve().map(requested -> requested.isAtLeast(threshold)))
+                .orElse(false);
+    }
+}

@@ -6,7 +6,9 @@ import com.aisip.OnO.backend.common.ratelimit.RateLimitService;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import com.aisip.OnO.backend.config.rabbitmq.producer.ProblemAnalysisProducer;
+import com.aisip.OnO.backend.mission.entity.MissionMetric;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
+import com.aisip.OnO.backend.mission.service.MissionProgressUpdater;
 import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.ProblemAnalysis;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
@@ -28,6 +30,7 @@ import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.dto.ReviewDueResponseDto;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
+import com.aisip.OnO.backend.problem.repository.ReviewDueProblemProjection;
 import com.aisip.OnO.backend.practicenote.repository.PracticeNoteRepository;
 import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveRepository;
 import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveSummary;
@@ -38,6 +41,8 @@ import com.aisip.OnO.backend.tag.entity.Tag;
 import com.aisip.OnO.backend.tag.exception.TagErrorCase;
 import com.aisip.OnO.backend.tag.repository.ProblemTagMappingRepository;
 import com.aisip.OnO.backend.tag.repository.TagRepository;
+import com.aisip.OnO.backend.problem.event.ProblemCreatedEvent;
+import com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderService;
 import com.aisip.OnO.backend.util.redis.StreakCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,7 +53,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
@@ -67,6 +72,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class ProblemService {
     private static final String AI_ANALYSIS_RATE_LIMIT_KEY = "ai_analysis";
     private static final int AI_ANALYSIS_LIMIT_PER_DAY = 20;
+    private static final int MEMO_MAX_LENGTH = 1000;
 
     private final ProblemRepository problemRepository;
 
@@ -78,6 +84,8 @@ public class ProblemService {
     private final FileUploadService fileUploadService;
 
     private final MissionLogService missionLogService;
+
+    private final MissionProgressUpdater missionProgressUpdater;
 
     private final ProblemAnalysisService analysisService;
 
@@ -93,6 +101,7 @@ public class ProblemService {
     private final RateLimitService rateLimitService;
     private final StreakCacheService streakCacheService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ProblemReviewReminderService reminderService;
 
     @Transactional(readOnly = true)
     public ProblemResponseDto findProblemForAdmin(Long problemId) {
@@ -205,8 +214,15 @@ public class ProblemService {
 
     @Transactional
     public Long registerProblem(ProblemRegisterDto problemRegisterDto, Long userId) {
+        validateProblemContent(problemRegisterDto.memo(), problemRegisterDto.reference());
 
-        Folder folder = folderRepository.findById(problemRegisterDto.folderId())
+        // folderId 가 null 이면 findById(null) 이 InvalidDataAccessApiUsageException 을 던져 500 이 나간다.
+        // 입력 누락은 서버 오류가 아니므로 400 으로 거절한다.
+        if (problemRegisterDto.folderId() == null) {
+            throw new ApplicationException(ProblemErrorCase.PROBLEM_FOLDER_ID_REQUIRED);
+        }
+
+        Folder folder = folderRepository.findByIdForShare(problemRegisterDto.folderId())
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
         validateFolderOwner(folder, userId);
 
@@ -219,8 +235,12 @@ public class ProblemService {
         analysisService.createSkippedAnalysis(problem.getId());
         streakCacheService.evict(userId);
         missionLogService.registerProblemWriteMission(userId);
+        missionProgressUpdater.increase(userId, MissionMetric.PROBLEM_CREATED);
         eventPublisher.publishEvent(new StudyRoomActivityEvent(
                 userId, StudyRoomFeedEventType.PROBLEM_REGISTERED, Map.of("count", 1)));
+        eventPublisher.publishEvent(new ProblemCreatedEvent(userId, List.of(
+                new ProblemCreatedEvent.ProblemData(problem.getId(), problem.getMemo(), problem.getReference(), problem.getCreatedAt())
+        )));
 
         log.info("userId: {} register problemId: {}", userId, problem.getId());
 
@@ -233,6 +253,7 @@ public class ProblemService {
      */
     @Transactional
     public Long registerProblemV2(ProblemRegisterV2Dto problemRegisterV2Dto, Long userId) {
+        validateProblemContent(problemRegisterV2Dto.memo(), problemRegisterV2Dto.reference());
         Folder folder = resolveRegisterFolder(problemRegisterV2Dto.folderId(), userId);
 
         ProblemRegisterDto baseDto = new ProblemRegisterDto(
@@ -278,8 +299,12 @@ public class ProblemService {
         analysisService.createSkippedAnalysis(problem.getId());
         streakCacheService.evict(userId);
         missionLogService.registerProblemWriteMission(userId);
+        missionProgressUpdater.increase(userId, MissionMetric.PROBLEM_CREATED);
         eventPublisher.publishEvent(new StudyRoomActivityEvent(
                 userId, StudyRoomFeedEventType.PROBLEM_REGISTERED, Map.of("count", 1)));
+        eventPublisher.publishEvent(new ProblemCreatedEvent(userId, List.of(
+                new ProblemCreatedEvent.ProblemData(problem.getId(), problem.getMemo(), problem.getReference(), problem.getCreatedAt())
+        )));
 
         log.info("userId: {} register problem(v2) problemId: {}", userId, problem.getId());
         return problem.getId();
@@ -296,6 +321,7 @@ public class ProblemService {
         if (registerDtos == null || registerDtos.isEmpty()) {
             return List.of();
         }
+        registerDtos.forEach(dto -> validateProblemContent(dto.memo(), dto.reference()));
 
         Map<Long, Folder> foldersById = resolveRegisterFolders(registerDtos, userId);
         Folder rootFolder = registerDtos.stream().anyMatch(dto -> dto.folderId() == null)
@@ -342,12 +368,19 @@ public class ProblemService {
 
         streakCacheService.evict(userId);
         missionLogService.registerProblemWriteMissionBatch(userId, problems.size());
+        // 여러 장을 한 번에 등록하면 장수만큼 오른다. 기존 적립은 하루 3건에서 멈추지만 미션 진행도는 별개다.
+        missionProgressUpdater.increase(userId, MissionMetric.PROBLEM_CREATED, problems.size());
         eventPublisher.publishEvent(new StudyRoomActivityEvent(
                 userId, StudyRoomFeedEventType.PROBLEM_REGISTERED, Map.of("count", problems.size())));
 
         List<Long> problemIds = problems.stream()
                 .map(Problem::getId)
                 .toList();
+
+        eventPublisher.publishEvent(new ProblemCreatedEvent(userId, problems.stream()
+                .map(p -> new ProblemCreatedEvent.ProblemData(p.getId(), p.getMemo(), p.getReference(), p.getCreatedAt()))
+                .toList()));
+
         log.info("userId: {} register problems(v2 batch) problemIds: {}", userId, problemIds);
         return problemIds;
     }
@@ -357,7 +390,7 @@ public class ProblemService {
             return resolveRootFolder(userId);
         }
 
-        return folderRepository.findById(folderId)
+        return folderRepository.findByIdForShare(folderId)
                 .map(folder -> {
                     validateFolderOwner(folder, userId);
                     return folder;
@@ -380,7 +413,7 @@ public class ProblemService {
             return Map.of();
         }
 
-        Map<Long, Folder> foldersById = folderRepository.findAllById(folderIds).stream()
+        Map<Long, Folder> foldersById = folderRepository.findAllByIdInForShare(folderIds).stream()
                 .collect(Collectors.toMap(Folder::getId, folder -> folder));
         if (foldersById.size() != folderIds.size()) {
             throw new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND);
@@ -512,7 +545,8 @@ public class ProblemService {
         analysisProblemWithoutOwnerCheck(problemId, userId);
     }
 
-    @Transactional
+    // 호출자(analysisProblem)의 트랜잭션 안에서 실행된다.
+    // private 메서드에 @Transactional 을 붙여도 Spring 프록시가 가로채지 못해 아무 효과가 없다.
     private void analysisProblemWithoutOwnerCheck(Long problemId, Long userId) {
         // 이미 분석이 완료된 문제는 재요청하지 않음
         if (problemAnalysisRepository.findByProblemId(problemId)
@@ -555,11 +589,13 @@ public class ProblemService {
 
     @Transactional
     public void updateProblemInfo(ProblemRegisterDto problemRegisterDto, Long userId) {
+        validateProblemContent(problemRegisterDto.memo(), problemRegisterDto.reference());
 
         Problem problem = findProblemEntity(problemRegisterDto.problemId(), userId);
 
         problem.updateProblem(problemRegisterDto);
         syncProblemTags(problem, userId, problemRegisterDto.tagIds());
+        reminderService.refreshSnapshot(problem.getId(), problem.getMemo(), problem.getReference());
 
         log.info("userId: {} update problemId: {}", userId, problem.getId());
     }
@@ -569,7 +605,7 @@ public class ProblemService {
         Problem problem = findProblemEntity(problemRegisterDto.problemId(), userId);
 
         if (problemRegisterDto.folderId() != null) {
-            Folder folder = folderRepository.findById(problemRegisterDto.folderId())
+            Folder folder = folderRepository.findByIdForShare(problemRegisterDto.folderId())
                     .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
             validateFolderOwner(folder, userId);
 
@@ -684,7 +720,7 @@ public class ProblemService {
      * - S3 파일 삭제: 비동기 (RabbitMQ Producer로 전송)
      * - PracticeNote 매핑 삭제: 동기 (데이터 정합성)
      */
-    @Transactional
+    // 호출자(deleteProblem / deleteFolderProblems / deleteAllUserProblems)의 트랜잭션 안에서 실행된다.
     private void deleteProblemWithoutOwnerCheck(Long problemId) {
         // 1. 이미지 데이터 조회
         List<ProblemImageData> imageDataList = problemImageDataRepository.findAllByProblemId(problemId);
@@ -702,12 +738,15 @@ public class ProblemService {
         // 4. PracticeNote 매핑 삭제 (동기 - 데이터 정합성 보장)
         practiceNoteRepository.deleteProblemFromAllPractice(problemId);
 
-        // 5. 문제 삭제 (Soft Delete)
+        // 5. 미발송 알림 예약 취소
+        reminderService.cancelPendingByProblem(problemId);
+
+        // 6. 문제 삭제 (Soft Delete)
         problemRepository.deleteById(problemId);
 
         log.info("problemId: {} DB 삭제 완료", problemId);
 
-        // 6. S3 파일 삭제는 비동기로 처리 (RabbitMQ Producer)
+        // 7. S3 파일 삭제는 비동기로 처리 (RabbitMQ Producer)
         imageDataList.forEach(imageData -> {
             try {
                 s3DeleteProducer.sendDeleteMessage(imageData.getImageUrl(), problemId);
@@ -744,7 +783,7 @@ public class ProblemService {
         problemIdList.forEach(problemId -> deleteProblem(problemId, userId));
     }
 
-    @Transactional
+    // 호출자(deleteAllByFolderIds)의 트랜잭션 안에서 실행된다.
     private void deleteFolderProblems(Long folderId) {
         problemRepository.findAllByFolderId(folderId)
                 .forEach(problem -> {
@@ -888,6 +927,19 @@ public class ProblemService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 컬럼 길이를 넘는 입력은 DB에서 Data truncation 으로 500 이 나므로 저장 전에 400 으로 거절한다.
+     */
+    private void validateProblemContent(String memo, String reference) {
+        if (memo != null && memo.length() > Problem.MEMO_MAX_LENGTH) {
+            throw new ApplicationException(ProblemErrorCase.PROBLEM_MEMO_TOO_LONG);
+        }
+
+        if (reference != null && reference.length() > Problem.REFERENCE_MAX_LENGTH) {
+            throw new ApplicationException(ProblemErrorCase.PROBLEM_REFERENCE_TOO_LONG);
+        }
+    }
+
     private void validateFolderOwner(Long folderId, Long userId) {
         Folder folder = folderRepository.findById(folderId)
                 .orElseThrow(() -> new ApplicationException(FolderErrorCase.FOLDER_NOT_FOUND));
@@ -900,23 +952,28 @@ public class ProblemService {
         }
     }
 
+    /**
+     * 오늘 복습 대상 문제 조회.
+     *
+     * <p>엔티티를 그대로 조회하면 {@code Problem.problemAnalysis} 가 mappedBy OneToOne 이라
+     * 행마다 존재 여부 확인 쿼리가 한 번씩 더 나간다(N+1). 응답에 필요한 값은 스칼라뿐이므로
+     * 프로젝션으로 한 번에 읽는다.
+     */
     @Transactional(readOnly = true)
     public ReviewDueResponseDto getReviewDueProblems(Long userId) {
         LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
-        List<Problem> dueProblems = problemRepository.findReviewDueProblems(userId, today);
+        List<ReviewDueProblemProjection> dueProblems = problemRepository.findReviewDueProblems(userId, today);
 
         long overdueCount = dueProblems.stream()
-                .filter(p -> p.getNextReviewAt().isBefore(today))
+                .filter(p -> p.nextReviewAt().isBefore(today))
                 .count();
-
-        List<ReviewDueResponseDto.ReviewDueProblemDto> problemDtos = dueProblems.stream()
-                .map(ReviewDueResponseDto.ReviewDueProblemDto::from)
-                .collect(Collectors.toList());
 
         return ReviewDueResponseDto.builder()
                 .dueCount(dueProblems.size())
                 .overdueCount(overdueCount)
-                .problems(problemDtos)
+                .problems(dueProblems.stream()
+                        .map(ReviewDueResponseDto.ReviewDueProblemDto::from)
+                        .toList())
                 .build();
     }
 }

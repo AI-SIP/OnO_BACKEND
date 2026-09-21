@@ -3,7 +3,6 @@ package com.aisip.OnO.backend.problemsolve.dto;
 import com.aisip.OnO.backend.problemsolve.entity.AnswerStatus;
 import com.aisip.OnO.backend.problemsolve.entity.ImprovementType;
 import com.aisip.OnO.backend.problemsolve.entity.ProblemSolve;
-import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Builder;
@@ -18,17 +17,15 @@ public record ProblemSolveResponseDto(
         Long problemSolveId,
         Long problemId,
         Long userId,
-        @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
         LocalDateTime practicedAt,
         AnswerStatus answerStatus,
         String reflection,
         List<ImprovementType> improvements,
         Integer timeSpentSeconds,
+        String moodEmojiKey,
         Boolean migratedFromLegacy,
         List<String> imageUrls,
-        @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
         LocalDateTime createdAt,
-        @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
         LocalDateTime updatedAt
 ) {
     private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -56,6 +53,7 @@ public record ProblemSolveResponseDto(
                 .reflection(problemSolve.getReflection())
                 .improvements(improvementList)
                 .timeSpentSeconds(problemSolve.getTimeSpentSeconds())
+                .moodEmojiKey(problemSolve.getMoodEmojiKey())
                 .migratedFromLegacy(problemSolve.getMigratedFromLegacy())
                 .imageUrls(problemSolve.getImages().stream()
                         .sorted((i1, i2) -> i1.getImageOrder().compareTo(i2.getImageOrder()))
