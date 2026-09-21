@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<!--/* 관리자 화면 공통 조각. 각 화면은 head, sidebar, scripts, pager 를 가져다 쓴다. */-->
+
+<head th:fragment="head(title)">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title th:text="${title} + ' | OnO 관리자'">OnO 관리자</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" th:href="@{/css/admin.css}">
+</head>
+
+<aside th:fragment="sidebar(active)" class="sidebar">
+  <a class="brand" th:href="@{/admin/main}">
+    <span class="brand-mark">On<b>O</b></span>
+    <span class="brand-sub">관리자</span>
+  </a>
+  <nav class="nav">
+    <div class="nav-group">
+      <div class="nav-label">한눈에 보기</div>
+      <a th:href="@{/admin/main}" th:classappend="${active == 'home'} ? 'active'">홈</a>
+      <a th:href="@{/admin/analysis}" th:classappend="${active == 'analysis'} ? 'active'">통계</a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">사용자</div>
+      <a th:href="@{/admin/users}" th:classappend="${active == 'users'} ? 'active'">유저</a>
+      <a th:href="@{/admin/feedbacks}" th:classappend="${active == 'feedbacks'} ? 'active'">피드백</a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">학습 기록</div>
+      <a th:href="@{/admin/problems}" th:classappend="${active == 'problems'} ? 'active'">오답노트</a>
+      <a th:href="@{/admin/practice-logs}" th:classappend="${active == 'solves'} ? 'active'">복습 기록</a>
+      <a th:href="@{/admin/practice-notes}" th:classappend="${active == 'notes'} ? 'active'">복습노트</a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">함께 공부</div>
+      <a th:href="@{/admin/study-rooms}" th:classappend="${active == 'rooms'} ? 'active'">스터디룸</a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">성장</div>
+      <a th:href="@{/admin/missions}" th:classappend="${active == 'missions'} ? 'active'">미션</a>
+      <a th:href="@{/admin/achievements}" th:classappend="${active == 'achievements'} ? 'active'">업적</a>
+      <a th:href="@{/admin/cosmetics}" th:classappend="${active == 'cosmetics'} ? 'active'">치장</a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">운영</div>
+      <a th:href="@{/admin/notice}" th:classappend="${active == 'notice'} ? 'active'">공지</a>
+    </div>
+  </nav>
+  <div class="sidebar-foot">
+    <form th:action="@{/logout}" method="post">
+      <button type="submit" class="logout">로그아웃</button>
+    </form>
+  </div>
+</aside>
+
+<th:block th:fragment="scripts">
+  <script th:src="@{/js/admin.js}"></script>
+</th:block>
+
+<!--/* 목록 아래 페이지 이동. pager 는 AdminPager 이고, 링크에는 지금 걸린 필터가 그대로 들어 있다. */-->
+<div th:fragment="pager(pager)" class="pager" th:if="${pager != null}">
+  <span class="pager-info num" th:if="${pager.totalElements() > 0}"
+        th:text="|${#numbers.formatInteger(pager.startItem(), 1, 'COMMA')}–${#numbers.formatInteger(pager.endItem(), 1, 'COMMA')} / 총 ${#numbers.formatInteger(pager.totalElements(), 1, 'COMMA')}개|">1–20 / 총 100개</span>
+  <span class="pager-info" th:if="${pager.totalElements() == 0}">결과가 없어요</span>
+  <div class="pager-pages" th:if="${pager.totalPages() > 1}">
+    <a th:if="${pager.previousUrl() != null}" th:href="${pager.previousUrl()}" aria-label="이전">‹</a>
+    <span th:if="${pager.previousUrl() == null}" class="off">‹</span>
+    <th:block th:each="link : ${pager.links()}">
+      <span th:if="${link.current()}" class="on" th:text="${link.number()}">1</span>
+      <a th:unless="${link.current()}" th:href="${link.url()}" th:text="${link.number()}">2</a>
+    </th:block>
+    <a th:if="${pager.nextUrl() != null}" th:href="${pager.nextUrl()}" aria-label="다음">›</a>
+    <span th:if="${pager.nextUrl() == null}" class="off">›</span>
+  </div>
+</div>
+
+</html>

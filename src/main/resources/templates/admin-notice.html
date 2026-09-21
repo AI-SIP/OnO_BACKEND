@@ -1,121 +1,113 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OnO 관리자 - 공지 관리</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
-  <nav class="bg-white shadow-lg">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between h-16">
-        <div class="flex items-center">
-          <h1 class="text-2xl font-bold text-indigo-600">OnO 관리자</h1>
-        </div>
-        <div class="flex items-center space-x-4">
-          <a th:href="@{/admin/main}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-            대시보드
-          </a>
-          <form th:action="@{/logout}" method="post">
-            <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-150">
-              로그아웃
-            </button>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/admin-layout :: head('공지')}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{fragments/admin-layout :: sidebar('notice')}"></aside>
+  <main class="main" data-reveal>
+    <div class="page-head">
+      <div>
+        <h1>공지</h1>
+        <p class="desc">앱을 켠 모든 유저에게 팝업으로 보여요. 한 번에 하나만 걸 수 있어요.</p>
+      </div>
+    </div>
+
+    <div>
+      <div class="notice-box ok" th:if="${resultMessage}" th:text="${resultMessage}">등록했어요</div>
+      <div class="notice-box err" th:if="${errorMessage}" th:text="${errorMessage}">오류</div>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <h2 class="card-title">지금 걸려 있는 공지</h2>
+        <div th:if="${activeNotice == null}" class="empty" style="padding: 36px 0;">걸려 있는 공지가 없어요.</div>
+        <div th:if="${activeNotice != null}">
+          <div class="gap-8">
+            <span class="chip" th:classappend="${activeNotice.type().name() == 'WARNING'} ? 'orange' : 'blue'"
+                  th:text="${activeNotice.type().name() == 'WARNING'} ? '주의' : '안내'">안내</span>
+            <span class="small muted num" th:text="|${#temporals.format(activeNotice.expiresAt(), 'M월 d일 HH:mm')}까지|">까지</span>
+          </div>
+          <h3 style="margin: 14px 0 8px; font-size: 18px;" th:text="${activeNotice.title()}">제목</h3>
+          <div class="quote" th:text="${activeNotice.content()}">내용</div>
+          <form id="removeForm" th:action="@{/admin/notice/{id}/delete(id=${activeNotice.noticeId()})}" method="post" class="mt-20">
+            <button type="button" class="btn danger" onclick="OnoAdmin.openModal('removeModal')">지금 내리기</button>
           </form>
         </div>
       </div>
-    </div>
-  </nav>
 
-  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-    <div class="mb-8">
-      <h2 class="text-3xl font-bold text-gray-900 mb-2">공지 관리</h2>
-      <p class="text-gray-600">등록한 공지는 유저가 앱 메인에 들어올 때 팝업으로 보입니다. 동시에 한 건만 노출됩니다.</p>
-    </div>
-
-    <div th:if="${resultMessage}" class="mb-6 p-4 rounded-md bg-green-50 border border-green-200 text-green-800 text-sm"
-         th:text="${resultMessage}"></div>
-    <div th:if="${errorMessage}" class="mb-6 p-4 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm"
-         th:text="${errorMessage}"></div>
-
-    <!-- 지금 걸려 있는 공지 -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-8 border-l-4 border-indigo-500">
-      <h3 class="text-xl font-semibold text-gray-800 mb-4">현재 노출 중인 공지</h3>
-
-      <div th:if="${activeNotice == null}" class="text-gray-500 text-sm">
-        지금 노출 중인 공지가 없습니다.
-      </div>
-
-      <div th:if="${activeNotice != null}">
-        <dl class="space-y-3 mb-5">
-          <div class="flex">
-            <dt class="w-24 text-sm font-medium text-gray-500">제목</dt>
-            <dd class="text-sm text-gray-900" th:text="${activeNotice.title()}"></dd>
+      <div class="card">
+        <h2 class="card-title">새 공지 <small>걸려 있는 공지는 자동으로 내려가요</small></h2>
+        <form id="noticeForm" th:action="@{/admin/notice}" method="post" style="display: flex; flex-direction: column; gap: 16px;">
+          <div class="field">
+            <label for="title">제목</label>
+            <input class="input" type="text" id="title" name="title" maxlength="100" required placeholder="최대 100자">
           </div>
-          <div class="flex">
-            <dt class="w-24 text-sm font-medium text-gray-500">내용</dt>
-            <dd class="text-sm text-gray-900 whitespace-pre-line" th:text="${activeNotice.content()}"></dd>
+          <div class="field">
+            <label for="content">내용</label>
+            <textarea class="textarea" id="content" name="content" maxlength="500" required placeholder="최대 500자"></textarea>
           </div>
-          <div class="flex">
-            <dt class="w-24 text-sm font-medium text-gray-500">유형</dt>
-            <dd class="text-sm text-gray-900" th:text="${activeNotice.type()}"></dd>
+          <div class="grid grid-2">
+            <div class="field">
+              <label for="type">유형</label>
+              <select class="select" id="type" name="type">
+                <option th:each="noticeType : ${noticeTypes}" th:value="${noticeType}"
+                        th:text="${noticeType.name() == 'WARNING'} ? '주의 (점검, 장애)' : '안내'">안내</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="durationHours">노출 시간</label>
+              <input class="input" type="number" id="durationHours" name="durationHours" min="1" max="168" value="24">
+            </div>
           </div>
-          <div class="flex">
-            <dt class="w-24 text-sm font-medium text-gray-500">노출 종료</dt>
-            <dd class="text-sm text-gray-900"
-                th:text="${#temporals.format(activeNotice.expiresAt(), 'yyyy-MM-dd HH:mm')}"></dd>
+          <div>
+            <button type="submit" class="btn primary">공지 걸기</button>
           </div>
-        </dl>
-
-        <form th:action="@{/admin/notice/{id}/delete(id=${activeNotice.noticeId()})}" method="post">
-          <button type="submit"
-                  class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-150">
-            지금 내리기
-          </button>
         </form>
       </div>
     </div>
+  </main>
+</div>
 
-    <!-- 새 공지 등록 -->
-    <div class="bg-white rounded-lg shadow-md p-6">
-      <h3 class="text-xl font-semibold text-gray-800 mb-1">새 공지 등록</h3>
-      <p class="text-sm text-gray-500 mb-5">이미 노출 중인 공지가 있으면 자동으로 내려가고 새 공지로 바뀝니다.</p>
-
-      <form th:action="@{/admin/notice}" method="post" class="space-y-5">
-        <div>
-          <label for="title" class="block text-sm font-medium text-gray-700 mb-1">제목 (최대 100자)</label>
-          <input type="text" id="title" name="title" maxlength="100" required
-                 class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-indigo-500 focus:border-indigo-500">
-        </div>
-
-        <div>
-          <label for="content" class="block text-sm font-medium text-gray-700 mb-1">내용 (최대 500자)</label>
-          <textarea id="content" name="content" rows="5" maxlength="500" required
-                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-indigo-500 focus:border-indigo-500"></textarea>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          <div>
-            <label for="type" class="block text-sm font-medium text-gray-700 mb-1">유형</label>
-            <select id="type" name="type"
-                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-indigo-500 focus:border-indigo-500">
-              <option th:each="noticeType : ${noticeTypes}" th:value="${noticeType}" th:text="${noticeType}"></option>
-            </select>
-          </div>
-
-          <div>
-            <label for="durationHours" class="block text-sm font-medium text-gray-700 mb-1">노출 시간 (1~168시간)</label>
-            <input type="number" id="durationHours" name="durationHours" min="1" max="168" value="24"
-                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-indigo-500 focus:border-indigo-500">
-          </div>
-        </div>
-
-        <button type="submit"
-                class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-md text-sm font-medium transition duration-150">
-          공지 등록
-        </button>
-      </form>
+<div class="modal" id="publishModal" onclick="if (event.target === this) OnoAdmin.closeModal('publishModal')">
+  <div class="modal-sheet">
+    <h3>이 공지를 모든 유저에게 보여줄까요?</h3>
+    <p class="muted small" id="publishSummary" style="margin: -8px 0 0;"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn" onclick="OnoAdmin.closeModal('publishModal')">취소</button>
+      <button type="button" class="btn primary" id="publishConfirm">공지 걸기</button>
     </div>
   </div>
+</div>
+
+<div class="modal" id="removeModal" onclick="if (event.target === this) OnoAdmin.closeModal('removeModal')">
+  <div class="modal-sheet">
+    <h3>공지를 지금 내릴까요?</h3>
+    <div class="modal-actions">
+      <button type="button" class="btn" onclick="OnoAdmin.closeModal('removeModal')">취소</button>
+      <button type="button" class="btn danger" onclick="document.getElementById('removeForm').submit()">내리기</button>
+    </div>
+  </div>
+</div>
+
+<th:block th:replace="~{fragments/admin-layout :: scripts}"></th:block>
+<script>
+  // 공지는 실사용자 전원에게 바로 뜨므로 한 번 더 확인받는다.
+  (function () {
+    var form = document.getElementById('noticeForm');
+    var confirmed = false;
+    form.addEventListener('submit', function (e) {
+      if (confirmed) return;
+      e.preventDefault();
+      var hours = document.getElementById('durationHours').value || '24';
+      document.getElementById('publishSummary').textContent =
+        '"' + document.getElementById('title').value + '" · ' + hours + '시간 동안 노출돼요';
+      OnoAdmin.openModal('publishModal');
+    });
+    document.getElementById('publishConfirm').addEventListener('click', function () {
+      confirmed = true;
+      form.requestSubmit();
+    });
+  })();
+</script>
 </body>
 </html>
