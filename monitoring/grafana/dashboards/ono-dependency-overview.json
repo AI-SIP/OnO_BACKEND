@@ -211,9 +211,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "red", "value": null},
-              {"color": "orange", "value": 0.6},
-              {"color": "green", "value": 0.9}
+              {"color": "blue", "value": null}
             ]
           },
           "unit": "percentunit"
@@ -243,6 +241,7 @@
           "refId": "A"
         }
       ],
+      "description": "Redis 조회 중 키가 있었던 비율. 인증이 필요한 요청마다 로그아웃 토큰 블랙리스트와 탈퇴 사용자 블랙리스트를 조회하는데(RedisTokenService.isBlacklisted, isUserBlacklisted), 두 키 모두 대부분 없는 것이 정상이라 이 값은 낮게 나온다. 낮다고 장애가 아니라서 경고색을 두지 않는다.",
       "title": "Redis Hit Ratio",
       "type": "stat"
     },
@@ -298,20 +297,21 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rabbitmq_queue_messages_ready{job=~\"$rabbit_job\"})",
-          "legendFormat": "Ready",
+          "expr": "sum by (queue) (rabbitmq_detailed_queue_messages_ready{job=~\"$rabbit_job\"})",
+          "legendFormat": "{{queue}} ready",
           "range": true,
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "sum(rabbitmq_queue_messages_unacked{job=~\"$rabbit_job\"})",
-          "legendFormat": "Unacked",
+          "expr": "sum by (queue) (rabbitmq_detailed_queue_messages_unacked{job=~\"$rabbit_job\"})",
+          "legendFormat": "{{queue}} unacked",
           "range": true,
           "refId": "B"
         }
       ],
-      "title": "RabbitMQ Queue Depth",
+      "description": "큐별로 처리 대기(ready)와 처리 중(unacked) 메시지 수. ready 가 계속 늘면 컨슈머가 못 따라가거나 멈춘 것이다.",
+      "title": "RabbitMQ 큐 적체",
       "type": "timeseries"
     },
     {
@@ -332,20 +332,21 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rabbitmq_queue_consumers{job=~\"$rabbit_job\"})",
-          "legendFormat": "Consumers",
+          "expr": "sum by (queue) (rabbitmq_detailed_queue_consumers{job=~\"$rabbit_job\"})",
+          "legendFormat": "{{queue}} consumers",
           "range": true,
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "sum(rabbitmq_up{job=~\"$rabbit_job\"})",
-          "legendFormat": "Exporter Up",
+          "expr": "sum(up{job=~\"$rabbit_job\"})",
+          "legendFormat": "scrape up",
           "range": true,
           "refId": "B"
         }
       ],
-      "title": "RabbitMQ Consumers & Up",
+      "description": "큐별 컨슈머 수. 0 이 된 큐는 메시지를 아무도 처리하지 않는다. scrape up 이 0 이면 RabbitMQ 지표 자체를 못 가져오는 것이다.",
+      "title": "RabbitMQ 큐별 컨슈머",
       "type": "timeseries"
     },
     {
@@ -364,6 +365,10 @@
               {"color": "green", "value": 0.99}
             ]
           },
+          "mappings": [
+            {"type": "special", "options": {"match": "null", "result": {"text": "최근 1시간 호출 없음", "color": "#808080", "index": 0}}}
+          ],
+          "noValue": "최근 1시간 호출 없음",
           "unit": "percentunit"
         },
         "overrides": []
@@ -385,13 +390,14 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(ono_external_requests_seconds_count{job=~\"$backend_job\",dependency=~\"$dependency\",outcome=\"success\"}[5m])) / clamp_min(sum(rate(ono_external_requests_seconds_count{job=~\"$backend_job\",dependency=~\"$dependency\"}[5m])), 1e-9)",
+          "expr": "sum(increase(ono_external_requests_seconds_count{job=~\"$backend_job\",dependency=~\"$dependency\",outcome=\"success\"}[1h])) / (sum(increase(ono_external_requests_seconds_count{job=~\"$backend_job\",dependency=~\"$dependency\"}[1h])) > 0)",
           "legendFormat": "Success Rate",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "External Dependency Success Rate",
+      "description": "최근 1시간 외부 API(OpenAI, S3 등) 호출 성공률. 호출이 없으면 0% 대신 호출 없음으로 표시한다.",
+      "title": "외부 API 성공률 (1h)",
       "type": "stat"
     },
     {
@@ -412,13 +418,13 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(ono_external_requests_seconds_bucket{job=~\"$backend_job\",dependency=~\"$dependency\"}[5m])) by (le, dependency))",
+          "expr": "histogram_quantile(0.95, sum(rate(ono_external_requests_seconds_bucket{job=~\"$backend_job\",dependency=~\"$dependency\"}[1h])) by (le, dependency))",
           "legendFormat": "{{dependency}} p95",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "External Dependency Latency p95",
+      "title": "외부 API p95 응답시간 (1h)",
       "type": "timeseries"
     },
     {
@@ -449,7 +455,7 @@
       "type": "timeseries"
     }
   ],
-  "refresh": "10s",
+  "refresh": "1m",
   "schemaVersion": 39,
   "style": "dark",
   "tags": ["ono", "dependencies", "infra"],

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<!--/* 학습 기록 화면(오답노트, 복습 기록, 복습노트)이 같이 쓰는 표시 조각. */-->
+
+<!--/* AI 분석 상태. 분석 행이 아예 없으면 status 가 null 이다. */-->
+<th:block th:fragment="analysisChip(status)" th:switch="${status}">
+  <span th:case="'COMPLETED'" class="chip green">분석 완료</span>
+  <span th:case="'FAILED'" class="chip red">분석 실패</span>
+  <span th:case="'PROCESSING'" class="chip blue">분석 중</span>
+  <span th:case="'RATE_LIMIT_EXCEEDED'" class="chip orange">요청 제한</span>
+  <span th:case="'NOT_STARTED'" class="chip">분석 대기</span>
+  <span th:case="'NO_IMAGE'" class="chip">이미지 없음</span>
+  <span th:case="*" class="chip">분석 없음</span>
+</th:block>
+
+<!--/* 분석 상태 이름. 필터 칩과 select 에 쓴다. */-->
+<th:block th:fragment="analysisLabel(status)" th:switch="${status}">
+  <th:block th:case="'COMPLETED'">분석 완료</th:block>
+  <th:block th:case="'FAILED'">분석 실패</th:block>
+  <th:block th:case="'PROCESSING'">분석 중</th:block>
+  <th:block th:case="'RATE_LIMIT_EXCEEDED'">요청 제한</th:block>
+  <th:block th:case="'NOT_STARTED'">분석 대기</th:block>
+  <th:block th:case="'NO_IMAGE'">이미지 없음</th:block>
+  <th:block th:case="*" th:text="${status}">상태</th:block>
+</th:block>
+
+<!--/* 복습 결과. UNKNOWN 은 결과를 남기지 않던 예전 기록을 옮겨 온 것이다. */-->
+<th:block th:fragment="answerChip(status)" th:switch="${status}">
+  <span th:case="'CORRECT'" class="chip green">정답</span>
+  <span th:case="'WRONG'" class="chip red">오답</span>
+  <span th:case="'PARTIAL'" class="chip orange">부분 정답</span>
+  <span th:case="'UNKNOWN'" class="chip">결과 없음</span>
+  <span th:case="*" class="muted">-</span>
+</th:block>
+
+<th:block th:fragment="answerLabel(status)" th:switch="${status}">
+  <th:block th:case="'CORRECT'">정답</th:block>
+  <th:block th:case="'WRONG'">오답</th:block>
+  <th:block th:case="'PARTIAL'">부분 정답</th:block>
+  <th:block th:case="'UNKNOWN'">결과 없음</th:block>
+  <th:block th:case="*" th:text="${status}">상태</th:block>
+</th:block>
+
+<!--/* 작성자 칸. 유저 상세로 이동한다. */-->
+<th:block th:fragment="who(userId, name, email)">
+  <a th:if="${userId != null}" class="who" th:href="@{/admin/user/{id}(id=${userId})}">
+    <b th:text="${name ?: '이름 없음'}">이름</b>
+    <span th:text="${email ?: ('ID ' + userId)}">email</span>
+  </a>
+  <span th:if="${userId == null}" class="muted">-</span>
+</th:block>
+
+</html>

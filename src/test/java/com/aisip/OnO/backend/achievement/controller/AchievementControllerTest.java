@@ -30,7 +30,7 @@ class AchievementControllerTest extends AchievementTestSupport {
                         "first_step", "archivist", "persistence", "phoenix", "dawn_class", "night_owl",
                         "perfect_month", "flawless", "organizer", "reviewer", "companion", "cheerleader")))
                 .andExpect(jsonPath("$.data.achievements[0].nameKo").value("첫 걸음"))
-                .andExpect(jsonPath("$.data.achievements[0].descriptionKo").value("오답노트를 처음 적었어요"))
+                .andExpect(jsonPath("$.data.achievements[0].descriptionKo").value("오답노트를 처음 작성했어요"))
                 .andExpect(jsonPath("$.data.achievements[0].imageUrl").value("assets/Medal/first_step.png"))
                 .andExpect(jsonPath("$.data.achievements[0].earned").value(false))
                 .andExpect(jsonPath("$.data.achievements[0].earnedAt").doesNotExist())

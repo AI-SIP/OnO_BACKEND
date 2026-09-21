@@ -275,6 +275,41 @@ services:
     profiles:
       - monitoring
 
+  redis-exporter-prod:
+    image: oliver006/redis_exporter:v1.67.0
+    container_name: ono-redis-exporter-prod
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis-prod:6379
+    depends_on:
+      - redis-prod
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
+  # Alertmanager - PRODUCTION (Profile: monitoring)
+  # Prometheus 알림을 디스코드로 보낸다. 웹훅 주소를 설정 파일에 적지 않으려고
+  # 뜰 때 환경변수를 파일로 옮기고 alertmanager.prod.yml 의 webhook_url_file 로 읽는다.
+  alertmanager-prod:
+    image: prom/alertmanager:v0.28.1
+    container_name: ono-alertmanager-prod
+    restart: unless-stopped
+    environment:
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        printf '%s' "$$DISCORD_WEBHOOK_URL" > /tmp/discord_webhook_url
+        exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml --storage.path=/alertmanager --cluster.listen-address=
+    volumes:
+      - ./monitoring/alertmanager.prod.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_prod_data:/alertmanager
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
   # Grafana - PRODUCTION (Profile: monitoring)
   grafana-prod:
     image: grafana/grafana:latest
@@ -319,4 +354,6 @@ volumes:
   promtail_prod_positions:
     driver: local
   grafana_prod_data:
+    driver: local
+  alertmanager_prod_data:
     driver: local

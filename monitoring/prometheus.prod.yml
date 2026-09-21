@@ -5,6 +5,12 @@ global:
 rule_files:
   - /etc/prometheus/alerts/ono-alerts.yml
 
+# 규칙이 평가돼도 받을 곳이 없으면 아무도 모른다. Alertmanager 가 디스코드로 보낸다.
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager-prod:9093"]
+
 scrape_configs:
   - job_name: "ono-backend-prod-blue"
     metrics_path: "/actuator/prometheus"
@@ -19,3 +25,17 @@ scrape_configs:
   - job_name: "ono-mysql-prod"
     static_configs:
       - targets: ["mysql-exporter-prod:9104"]
+
+  - job_name: "ono-redis-prod"
+    static_configs:
+      - targets: ["redis-exporter-prod:9121"]
+
+  # RabbitMQ 이미지에 내장된 rabbitmq_prometheus 플러그인을 쓴다.
+  # 기본 /metrics 는 전체 합계만 주기 때문에, 큐 하나의 컨슈머가 죽어도 티가 안 난다.
+  # 큐별 적체와 컨슈머 수를 보려고 detailed 엔드포인트에서 필요한 묶음만 가져온다.
+  - job_name: "ono-rabbitmq-prod"
+    metrics_path: "/metrics/detailed"
+    params:
+      family: ["queue_coarse_metrics", "queue_consumer_count"]
+    static_configs:
+      - targets: ["rabbitmq-prod:15692"]

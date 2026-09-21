@@ -36,8 +36,20 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
+    /** 관리자 로그인 유지 시간. 세션 유휴 만료와 로그인 유지 쿠키 수명을 같은 값으로 맞춘다. */
+    private static final int ADMIN_LOGIN_TTL_SECONDS = (int) java.time.Duration.ofHours(24).toSeconds();
+
+    private static final String ADMIN_REMEMBER_ME_COOKIE = "ONO_ADMIN_REMEMBER";
+
     @Value("${spring.site.url}")
     private String siteUrl;
+
+    /**
+     * 로그인 유지 쿠키의 서명 키. 재시작해도 같아야 배포 뒤에 로그인이 풀리지 않으므로
+     * 설정 파일에 이미 있는 비밀값에서 만든다. 액세스 토큰 서명 키와 섞이지 않게 접두사를 붙인다.
+     */
+    @Value("${jwt.accessToken.secret}")
+    private String accessTokenSecret;
 
     public final JwtTokenFilter jwtTokenFilter;
 
@@ -126,6 +138,8 @@ public class SecurityConfig {
                             // 접두사를 포함한 계약이므로 createAccessToken 쪽은 그대로 둔다.
                             String token = jwtTokenizer.createAccessToken(String.valueOf(adminId), Map.of("authority", Authority.ROLE_ADMIN));
                             response.setHeader("Authorization", token);
+                            // 톰캣 기본 세션 유휴 만료는 30분이라 화면을 잠깐 켜 두기만 해도 로그인이 풀렸다.
+                            request.getSession().setMaxInactiveInterval(ADMIN_LOGIN_TTL_SECONDS);
                             response.sendRedirect(siteUrl + "/admin/main"); // 성공 후 관리자 페이지로 이동
                         })
                         .failureHandler((request, response, exception) -> {
@@ -133,9 +147,22 @@ public class SecurityConfig {
                         })
                         .permitAll()
                 )
+                // 세션은 메모리에만 있어서 배포로 컨테이너가 바뀌면 사라진다.
+                // 로그인 유지 쿠키가 있으면 새 컨테이너에서도 다시 로그인하지 않고 이어서 쓸 수 있다.
+                .rememberMe(rememberMe -> rememberMe
+                        .key("ono-admin-remember-me:" + accessTokenSecret)
+                        .rememberMeCookieName(ADMIN_REMEMBER_ME_COOKIE)
+                        .tokenValiditySeconds(ADMIN_LOGIN_TTL_SECONDS)
+                        .alwaysRemember(true)
+                        .useSecureCookie(siteUrl.startsWith("https"))
+                )
                 .logout(logout -> logout
-                        .logoutUrl(siteUrl + "/logout")
-                        .logoutSuccessUrl(siteUrl + "/login?logout")
+                        // logoutUrl 은 요청 경로와 비교하는 값이다. 전체 URL 을 넣으면 어떤 요청과도
+                        // 맞지 않아서 로그아웃 버튼을 눌러도 세션이 그대로 남았다.
+                        .logoutUrl("/logout")
+                        .deleteCookies("JSESSIONID", ADMIN_REMEMBER_ME_COOKIE)
+                        .logoutSuccessHandler((request, response, authentication) ->
+                                response.sendRedirect(siteUrl + "/login?logout"))
                         .permitAll()
                 )
                 .sessionManagement(sessionManagement ->

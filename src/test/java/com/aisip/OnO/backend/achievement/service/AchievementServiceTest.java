@@ -179,7 +179,7 @@ class AchievementServiceTest extends AchievementTestSupport {
             folderService.initializeDefaultFoldersIfAbsent(user.getId());
 
             assertThat(itemOf(user, "organizer").current())
-                    .as("아무것도 안 한 사람이 2/10 에서 시작하면 '폴더를 열 개나 만들어 정리했어요' 와 안 맞는다")
+                    .as("아무것도 안 한 사람이 2/10 에서 시작하면 '폴더를 10개 만들었어요' 와 안 맞는다")
                     .isLessThanOrEqualTo(1L);
         }
 

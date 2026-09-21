@@ -26,40 +26,40 @@ import java.util.function.ToLongFunction;
 @Getter
 public enum Achievement {
 
-    FIRST_STEP("first_step", "첫 걸음", "오답노트를 처음 적었어요",
+    FIRST_STEP("first_step", "첫 걸음", "오답노트를 처음 작성했어요",
             1, false, AchievementStats::problemCount),
 
-    ARCHIVIST("archivist", "기록광", "오답노트를 백 개나 모았어요",
+    ARCHIVIST("archivist", "기록광", "오답노트를 100개 작성했어요",
             100, true, AchievementStats::problemCount),
 
-    PERSISTENCE("persistence", "집념", "한 문제를 다섯 번 다시 봤어요",
+    PERSISTENCE("persistence", "집념", "한 문제를 5번 복습했어요",
             5, true, AchievementStats::maxSolveCountOnOneProblem),
 
-    PHOENIX("phoenix", "불사조", "틀렸던 문제를 기어이 맞혔어요",
+    PHOENIX("phoenix", "불사조", "틀렸던 문제를 다시 풀어 맞혔어요",
             1, false, AchievementStats::comebackCount),
 
-    DAWN_CLASS("dawn_class", "새벽반", "해 뜨기 전에 열 번 공부했어요",
+    DAWN_CLASS("dawn_class", "새벽반", "새벽 5~8시에 10번 복습했어요",
             10, true, AchievementStats::dawnSolveCount),
 
-    NIGHT_OWL("night_owl", "올빼미", "밤이 깊어도 열 번 공부했어요",
+    NIGHT_OWL("night_owl", "올빼미", "밤 12~3시에 10번 복습했어요",
             10, true, AchievementStats::nightSolveCount),
 
-    PERFECT_MONTH("perfect_month", "개근", "서른 날을 하루도 안 빼먹었어요",
+    PERFECT_MONTH("perfect_month", "개근", "30일 연속 출석했어요",
             30, true, AchievementStats::longestLoginStreak),
 
-    FLAWLESS("flawless", "무결점", "열 번을 내리 맞혔어요",
+    FLAWLESS("flawless", "무결점", "10번 연속으로 맞혔어요",
             10, true, AchievementStats::longestCorrectStreak),
 
-    ORGANIZER("organizer", "정리의 신", "폴더를 열 개나 만들어 정리했어요",
+    ORGANIZER("organizer", "정리의 신", "폴더를 10개 만들었어요",
             10, true, AchievementStats::folderCount),
 
-    REVIEWER("reviewer", "회고왕", "복습하고 쉰 번을 되돌아봤어요",
+    REVIEWER("reviewer", "회고왕", "복습 회고를 50번 남겼어요",
             50, true, AchievementStats::reflectionCount),
 
-    COMPANION("companion", "동행", "같이 공부할 사람을 찾았어요",
+    COMPANION("companion", "동행", "스터디룸에 처음 참여했어요",
             1, true, AchievementStats::studyRoomCount),
 
-    CHEERLEADER("cheerleader", "응원단장", "백 번을 응원했어요",
+    CHEERLEADER("cheerleader", "응원단장", "응원을 100번 보냈어요",
             100, true, AchievementStats::reactionCount);
 
     /**

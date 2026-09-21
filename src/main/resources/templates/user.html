@@ -1,460 +1,475 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OnO 관리자 - 유저 상세</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
-  <!-- Navigation Bar -->
-  <nav class="bg-white shadow-lg">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between h-16">
-        <div class="flex items-center">
-          <a th:href="@{/admin/main}">
-            <h1 class="text-2xl font-bold text-indigo-600">OnO 관리자</h1>
-          </a>
-        </div>
-        <div class="flex items-center space-x-4">
-          <a th:href="@{/admin/main}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-            대시보드
-          </a>
-          <a th:href="@{/admin/users}" class="text-indigo-600 px-3 py-2 rounded-md text-sm font-medium border-b-2 border-indigo-600">
-            유저
-          </a>
-          <a th:href="@{/admin/problems}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-            문제
-          </a>
-          <a th:href="@{/admin/practice-notes}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-            복습
-          </a>
-          <a th:href="@{/admin/analysis}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-            통계
-          </a>
-          <form th:action="@{/logout}" method="post">
-            <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-150">
-              로그아웃
-            </button>
-          </form>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/admin-layout :: head(${user.name() != null ? user.name() : '유저 상세'})}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{fragments/admin-layout :: sidebar('users')}"></aside>
+  <main class="main" data-reveal th:attr="data-user-id=${user.userId()}">
+
+    <div class="page-head">
+      <div>
+        <a class="crumb" th:href="@{/admin/users}">유저</a>
+        <div class="profile-head">
+          <img th:if="${user.hasViewableProfileImage()}" class="avatar" th:src="${user.profileImageUrl()}" alt="">
+          <div>
+            <h1 th:text="${user.name() != null ? user.name() : '(이름 없음)'}">이름</h1>
+            <p class="desc gap-8">
+              <span th:text="${user.email() != null ? user.email() : '이메일 없음'}">email</span>
+              <span th:if="${user.platform() != null}" class="chip"
+                    th:classappend="${#strings.equalsIgnoreCase(user.platform(), 'GUEST')} ? '' : 'green'"
+                    th:text="${#strings.toUpperCase(user.platform())}">GOOGLE</span>
+            </p>
+          </div>
         </div>
       </div>
     </div>
-  </nav>
 
-  <!-- Main Content -->
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <!-- Back Button -->
-    <div class="mb-4">
-      <a th:href="@{/admin/users}" class="text-indigo-600 hover:text-indigo-800 flex items-center">
-        <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-        </svg>
-        유저 목록으로 돌아가기
+    <div class="kpis">
+      <a class="kpi" th:href="@{/admin/problems(userId=${user.userId()})}">
+        <div class="kpi-label">오답노트</div>
+        <div class="kpi-value"><span data-count th:text="${counts.problemCount()}">0</span><span class="unit">개</span></div>
       </a>
-    </div>
-
-    <!-- User Details Card -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-      <div class="flex justify-between items-start mb-6">
-        <h2 class="text-2xl font-bold text-gray-900">유저 상세 정보</h2>
-        <button onclick="deleteUser()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition">
-          유저 삭제
-        </button>
+      <a class="kpi" th:href="@{/admin/practice-logs(userId=${user.userId()})}">
+        <div class="kpi-label">복습 기록</div>
+        <div class="kpi-value"><span data-count th:text="${counts.solveCount()}">0</span><span class="unit">회</span></div>
+        <div class="kpi-sub num" th:text="|정답률 ${#numbers.formatDecimal(counts.correctRate(), 1, 1)}%|">정답률 0%</div>
+      </a>
+      <a class="kpi" th:href="@{/admin/practice-notes(userId=${user.userId()})}">
+        <div class="kpi-label">복습노트</div>
+        <div class="kpi-value"><span data-count th:text="${counts.practiceNoteCount()}">0</span><span class="unit">개</span></div>
+      </a>
+      <div class="kpi">
+        <div class="kpi-label">연속 출석</div>
+        <div class="kpi-value"><span data-count th:text="${loginStreak}">0</span><span class="unit">일</span></div>
+        <div class="kpi-sub num" th:text="|총 ${counts.loginDayCount()}일 출석|">총 0일</div>
       </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <!-- User Information -->
-        <div class="space-y-4">
-          <div>
-            <label class="text-sm font-medium text-gray-500">유저 ID</label>
-            <p class="mt-1 text-lg font-semibold text-gray-900" th:text="${user.userId}">1</p>
-          </div>
-          <div>
-            <label class="text-sm font-medium text-gray-500">이름</label>
-            <p class="mt-1 text-lg text-gray-900" th:text="${user.name}">유저 이름</p>
-          </div>
-          <div>
-            <label class="text-sm font-medium text-gray-500">이메일</label>
-            <p class="mt-1 text-lg text-gray-900" th:text="${user.email}">user@example.com</p>
-          </div>
-          <div>
-            <label class="text-sm font-medium text-gray-500">가입일</label>
-            <p class="mt-1 text-lg text-gray-900" th:text="${#temporals.format(user.createdAt, 'yyyy-MM-dd HH:mm:ss')}">2024-01-01 00:00:00</p>
-          </div>
-        </div>
-
-        <!-- Summary Stats -->
-        <div class="space-y-4">
-          <div class="grid grid-cols-2 gap-4">
-            <div class="bg-blue-50 rounded-lg p-4">
-              <label class="text-xs font-medium text-blue-700">총 문제 수</label>
-              <p class="text-2xl font-bold text-blue-600" th:text="${problemCount}">0</p>
-            </div>
-            <div class="bg-green-50 rounded-lg p-4">
-              <label class="text-xs font-medium text-green-700">총 폴더 수</label>
-              <p class="text-2xl font-bold text-green-600" th:text="${folderCount}">0</p>
-            </div>
-            <div class="bg-purple-50 rounded-lg p-4">
-              <label class="text-xs font-medium text-purple-700">복습노트 수</label>
-              <p class="text-2xl font-bold text-purple-600" th:text="${practiceNoteCount}">0</p>
-            </div>
-            <div class="bg-pink-50 rounded-lg p-4">
-              <label class="text-xs font-medium text-pink-700">미션 기록 수</label>
-              <p class="text-2xl font-bold text-pink-600" th:text="${missionLogCount}">0</p>
-            </div>
-          </div>
-        </div>
+      <div class="kpi">
+        <div class="kpi-label">스터디룸</div>
+        <div class="kpi-value"><span data-count th:text="${counts.studyRoomCount()}">0</span><span class="unit">개</span></div>
       </div>
-
-      <!-- Level Information Section -->
-      <div class="border-t pt-6">
-        <h3 class="text-xl font-bold text-gray-900 mb-4">레벨 정보 (클릭하여 수정)</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <!-- Total Study Level -->
-          <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg p-4 cursor-pointer hover:shadow-md transition"
-               th:onclick="'editLevel(\'totalStudy\', \'총 학습\', ' + ${user.totalStudyLevel} + ', ' + ${user.totalStudyCurrentPoint} + ')'">
-            <label class="text-sm font-medium text-indigo-700">총 학습 레벨</label>
-            <div class="mt-2 flex items-baseline">
-              <p class="text-3xl font-bold text-indigo-600" th:text="'Lv.' + ${user.totalStudyLevel}">Lv.1</p>
-              <p class="ml-2 text-sm text-indigo-500" th:text="'(' + ${user.totalStudyCurrentPoint} + '/' + ${user.totalStudyNextLevelThreshold} + ' pt)'">(0/40 pt)</p>
-            </div>
-          </div>
-
-          <!-- Attendance Level -->
-          <div class="bg-blue-50 rounded-lg p-4 cursor-pointer hover:shadow-md transition"
-               th:onclick="'editLevel(\'attendance\', \'출석\', ' + ${user.attendanceLevel} + ', ' + ${user.attendancePoint} + ')'">
-            <label class="text-sm font-medium text-blue-700">출석</label>
-            <div class="mt-2 flex items-baseline">
-              <p class="text-2xl font-bold text-blue-600" th:text="'Lv.' + ${user.attendanceLevel}">Lv.1</p>
-              <p class="ml-2 text-sm text-blue-500" th:text="'(' + ${user.attendancePoint} + ' pt)'">(0 pt)</p>
-            </div>
-          </div>
-
-          <!-- Note Write Level -->
-          <div class="bg-green-50 rounded-lg p-4 cursor-pointer hover:shadow-md transition"
-               th:onclick="'editLevel(\'noteWrite\', \'오답노트 작성\', ' + ${user.noteWriteLevel} + ', ' + ${user.noteWritePoint} + ')'">
-            <label class="text-sm font-medium text-green-700">오답노트 작성</label>
-            <div class="mt-2 flex items-baseline">
-              <p class="text-2xl font-bold text-green-600" th:text="'Lv.' + ${user.noteWriteLevel}">Lv.1</p>
-              <p class="ml-2 text-sm text-green-500" th:text="'(' + ${user.noteWritePoint} + ' pt)'">(0 pt)</p>
-            </div>
-          </div>
-
-          <!-- Problem Practice Level -->
-          <div class="bg-purple-50 rounded-lg p-4 cursor-pointer hover:shadow-md transition"
-               th:onclick="'editLevel(\'problemPractice\', \'문제 복습\', ' + ${user.problemPracticeLevel} + ', ' + ${user.problemPracticePoint} + ')'">
-            <label class="text-sm font-medium text-purple-700">문제 복습</label>
-            <div class="mt-2 flex items-baseline">
-              <p class="text-2xl font-bold text-purple-600" th:text="'Lv.' + ${user.problemPracticeLevel}">Lv.1</p>
-              <p class="ml-2 text-sm text-purple-500" th:text="'(' + ${user.problemPracticePoint} + ' pt)'">(0 pt)</p>
-            </div>
-          </div>
-
-          <!-- Note Practice Level -->
-          <div class="bg-pink-50 rounded-lg p-4 cursor-pointer hover:shadow-md transition"
-               th:onclick="'editLevel(\'notePractice\', \'복습노트 사용\', ' + ${user.notePracticeLevel} + ', ' + ${user.notePracticePoint} + ')'">
-            <label class="text-sm font-medium text-pink-700">복습노트 사용</label>
-            <div class="mt-2 flex items-baseline">
-              <p class="text-2xl font-bold text-pink-600" th:text="'Lv.' + ${user.notePracticeLevel}">Lv.1</p>
-              <p class="ml-2 text-sm text-pink-500" th:text="'(' + ${user.notePracticePoint} + ' pt)'">(0 pt)</p>
-            </div>
-          </div>
-        </div>
+      <div class="kpi">
+        <div class="kpi-label">업적</div>
+        <div class="kpi-value"><span data-count th:text="${counts.achievementCount()}">0</span><span class="unit">개</span></div>
       </div>
     </div>
 
-    <!-- Tab Navigation -->
-    <div class="bg-white rounded-t-lg shadow-md">
-      <div class="border-b border-gray-200">
-        <nav class="-mb-px flex space-x-8 px-6" aria-label="Tabs">
-          <button onclick="showTab('problems')" id="tab-problems" class="tab-button border-indigo-500 text-indigo-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
-            문제 (<span th:text="${problemCount}">0</span>)
-          </button>
-          <button onclick="showTab('folders')" id="tab-folders" class="tab-button border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
-            폴더 (<span th:text="${folderCount}">0</span>)
-          </button>
-          <button onclick="showTab('practiceNotes')" id="tab-practiceNotes" class="tab-button border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
-            복습노트 (<span th:text="${practiceNoteCount}">0</span>)
-          </button>
-          <button onclick="showTab('missionLogs')" id="tab-missionLogs" class="tab-button border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
-            미션 기록 (<span th:text="${missionLogCount}">0</span>)
-          </button>
-        </nav>
+    <div class="section">
+      <div class="tabs" data-tabs>
+        <button type="button" data-tab="overview">개요</button>
+        <button type="button" data-tab="problems">오답노트<span class="count" th:text="${counts.problemCount()}">0</span></button>
+        <button type="button" data-tab="solves">복습 기록<span class="count" th:text="${counts.solveCount()}">0</span></button>
+        <button type="button" data-tab="notes">복습노트<span class="count" th:text="${counts.practiceNoteCount()}">0</span></button>
+        <button type="button" data-tab="folders">폴더와 태그<span class="count" th:text="${counts.folderCount() + counts.tagCount()}">0</span></button>
+        <button type="button" data-tab="missions">미션<span class="count" th:text="${#lists.size(missionProgress)}">0</span></button>
+        <button type="button" data-tab="rooms">스터디룸<span class="count" th:text="${counts.studyRoomCount()}">0</span></button>
       </div>
-    </div>
 
-    <!-- Tab Content -->
-    <div class="bg-white rounded-b-lg shadow-md p-6">
-      <!-- Problems Tab -->
-      <div id="content-problems" class="tab-content">
-        <h3 class="text-xl font-bold text-gray-900 mb-4">유저가 작성한 문제</h3>
-        <div th:if="${problemCount > 0}" class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+      <!-- 개요 -->
+      <section class="tab-panel" data-panel="overview">
+        <div class="grid grid-2">
+          <div class="card">
+            <h3 class="card-title">계정</h3>
+            <dl class="kv">
+              <dt>유저 ID</dt><dd class="num" th:text="${user.userId()}">1</dd>
+              <dt>가입일</dt><dd class="num" th:text="${user.createdAt() != null ? #temporals.format(user.createdAt(), 'yyyy-MM-dd HH:mm') : '-'}">-</dd>
+              <dt>최근 활동</dt><dd class="num" th:text="${user.lastActiveAt() != null ? #temporals.format(user.lastActiveAt(), 'yyyy-MM-dd HH:mm') : '-'}">-</dd>
+              <dt>푸시 알림</dt>
+              <dd>
+                <span th:if="${user.notificationEnabled()}" class="chip green">켜짐</span>
+                <span th:unless="${user.notificationEnabled()}" class="chip">꺼짐</span>
+                <span class="muted small num" th:text="|기기 ${counts.fcmTokenCount()}대|">기기 0대</span>
+              </dd>
+              <dt>마지막 알림</dt><dd class="num" th:text="${user.lastNotifiedAt() != null ? #temporals.format(user.lastNotifiedAt(), 'yyyy-MM-dd') : '-'}">-</dd>
+            </dl>
+          </div>
+
+          <div class="card">
+            <h3 class="card-title">레벨 <small>눌러서 수정</small></h3>
+            <div class="levels">
+              <button type="button" class="level-card total" data-type="totalStudy" data-name="총 학습"
+                      th:data-level="${user.totalStudy().level()}" th:data-point="${user.totalStudy().point()}">
+                <span class="level-name">총 학습</span>
+                <span class="level-num num">Lv.<th:block th:text="${user.totalStudy().level()}">1</th:block></span>
+                <span class="level-pt num" th:text="|${user.totalStudy().point()}pt|">0pt</span>
+              </button>
+              <button type="button" class="level-card" data-type="attendance" data-name="출석"
+                      th:data-level="${user.attendance().level()}" th:data-point="${user.attendance().point()}">
+                <span class="level-name">출석</span>
+                <span class="level-num num">Lv.<th:block th:text="${user.attendance().level()}">1</th:block></span>
+                <span class="level-pt num" th:text="|${user.attendance().point()}pt|">0pt</span>
+              </button>
+              <button type="button" class="level-card" data-type="noteWrite" data-name="오답노트 작성"
+                      th:data-level="${user.noteWrite().level()}" th:data-point="${user.noteWrite().point()}">
+                <span class="level-name">오답노트 작성</span>
+                <span class="level-num num">Lv.<th:block th:text="${user.noteWrite().level()}">1</th:block></span>
+                <span class="level-pt num" th:text="|${user.noteWrite().point()}pt|">0pt</span>
+              </button>
+              <button type="button" class="level-card" data-type="problemPractice" data-name="문제 복습"
+                      th:data-level="${user.problemPractice().level()}" th:data-point="${user.problemPractice().point()}">
+                <span class="level-name">문제 복습</span>
+                <span class="level-num num">Lv.<th:block th:text="${user.problemPractice().level()}">1</th:block></span>
+                <span class="level-pt num" th:text="|${user.problemPractice().point()}pt|">0pt</span>
+              </button>
+              <button type="button" class="level-card" data-type="notePractice" data-name="복습노트 사용"
+                      th:data-level="${user.notePractice().level()}" th:data-point="${user.notePractice().point()}">
+                <span class="level-name">복습노트 사용</span>
+                <span class="level-num num">Lv.<th:block th:text="${user.notePractice().level()}">1</th:block></span>
+                <span class="level-pt num" th:text="|${user.notePractice().point()}pt|">0pt</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 class="card-title">착용 중인 치장 <small th:text="|${#lists.size(cosmetics)}개|">0개</small></h3>
+            <div class="rows" th:unless="${#lists.isEmpty(cosmetics)}">
+              <div class="row" th:each="c : ${cosmetics}">
+                <div class="row-main">
+                  <div class="row-title" th:text="${c.itemName() != null ? c.itemName() : c.itemKey()}">아이템</div>
+                  <div class="row-sub" th:text="${c.setName() != null ? c.itemKey() + ', ' + c.setName() + ' 세트' : c.itemKey()}">key</div>
+                </div>
+                <span class="chip" th:text="${c.slotName()}">머리</span>
+              </div>
+            </div>
+            <div class="empty" th:if="${#lists.isEmpty(cosmetics)}">착용한 치장이 없어요</div>
+          </div>
+
+          <div class="card">
+            <h3 class="card-title">받은 업적 <small th:text="|${#lists.size(achievements)}개|">0개</small></h3>
+            <div class="rows" th:unless="${#lists.isEmpty(achievements)}">
+              <div class="row" th:each="a : ${achievements}">
+                <div class="row-main">
+                  <div class="row-title" th:text="${a.name()}">첫 걸음</div>
+                  <div class="row-sub" th:text="${a.description() != null ? a.description() : a.key()}">설명</div>
+                </div>
+                <span class="row-value small muted" th:text="${a.earnedAt() != null ? #temporals.format(a.earnedAt(), 'yyyy-MM-dd') : '-'}">2026-01-01</span>
+              </div>
+            </div>
+            <div class="empty" th:if="${#lists.isEmpty(achievements)}">아직 받은 업적이 없어요</div>
+          </div>
+
+          <div class="card span-2">
+            <h3 class="card-title">최근 기분 기록 <small>학습 달력에 남긴 기분, 최근 14일치</small></h3>
+            <div class="moods" th:unless="${#lists.isEmpty(moods)}">
+              <div class="mood" th:each="m : ${moods}">
+                <span class="mood-date num" th:text="${#temporals.format(m.studyDate(), 'M/d')}">9/1</span>
+                <span class="mood-key" th:text="${m.emojiKey()}">happy</span>
+              </div>
+            </div>
+            <div class="empty" th:if="${#lists.isEmpty(moods)}">기분 기록이 없어요</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 오답노트 -->
+      <section class="tab-panel" data-panel="problems" hidden>
+        <div class="card flush">
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">메모</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">출처</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">이미지</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">푼 날짜</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">작성일</th>
+                <th>ID</th><th>출처</th><th>메모</th><th>폴더</th><th>AI 분석</th><th class="r">복습</th><th>다음 복습</th><th>작성일</th>
               </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              <tr th:each="problem : ${problems}" class="hover:bg-gray-50 cursor-pointer" th:onclick="'location.href=\'/admin/problem/' + ${problem.problemId} + '\''">
-                <td class="px-4 py-3 text-sm font-medium text-indigo-600 hover:text-indigo-800" th:text="${problem.problemId}">1</td>
-                <td class="px-4 py-3 text-sm text-gray-600">
-                  <span th:if="${problem.memo != null and !problem.memo.isEmpty()}" th:text="${#strings.abbreviate(problem.memo, 30)}">메모...</span>
-                  <span th:unless="${problem.memo != null and !problem.memo.isEmpty()}" class="text-gray-400">-</span>
+              </thead>
+              <tbody>
+              <tr th:each="p : ${problems}" th:attr="data-href=@{/admin/problem/{id}(id=${p.problemId()})}">
+                <td class="muted num" th:text="${p.problemId()}">1</td>
+                <td class="ellipsis" th:text="${p.reference() != null and !#strings.isEmpty(p.reference()) ? p.reference() : '-'}">출처</td>
+                <td class="ellipsis muted" th:text="${p.memo() != null and !#strings.isEmpty(p.memo()) ? p.memo() : '-'}">메모</td>
+                <td class="ellipsis" th:text="${p.folderName() != null ? p.folderName() : '-'}">폴더</td>
+                <td th:switch="${p.analysisStatus()}">
+                  <span th:case="'COMPLETED'" class="chip green" th:text="${p.subject() != null ? p.subject() : '분석 완료'}">수학</span>
+                  <span th:case="'FAILED'" class="chip red">분석 실패</span>
+                  <span th:case="'PROCESSING'" class="chip blue">분석 중</span>
+                  <span th:case="'RATE_LIMIT_EXCEEDED'" class="chip orange">한도 초과</span>
+                  <span th:case="'NO_IMAGE'" class="chip">이미지 없음</span>
+                  <span th:case="'NOT_STARTED'" class="chip">대기</span>
+                  <span th:case="*" class="muted">-</span>
                 </td>
-                <td class="px-4 py-3 text-sm text-gray-600">
-                  <span th:if="${problem.reference != null and !problem.reference.isEmpty()}" th:text="${problem.reference}">출처</span>
-                  <span th:unless="${problem.reference != null and !problem.reference.isEmpty()}" class="text-gray-400">-</span>
+                <td class="r" th:classappend="${p.solveCount() == 0} ? 'zero'" th:text="${p.solveCount()}">0</td>
+                <td class="nowrap muted num" th:text="${p.nextReviewAt() != null ? #temporals.format(p.nextReviewAt(), 'yyyy-MM-dd') : '-'}">-</td>
+                <td class="nowrap muted num" th:text="${p.createdAt() != null ? #temporals.format(p.createdAt(), 'yyyy-MM-dd HH:mm') : '-'}">-</td>
+              </tr>
+              </tbody>
+            </table>
+            <div class="empty" th:if="${#lists.isEmpty(problems)}">작성한 오답노트가 없어요</div>
+          </div>
+          <div class="pager" th:if="${counts.problemCount() > #lists.size(problems)}">
+            <span class="pager-info" th:text="|최근 ${#lists.size(problems)}개만 보여요|">최근 300개</span>
+            <a class="btn small" th:href="@{/admin/problems(userId=${user.userId()})}">전체 보기</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- 복습 기록 -->
+      <section class="tab-panel" data-panel="solves" hidden>
+        <div class="card flush">
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+              <tr>
+                <th>복습일</th><th>문제</th><th>결과</th><th class="r">걸린 시간</th><th>회고</th><th>기분</th>
+              </tr>
+              </thead>
+              <tbody>
+              <tr th:each="s : ${solves}" th:attr="data-href=@{/admin/problem/{id}(id=${s.problemId()})}">
+                <td class="nowrap num" th:text="${s.practicedAt() != null ? #temporals.format(s.practicedAt(), 'yyyy-MM-dd HH:mm') : '-'}">-</td>
+                <td class="ellipsis">
+                  <span class="muted num" th:text="|#${s.problemId()}|">#1</span>
+                  <span th:text="${s.problemReference() != null ? s.problemReference() : ''}">출처</span>
                 </td>
-                <td class="px-4 py-3 text-sm text-gray-600">
-                  <div class="flex space-x-1">
-                    <span th:each="image : ${problem.imageUrlList}" class="inline-block">
-                      <a th:href="@{/admin/user/image/view(url=${image.imageUrl})}" target="_blank" class="text-indigo-600 hover:text-indigo-800">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                        </svg>
-                      </a>
-                    </span>
-                    <span th:if="${#lists.isEmpty(problem.imageUrlList)}" class="text-gray-400">이미지 없음</span>
+                <td th:switch="${s.answerStatus()}">
+                  <span th:case="'CORRECT'" class="chip green">정답</span>
+                  <span th:case="'WRONG'" class="chip red">오답</span>
+                  <span th:case="'PARTIAL'" class="chip orange">부분 정답</span>
+                  <span th:case="*" class="muted">-</span>
+                </td>
+                <td class="r nowrap" th:text="${s.timeSpentSeconds() == null ? '-' : (s.timeSpentSeconds() >= 60 ? (s.timeSpentSeconds() / 60) + '분 ' + (s.timeSpentSeconds() % 60) + '초' : s.timeSpentSeconds() + '초')}">-</td>
+                <td class="ellipsis muted" th:text="${s.reflection() != null and !#strings.isEmpty(s.reflection()) ? s.reflection() : '-'}">회고</td>
+                <td class="muted small" th:text="${s.moodEmojiKey() != null ? s.moodEmojiKey() : '-'}">-</td>
+              </tr>
+              </tbody>
+            </table>
+            <div class="empty" th:if="${#lists.isEmpty(solves)}">복습 기록이 없어요</div>
+          </div>
+          <div class="pager" th:if="${counts.solveCount() > #lists.size(solves)}">
+            <span class="pager-info" th:text="|최근 ${#lists.size(solves)}개만 보여요|">최근 300개</span>
+            <a class="btn small" th:href="@{/admin/practice-logs(userId=${user.userId()})}">전체 보기</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- 복습노트 -->
+      <section class="tab-panel" data-panel="notes" hidden>
+        <div class="card flush">
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+              <tr>
+                <th>ID</th><th>제목</th><th class="r">문제</th><th class="r">복습 횟수</th><th>반복</th><th>마지막 복습</th><th>만든 날</th>
+              </tr>
+              </thead>
+              <tbody>
+              <tr th:each="n : ${practiceNotes}" th:attr="data-href=@{/admin/practice-notes/{id}(id=${n.practiceNoteId()})}">
+                <td class="muted num" th:text="${n.practiceNoteId()}">1</td>
+                <td class="ellipsis" th:text="${n.title() != null and !#strings.isEmpty(n.title()) ? n.title() : '(제목 없음)'}">제목</td>
+                <td class="r" th:text="${n.problemCount()}">0</td>
+                <td class="r" th:classappend="${n.practiceCount() == null or n.practiceCount() == 0} ? 'zero'" th:text="${n.practiceCount() != null ? n.practiceCount() : 0}">0</td>
+                <td class="muted small" th:text="${n.repeatType() != null ? n.repeatType() : '-'}">-</td>
+                <td class="nowrap muted num" th:text="${n.lastSolvedAt() != null ? #temporals.format(n.lastSolvedAt(), 'yyyy-MM-dd HH:mm') : '-'}">-</td>
+                <td class="nowrap muted num" th:text="${n.createdAt() != null ? #temporals.format(n.createdAt(), 'yyyy-MM-dd') : '-'}">-</td>
+              </tr>
+              </tbody>
+            </table>
+            <div class="empty" th:if="${#lists.isEmpty(practiceNotes)}">만든 복습노트가 없어요</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 폴더와 태그 -->
+      <section class="tab-panel" data-panel="folders" hidden>
+        <div class="grid grid-2">
+          <div class="card flush">
+            <h3 class="card-title">폴더 <small th:text="|${counts.folderCount()}개|">0개</small></h3>
+            <div class="table-wrap">
+              <table class="table">
+                <thead><tr><th>이름</th><th>상위 폴더</th><th class="r">문제</th><th>만든 날</th></tr></thead>
+                <tbody>
+                <tr th:each="f : ${folders}">
+                  <td th:text="${f.name()}">폴더</td>
+                  <td class="muted" th:text="${f.parentName() != null ? f.parentName() : '-'}">-</td>
+                  <td class="r" th:classappend="${f.problemCount() == 0} ? 'zero'" th:text="${f.problemCount()}">0</td>
+                  <td class="nowrap muted num" th:text="${f.createdAt() != null ? #temporals.format(f.createdAt(), 'yyyy-MM-dd') : '-'}">-</td>
+                </tr>
+                </tbody>
+              </table>
+              <div class="empty" th:if="${#lists.isEmpty(folders)}">폴더가 없어요</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3 class="card-title">태그 <small th:text="|${counts.tagCount()}개|">0개</small></h3>
+            <div class="gap-8" th:unless="${#lists.isEmpty(tags)}">
+              <span class="chip" th:each="t : ${tags}" th:text="|${t.name()} ${t.problemCount()}|">태그 3</span>
+            </div>
+            <div class="empty" th:if="${#lists.isEmpty(tags)}">태그가 없어요</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 미션 -->
+      <section class="tab-panel" data-panel="missions" hidden>
+        <div class="card flush">
+          <h3 class="card-title">미션 진행 <small>일간, 주간 미션의 기간별 진행도</small></h3>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>기간</th><th>미션</th><th>구분</th><th class="r">진행</th><th>상태</th><th>보상</th><th>완료</th></tr></thead>
+              <tbody>
+              <tr th:each="m : ${missionProgress}">
+                <td class="nowrap num" th:text="${m.periodKey()}">2026-09-20</td>
+                <td>
+                  <div class="who">
+                    <b th:text="${m.title() != null ? m.title() : '-'}">출석</b>
+                    <span th:text="${m.code()}">DAILY_ATTEND</span>
                   </div>
                 </td>
-                <td class="px-4 py-3 text-sm text-gray-600">
-                  <span th:if="${problem.solvedAt != null}" th:text="${#temporals.format(problem.solvedAt, 'yyyy-MM-dd')}">2024-01-01</span>
-                  <span th:unless="${problem.solvedAt != null}" class="text-gray-400">-</span>
+                <td class="muted" th:text="${m.category() == 'DAILY' ? '일간' : (m.category() == 'WEEKLY' ? '주간' : m.category())}">일간</td>
+                <td class="r num" th:text="|${m.currentValue()} / ${m.targetValue()}|">0 / 1</td>
+                <td>
+                  <span th:if="${m.claimedAt() != null}" class="chip green">보상 받음</span>
+                  <span th:if="${m.claimedAt() == null and m.completedAt() != null}" class="chip blue">완료</span>
+                  <span th:if="${m.completedAt() == null}" class="chip">진행 중</span>
                 </td>
-                <td class="px-4 py-3 text-sm text-gray-600" th:text="${#temporals.format(problem.createdAt, 'yyyy-MM-dd HH:mm')}">2024-01-01 00:00</td>
+                <td class="muted small" th:text="${m.rewardType() != null ? m.rewardType() + ' ' + (m.rewardValue() != null ? m.rewardValue() : '') : '-'}">XP 10</td>
+                <td class="nowrap muted num" th:text="${m.completedAt() != null ? #temporals.format(m.completedAt(), 'MM-dd HH:mm') : '-'}">-</td>
               </tr>
-            </tbody>
-          </table>
-        </div>
-        <div th:unless="${problemCount > 0}" class="text-center py-8 text-gray-500">
-          이 유저가 작성한 문제가 없습니다
-        </div>
-      </div>
-
-      <!-- Folders Tab -->
-      <div id="content-folders" class="tab-content hidden">
-        <h3 class="text-xl font-bold text-gray-900 mb-4">유저의 폴더</h3>
-        <div th:if="${folderCount > 0}" class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">폴더 ID</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">폴더 이름</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">하위 폴더 수</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">문제 수</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">작성일</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              <tr th:each="folder : ${folders}" class="hover:bg-gray-50">
-                <td class="px-4 py-3 text-sm font-medium text-gray-900" th:text="${folder.folderId}">1</td>
-                <td class="px-4 py-3 text-sm text-gray-900" th:text="${folder.folderName}">폴더 이름</td>
-                <td class="px-4 py-3 text-sm text-gray-600" th:text="${#lists.size(folder.subFolderList)}">0</td>
-                <td class="px-4 py-3 text-sm text-gray-600" th:text="${#lists.size(folder.problemIdList)}">0</td>
-                <td class="px-4 py-3 text-sm text-gray-600" th:text="${#temporals.format(folder.createdAt, 'yyyy-MM-dd HH:mm')}">2024-01-01 00:00</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div th:unless="${folderCount > 0}" class="text-center py-8 text-gray-500">
-          이 유저의 폴더가 없습니다
-        </div>
-      </div>
-
-      <!-- Practice Notes Tab -->
-      <div id="content-practiceNotes" class="tab-content hidden">
-        <h3 class="text-xl font-bold text-gray-900 mb-4">유저의 복습노트</h3>
-        <div th:if="${practiceNoteCount > 0}" class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">복습노트 ID</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">제목</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">문제 수</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">복습 횟수</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">작성일</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              <tr th:each="note : ${practiceNotes}" class="hover:bg-gray-50">
-                <td class="px-4 py-3 text-sm font-medium text-gray-900" th:text="${note.practiceNoteId}">1</td>
-                <td class="px-4 py-3 text-sm text-gray-900" th:text="${note.practiceTitle}">복습노트 제목</td>
-                <td class="px-4 py-3 text-sm text-gray-600" th:text="${#lists.size(note.problemIdList)}">0</td>
-                <td class="px-4 py-3 text-sm text-gray-600" th:text="${note.practiceCount}">0</td>
-                <td class="px-4 py-3 text-sm text-gray-600" th:text="${#temporals.format(note.createdAt, 'yyyy-MM-dd HH:mm')}">2024-01-01 00:00</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div th:unless="${practiceNoteCount > 0}" class="text-center py-8 text-gray-500">
-          이 유저의 복습노트가 없습니다
-        </div>
-      </div>
-
-      <!-- Mission Logs Tab -->
-      <div id="content-missionLogs" class="tab-content hidden">
-        <h3 class="text-xl font-bold text-gray-900 mb-4">유저의 미션 기록</h3>
-        <div th:if="${missionLogCount > 0}" class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">미션 ID</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">미션 타입</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">획득 포인트</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">참조 ID</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">완료일</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              <tr th:each="mission : ${missionLogs}" class="hover:bg-gray-50">
-                <td class="px-4 py-3 text-sm font-medium text-gray-900" th:text="${mission.id}">1</td>
-                <td class="px-4 py-3 text-sm text-gray-900">
-                  <span th:if="${mission.missionType.name() == 'USER_LOGIN'}" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">출석</span>
-                  <span th:if="${mission.missionType.name() == 'PROBLEM_WRITE'}" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">오답노트 작성</span>
-                  <span th:if="${mission.missionType.name() == 'PROBLEM_PRACTICE'}" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">문제 복습</span>
-                  <span th:if="${mission.missionType.name() == 'NOTE_PRACTICE'}" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-pink-100 text-pink-800">복습노트 사용</span>
-                </td>
-                <td class="px-4 py-3 text-sm text-gray-600" th:text="${mission.point} + 'pt'">10pt</td>
-                <td class="px-4 py-3 text-sm text-gray-600">
-                  <span th:if="${mission.referenceId != null}" th:text="${mission.referenceId}">1</span>
-                  <span th:unless="${mission.referenceId != null}" class="text-gray-400">-</span>
-                </td>
-                <td class="px-4 py-3 text-sm text-gray-600" th:text="${#temporals.format(mission.createdAt, 'yyyy-MM-dd HH:mm')}">2024-01-01 00:00</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div th:unless="${missionLogCount > 0}" class="text-center py-8 text-gray-500">
-          이 유저의 미션 기록이 없습니다
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Edit Level Modal -->
-  <div id="levelModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-      <div class="mt-3">
-        <h3 class="text-lg font-medium text-gray-900 mb-4" id="modalTitle">레벨 수정</h3>
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">레벨</label>
-            <input type="number" id="levelInput" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" min="1" max="15">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">포인트</label>
-            <input type="number" id="pointInput" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" min="0">
+              </tbody>
+            </table>
+            <div class="empty" th:if="${#lists.isEmpty(missionProgress)}">미션 진행 기록이 없어요</div>
           </div>
         </div>
-        <div class="mt-6 flex space-x-3">
-          <button onclick="saveLevelChange()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition">
-            저장
-          </button>
-          <button onclick="closeLevelModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-md text-sm font-medium transition">
-            취소
-          </button>
+
+        <div class="card flush mt-12">
+          <h3 class="card-title">포인트 적립 기록 <small th:text="|최근 ${#lists.size(missionLogs)}건|">최근 0건</small></h3>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>ID</th><th>종류</th><th class="r">포인트</th><th>대상</th><th>일시</th></tr></thead>
+              <tbody>
+              <tr th:each="log : ${missionLogs}">
+                <td class="muted num" th:text="${log.missionLogId()}">1</td>
+                <td th:text="${log.missionType()}">출석</td>
+                <td class="r num" th:classappend="${log.point() == null or log.point() == 0} ? 'zero'" th:text="${log.point() != null ? log.point() : 0}">15</td>
+                <td class="muted num" th:text="${log.referenceId() != null ? '#' + log.referenceId() : '-'}">-</td>
+                <td class="nowrap muted num" th:text="${log.createdAt() != null ? #temporals.format(log.createdAt(), 'yyyy-MM-dd HH:mm') : '-'}">-</td>
+              </tr>
+              </tbody>
+            </table>
+            <div class="empty" th:if="${#lists.isEmpty(missionLogs)}">적립 기록이 없어요</div>
+          </div>
         </div>
+      </section>
+
+      <!-- 스터디룸 -->
+      <section class="tab-panel" data-panel="rooms" hidden>
+        <div class="card flush">
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>ID</th><th>방 이름</th><th>역할</th><th class="r">멤버</th><th class="r">주간 목표</th><th>참여일</th></tr></thead>
+              <tbody>
+              <tr th:each="r : ${studyRooms}" th:attr="data-href=@{/admin/study-rooms/{id}(id=${r.roomId()})}">
+                <td class="muted num" th:text="${r.roomId()}">1</td>
+                <td th:text="${r.name()}">방</td>
+                <td>
+                  <span th:if="${r.role() == 'HOST'}" class="chip green">방장</span>
+                  <span th:unless="${r.role() == 'HOST'}" class="chip">멤버</span>
+                </td>
+                <td class="r num" th:text="|${r.memberCount()}명|">1명</td>
+                <td class="r num" th:text="${r.weeklyGoal() != null ? r.weeklyGoal() : '-'}">-</td>
+                <td class="nowrap muted num" th:text="${r.joinedAt() != null ? #temporals.format(r.joinedAt(), 'yyyy-MM-dd') : '-'}">-</td>
+              </tr>
+              </tbody>
+            </table>
+            <div class="empty" th:if="${#lists.isEmpty(studyRooms)}">참여한 스터디룸이 없어요</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+  </main>
+</div>
+
+<div class="modal" id="levelModal" role="dialog" aria-modal="true" aria-labelledby="levelModalTitle">
+  <div class="modal-sheet">
+    <h3 id="levelModalTitle">레벨 수정</h3>
+    <div class="grid">
+      <div class="field">
+        <label for="levelInput">레벨</label>
+        <input id="levelInput" class="input" type="number" min="1" step="1">
+      </div>
+      <div class="field">
+        <label for="pointInput">현재 레벨 안의 포인트</label>
+        <input id="pointInput" class="input" type="number" min="0" step="1">
       </div>
     </div>
+    <p class="small muted mt-12">운영 중인 계정의 값이 바로 바뀌어요. 보상 누락처럼 확인된 건만 고쳐 주세요.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn" data-close>취소</button>
+      <button type="button" class="btn primary" id="levelSave">저장</button>
+    </div>
   </div>
+</div>
 
-  <!-- Scripts -->
-  <script th:inline="javascript">
-    let currentLevelType = '';
-    const userId = /*[[${user.userId}]]*/ 1;
+<th:block th:replace="~{fragments/admin-layout :: scripts}"></th:block>
 
-    // Tab switching
-    function showTab(tabName) {
-      // Hide all content
-      document.querySelectorAll('.tab-content').forEach(content => {
-        content.classList.add('hidden');
+<style>
+  .profile-head { display: flex; align-items: center; gap: 14px; }
+  .avatar { width: 56px; height: 56px; border-radius: 18px; object-fit: cover; background: var(--surface-3); }
+  .levels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .level-card {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+    padding: 14px 16px; border: 0; border-radius: var(--radius-m);
+    background: var(--surface-2); text-align: left; cursor: pointer;
+    transition: background .15s, transform .12s var(--ease);
+  }
+  .level-card:hover { background: var(--surface-3); }
+  .level-card:active { transform: scale(.98); }
+  .level-card.total { grid-column: span 2; background: var(--brand-weaker); }
+  .level-card.total:hover { background: var(--brand-weak); }
+  .level-name { font-size: 13px; color: var(--t3); }
+  .level-num { font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
+  .level-card.total .level-num { color: var(--brand-text); font-size: 24px; }
+  .level-pt { font-size: 12px; color: var(--t3); }
+  .moods { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+  .mood { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: var(--radius-s); background: var(--surface-2); }
+  .mood-date { font-size: 12px; color: var(--t3); }
+  .mood-key { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+</style>
+
+<script>
+  (function () {
+    var userId = document.querySelector('main[data-user-id]').getAttribute('data-user-id');
+    var modal = document.getElementById('levelModal');
+    var levelInput = document.getElementById('levelInput');
+    var pointInput = document.getElementById('pointInput');
+    var current = null;
+
+    document.querySelectorAll('.level-card').forEach(function (card) {
+      card.addEventListener('click', function () {
+        current = card.getAttribute('data-type');
+        document.getElementById('levelModalTitle').textContent = card.getAttribute('data-name') + ' 레벨 수정';
+        levelInput.value = card.getAttribute('data-level');
+        pointInput.value = card.getAttribute('data-point');
+        OnoAdmin.openModal('levelModal');
+        setTimeout(function () { levelInput.focus(); }, 50);
       });
+    });
 
-      // Remove active state from all tabs
-      document.querySelectorAll('.tab-button').forEach(button => {
-        button.classList.remove('border-indigo-500', 'text-indigo-600');
-        button.classList.add('border-transparent', 'text-gray-500');
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal || e.target.hasAttribute('data-close')) OnoAdmin.closeModal('levelModal');
+    });
+
+    document.getElementById('levelSave').addEventListener('click', function () {
+      var body = new URLSearchParams({
+        levelType: current,
+        levelValue: levelInput.value,
+        pointValue: pointInput.value
       });
-
-      // Show selected content
-      document.getElementById('content-' + tabName).classList.remove('hidden');
-
-      // Add active state to selected tab
-      const activeTab = document.getElementById('tab-' + tabName);
-      activeTab.classList.remove('border-transparent', 'text-gray-500');
-      activeTab.classList.add('border-indigo-500', 'text-indigo-600');
-    }
-
-    // Level editing
-    function editLevel(levelType, levelName, currentLevel, currentPoint) {
-      currentLevelType = levelType;
-      document.getElementById('modalTitle').textContent = levelName + ' 레벨 수정';
-      document.getElementById('levelInput').value = currentLevel;
-      document.getElementById('pointInput').value = currentPoint;
-      document.getElementById('levelModal').classList.remove('hidden');
-    }
-
-    function closeLevelModal() {
-      document.getElementById('levelModal').classList.add('hidden');
-    }
-
-    function saveLevelChange() {
-      const levelValue = document.getElementById('levelInput').value;
-      const pointValue = document.getElementById('pointInput').value;
-
-      fetch(`/admin/user/${userId}/level`, {
+      fetch('/admin/user/' + userId + '/level', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `levelType=${currentLevelType}&levelValue=${levelValue}&pointValue=${pointValue}`
-      })
-      .then(response => {
-        if (response.ok) {
-          alert('레벨이 성공적으로 수정되었습니다');
-          location.reload();
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body
+      }).then(function (res) {
+        OnoAdmin.closeModal('levelModal');
+        if (res.ok) {
+          OnoAdmin.toast('레벨을 바꿨어요');
+          setTimeout(function () { location.reload(); }, 700);
         } else {
-          alert('레벨 수정에 실패했습니다');
+          OnoAdmin.toast('레벨을 바꾸지 못했어요');
         }
-      })
-      .catch(error => {
-        console.error('레벨 수정 중 에러 발생:', error);
-        alert('레벨 수정에 실패했습니다');
+      }).catch(function () {
+        OnoAdmin.closeModal('levelModal');
+        OnoAdmin.toast('레벨을 바꾸지 못했어요');
       });
-
-      closeLevelModal();
-    }
-
-    // User deletion
-    function deleteUser() {
-      if (confirm("정말 이 유저를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
-        fetch(`/admin/user/${userId}`, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        })
-        .then(response => {
-          if (response.ok) {
-            alert("유저가 성공적으로 삭제되었습니다");
-            window.location.href = "/admin/users";
-          } else {
-            alert("유저 삭제에 실패했습니다");
-          }
-        })
-        .catch(error => {
-          console.error("유저 삭제 중 에러 발생:", error);
-          alert("유저 삭제에 실패했습니다");
-        });
-      }
-    }
-  </script>
+    });
+  })();
+</script>
 </body>
 </html>

@@ -1,284 +1,214 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OnO 관리자 - 문제 상세</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
-  <!-- Navigation Bar -->
-  <nav class="bg-white shadow-lg">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between h-16">
-        <div class="flex items-center">
-          <a th:href="@{/admin/main}">
-            <h1 class="text-2xl font-bold text-indigo-600">OnO 관리자</h1>
-          </a>
-        </div>
-        <div class="flex items-center space-x-4">
-          <a th:href="@{/admin/main}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-            대시보드
-          </a>
-          <a th:href="@{/admin/users}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-            유저
-          </a>
-          <a th:href="@{/admin/problems}" class="text-indigo-600 px-3 py-2 rounded-md text-sm font-medium border-b-2 border-indigo-600">
-            문제
-          </a>
-          <a th:href="@{/admin/practice-notes}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-            복습
-          </a>
-          <a th:href="@{/admin/analysis}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-            통계
-          </a>
-          <form th:action="@{/logout}" method="post">
-            <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-150">
-              로그아웃
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
-  </nav>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/admin-layout :: head('오답노트 상세')}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{fragments/admin-layout :: sidebar('problems')}"></aside>
+  <main class="main" data-reveal>
 
-  <!-- Main Content -->
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <!-- Header -->
-    <div class="mb-6 flex items-center justify-between">
+    <div class="page-head">
       <div>
-        <div class="flex items-center space-x-3">
-          <a th:href="@{/admin/problems}" class="text-gray-500 hover:text-gray-700">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-            </svg>
-          </a>
-          <h2 class="text-2xl font-bold text-gray-900">문제 상세 정보</h2>
-        </div>
-        <p class="text-gray-600 mt-1">문제 ID: <span class="font-semibold text-indigo-600" th:text="${problem.problemId}">1</span></p>
+        <a class="crumb" th:href="@{/admin/problems}">오답노트</a>
+        <h1 th:text="${problem.reference != null and !#strings.isEmpty(problem.reference)} ? ${problem.reference} : |오답노트 #${problem.problemId}|">오답노트</h1>
+        <p class="desc">
+          <span th:text="|#${problem.problemId}|">#1</span>
+          <span th:text="|· ${#temporals.format(problem.createdAt, 'yyyy-MM-dd HH:mm')} 등록|">등록일</span>
+        </p>
       </div>
+      <th:block th:replace="~{fragments/admin-learning :: analysisChip(${problem.analysisStatus})}"></th:block>
     </div>
 
-    <!-- Problem Detail -->
-    <div class="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-      <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
-        <h3 class="text-lg font-semibold text-gray-900">기본 정보</h3>
-      </div>
-      <div class="px-6 py-5">
-        <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
-          <div>
-            <dt class="text-sm font-medium text-gray-500">문제 ID</dt>
-            <dd class="mt-1 text-sm text-gray-900" th:text="${problem.problemId}">1</dd>
-          </div>
-          <div>
-            <dt class="text-sm font-medium text-gray-500">폴더</dt>
-            <dd class="mt-1 text-sm text-gray-900">
-              <span class="font-medium" th:text="${folder.folderName}">폴더명</span>
-              <span class="text-gray-500 ml-2" th:text="'(ID: ' + ${folder.folderId} + ')'"></span>
-            </dd>
-          </div>
-          <div>
-            <dt class="text-sm font-medium text-gray-500">작성자</dt>
-            <dd class="mt-1 text-sm text-gray-900">
-              <a th:href="@{/admin/user/{userId}(userId=${user.userId})}"
-                 class="text-indigo-600 hover:text-indigo-800 font-medium">
-                <span th:text="${user.name}">사용자명</span>
-              </a>
-              <span class="text-gray-500 ml-2" th:text="'(ID: ' + ${user.userId} + ')'"></span>
-            </dd>
-          </div>
-          <div>
-            <dt class="text-sm font-medium text-gray-500">작성일</dt>
-            <dd class="mt-1 text-sm text-gray-900" th:text="${#temporals.format(problem.createdAt, 'yyyy-MM-dd HH:mm:ss')}">2024-01-01 00:00:00</dd>
-          </div>
-          <div>
-            <dt class="text-sm font-medium text-gray-500">푼 날짜</dt>
-            <dd class="mt-1 text-sm text-gray-900">
-              <span th:if="${problem.solvedAt != null}" th:text="${#temporals.format(problem.solvedAt, 'yyyy-MM-dd')}">2024-01-01</span>
-              <span th:unless="${problem.solvedAt != null}" class="text-gray-400">-</span>
-            </dd>
-          </div>
-          <div>
-            <dt class="text-sm font-medium text-gray-500">출처</dt>
-            <dd class="mt-1 text-sm text-gray-900">
-              <span th:if="${problem.reference != null and !problem.reference.isEmpty()}" th:text="${problem.reference}">출처</span>
-              <span th:unless="${problem.reference != null and !problem.reference.isEmpty()}" class="text-gray-400">-</span>
-            </dd>
-          </div>
-          <div class="sm:col-span-2">
-            <dt class="text-sm font-medium text-gray-500">메모</dt>
-            <dd class="mt-1 text-sm text-gray-900 whitespace-pre-wrap">
-              <span th:if="${problem.memo != null and !problem.memo.isEmpty()}" th:text="${problem.memo}">메모 내용</span>
-              <span th:unless="${problem.memo != null and !problem.memo.isEmpty()}" class="text-gray-400">-</span>
-            </dd>
-          </div>
+    <div class="grid grid-2">
+      <div class="card">
+        <h2 class="card-title">기본 정보</h2>
+        <dl class="kv">
+          <dt>작성자</dt>
+          <dd>
+            <a th:if="${problem.userId != null}" class="strong" th:href="@{/admin/user/{id}(id=${problem.userId})}"
+               th:text="${problem.userName ?: '이름 없음'}">이름</a>
+            <span class="small muted" th:if="${problem.userId != null}" th:text="|ID ${problem.userId}|">ID</span>
+            <span class="chip red" th:if="${problem.userDeleted}">탈퇴</span>
+          </dd>
+          <dt>이메일</dt>
+          <dd th:text="${problem.userEmail ?: '-'}">email</dd>
+          <dt>폴더</dt>
+          <dd>
+            <span th:text="${problem.folderName ?: '-'}">폴더</span>
+            <span class="small muted" th:if="${problem.folderId != null}" th:text="|ID ${problem.folderId}|">ID</span>
+          </dd>
+          <dt>출처</dt>
+          <dd th:text="${problem.reference ?: '-'}">출처</dd>
+          <dt>푼 날짜</dt>
+          <dd th:text="${problem.solvedAt != null} ? ${#temporals.format(problem.solvedAt, 'yyyy-MM-dd')} : '-'">-</dd>
+          <dt>태그</dt>
+          <dd>
+            <div class="gap-8" th:if="${!#lists.isEmpty(tags)}">
+              <span class="chip" th:each="t : ${tags}" th:text="${t.name}">태그</span>
+            </div>
+            <span class="muted" th:if="${#lists.isEmpty(tags)}">없음</span>
+          </dd>
         </dl>
+        <div th:if="${problem.memo != null and !#strings.isEmpty(problem.memo)}">
+          <div class="prose-label">메모</div>
+          <div class="quote" th:text="${problem.memo}">메모</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">복습 상태</h2>
+        <div class="stats">
+          <div>
+            <div class="stat-label">복습 횟수</div>
+            <div class="stat-value" th:text="|${problemSolveCount}회|">0회</div>
+          </div>
+          <div>
+            <div class="stat-label">연속 정답</div>
+            <div class="stat-value" th:text="|${problem.consecutiveCorrectCount ?: 0}회|">0회</div>
+          </div>
+          <div>
+            <div class="stat-label">복습 간격</div>
+            <div class="stat-value" th:text="|${problem.reviewInterval ?: 1}일|">1일</div>
+          </div>
+          <div>
+            <div class="stat-label">다음 복습일</div>
+            <div class="stat-value" th:text="${problem.nextReviewAt != null} ? ${#temporals.format(problem.nextReviewAt, 'MM.dd')} : '-'">-</div>
+          </div>
+        </div>
+
+        <div class="prose-label mt-20">들어 있는 복습노트</div>
+        <div class="rows" th:if="${!#lists.isEmpty(practiceNotes)}">
+          <a class="row" th:each="n : ${practiceNotes}" th:href="@{/admin/practice-notes/{id}(id=${n.noteId})}">
+            <div class="row-main">
+              <div class="row-title" th:text="${n.title ?: '제목 없음'}">복습노트</div>
+              <div class="row-sub" th:text="${n.lastSolvedAt != null} ? |마지막 복습 ${#temporals.format(n.lastSolvedAt, 'yyyy-MM-dd')}| : '아직 복습 안 함'">-</div>
+            </div>
+            <span class="row-value" th:text="|${n.practiceCount}회|">0회</span>
+          </a>
+        </div>
+        <p class="muted small" th:if="${#lists.isEmpty(practiceNotes)}">어느 복습노트에도 들어 있지 않아요.</p>
       </div>
     </div>
 
-    <!-- Images -->
-    <div class="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-      <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
-        <h3 class="text-lg font-semibold text-gray-900">문제 이미지</h3>
-      </div>
-      <div class="px-6 py-5">
-        <div th:if="${!#lists.isEmpty(problem.imageUrlList)}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div th:each="image : ${problem.imageUrlList}" class="border border-gray-200 rounded-lg overflow-hidden">
-            <div class="bg-gray-50 px-3 py-2 border-b border-gray-200">
-              <span class="text-xs font-medium text-gray-700" th:text="${image.problemImageType}">이미지 타입</span>
-            </div>
-            <div class="p-3">
-              <a th:href="@{/admin/user/image/view(url=${image.imageUrl})}" target="_blank">
-                <img th:src="${image.imageUrl}"
-                     alt="문제 이미지"
-                     class="w-full h-auto rounded cursor-pointer hover:opacity-75 transition-opacity"
-                     style="max-height: 400px; object-fit: contain;">
-              </a>
-              <div class="mt-2">
-                <a th:href="@{/admin/user/image/view(url=${image.imageUrl})}"
-                   target="_blank"
-                   class="text-xs text-indigo-600 hover:text-indigo-800 break-all">
-                  새 창에서 보기 →
-                </a>
-              </div>
+    <section class="section" th:if="${!#lists.isEmpty(images)}">
+      <div class="section-head"><h2>이미지</h2><span class="hint" th:text="|${#lists.size(images)}장|">0장</span></div>
+      <div class="card">
+        <div class="thumbs">
+          <div th:each="img : ${images}">
+            <a class="thumb" th:href="@{/admin/user/image/view(url=${img.url})}" target="_blank" rel="noopener">
+              <img th:src="${img.url}" alt="" loading="lazy">
+            </a>
+            <div class="thumb-cap" th:switch="${img.type}">
+              <th:block th:case="'PROBLEM_IMAGE'">문제</th:block>
+              <th:block th:case="'ANSWER_IMAGE'">정답</th:block>
+              <th:block th:case="'SOLVE_IMAGE'">풀이</th:block>
+              <th:block th:case="'PROCESS_IMAGE'">풀이 과정</th:block>
+              <th:block th:case="*" th:text="${img.type}">유형</th:block>
             </div>
           </div>
         </div>
-        <div th:if="${#lists.isEmpty(problem.imageUrlList)}" class="text-center py-8 text-gray-500">
-          이미지가 없습니다
-        </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Analysis -->
-    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-      <div class="px-6 py-5 border-b border-gray-200 bg-gray-50">
-        <h3 class="text-lg font-semibold text-gray-900">AI 분석 결과</h3>
-      </div>
-      <div class="px-6 py-5">
-        <div th:if="${problem.analysis != null}">
-          <div class="mb-4">
-            <span th:if="${problem.analysis.status == 'COMPLETED'}"
-                  class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-              분석 완료
-            </span>
-            <span th:if="${problem.analysis.status == 'PENDING'}"
-                  class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-              분석중
-            </span>
-            <span th:if="${problem.analysis.status == 'NOT_STARTED'}"
-                  class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-              분석 대기
-            </span>
-            <span th:if="${problem.analysis.status == 'FAILED'}"
-                  class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
-              분석 실패
-            </span>
+    <section class="section">
+      <div class="section-head"><h2>AI 분석</h2></div>
+      <div class="card">
+        <div th:if="${problem.analysisStatus == null}" class="muted">분석 기록이 없어요.</div>
+        <th:block th:if="${problem.analysisStatus != null}">
+          <div class="gap-8">
+            <th:block th:replace="~{fragments/admin-learning :: analysisChip(${problem.analysisStatus})}"></th:block>
+            <span class="chip" th:if="${problem.subject != null}" th:text="${problem.subject}">수학</span>
+            <span class="chip" th:if="${problem.problemType != null}" th:text="${problem.problemType}">유형</span>
           </div>
-          <dl class="grid grid-cols-1 gap-x-4 gap-y-6">
-            <div th:if="${problem.analysis.subject != null}">
-              <dt class="text-sm font-medium text-gray-500">과목</dt>
-              <dd class="mt-1 text-sm text-gray-900 font-semibold" th:text="${problem.analysis.subject}">과목</dd>
-            </div>
-            <div th:if="${problem.analysis.problemType != null}">
-              <dt class="text-sm font-medium text-gray-500">문제 유형</dt>
-              <dd class="mt-1 text-sm text-gray-900" th:text="${problem.analysis.problemType}">문제 유형</dd>
-            </div>
-            <div th:if="${problem.analysis.keyPoints != null and !#lists.isEmpty(problem.analysis.keyPoints)}">
-              <dt class="text-sm font-medium text-gray-500">핵심 포인트</dt>
-              <dd class="mt-1">
-                <ul class="list-disc list-inside space-y-1 bg-blue-50 p-4 rounded-lg">
-                  <li th:each="point : ${problem.analysis.keyPoints}"
-                      class="text-sm text-gray-900"
-                      th:text="${point}">핵심 포인트</li>
-                </ul>
-              </dd>
-            </div>
-            <div th:if="${problem.analysis.solution != null}">
-              <dt class="text-sm font-medium text-gray-500">풀이</dt>
-              <dd class="mt-1 text-sm text-gray-900 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg" th:text="${problem.analysis.solution}">풀이</dd>
-            </div>
-            <div th:if="${problem.analysis.commonMistakes != null}">
-              <dt class="text-sm font-medium text-gray-500">흔한 실수</dt>
-              <dd class="mt-1 text-sm text-gray-900 whitespace-pre-wrap bg-orange-50 p-4 rounded-lg" th:text="${problem.analysis.commonMistakes}">흔한 실수</dd>
-            </div>
-            <div th:if="${problem.analysis.studyTips != null}">
-              <dt class="text-sm font-medium text-gray-500">학습 팁</dt>
-              <dd class="mt-1 text-sm text-gray-900 whitespace-pre-wrap bg-green-50 p-4 rounded-lg" th:text="${problem.analysis.studyTips}">학습 팁</dd>
-            </div>
-            <div th:if="${problem.analysis.status == 'FAILED' and problem.analysis.errorMessage != null}">
-              <dt class="text-sm font-medium text-gray-500">에러 메시지</dt>
-              <dd class="mt-1 text-sm text-red-600 whitespace-pre-wrap bg-red-50 p-4 rounded-lg" th:text="${problem.analysis.errorMessage}">에러 메시지</dd>
-            </div>
-          </dl>
-        </div>
-        <div th:unless="${problem.analysis != null}" class="text-center py-8">
-          <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-600">
-            미등록
-          </span>
-          <p class="mt-2 text-sm text-gray-500">아직 AI 분석이 등록되지 않았습니다</p>
-        </div>
+          <div th:if="${problem.errorMessage != null and !#strings.isEmpty(problem.errorMessage)}">
+            <div class="prose-label mt-20">에러 메시지</div>
+            <div class="quote red" th:text="${problem.errorMessage}">에러</div>
+          </div>
+          <div th:if="${!#lists.isEmpty(keyPoints)}">
+            <div class="prose-label mt-20">핵심 포인트</div>
+            <div class="gap-8"><span class="chip green" th:each="k : ${keyPoints}" th:text="${k}">포인트</span></div>
+          </div>
+          <div th:if="${problem.solution != null}">
+            <div class="prose-label mt-20">풀이</div>
+            <div class="prose" th:text="${problem.solution}">풀이</div>
+          </div>
+          <div th:if="${problem.commonMistakes != null}">
+            <div class="prose-label mt-20">흔한 실수</div>
+            <div class="prose" th:text="${problem.commonMistakes}">실수</div>
+          </div>
+          <div th:if="${problem.studyTips != null}">
+            <div class="prose-label mt-20">학습 팁</div>
+            <div class="prose" th:text="${problem.studyTips}">팁</div>
+          </div>
+        </th:block>
       </div>
-    </div>
+    </section>
 
-    <!-- Problem Solve Records -->
-    <div class="bg-white rounded-lg shadow-md overflow-hidden mt-6">
-      <div class="px-6 py-5 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-        <h3 class="text-lg font-semibold text-gray-900">문제 복습 기록</h3>
-        <span class="text-sm text-gray-500">
-          총 <span class="font-semibold text-indigo-600" th:text="${problemSolveCount}">0</span>개
-        </span>
-      </div>
-      <div class="px-6 py-5">
-        <div th:if="${!#lists.isEmpty(problemSolves)}" class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">기록 ID</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">유저 ID</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">복습일</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">정답 상태</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">소요 시간</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">회고</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">이미지</th>
-              </tr>
+    <section class="section" th:if="${!#lists.isEmpty(sharedRooms)}">
+      <div class="section-head"><h2>공유된 스터디룸</h2><span class="hint" th:text="|${#lists.size(sharedRooms)}곳|">0곳</span></div>
+      <div class="card flush">
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+            <tr><th>스터디룸</th><th>공유한 사람</th><th>한마디</th><th class="r">댓글</th><th class="r">반응</th><th>공유일</th></tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              <tr th:each="solve : ${problemSolves}" class="hover:bg-gray-50">
-                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900" th:text="${solve.problemSolveId}">1</td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                  <a th:href="@{/admin/user/{userId}(userId=${solve.userId})}" class="text-indigo-600 hover:text-indigo-800 font-medium" th:text="${solve.userId}">1</a>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600" th:text="${#temporals.format(solve.practicedAt, 'yyyy-MM-dd HH:mm')}">2024-01-01</td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600" th:text="${solve.answerStatus}">CORRECT</td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                  <span th:if="${solve.timeSpentSeconds != null}" th:text="${solve.timeSpentSeconds} + '초'">60초</span>
-                  <span th:unless="${solve.timeSpentSeconds != null}" class="text-gray-400">-</span>
-                </td>
-                <td class="px-4 py-3 text-sm text-gray-600">
-                  <span th:if="${solve.reflection != null and !solve.reflection.isEmpty()}" th:text="${#strings.abbreviate(solve.reflection, 60)}">회고</span>
-                  <span th:unless="${solve.reflection != null and !solve.reflection.isEmpty()}" class="text-gray-400">-</span>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                  <span th:text="${#lists.size(solve.imageUrls)} + '장'">0장</span>
-                </td>
-              </tr>
+            <tbody>
+            <tr th:each="r : ${sharedRooms}" th:attr="data-href=${r.roomId != null} ? @{/admin/study-rooms/{id}(id=${r.roomId})} : null">
+              <td class="strong" th:text="${r.roomName ?: '삭제된 방'}">방</td>
+              <td>
+                <a th:if="${r.sharedByUserId != null}" class="link" th:href="@{/admin/user/{id}(id=${r.sharedByUserId})}" th:text="${r.sharedByName ?: ('ID ' + r.sharedByUserId)}">이름</a>
+              </td>
+              <td class="ellipsis muted" th:text="${r.comment ?: '-'}">한마디</td>
+              <td class="r" th:text="${r.commentCount}">0</td>
+              <td class="r" th:text="${r.reactionCount}">0</td>
+              <td class="nowrap muted" th:text="${#temporals.format(r.sharedAt, 'yyyy-MM-dd HH:mm')}">날짜</td>
+            </tr>
             </tbody>
           </table>
         </div>
-        <div th:if="${#lists.isEmpty(problemSolves)}" class="text-center py-8 text-gray-500">
-          이 문제에 작성된 복습 기록이 없습니다
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>복습 기록</h2>
+        <span class="hint" th:text="|${problemSolveCount}회|">0회</span>
+      </div>
+      <div class="card" th:if="${#lists.isEmpty(problemSolves)}">
+        <div class="empty">아직 이 문제를 다시 풀지 않았어요.</div>
+      </div>
+      <div class="card solve" th:each="s : ${problemSolves}">
+        <div class="between">
+          <div class="gap-8">
+            <th:block th:replace="~{fragments/admin-learning :: answerChip(${s.answerStatus})}"></th:block>
+            <span class="strong num" th:text="${#temporals.format(s.practicedAt, 'yyyy-MM-dd HH:mm')}">날짜</span>
+            <span class="small muted" th:if="${s.timeSpentText() != null}" th:text="|${s.timeSpentText()} 걸림|">시간</span>
+          </div>
+          <div class="gap-8">
+            <span class="chip" th:if="${s.moodEmojiKey != null}" th:text="${s.moodEmojiKey}">기분</span>
+            <span class="chip" th:if="${s.migratedFromLegacy}">예전 기록 이관</span>
+          </div>
+        </div>
+        <div th:if="${s.reflection != null and !#strings.isEmpty(s.reflection)}">
+          <div class="prose-label mt-12">회고</div>
+          <div class="quote" th:text="${s.reflection}">회고</div>
+        </div>
+        <div th:if="${!#lists.isEmpty(s.improvementTexts())}">
+          <div class="prose-label mt-12">나아진 점</div>
+          <div class="gap-8"><span class="chip green" th:each="t : ${s.improvementTexts()}" th:text="${t}">개선</span></div>
+        </div>
+        <div class="thumbs mt-12 solve-thumbs" th:if="${!#lists.isEmpty(s.imageUrls)}">
+          <a class="thumb" th:each="url : ${s.imageUrls}" th:href="@{/admin/user/image/view(url=${url})}" target="_blank" rel="noopener">
+            <img th:src="${url}" alt="" loading="lazy">
+          </a>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Back Button -->
-    <div class="mt-6 flex justify-end">
-      <a th:href="@{/admin/problems}"
-         class="px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-medium transition duration-150">
-        목록으로 돌아가기
-      </a>
-    </div>
-  </div>
+  </main>
+</div>
+<style>
+  .solve-thumbs { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+</style>
+<th:block th:replace="~{fragments/admin-layout :: scripts}"></th:block>
 </body>
 </html>

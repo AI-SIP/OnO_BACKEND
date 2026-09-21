@@ -38,7 +38,8 @@ public class MissionDefinitionSeeder {
      */
     private static final List<String> MIGRATION_PATHS = List.of(
             "db/migration/V30__seed_mission_definitions.sql",
-            "db/migration/V33__refine_mission_definition_wording.sql"
+            "db/migration/V33__refine_mission_definition_wording.sql",
+            "db/migration/V47__use_digits_in_mission_titles.sql"
     );
 
     @PersistenceContext

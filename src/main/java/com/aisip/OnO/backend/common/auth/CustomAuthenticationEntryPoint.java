@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
@@ -54,10 +55,20 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
 
     private final ObjectMapper objectMapper;
 
+    @Value("${spring.site.url}")
+    private String siteUrl;
+
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException) throws IOException {
 
         if (isPublicPath(request.getRequestURI())) {
+            return;
+        }
+
+        // 관리자 화면은 브라우저가 연다. 로그인이 풀린 채 새로고침하면 JSON 401 이 그대로 보여서
+        // 다시 로그인할 방법이 안 보였다. 화면 요청(GET)만 로그인 화면으로 보내고 나머지는 401 을 유지한다.
+        if (isAdminPageRequest(request)) {
+            response.sendRedirect(siteUrl + "/login");
             return;
         }
 
@@ -66,6 +77,13 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
         response.setContentType("application/json;charset=UTF-8");
         response.setStatus(errorCase.getHttpStatusCode());
         objectMapper.writeValue(response.getWriter(), CommonResponse.error(errorCase));
+    }
+
+    private boolean isAdminPageRequest(HttpServletRequest request) {
+        String requestURI = request.getRequestURI();
+        return "GET".equalsIgnoreCase(request.getMethod())
+                && requestURI != null
+                && (requestURI.equals("/admin") || requestURI.startsWith("/admin/"));
     }
 
     private boolean isPublicPath(String requestURI) {

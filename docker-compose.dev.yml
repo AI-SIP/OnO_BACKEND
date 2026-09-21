@@ -209,6 +209,19 @@ services:
     profiles:
       - monitoring
 
+  redis-exporter-dev:
+    image: oliver006/redis_exporter:v1.67.0
+    container_name: ono-redis-exporter-dev
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis-dev:6379
+    depends_on:
+      - redis-dev
+    networks:
+      - ono-network
+    profiles:
+      - monitoring
+
   # Grafana - DEVELOPMENT (Profile: monitoring)
   grafana-dev:
     image: grafana/grafana:latest

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/admin-layout :: head('미션')}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{fragments/admin-layout :: sidebar('missions')}"></aside>
+
+  <main class="main" data-reveal>
+    <div class="page-head">
+      <div>
+        <h1>미션</h1>
+        <p class="desc" th:text="|오늘(${dailyKey})과 이번 주(${weeklyKey}) 기준이에요.|">오늘과 이번 주 기준</p>
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi">
+        <div class="kpi-label">운영 중인 미션</div>
+        <div class="kpi-value"><span data-count th:text="${overview.activeMissions()}">0</span><span class="unit">개</span></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">오늘 달성</div>
+        <div class="kpi-value"><span data-count th:text="${overview.todayCompleted()}">0</span><span class="unit">건</span></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">오늘 보상 받음</div>
+        <div class="kpi-value"><span data-count th:text="${overview.todayClaimed()}">0</span><span class="unit">건</span></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">최근 7일 보상 받음</div>
+        <div class="kpi-value"><span data-count th:text="${overview.claimedLast7Days()}">0</span><span class="unit">건</span></div>
+      </div>
+    </div>
+
+    <th:block th:each="block : ${ {'DAILY', 'WEEKLY'} }"
+              th:with="list=${block == 'DAILY'} ? ${dailyMissions} : ${weeklyMissions}">
+      <div class="section">
+        <div class="section-head">
+          <h2 th:text="${block == 'DAILY'} ? '일일 미션' : '주간 미션'">일일 미션</h2>
+          <span class="hint" th:text="${block == 'DAILY'} ? |이번 기간 ${dailyKey}| : |이번 기간 ${weeklyKey}|">기간</span>
+        </div>
+        <div class="card flush">
+          <p class="small muted mission-help" th:if="${block == 'DAILY'}">진행도는 유저가 해당 행동을 한 번이라도 해야 생겨요. 그래서 시작 대비 달성은 이번 기간에 시작한 유저 가운데 목표까지 채운 비율이에요.</p>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+              <tr>
+                <th>미션</th>
+                <th>지표</th>
+                <th class="r">목표</th>
+                <th>보상</th>
+                <th class="r" title="이번 기간에 이 미션 진행도가 한 번이라도 올라간 유저 수">시작한 유저</th>
+                <th class="r">목표 달성</th>
+                <th class="r">보상 받음</th>
+                <th title="시작한 유저 가운데 목표를 채운 유저의 비율">시작 대비 달성</th>
+                <th class="r">누적 달성</th>
+                <th class="r">누적 받음</th>
+              </tr>
+              </thead>
+              <tbody>
+              <tr th:each="m : ${list}" th:classappend="${!m.active()} ? 'off-row'">
+                <td>
+                  <div class="who">
+                    <b>
+                      <span th:text="${m.title()}">제목</span>
+                      <span th:if="${!m.active()}" class="chip">꺼짐</span>
+                    </b>
+                    <span th:text="${m.description() ?: m.code()}">설명</span>
+                  </div>
+                </td>
+                <td th:text="${m.metricLabel()}">출석</td>
+                <td class="r" th:text="${m.target()}">1</td>
+                <td class="nowrap" th:text="${m.rewardLabel()}">10 XP</td>
+                <td class="r" th:text="${m.currentParticipants()}">0</td>
+                <td class="r" th:text="${m.currentCompleted()}">0</td>
+                <td class="r" th:text="${m.currentClaimed()}">0</td>
+                <td class="rate-cell">
+                  <div class="rate">
+                    <div class="bar-track"><div class="bar-fill" th:style="|width: ${m.currentCompletionRate()}%|"></div></div>
+                    <span class="num" th:text="|${#numbers.formatDecimal(m.currentCompletionRate(), 1, 0)}%|">0%</span>
+                  </div>
+                </td>
+                <td class="r" th:text="${m.totalCompleted()}">0</td>
+                <td class="r" th:text="${m.totalClaimed()}">0</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <div th:if="${#lists.isEmpty(list)}" class="empty">등록된 미션이 없어요</div>
+        </div>
+      </div>
+    </th:block>
+
+    <div class="section grid grid-2">
+      <div class="card">
+        <h2 class="card-title">최근 30일 달성과 보상 <small>날짜별 건수</small></h2>
+        <div class="legend mt-0">
+          <span><i style="background: var(--brand)"></i>달성</span>
+          <span><i style="background: var(--blue)"></i>보상 받음</span>
+        </div>
+        <div class="trend">
+          <div class="trend-row" th:each="t : ${trend}">
+            <span class="trend-date num" th:text="${#temporals.format(t.date(), 'MM-dd E')}">09-21</span>
+            <div class="trend-bars">
+              <div class="bar-track"><div class="bar-fill" th:style="|width: ${maxTrend == 0 ? 0 : t.completed() * 100.0 / maxTrend}%|"></div></div>
+              <div class="bar-track"><div class="bar-fill blue" th:style="|width: ${maxTrend == 0 ? 0 : t.claimed() * 100.0 / maxTrend}%|"></div></div>
+            </div>
+            <span class="trend-val num" th:text="|${t.completed()} / ${t.claimed()}|">0 / 0</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2 class="card-title">예전 방식 적립 <small>최근 30일, mission_log 기준</small></h2>
+        <p class="small muted mt-0">미션이 생기기 전부터 쓰던 적립 기록이에요. 복습노트는 노트마다 처음 완료할 때 한 번만 쌓여요.</p>
+        <div class="rows">
+          <div class="row" th:each="l : ${legacyLogs}">
+            <div class="row-main">
+              <div class="row-title" th:text="${l.label()}">출석</div>
+              <div class="row-sub" th:text="|적립 ${l.points()}pt|">적립 0pt</div>
+            </div>
+            <span class="row-value" th:text="|${l.count()}건|">0건</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<style>
+  .off-row td { opacity: .55; }
+  .who b { display: flex; align-items: center; gap: 6px; }
+  .rate-cell { min-width: 140px; }
+  .mission-help { margin: 0; padding: 16px 16px 4px; }
+  .rate { display: grid; grid-template-columns: 1fr 40px; align-items: center; gap: 8px; }
+  .rate .num { text-align: right; font-weight: 600; font-size: 13px; }
+  .trend { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+  .trend-row { display: grid; grid-template-columns: 76px 1fr 60px; align-items: center; gap: 10px; font-size: 13px; }
+  .trend-date { color: var(--t3); }
+  .trend-bars { display: flex; flex-direction: column; gap: 3px; }
+  .trend-bars .bar-track { height: 6px; }
+  .trend-val { text-align: right; font-weight: 600; color: var(--t2); }
+</style>
+<th:block th:replace="~{fragments/admin-layout :: scripts}"></th:block>
+</body>
+</html>
