@@ -346,35 +346,17 @@ class AdminUserControllerTest extends AdminTestSupport {
     class DeleteUser {
 
         @Test
-        @DisplayName("사용자를 삭제하면 200을 주고 조회되지 않는다")
-        void deletesUser() throws Exception {
+        @DisplayName("관리자 화면에서는 사용자를 삭제할 수 없고 데이터가 그대로 남는다")
+        void cannotDeleteUserFromAdmin() throws Exception {
             User target = fixtures.createUser();
 
-            mockMvc.perform(delete("/admin/user/{userId}", target.getId()))
-                    .andExpect(status().isOk());
+            int status = mockMvc.perform(delete("/admin/user/{userId}", target.getId()))
+                    .andReturn().getResponse().getStatus();
 
-            assertThat(userRepository.findById(target.getId()))
-                    .as("소프트 삭제 후에도 조회되면 탈퇴가 동작하지 않은 것이다")
-                    .isEmpty();
-        }
-
-        @Test
-        @DisplayName("삭제해도 다른 사용자는 남는다")
-        void keepsOtherUsers() throws Exception {
-            User target = fixtures.createUser();
-            User other = fixtures.createOtherUser();
-
-            mockMvc.perform(delete("/admin/user/{userId}", target.getId()))
-                    .andExpect(status().isOk());
-
-            assertThat(userRepository.findById(other.getId())).isPresent();
-        }
-
-        @Test
-        @DisplayName("없는 사용자를 삭제하면 404로 응답한다")
-        void returnsNotFoundForUnknownUser() throws Exception {
-            mockMvc.perform(delete("/admin/user/{userId}", 999_999L))
-                    .andExpect(status().isNotFound());
+            assertThat(status)
+                    .as("삭제 엔드포인트를 없앴으므로 성공 응답이 나가면 안 된다")
+                    .isNotEqualTo(200);
+            assertThat(userRepository.findById(target.getId())).isPresent();
         }
     }
 }

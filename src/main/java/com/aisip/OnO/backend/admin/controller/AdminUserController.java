@@ -14,7 +14,6 @@ import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -113,11 +112,5 @@ public class AdminUserController {
     ) {
         userService.updateUserLevel(userId, levelType, levelValue, pointValue);
         return "success";
-    }
-
-    @ResponseStatus(HttpStatus.OK)
-    @DeleteMapping("/user/{userId}")
-    public void deleteUserInfo(@PathVariable(name = "userId") Long userId) {
-        userService.deleteUserById(userId);
     }
 }
