@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/admin-layout :: head('치장')}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{fragments/admin-layout :: sidebar('cosmetics')}"></aside>
+
+  <main class="main" data-reveal>
+    <div class="page-head">
+      <div>
+        <h1>치장</h1>
+        <p class="desc">아이템마다 해금 조건과 지금 착용 중인 유저 수를 볼 수 있어요.</p>
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi">
+        <div class="kpi-label">전체 아이템</div>
+        <div class="kpi-value"><span data-count th:text="${overview.totalItems()}">0</span><span class="unit">개</span></div>
+        <div class="kpi-sub" th:text="|활성 ${overview.activeItems()}개|">활성 0개</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">꾸민 유저</div>
+        <div class="kpi-value"><span data-count th:text="${overview.usersWithLoadout()}">0</span><span class="unit">명</span></div>
+        <div class="kpi-sub">한 자리라도 착용한 유저</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">가장 많이 착용한 아이템</div>
+        <div class="kpi-value top-item" th:text="${overview.topItemName() ?: '-'}">-</div>
+        <div class="kpi-sub" th:if="${overview.topItemName() != null}" th:text="|${overview.topItemEquipped()}명이 착용 중|">0명</div>
+      </div>
+    </div>
+
+    <div class="section grid grid-2">
+      <div class="card">
+        <h2 class="card-title">자리별 착용 <small>착용 중인 유저 수</small></h2>
+        <div class="bars">
+          <div class="bar-row" th:each="g : ${groups}">
+            <span class="name" th:text="${g.label()}">머리</span>
+            <div class="bar-track">
+              <div class="bar-fill"
+                   th:style="|width: ${maxSlotEquipped == 0 ? 0 : g.equippedUsers() * 100.0 / maxSlotEquipped}%|"></div>
+            </div>
+            <span class="val" th:text="${g.equippedUsers()}">0</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2 class="card-title">세트 <small th:text="|${sets.size()}개|">0개</small></h2>
+        <div class="rows" th:if="${!#lists.isEmpty(sets)}">
+          <div class="row" th:each="s : ${sets}">
+            <div class="row-main">
+              <div class="row-title" th:text="${s.setNameKo()}">세트</div>
+              <div class="row-sub" th:text="|${s.setId()}, 아이템 ${s.itemCount()}개|">set, 아이템 3개</div>
+            </div>
+            <span class="row-value" th:text="|착용 ${s.equippedUsers()}|">착용 0</span>
+          </div>
+        </div>
+        <div th:if="${#lists.isEmpty(sets)}" class="empty">세트로 묶인 아이템이 없어요</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <h2>아이템</h2>
+        <div class="slot-filter">
+          <a class="chip" th:href="@{/admin/cosmetics}" th:classappend="${selectedSlot == null} ? 'on'">전체</a>
+          <a class="chip" th:each="g : ${groups}" th:href="@{/admin/cosmetics(slot=${g.slot()})}"
+             th:classappend="${selectedSlot == g.slot()} ? 'on'" th:text="${g.label()}">머리</a>
+        </div>
+      </div>
+
+      <div th:each="g : ${visibleGroups}" class="slot-block">
+        <div class="slot-head">
+          <b th:text="${g.label()}">머리</b>
+          <span class="muted small" th:text="|${g.items().size()}개, 착용 ${g.equippedUsers()}명|">3개</span>
+        </div>
+        <div class="items">
+          <div class="item" th:each="i : ${g.items()}" th:classappend="${!i.active()} ? 'inactive'">
+            <div class="item-img">
+              <img th:if="${i.hasRemoteImage()}" th:src="${i.imageUrl()}" alt="" loading="lazy">
+              <span th:unless="${i.hasRemoteImage()}" class="noimg" th:text="${i.itemKey()}">item_key</span>
+            </div>
+            <div class="item-name" th:text="${i.nameKo()}">이름</div>
+            <div class="item-meta" th:text="${i.unlockLabel()}">총 학습 Lv.2</div>
+            <div class="item-meta" th:if="${i.setNameKo() != null}" th:text="|세트: ${i.setNameKo()}|">세트</div>
+            <div class="gap-8">
+              <span class="chip" th:classappend="${i.equippedUsers() > 0} ? 'green'" th:text="|착용 ${i.equippedUsers()}|">착용 0</span>
+              <span th:if="${!i.active()}" class="chip">비활성</span>
+              <span th:if="${i.fullBody()}" class="chip purple">전신</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div th:if="${#lists.isEmpty(visibleGroups)}" class="card empty">등록된 아이템이 없어요</div>
+    </div>
+  </main>
+</div>
+<style>
+  .top-item { font-size: 22px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .slot-block + .slot-block { margin-top: 28px; }
+  .slot-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; font-size: 16px; }
+  .item-img .noimg { padding: 8px; text-align: center; word-break: break-all; }
+  .section-head { flex-wrap: wrap; }
+  .slot-filter { display: flex; flex-wrap: wrap; gap: 6px; }
+  .slot-filter .chip { height: 32px; padding: 0 14px; font-size: 13px; background: var(--surface); transition: background .15s, color .15s; }
+  .slot-filter .chip:hover { color: var(--t1); }
+  .slot-filter .chip.on { background: var(--t1); color: #fff; }
+</style>
+<th:block th:replace="~{fragments/admin-layout :: scripts}"></th:block>
+</body>
+</html>

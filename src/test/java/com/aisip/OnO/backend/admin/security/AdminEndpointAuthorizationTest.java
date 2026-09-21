@@ -39,7 +39,7 @@ class AdminEndpointAuthorizationTest extends AdminTestSupport {
     }
 
     /**
-     * 관리자 컨트롤러 7개의 모든 엔드포인트.
+     * 관리자 컨트롤러 9개의 모든 엔드포인트.
      *
      * <p>경로 변수에는 존재하지 않는 id를 넣는다. 권한 검사는 컨트롤러에 진입하기 전에
      * 끝나야 하므로, 데이터가 없어도 결과가 달라지면 안 된다.
@@ -60,6 +60,7 @@ class AdminEndpointAuthorizationTest extends AdminTestSupport {
                 // AdminPracticeNoteController
                 new Object[]{HttpMethod.GET, "/admin/practice-notes"},
                 new Object[]{HttpMethod.GET, "/admin/practice-logs"},
+                new Object[]{HttpMethod.GET, "/admin/practice-notes/999999"},
                 // AdminStudyRoomController
                 new Object[]{HttpMethod.GET, "/admin/study-rooms"},
                 new Object[]{HttpMethod.GET, "/admin/study-rooms/999999"},
@@ -69,7 +70,15 @@ class AdminEndpointAuthorizationTest extends AdminTestSupport {
                 new Object[]{HttpMethod.GET, "/admin/analysis/daily-active-users?date=2026-01-01"},
                 // AdminFeedbackController
                 new Object[]{HttpMethod.GET, "/admin/feedbacks"},
-                new Object[]{HttpMethod.GET, "/admin/feedbacks/999999"}
+                new Object[]{HttpMethod.GET, "/admin/feedbacks/999999"},
+                // AdminNoticeController (공지는 실사용자 전원에게 뜨므로 권한 검증 대상에 넣는다)
+                new Object[]{HttpMethod.GET, "/admin/notice"},
+                new Object[]{HttpMethod.POST, "/admin/notice?title=t&content=c&type=INFO"},
+                new Object[]{HttpMethod.POST, "/admin/notice/999999/delete"},
+                // AdminGrowthController
+                new Object[]{HttpMethod.GET, "/admin/cosmetics"},
+                new Object[]{HttpMethod.GET, "/admin/achievements"},
+                new Object[]{HttpMethod.GET, "/admin/missions"}
         );
     }
 
@@ -164,7 +173,9 @@ class AdminEndpointAuthorizationTest extends AdminTestSupport {
                         com.aisip.OnO.backend.admin.controller.AdminPracticeNoteController.class,
                         com.aisip.OnO.backend.admin.controller.AdminStudyRoomController.class,
                         com.aisip.OnO.backend.admin.controller.AdminAnalysisController.class,
-                        com.aisip.OnO.backend.admin.controller.AdminFeedbackController.class
+                        com.aisip.OnO.backend.admin.controller.AdminFeedbackController.class,
+                        com.aisip.OnO.backend.admin.controller.AdminGrowthController.class,
+                        com.aisip.OnO.backend.admin.controller.AdminNoticeController.class
                 )
                 .flatMap(type -> java.util.Arrays.stream(type.getDeclaredMethods()))
                 .filter(m -> java.util.Arrays.stream(m.getAnnotations())

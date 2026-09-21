@@ -1,563 +1,476 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OnO 관리자 - 통계</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
-  <!-- Navigation Bar -->
-  <nav class="bg-white shadow-lg">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between h-16">
-        <div class="flex items-center">
-          <a th:href="@{/admin/main}">
-            <h1 class="text-2xl font-bold text-indigo-600">OnO 관리자</h1>
-          </a>
-        </div>
-        <div class="flex items-center space-x-4">
-          <a th:href="@{/admin/main}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-            대시보드
-          </a>
-          <a th:href="@{/admin/users}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-            유저
-          </a>
-          <a th:href="@{/admin/problems}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-            문제
-          </a>
-          <a th:href="@{/admin/practice-notes}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">
-            복습
-          </a>
-          <a th:href="@{/admin/analysis}" class="text-indigo-600 px-3 py-2 rounded-md text-sm font-medium border-b-2 border-indigo-600">
-            통계
-          </a>
-          <form th:action="@{/logout}" method="post">
-            <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-150">
-              로그아웃
-            </button>
-          </form>
-        </div>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/admin-layout :: head('통계')}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{fragments/admin-layout :: sidebar('analysis')}"></aside>
+
+  <main class="main" data-reveal>
+
+    <div class="page-head">
+      <div>
+        <h1>통계</h1>
+        <p class="desc num"
+           th:text="|${#temporals.format(startDate, 'yyyy. M. d')} ~ ${#temporals.format(endDate, 'yyyy. M. d')} (${days}일), 직전 비교 ${#temporals.format(previousStartDate, 'M. d')} ~ ${#temporals.format(previousEndDate, 'M. d')}|">
+          2026. 8. 23 ~ 2026. 9. 21 (30일)</p>
+      </div>
+      <div class="seg">
+        <a th:href="@{/admin/analysis(startDate=${quickStart7Days}, endDate=${today})}"
+           th:classappend="${startDate == quickStart7Days and endDate == today} ? 'on'">7일</a>
+        <a th:href="@{/admin/analysis(startDate=${quickStart30Days}, endDate=${today})}"
+           th:classappend="${startDate == quickStart30Days and endDate == today} ? 'on'">30일</a>
+        <a th:href="@{/admin/analysis(startDate=${quickStart90Days}, endDate=${today})}"
+           th:classappend="${startDate == quickStart90Days and endDate == today} ? 'on'">90일</a>
+        <a th:href="@{/admin/analysis(startDate=${quickStartMonth}, endDate=${today})}"
+           th:classappend="${startDate == quickStartMonth and endDate == today and quickStartMonth != quickStart7Days and quickStartMonth != quickStart30Days} ? 'on'">이번 달</a>
       </div>
     </div>
-  </nav>
 
-  <!-- Main Content -->
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <!-- Header -->
-    <div class="mb-8">
-      <h2 class="text-2xl font-bold text-gray-900">시스템 통계</h2>
-      <p class="text-gray-600 mt-1">OnO 애플리케이션 통계 개요</p>
-    </div>
-
-    <form th:action="@{/admin/analysis}" method="get" class="mb-8 bg-white rounded-lg shadow-md border border-gray-100 overflow-hidden">
-      <div class="px-5 py-4 bg-gray-50 border-b border-gray-100 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p class="text-sm font-semibold text-gray-900">기간별 통계 조회</p>
-          <p class="mt-1 text-xs text-gray-500">
-            <span th:text="${#temporals.format(startDate, 'yyyy-MM-dd')}">2024-01-01</span>
-            부터
-            <span th:text="${#temporals.format(endDate, 'yyyy-MM-dd')}">2024-01-30</span>
-            까지
-          </p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <a th:href="@{/admin/analysis(startDate=${quickStart7Days}, endDate=${today})}"
-             class="px-3 py-2 bg-white border border-gray-200 rounded-md text-xs font-medium text-gray-700 hover:border-indigo-300 hover:text-indigo-700 transition">최근 7일</a>
-          <a th:href="@{/admin/analysis(startDate=${quickStart30Days}, endDate=${today})}"
-             class="px-3 py-2 bg-white border border-gray-200 rounded-md text-xs font-medium text-gray-700 hover:border-indigo-300 hover:text-indigo-700 transition">최근 30일</a>
-          <a th:href="@{/admin/analysis(startDate=${quickStart90Days}, endDate=${today})}"
-             class="px-3 py-2 bg-white border border-gray-200 rounded-md text-xs font-medium text-gray-700 hover:border-indigo-300 hover:text-indigo-700 transition">최근 90일</a>
-        </div>
+    <form class="card toolbar" th:action="@{/admin/analysis}" method="get">
+      <div class="field">
+        <label for="startDate">시작일</label>
+        <input class="input" type="date" id="startDate" name="startDate" th:value="${startDate}" th:max="${today}">
       </div>
-      <div class="p-5 grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 items-end">
-        <div>
-          <label for="startDate" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">시작일</label>
-          <div class="relative">
-            <input id="startDate" name="startDate" type="date" th:value="${startDate}"
-                   class="w-full h-11 rounded-lg border border-gray-200 bg-gray-50 px-4 text-sm text-gray-900 shadow-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100">
-          </div>
-        </div>
-        <div>
-          <label for="endDate" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">종료일</label>
-          <div class="relative">
-            <input id="endDate" name="endDate" type="date" th:value="${endDate}"
-                   class="w-full h-11 rounded-lg border border-gray-200 bg-gray-50 px-4 text-sm text-gray-900 shadow-sm outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100">
-          </div>
-        </div>
-        <button type="submit" class="h-11 bg-indigo-600 hover:bg-indigo-700 text-white px-5 rounded-lg text-sm font-semibold shadow-sm transition">
-          적용
-        </button>
+      <div class="field">
+        <label for="endDate">종료일</label>
+        <input class="input" type="date" id="endDate" name="endDate" th:value="${endDate}" th:max="${today}">
       </div>
+      <button type="submit" class="btn primary">조회</button>
+      <span class="small muted">최대 366일까지 볼 수 있어요</span>
     </form>
 
-    <!-- Key Metrics -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-      <!-- Total Users -->
-      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-gray-500 uppercase">총 유저 수</p>
-            <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${allUserCount}">0</p>
-          </div>
-          <div class="p-3 bg-blue-100 rounded-full">
-            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-            </svg>
-          </div>
-        </div>
-        <div class="mt-4">
-          <a th:href="@{/admin/users}" class="text-sm text-blue-600 hover:text-blue-800 font-medium">모든 유저 보기 →</a>
-        </div>
-      </div>
+    <!-- 주요 지표. 직전 같은 길이 기간과 비교한다. -->
+    <div class="kpis section">
+      <div th:replace="~{fragments/admin-stats :: kpi('가입', ${userStats.signups()}, false, '직전')}"></div>
+      <div th:replace="~{fragments/admin-stats :: kpi('활성 유저', ${userStats.activeUsers()}, false, '직전')}"></div>
+      <div th:replace="~{fragments/admin-stats :: kpi('평균 DAU', ${userStats.averageDau()}, true, '직전')}"></div>
+      <div th:replace="~{fragments/admin-stats :: kpi('오답노트 등록', ${learningStats.problems()}, false, '직전')}"></div>
+      <div th:replace="~{fragments/admin-stats :: kpi('복습', ${learningStats.solves()}, false, '직전')}"></div>
+      <div th:replace="~{fragments/admin-stats :: kpi('복습노트 생성', ${learningStats.practiceNotes()}, false, '직전')}"></div>
+    </div>
 
-      <!-- Total Problems -->
-      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-gray-500 uppercase">총 문제 수</p>
-            <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${allProblemCount}">0</p>
-          </div>
-          <div class="p-3 bg-green-100 rounded-full">
-            <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-          </div>
-        </div>
-        <div class="mt-4">
-          <a th:href="@{/admin/problems}" class="text-sm text-green-600 hover:text-green-800 font-medium">모든 문제 보기 →</a>
-        </div>
+    <div class="grid grid-2 section">
+      <div class="card">
+        <h3 class="card-title">활성 유저와 신규 가입 <small>일별</small></h3>
+        <div class="chart-box"><canvas id="userChart"></canvas></div>
       </div>
-
-      <!-- Average Daily Visitors -->
-      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-emerald-500">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-gray-500 uppercase">선택 기간 문제 등록 수</p>
-            <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${periodProblemCount}">0</p>
-          </div>
-          <div class="p-3 bg-emerald-100 rounded-full">
-            <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-            </svg>
-          </div>
-        </div>
-        <div class="mt-4">
-          <p class="text-xs text-gray-500">선택 기간 작성된 문제</p>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-red-500">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-gray-500 uppercase">선택 기간 분석 실패율</p>
-            <p class="mt-2 text-3xl font-bold text-gray-900"
-               th:text="${#numbers.formatDecimal(periodAnalysisFailureRate, 1, 1)} + '%'">0.0%</p>
-          </div>
-          <div class="p-3 bg-red-100 rounded-full">
-            <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path>
-            </svg>
-          </div>
-        </div>
-        <div class="mt-4">
-          <p class="text-xs text-gray-500">완료/실패 처리된 분석 기준</p>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-cyan-500">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-gray-500 uppercase">선택 기간 고유 방문 유저</p>
-            <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${periodUniqueVisitorCount}">0</p>
-          </div>
-          <div class="p-3 bg-cyan-100 rounded-full">
-            <svg class="w-8 h-8 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 18.72a9.094 9.094 0 003.75.78 9 9 0 00-9-9 9.094 9.094 0 00-3.75.78M18 18.72A8.966 8.966 0 0112.75 21a8.966 8.966 0 01-5.25-2.28M18 18.72A5.985 5.985 0 0012.75 15a5.985 5.985 0 00-5.25 3.72M15.75 6a3 3 0 11-6 0 3 3 0 016 0z"></path>
-            </svg>
-          </div>
-        </div>
-        <div class="mt-4">
-          <p class="text-xs text-gray-500">선택 기간 로그인한 서로 다른 유저</p>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-purple-500">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-gray-500 uppercase">선택 기간 평균 DAU</p>
-            <p class="mt-2 text-3xl font-bold text-gray-900"
-               th:text="${#numbers.formatDecimal(averageDailyVisitors, 1, 1)}">0.0</p>
-          </div>
-          <div class="p-3 bg-purple-100 rounded-full">
-            <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-            </svg>
-          </div>
-        </div>
-        <div class="mt-4">
-          <p class="text-xs text-gray-500">날짜별 출석 유저 수 평균</p>
-        </div>
-      </div>
-
-      <!-- Selected Period New Users -->
-      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-orange-500">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-gray-500 uppercase">선택 기간 가입자 수</p>
-            <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${recentNewUsersCount}">0</p>
-          </div>
-          <div class="p-3 bg-orange-100 rounded-full">
-            <svg class="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
-            </svg>
-          </div>
-        </div>
-        <div class="mt-4">
-          <p class="text-xs text-gray-500">선택 기간 신규 가입</p>
-        </div>
-      </div>
-
-      <!-- System Health -->
-      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-pink-500">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-gray-500 uppercase">총 복습노트 수</p>
-            <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${allPracticeNoteCount}">0</p>
-          </div>
-          <div class="p-3 bg-pink-100 rounded-full">
-            <svg class="w-8 h-8 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2m4-2a8 8 0 11-16 0 8 8 0 0116 0z"></path>
-            </svg>
-          </div>
-        </div>
-        <div class="mt-4">
-          <a th:href="@{/admin/practice-notes}" class="text-sm text-pink-600 hover:text-pink-800 font-medium">복습 관리 보기 →</a>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-lg shadow-md p-6 border-l-4 border-indigo-500">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-gray-500 uppercase">총 복습 기록 수</p>
-            <p class="mt-2 text-3xl font-bold text-gray-900" th:text="${allPracticeLogCount}">0</p>
-          </div>
-          <div class="p-3 bg-indigo-100 rounded-full">
-            <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2m-4 0V3m0 2v4m0-4h4m-4 0H7"></path>
-            </svg>
-          </div>
-        </div>
-        <div class="mt-4">
-          <p class="text-xs text-gray-500">복습노트 사용 미션 기준</p>
-        </div>
+      <div class="card">
+        <h3 class="card-title">오답노트와 복습 <small>일별</small></h3>
+        <div class="chart-box"><canvas id="learningChart"></canvas></div>
       </div>
     </div>
 
-    <!-- Detailed Statistics -->
-    <div class="bg-white rounded-lg shadow-md overflow-hidden mb-8">
-      <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
-        <h3 class="text-lg font-semibold text-gray-900">상세 통계</h3>
+    <div class="section">
+      <div class="tabs" data-tabs>
+        <button type="button" data-tab="users">사용자</button>
+        <button type="button" data-tab="learning">학습</button>
+        <button type="button" data-tab="analysis">AI 분석</button>
+        <button type="button" data-tab="growth">성장</button>
+        <button type="button" data-tab="rooms">스터디룸</button>
+        <button type="button" data-tab="ranking">많이 쓴 유저</button>
       </div>
-      <div class="p-6">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <!-- User Statistics -->
-          <div>
-            <h4 class="text-md font-semibold text-gray-800 mb-4 flex items-center">
-              <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-              </svg>
-              유저 통계
-            </h4>
-            <div class="space-y-3">
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">총 유저 수</span>
-                <span class="text-sm font-bold text-gray-900" th:text="${allUserCount}">0</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">선택 기간 방문 횟수</span>
-                <span class="text-sm font-bold text-gray-900" th:text="${periodVisitCount}">0</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">선택 기간 고유 방문 유저</span>
-                <span class="text-sm font-bold text-gray-900" th:text="${periodUniqueVisitorCount}">0</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">선택 기간 평균 DAU</span>
-                <span class="text-sm font-bold text-gray-900"
-                      th:text="${#numbers.formatDecimal(averageDailyVisitors, 1, 1)}">0.0</span>
-              </div>
+
+      <!-- 사용자 -->
+      <section class="tab-panel" data-panel="users">
+        <div class="grid grid-2">
+          <div class="card">
+            <h3 class="card-title">규모</h3>
+            <div class="stats">
+              <div><div class="stat-label">전체 유저</div><div class="stat-value" th:text="${#numbers.formatInteger(userStats.totalUsers(), 1, 'COMMA')}">0</div></div>
+              <div><div class="stat-label">게스트</div><div class="stat-value"><th:block th:text="${#numbers.formatInteger(userStats.guestUsers(), 1, 'COMMA')}">0</th:block><small th:text="${#numbers.formatDecimal(userStats.guestRate(), 1, 1)} + '%'">0%</small></div></div>
+              <div><div class="stat-label">알림 켠 유저</div><div class="stat-value"><th:block th:text="${#numbers.formatInteger(userStats.notificationEnabledUsers(), 1, 'COMMA')}">0</th:block><small th:text="${#numbers.formatDecimal(userStats.notificationEnabledRate(), 1, 1)} + '%'">0%</small></div></div>
+              <div><div class="stat-label">푸시 토큰 있는 유저</div><div class="stat-value" th:text="${#numbers.formatInteger(userStats.fcmUsers(), 1, 'COMMA')}">0</div></div>
             </div>
           </div>
-
-          <!-- Problem Statistics -->
-          <div>
-            <h4 class="text-md font-semibold text-gray-800 mb-4 flex items-center">
-              <svg class="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-              </svg>
-              문제 통계
-            </h4>
-            <div class="space-y-3">
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">총 문제 수</span>
-                <span class="text-sm font-bold text-gray-900" th:text="${allProblemCount}">0</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">선택 기간 문제 등록</span>
-                <span class="text-sm font-bold text-gray-900" th:text="${periodProblemCount}">0</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">총 분석 데이터 수</span>
-                <span class="text-sm font-bold text-gray-900" th:text="${allProblemAnalysisCount}">0</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">전체 분석 완료</span>
-                <span class="text-sm font-bold text-green-700" th:text="${allCompletedAnalysisCount}">0</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">전체 분석 실패</span>
-                <span class="text-sm font-bold text-red-700" th:text="${allFailedAnalysisCount}">0</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">전체 분석 중</span>
-                <span class="text-sm font-bold text-yellow-700" th:text="${allProcessingAnalysisCount}">0</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">전체 분석 대기</span>
-                <span class="text-sm font-bold text-blue-700" th:text="${allNotStartedAnalysisCount}">0</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">전체 이미지 없음</span>
-                <span class="text-sm font-bold text-gray-700" th:text="${allNoImageAnalysisCount}">0</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">전체 요청 제한 초과</span>
-                <span class="text-sm font-bold text-orange-700" th:text="${allRateLimitExceededAnalysisCount}">0</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">선택 기간 분석 완료</span>
-                <span class="text-sm font-bold text-green-700" th:text="${periodCompletedAnalysisCount}">0</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">선택 기간 분석 실패</span>
-                <span class="text-sm font-bold text-red-700" th:text="${periodFailedAnalysisCount}">0</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">선택 기간 분석 실패율</span>
-                <span class="text-sm font-bold text-red-700"
-                      th:text="${#numbers.formatDecimal(periodAnalysisFailureRate, 1, 1)} + '%'">0.0%</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">선택 기간 분석 중</span>
-                <span class="text-sm font-bold text-yellow-700" th:text="${periodProcessingAnalysisCount}">0</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">선택 기간 분석 대기</span>
-                <span class="text-sm font-bold text-blue-700" th:text="${periodNotStartedAnalysisCount}">0</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">선택 기간 이미지 없음</span>
-                <span class="text-sm font-bold text-gray-700" th:text="${periodNoImageAnalysisCount}">0</span>
-              </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">선택 기간 요청 제한 초과</span>
-                <span class="text-sm font-bold text-orange-700" th:text="${periodRateLimitExceededAnalysisCount}">0</span>
-              </div>
+          <div class="card">
+            <h3 class="card-title">활동 <small th:text="|${#temporals.format(endDate, 'M. d')} 기준|">기준</small></h3>
+            <div class="stats">
+              <div><div class="stat-label">WAU (7일)</div><div class="stat-value" th:text="${#numbers.formatInteger(userStats.wau(), 1, 'COMMA')}">0</div></div>
+              <div><div class="stat-label">MAU (30일)</div><div class="stat-value" th:text="${#numbers.formatInteger(userStats.mau(), 1, 'COMMA')}">0</div></div>
+              <div><div class="stat-label">고착도 (DAU/MAU)</div><div class="stat-value" th:text="${#numbers.formatDecimal(userStats.stickiness(), 1, 1)} + '%'">0%</div></div>
+              <div><div class="stat-label">기간 활성 유저</div><div class="stat-value" th:text="${#numbers.formatInteger(userStats.activeUsers().value(), 1, 'COMMA')}">0</div></div>
             </div>
           </div>
+          <div class="card">
+            <h3 class="card-title">재방문 <small>기간 가입자 기준</small></h3>
+            <div class="stats">
+              <div>
+                <div class="stat-label">다음 날 재방문 (D1)</div>
+                <div class="stat-value"><th:block th:text="${#numbers.formatDecimal(userStats.d1().rate(), 1, 1)} + '%'">0%</th:block><small th:text="|${userStats.d1().retained()}/${userStats.d1().cohort()}명|">0/0명</small></div>
+              </div>
+              <div>
+                <div class="stat-label">7일째 재방문 (D7)</div>
+                <div class="stat-value"><th:block th:text="${#numbers.formatDecimal(userStats.d7().rate(), 1, 1)} + '%'">0%</th:block><small th:text="|${userStats.d7().retained()}/${userStats.d7().cohort()}명|">0/0명</small></div>
+              </div>
+            </div>
+            <p class="small muted mt-20">가입 N일째에 로그인한 비율이에요. 아직 N일이 지나지 않은 가입자는 빼고 계산해요.</p>
+          </div>
+          <div class="card">
+            <h3 class="card-title">가입 경로 <small th:text="|기간 가입 ${#numbers.formatInteger(userStats.signups().value(), 1, 'COMMA')}명|">기간 가입</small></h3>
+            <div class="bars" th:if="${!userStats.signupsByPlatform().isEmpty()}">
+              <div class="bar-row" th:each="p : ${userStats.signupsByPlatform()}"
+                   th:with="pct=${p.percentOf(T(java.lang.Math).round(userStats.signups().value()))}">
+                <span class="name" th:text="${T(com.aisip.OnO.backend.admin.dto.AdminStatsDto).platformLabel(p.label())}">구글</span>
+                <div class="bar-track"><div class="bar-fill" th:style="|width: ${pct}%|"></div></div>
+                <span class="val" th:text="${p.count()}">0</span>
+              </div>
+            </div>
+            <div class="empty" th:if="${userStats.signupsByPlatform().isEmpty()}">기간 가입자가 없어요</div>
+          </div>
+        </div>
+      </section>
 
-          <!-- Practice Statistics -->
-          <div>
-            <h4 class="text-md font-semibold text-gray-800 mb-4 flex items-center">
-              <svg class="w-5 h-5 mr-2 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2m4-2a8 8 0 11-16 0 8 8 0 0116 0z"></path>
-              </svg>
-              복습 통계
-            </h4>
-            <div class="space-y-3">
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">총 복습노트 수</span>
-                <span class="text-sm font-bold text-gray-900" th:text="${allPracticeNoteCount}">0</span>
+      <!-- 학습 -->
+      <section class="tab-panel" data-panel="learning" hidden>
+        <div class="grid grid-2">
+          <div class="card">
+            <h3 class="card-title">오답노트</h3>
+            <div class="stats">
+              <div><div class="stat-label">기간 등록</div><div class="stat-value" th:text="${#numbers.formatInteger(learningStats.problems().value(), 1, 'COMMA')}">0</div></div>
+              <div><div class="stat-label">등록한 유저</div><div class="stat-value" th:text="${#numbers.formatInteger(learningStats.problemWriters(), 1, 'COMMA')}">0</div></div>
+              <div><div class="stat-label">활성 유저당 등록</div><div class="stat-value" th:text="${#numbers.formatDecimal(learningStats.problemsPerActiveUser(T(java.lang.Math).round(userStats.activeUsers().value())), 1, 1)}">0</div></div>
+              <div><div class="stat-label">누적 오답노트</div><div class="stat-value" th:text="${#numbers.formatInteger(learningStats.totalProblems(), 1, 'COMMA')}">0</div></div>
+              <div><div class="stat-label">새 태그</div><div class="stat-value" th:text="${#numbers.formatInteger(learningStats.tagsCreated(), 1, 'COMMA')}">0</div></div>
+              <div><div class="stat-label">새 폴더</div><div class="stat-value" th:text="${#numbers.formatInteger(learningStats.foldersCreated(), 1, 'COMMA')}">0</div></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3 class="card-title">복습</h3>
+            <div class="stats">
+              <div><div class="stat-label">기간 복습</div><div class="stat-value" th:text="${#numbers.formatInteger(learningStats.solves().value(), 1, 'COMMA')}">0</div></div>
+              <div><div class="stat-label">복습한 유저</div><div class="stat-value" th:text="${#numbers.formatInteger(learningStats.solvers(), 1, 'COMMA')}">0</div></div>
+              <div><div class="stat-label">평균 풀이 시간</div>
+                <div class="stat-value" th:text="${learningStats.averageSolveSeconds() == null} ? '-' : (${learningStats.averageSolveSeconds() >= 60} ? ${#numbers.formatDecimal(learningStats.averageSolveSeconds() / 60, 1, 1)} + '분' : ${#numbers.formatInteger(learningStats.averageSolveSeconds(), 1)} + '초')">-</div></div>
+              <div><div class="stat-label">회고 작성</div><div class="stat-value" th:text="${#numbers.formatDecimal(learningStats.reflectionRate(), 1, 1)} + '%'">0%</div></div>
+              <div><div class="stat-label">누적 복습</div><div class="stat-value" th:text="${#numbers.formatInteger(learningStats.totalSolves(), 1, 'COMMA')}">0</div></div>
+            </div>
+            <th:block th:with="answered=${learningStats.correct() + learningStats.wrong() + learningStats.partial()}">
+              <div class="between mt-20">
+                <span class="small muted">정답률</span>
+                <span class="strong" th:text="${#numbers.formatDecimal(learningStats.correctRate(), 1, 1)} + '%'">0%</span>
               </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">총 복습 기록 수</span>
-                <span class="text-sm font-bold text-gray-900" th:text="${allPracticeLogCount}">0</span>
+              <div class="stack mt-12" th:if="${answered > 0}">
+                <span th:style="|width: ${learningStats.correct() * 100.0 / answered}%; background: var(--brand)|"></span>
+                <span th:style="|width: ${learningStats.partial() * 100.0 / answered}%; background: var(--orange)|"></span>
+                <span th:style="|width: ${learningStats.wrong() * 100.0 / answered}%; background: var(--red)|"></span>
               </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">선택 기간 복습노트 생성</span>
-                <span class="text-sm font-bold text-gray-900" th:text="${periodPracticeNoteCount}">0</span>
+              <div class="stack mt-12" th:if="${answered == 0}"></div>
+              <div class="legend">
+                <span><i style="background: var(--brand)"></i>정답 <b th:text="${learningStats.correct()}">0</b></span>
+                <span><i style="background: var(--orange)"></i>부분 정답 <b th:text="${learningStats.partial()}">0</b></span>
+                <span><i style="background: var(--red)"></i>오답 <b th:text="${learningStats.wrong()}">0</b></span>
               </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="text-sm font-medium text-gray-600">선택 기간 복습 수행</span>
-                <span class="text-sm font-bold text-gray-900" th:text="${periodPracticeLogCount}">0</span>
-              </div>
+            </th:block>
+          </div>
+          <div class="card">
+            <h3 class="card-title">복습노트</h3>
+            <div class="stats">
+              <div><div class="stat-label">기간 생성</div><div class="stat-value" th:text="${#numbers.formatInteger(learningStats.practiceNotes().value(), 1, 'COMMA')}">0</div></div>
+              <div><div class="stat-label">처음 끝낸 노트</div><div class="stat-value" th:text="${#numbers.formatInteger(learningStats.practiceNoteFirstCompletions(), 1, 'COMMA')}">0</div></div>
+              <div><div class="stat-label">누적 복습노트</div><div class="stat-value" th:text="${#numbers.formatInteger(learningStats.totalPracticeNotes(), 1, 'COMMA')}">0</div></div>
+            </div>
+            <p class="small muted mt-20">처음 끝낸 노트는 노트별로 한 번만 세요. 전체 복습량은 복습 기록을 보세요.</p>
+          </div>
+          <div class="card">
+            <h3 class="card-title">기분 기록</h3>
+            <div class="stats">
+              <div><div class="stat-label">학습 달력</div><div class="stat-value" th:text="${#numbers.formatInteger(learningStats.calendarMoods(), 1, 'COMMA')}">0</div></div>
+              <div><div class="stat-label">복습 후 기분</div><div class="stat-value" th:text="${#numbers.formatInteger(learningStats.solveMoods(), 1, 'COMMA')}">0</div></div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      <!-- AI 분석 -->
+      <section class="tab-panel" data-panel="analysis" hidden>
+        <div class="grid grid-2">
+          <div class="card">
+            <h3 class="card-title">기간 분석 결과 <small th:text="|${#numbers.formatInteger(analysisStats.periodTotal(), 1, 'COMMA')}건|">0건</small></h3>
+            <div class="stats">
+              <div><div class="stat-label">실패율</div><div class="stat-value" th:classappend="${analysisStats.periodFailureRate() >= 10} ? 'red'" th:text="${#numbers.formatDecimal(analysisStats.periodFailureRate(), 1, 1)} + '%'">0%</div></div>
+              <div><div class="stat-label">완료</div><div class="stat-value" th:text="${analysisStats.periodCount('COMPLETED')}">0</div></div>
+              <div><div class="stat-label">실패</div><div class="stat-value" th:text="${analysisStats.periodCount('FAILED')}">0</div></div>
+              <div><div class="stat-label">요청 한도 초과</div><div class="stat-value" th:text="${analysisStats.periodCount('RATE_LIMIT_EXCEEDED')}">0</div></div>
+            </div>
+            <p class="small muted mt-20">실패율은 완료와 실패로 끝난 분석만 놓고 계산해요.</p>
+          </div>
+          <div class="card">
+            <h3 class="card-title">전체 상태 <small th:text="|${#numbers.formatInteger(analysisStats.allTotal(), 1, 'COMMA')}건|">0건</small></h3>
+            <div class="bars" th:if="${!analysisStats.allStatuses().isEmpty()}">
+              <div class="bar-row" th:each="s : ${analysisStats.allStatuses()}">
+                <span class="name" th:text="${T(com.aisip.OnO.backend.admin.dto.AdminStatsDto).analysisStatusLabel(s.label())}">완료</span>
+                <div class="bar-track">
+                  <div class="bar-fill"
+                       th:classappend="${s.label() == 'FAILED'} ? 'red' : (${s.label() == 'COMPLETED'} ? '' : 'gray')"
+                       th:style="|width: ${s.percentOf(analysisStats.allTotal())}%|"></div>
+                </div>
+                <span class="val" th:text="${#numbers.formatInteger(s.count(), 1, 'COMMA')}">0</span>
+              </div>
+            </div>
+            <div class="empty" th:if="${analysisStats.allStatuses().isEmpty()}">분석 기록이 없어요</div>
+          </div>
+          <div class="card span-2">
+            <h3 class="card-title">과목 <small>기간 등록 문제</small></h3>
+            <div class="bars" th:if="${!analysisStats.subjects().isEmpty()}"
+                 th:with="subjectTotal=${analysisStats.periodCount('COMPLETED')}">
+              <div class="bar-row" th:each="s : ${analysisStats.subjects()}">
+                <span class="name" th:text="${s.label()}">수학</span>
+                <div class="bar-track"><div class="bar-fill blue" th:style="|width: ${s.percentOf(subjectTotal)}%|"></div></div>
+                <span class="val" th:text="${s.count()}">0</span>
+              </div>
+            </div>
+            <div class="empty" th:if="${analysisStats.subjects().isEmpty()}">기간에 분석된 과목이 없어요</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 성장 -->
+      <section class="tab-panel" data-panel="growth" hidden>
+        <div class="grid grid-2">
+          <div class="card">
+            <h3 class="card-title">미션 <a class="small muted" th:href="@{/admin/missions}">미션 보기</a></h3>
+            <div class="stats">
+              <div><div class="stat-label">완료</div><div class="stat-value" th:text="${#numbers.formatInteger(growthStats.missionsCompleted(), 1, 'COMMA')}">0</div></div>
+              <div><div class="stat-label">보상 받음</div><div class="stat-value" th:text="${#numbers.formatInteger(growthStats.missionsClaimed(), 1, 'COMMA')}">0</div></div>
+            </div>
+            <div class="rows mt-20" th:if="${!growthStats.topMissions().isEmpty()}">
+              <div class="row" th:each="m : ${growthStats.topMissions()}">
+                <span class="row-title" th:text="${m.label()}">미션</span>
+                <span class="row-value" th:text="|${m.count()}회|">0회</span>
+              </div>
+            </div>
+            <div class="empty" th:if="${growthStats.topMissions().isEmpty()}">기간에 완료한 미션이 없어요</div>
+          </div>
+          <div class="card">
+            <h3 class="card-title">업적 <a class="small muted" th:href="@{/admin/achievements}">업적 보기</a></h3>
+            <div class="stats">
+              <div><div class="stat-label">기간 획득</div><div class="stat-value" th:text="${#numbers.formatInteger(growthStats.achievementsEarned(), 1, 'COMMA')}">0</div></div>
+              <div><div class="stat-label">치장 착용 유저</div><div class="stat-value" th:text="${#numbers.formatInteger(growthStats.cosmeticUsers(), 1, 'COMMA')}">0</div></div>
+            </div>
+            <div class="rows mt-20" th:if="${!growthStats.topAchievements().isEmpty()}">
+              <div class="row" th:each="a : ${growthStats.topAchievements()}">
+                <span class="row-title" th:text="${a.label()}">첫 걸음</span>
+                <span class="row-value" th:text="|${a.count()}명|">0명</span>
+              </div>
+            </div>
+            <div class="empty" th:if="${growthStats.topAchievements().isEmpty()}">기간에 얻은 업적이 없어요</div>
+          </div>
+          <div class="card span-2" th:with="levelTotal=${growthStats.levelTotal()}">
+            <h3 class="card-title">레벨 분포 <small>지금 기준, 관리자 제외</small></h3>
+            <div class="bars" th:if="${!growthStats.levelDistribution().isEmpty()}">
+              <div class="bar-row" th:each="l : ${growthStats.levelDistribution()}">
+                <span class="name" th:text="${l.label()}">Lv.1</span>
+                <div class="bar-track"><div class="bar-fill purple" th:style="|width: ${l.percentOf(levelTotal)}%|"></div></div>
+                <span class="val" th:text="${#numbers.formatInteger(l.count(), 1, 'COMMA')}">0</span>
+              </div>
+            </div>
+            <div class="empty" th:if="${growthStats.levelDistribution().isEmpty()}">유저가 없어요</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 스터디룸 -->
+      <section class="tab-panel" data-panel="rooms" hidden>
+        <div class="grid grid-2">
+          <div class="card">
+            <h3 class="card-title">방과 멤버 <a class="small muted" th:href="@{/admin/study-rooms}">스터디룸 보기</a></h3>
+            <div class="stats">
+              <div><div class="stat-label">전체 방</div><div class="stat-value" th:text="${roomStats.totalRooms()}">0</div></div>
+              <div><div class="stat-label">새로 만든 방</div><div class="stat-value" th:text="${roomStats.roomsCreated()}">0</div></div>
+              <div><div class="stat-label">새 멤버</div><div class="stat-value" th:text="${roomStats.membersJoined()}">0</div></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3 class="card-title">함께 공부한 기록</h3>
+            <div class="stats">
+              <div><div class="stat-label">공유한 문제</div><div class="stat-value" th:text="${roomStats.sharedProblems()}">0</div></div>
+              <div><div class="stat-label">댓글</div><div class="stat-value" th:text="${roomStats.comments()}">0</div></div>
+              <div><div class="stat-label">반응</div><div class="stat-value" th:text="${roomStats.reactions()}">0</div></div>
+            </div>
+          </div>
+          <div class="card span-2">
+            <h3 class="card-title">챌린지</h3>
+            <div class="stats">
+              <div><div class="stat-label">새로 연 챌린지</div><div class="stat-value" th:text="${roomStats.challengesCreated()}">0</div></div>
+              <div><div class="stat-label">성공</div><div class="stat-value green" th:text="${roomStats.challengesCompleted()}">0</div></div>
+              <div><div class="stat-label">실패</div><div class="stat-value" th:text="${roomStats.challengesFailed()}">0</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 많이 쓴 유저 -->
+      <section class="tab-panel" data-panel="ranking" hidden>
+        <div class="grid grid-2">
+          <div class="card">
+            <h3 class="card-title">오답노트를 많이 등록한 유저</h3>
+            <div class="rows" th:if="${!topProblemWriters.isEmpty()}">
+              <a class="row" th:each="r, st : ${topProblemWriters}" th:href="@{/admin/user/{id}(id=${r.userId()})}">
+                <div class="row-main">
+                  <div class="row-title" th:text="|${st.count}. ${r.name() ?: '이름 없음'}|">1. 이름</div>
+                  <div class="row-sub" th:text="${r.email()}">email</div>
+                </div>
+                <span class="row-value" th:text="|${r.count()}개|">0개</span>
+              </a>
+            </div>
+            <div class="empty" th:if="${topProblemWriters.isEmpty()}">기간에 등록한 오답노트가 없어요</div>
+          </div>
+          <div class="card">
+            <h3 class="card-title">복습을 많이 한 유저</h3>
+            <div class="rows" th:if="${!topSolvers.isEmpty()}">
+              <a class="row" th:each="r, st : ${topSolvers}" th:href="@{/admin/user/{id}(id=${r.userId()})}">
+                <div class="row-main">
+                  <div class="row-title" th:text="|${st.count}. ${r.name() ?: '이름 없음'}|">1. 이름</div>
+                  <div class="row-sub" th:text="${r.email()}">email</div>
+                </div>
+                <span class="row-value" th:text="|${r.count()}회|">0회</span>
+              </a>
+            </div>
+            <div class="empty" th:if="${topSolvers.isEmpty()}">기간에 복습 기록이 없어요</div>
+          </div>
+        </div>
+      </section>
     </div>
 
-    <!-- Daily Active Users -->
-    <div class="bg-white rounded-lg shadow-md overflow-hidden mb-8">
-      <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
-        <h3 class="text-lg font-semibold text-gray-900">날짜별 출석 유저 수</h3>
+    <!-- 날짜별. 숫자를 누르면 그날 기록 목록으로 간다. -->
+    <div class="section">
+      <div class="section-head">
+        <h2>날짜별</h2>
+        <span class="hint">숫자를 누르면 그날 목록으로 이동해요</span>
       </div>
-      <div class="p-6">
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">날짜</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">방문 횟수</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">출석 유저 수</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">신규 가입자 수</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">문제 등록 수</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">복습노트 생성 수</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">복습 수행 수</th>
-              </tr>
+      <div class="card flush">
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+            <tr>
+              <th>날짜</th>
+              <th class="r">활성 유저</th>
+              <th class="r">신규 가입</th>
+              <th class="r">오답노트</th>
+              <th class="r">복습</th>
+              <th class="r">복습노트</th>
+              <th class="r">미션 완료</th>
+              <th class="r">스터디룸 활동</th>
+            </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              <tr th:each="entry : ${dailyActiveUsers}" class="hover:bg-gray-50">
-                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900" th:text="${#temporals.format(entry.key, 'yyyy-MM-dd (E)')}">2024-01-01</td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                  <span class="font-semibold" th:classappend="${dailyVisits[entry.key] > 0 ? 'text-cyan-600' : 'text-gray-400'}"
-                        th:text="${dailyVisits[entry.key]}">0</span>
-                  <span class="ml-1 text-gray-500">회</span>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                  <a th:if="${entry.value > 0}"
-                     th:href="@{/admin/analysis/daily-active-users(date=${entry.key})}"
-                     class="inline-flex items-center hover:underline">
-                    <span class="font-semibold text-blue-600" th:text="${entry.value}">0</span>
-                    <span class="ml-1 text-gray-500">명</span>
-                  </a>
-                  <span th:if="${entry.value == 0}" class="inline-flex items-center">
-                    <span class="font-semibold text-gray-400" th:text="${entry.value}">0</span>
-                    <span class="ml-1 text-gray-500">명</span>
-                  </span>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                  <a th:if="${dailyNewUsers[entry.key] > 0}"
-                     th:href="@{/admin/analysis/daily-new-users(date=${entry.key})}"
-                     class="inline-flex items-center hover:underline">
-                    <span class="font-semibold text-orange-600" th:text="${dailyNewUsers[entry.key]}">0</span>
-                    <span class="ml-1 text-gray-500">명</span>
-                  </a>
-                  <span th:if="${dailyNewUsers[entry.key] == 0}" class="inline-flex items-center">
-                    <span class="font-semibold text-gray-400" th:text="${dailyNewUsers[entry.key]}">0</span>
-                    <span class="ml-1 text-gray-500">명</span>
-                  </span>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                  <span class="font-semibold" th:classappend="${dailyProblems[entry.key] > 0 ? 'text-emerald-600' : 'text-gray-400'}"
-                        th:text="${dailyProblems[entry.key]}">0</span>
-                  <span class="ml-1 text-gray-500">개</span>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                  <span class="font-semibold" th:classappend="${dailyPracticeNotes[entry.key] > 0 ? 'text-pink-600' : 'text-gray-400'}"
-                        th:text="${dailyPracticeNotes[entry.key]}">0</span>
-                  <span class="ml-1 text-gray-500">개</span>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                  <span class="font-semibold" th:classappend="${dailyPracticeLogs[entry.key] > 0 ? 'text-indigo-600' : 'text-gray-400'}"
-                        th:text="${dailyPracticeLogs[entry.key]}">0</span>
-                  <span class="ml-1 text-gray-500">회</span>
-                </td>
-              </tr>
-              <tr th:if="${#maps.isEmpty(dailyActiveUsers)}">
-                <td colspan="7" class="px-4 py-8 text-center text-gray-500">
-                  데이터가 없습니다
-                </td>
-              </tr>
+            <tbody>
+            <tr th:each="row : ${dailyRows}">
+              <td class="nowrap num">
+                <span th:text="${#temporals.format(row.date(), 'M. d')}">9. 21</span>
+                <span class="muted small" th:text="${#temporals.format(row.date(), 'E', T(java.util.Locale).KOREAN)}">월</span>
+              </td>
+              <td class="r">
+                <a class="cell-link" th:if="${row.activeUsers() > 0}" th:href="@{/admin/analysis/daily-active-users(date=${row.date()})}" th:text="${row.activeUsers()}">0</a>
+                <span class="zero" th:if="${row.activeUsers() == 0}">0</span>
+              </td>
+              <td class="r">
+                <a class="cell-link" th:if="${row.newUsers() > 0}" th:href="@{/admin/analysis/daily-new-users(date=${row.date()})}" th:text="${row.newUsers()}">0</a>
+                <span class="zero" th:if="${row.newUsers() == 0}">0</span>
+              </td>
+              <td class="r">
+                <a class="cell-link" th:if="${row.problems() > 0}" th:href="@{/admin/problems(date=${row.date()})}" th:text="${row.problems()}">0</a>
+                <span class="zero" th:if="${row.problems() == 0}">0</span>
+              </td>
+              <td class="r">
+                <a class="cell-link" th:if="${row.solves() > 0}" th:href="@{/admin/practice-logs(date=${row.date()})}" th:text="${row.solves()}">0</a>
+                <span class="zero" th:if="${row.solves() == 0}">0</span>
+              </td>
+              <td class="r">
+                <a class="cell-link" th:if="${row.practiceNotes() > 0}" th:href="@{/admin/practice-notes(date=${row.date()})}" th:text="${row.practiceNotes()}">0</a>
+                <span class="zero" th:if="${row.practiceNotes() == 0}">0</span>
+              </td>
+              <td class="r" th:classappend="${row.missionsCompleted() == 0} ? 'zero'" th:text="${row.missionsCompleted()}">0</td>
+              <td class="r" th:classappend="${row.roomActivity() == 0} ? 'zero'" th:text="${row.roomActivity()}">0</td>
+            </tr>
             </tbody>
-            <tfoot class="bg-gray-50 border-t border-gray-200">
-              <tr>
-                <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">합계</td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                  <span class="font-bold text-cyan-700" th:text="${periodVisitCount}">0</span>
-                  <span class="ml-1 text-gray-500">회</span>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                  <span class="font-bold text-blue-700" th:text="${periodActiveUserCount}">0</span>
-                  <span class="ml-1 text-gray-500">명</span>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                  <span class="font-bold text-orange-700" th:text="${recentNewUsersCount}">0</span>
-                  <span class="ml-1 text-gray-500">명</span>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                  <span class="font-bold text-emerald-700" th:text="${periodProblemCount}">0</span>
-                  <span class="ml-1 text-gray-500">개</span>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                  <span class="font-bold text-pink-700" th:text="${periodPracticeNoteCount}">0</span>
-                  <span class="ml-1 text-gray-500">개</span>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                  <span class="font-bold text-indigo-700" th:text="${periodPracticeLogCount}">0</span>
-                  <span class="ml-1 text-gray-500">회</span>
-                </td>
-              </tr>
+            <tfoot>
+            <tr>
+              <td>합계</td>
+              <td class="r" th:text="${#numbers.formatInteger(userStats.activeUsers().value(), 1, 'COMMA')}" title="기간 동안 들어온 서로 다른 유저 수">0</td>
+              <td class="r" th:text="${#numbers.formatInteger(dailyTotals.newUsers(), 1, 'COMMA')}">0</td>
+              <td class="r" th:text="${#numbers.formatInteger(dailyTotals.problems(), 1, 'COMMA')}">0</td>
+              <td class="r" th:text="${#numbers.formatInteger(dailyTotals.solves(), 1, 'COMMA')}">0</td>
+              <td class="r" th:text="${#numbers.formatInteger(dailyTotals.practiceNotes(), 1, 'COMMA')}">0</td>
+              <td class="r" th:text="${#numbers.formatInteger(dailyTotals.missionsCompleted(), 1, 'COMMA')}">0</td>
+              <td class="r" th:text="${#numbers.formatInteger(dailyTotals.roomActivity(), 1, 'COMMA')}">0</td>
+            </tr>
             </tfoot>
           </table>
         </div>
       </div>
+      <p class="small muted mt-12">활성 유저 합계는 날짜별 값을 더한 것이 아니라 기간 동안 들어온 서로 다른 유저 수예요.</p>
     </div>
+  </main>
+</div>
 
-    <!-- Quick Actions -->
-    <div class="bg-white rounded-lg shadow-md p-6">
-      <h3 class="text-lg font-semibold text-gray-900 mb-4">빠른 이동</h3>
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <a th:href="@{/admin/users}" class="flex items-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors group">
-          <div class="p-2 bg-blue-200 rounded-lg group-hover:bg-blue-300 transition-colors">
-            <svg class="w-6 h-6 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-            </svg>
-          </div>
-          <div class="ml-4">
-            <p class="text-sm font-medium text-gray-900">유저 관리</p>
-            <p class="text-xs text-gray-500">유저 계정 보기 및 수정</p>
-          </div>
-        </a>
+<th:block th:replace="~{fragments/admin-layout :: scripts}"></th:block>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script th:inline="javascript">
+  (function () {
+    var active = /*[[${dailyActiveUsers}]]*/ {};
+    var signups = /*[[${dailyNewUsers}]]*/ {};
+    var problems = /*[[${dailyProblems}]]*/ {};
+    var solves = /*[[${dailySolves}]]*/ {};
+    if (!window.Chart) return;
 
-        <a th:href="@{/admin/problems}" class="flex items-center p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors group">
-          <div class="p-2 bg-green-200 rounded-lg group-hover:bg-green-300 transition-colors">
-            <svg class="w-6 h-6 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-            </svg>
-          </div>
-          <div class="ml-4">
-            <p class="text-sm font-medium text-gray-900">문제 관리</p>
-            <p class="text-xs text-gray-500">모든 유저 문제 보기</p>
-          </div>
-        </a>
+    var dates = Object.keys(active);
+    var labels = dates.map(function (d) {
+      var p = d.split('-');
+      return Number(p[1]) + '/' + Number(p[2]);
+    });
+    var pick = function (m) { return dates.map(function (d) { return m[d] || 0; }); };
 
-        <a th:href="@{/admin/practice-notes}" class="flex items-center p-4 bg-pink-50 hover:bg-pink-100 rounded-lg transition-colors group">
-          <div class="p-2 bg-pink-200 rounded-lg group-hover:bg-pink-300 transition-colors">
-            <svg class="w-6 h-6 text-pink-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2m4-2a8 8 0 11-16 0 8 8 0 0116 0z"></path>
-            </svg>
-          </div>
-          <div class="ml-4">
-            <p class="text-sm font-medium text-gray-900">복습노트 관리</p>
-            <p class="text-xs text-gray-500">복습노트 목록 보기</p>
-          </div>
-        </a>
+    Chart.defaults.font.family = '"Pretendard Variable", Pretendard, -apple-system, sans-serif';
+    Chart.defaults.font.size = 12;
+    Chart.defaults.color = '#8b95a1';
 
-        <a th:href="@{/admin/main}" class="flex items-center p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors group">
-          <div class="p-2 bg-purple-200 rounded-lg group-hover:bg-purple-300 transition-colors">
-            <svg class="w-6 h-6 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-            </svg>
-          </div>
-          <div class="ml-4">
-            <p class="text-sm font-medium text-gray-900">대시보드</p>
-            <p class="text-xs text-gray-500">메인 대시보드로 돌아가기</p>
-          </div>
-        </a>
-      </div>
-    </div>
-  </div>
+    var common = {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      animation: { duration: 700, easing: 'easeOutCubic' },
+      plugins: {
+        legend: { position: 'top', align: 'end', labels: { boxWidth: 8, boxHeight: 8, usePointStyle: true, pointStyle: 'circle', color: '#4e5968' } },
+        tooltip: {
+          backgroundColor: 'rgba(25, 31, 40, .92)',
+          padding: 12,
+          cornerRadius: 12,
+          titleFont: { weight: '600' },
+          bodySpacing: 6,
+          boxPadding: 4,
+          usePointStyle: true
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, border: { display: false }, ticks: { maxTicksLimit: 10, maxRotation: 0 } },
+        y: { beginAtZero: true, grid: { color: '#f2f4f6' }, border: { display: false }, ticks: { precision: 0, maxTicksLimit: 5 } }
+      }
+    };
+
+    new Chart(document.getElementById('userChart'), {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: '활성 유저', data: pick(active), borderColor: '#1cba1a', backgroundColor: 'rgba(28, 186, 26, .08)', fill: true, tension: .35, borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 5 },
+          { label: '신규 가입', data: pick(signups), borderColor: '#3182f6', backgroundColor: '#3182f6', tension: .35, borderWidth: 2, pointRadius: 0, pointHoverRadius: 5 }
+        ]
+      },
+      options: common
+    });
+
+    new Chart(document.getElementById('learningChart'), {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: '오답노트', data: pick(problems), backgroundColor: '#1cba1a', borderRadius: 4, maxBarThickness: 14 },
+          { label: '복습', data: pick(solves), backgroundColor: '#3182f6', borderRadius: 4, maxBarThickness: 14 }
+        ]
+      },
+      options: common
+    });
+  })();
+</script>
 </body>
 </html>
