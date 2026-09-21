@@ -1,7 +1,9 @@
 package com.aisip.OnO.backend.admin.controller;
 
+import com.aisip.OnO.backend.admin.dto.AdminPager;
 import com.aisip.OnO.backend.feedback.dto.FeedbackResponseDto;
 import com.aisip.OnO.backend.feedback.service.FeedbackService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Controller;
@@ -22,6 +24,7 @@ public class AdminFeedbackController {
     public String feedbackList(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest request,
             Model model
     ) {
         // 쿼리 파라미터는 사용자 입력이다. page 가 음수이거나 size 가 0 이하면
@@ -38,6 +41,7 @@ public class AdminFeedbackController {
         model.addAttribute("currentPage", selectedPage);
         model.addAttribute("totalPages", pageResult.getTotalPages());
         model.addAttribute("size", selectedSize);
+        model.addAttribute("pager", AdminPager.of(request, "page", selectedPage, selectedSize, pageResult.getTotalElements()));
 
         int blockSize = 10;
         int blockStart = (selectedPage / blockSize) * blockSize;

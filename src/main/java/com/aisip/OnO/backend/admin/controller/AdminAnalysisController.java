@@ -1,9 +1,8 @@
 package com.aisip.OnO.backend.admin.controller;
 
+import com.aisip.OnO.backend.admin.repository.AdminStatsQueryRepository;
+import com.aisip.OnO.backend.admin.service.AdminStatsService;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
-import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
-import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
-import com.aisip.OnO.backend.problem.service.ProblemService;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.service.UserService;
@@ -17,9 +16,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -28,10 +27,16 @@ import java.util.stream.Collectors;
 @RequestMapping("/admin")
 public class AdminAnalysisController {
 
+    /** 서비스 기준 시간대. 인자 없는 now() 는 서버 기본 시간대를 따라 하루가 밀릴 수 있다. */
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
     private final UserService userService;
-    private final ProblemService problemService;
     private final MissionLogService missionLogService;
-    private final PracticeNoteService practiceNoteService;
+    private final AdminStatsService adminStatsService;
+    private final AdminStatsQueryRepository adminStatsQueryRepository;
+
+    /** 한 번에 볼 수 있는 최대 기간. 날짜별 표와 차트가 한 화면에 들어가는 선이다. */
+    private static final int MAX_RANGE_DAYS = 366;
 
     @GetMapping("/analysis")
     public String getAllAnalysis(
@@ -41,14 +46,7 @@ public class AdminAnalysisController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             Model model
     ) {
-        long allUserCount = userService.countAllUsers();
-        long allProblemCount = problemService.countAllProblems();
-        long allPracticeNoteCount = practiceNoteService.countAllPracticeNotes();
-        long allPracticeLogCount = missionLogService.countNotePracticeLogs();
-        long allProblemAnalysisCount = problemService.countAllProblemAnalyses();
-        Map<AnalysisStatus, Long> allAnalysisStatusCounts = problemService.countProblemAnalysesByStatus();
-
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(KST);
         LocalDate selectedStartDate = startDate != null ? startDate : today.minusDays(29);
         LocalDate selectedEndDate = endDate != null ? endDate : today;
 
@@ -57,90 +55,39 @@ public class AdminAnalysisController {
             selectedStartDate = selectedEndDate;
             selectedEndDate = temp;
         }
+        if (ChronoUnit.DAYS.between(selectedStartDate, selectedEndDate) + 1 > MAX_RANGE_DAYS) {
+            selectedStartDate = selectedEndDate.minusDays(MAX_RANGE_DAYS - 1);
+        }
 
-        // 선택 기간 날짜별 출석 유저 수 및 신규 가입자 수
-        Map<LocalDate, Long> dailyActiveUsers = missionLogService.getDailyActiveUsersCount(selectedStartDate, selectedEndDate);
-        Map<LocalDate, Long> dailyVisits = missionLogService.getDailyVisitCount(selectedStartDate, selectedEndDate);
-        Map<LocalDate, Long> dailyNewUsers = userService.getDailyNewUsersCount(selectedStartDate, selectedEndDate);
-        Map<LocalDate, Long> dailyPracticeNotes = practiceNoteService.getDailyPracticeNotesCount(selectedStartDate, selectedEndDate);
-        Map<LocalDate, Long> dailyPracticeLogs = missionLogService.getDailyNotePracticeLogsCount(selectedStartDate, selectedEndDate);
-        Map<LocalDate, Long> dailyProblems = problemService.getDailyProblemsCount(selectedStartDate, selectedEndDate);
-        Map<AnalysisStatus, Long> periodAnalysisStatusCounts = problemService.countProblemAnalysesByStatus(selectedStartDate, selectedEndDate);
+        AdminStatsService.Period period = adminStatsService.period(selectedStartDate, selectedEndDate);
+        AdminStatsService.Daily daily = adminStatsService.daily(selectedStartDate, selectedEndDate);
 
-        // 선택 기간 신규 가입자 총합
-        long recentNewUsersCount = dailyNewUsers.values().stream()
-                .mapToLong(Long::longValue)
-                .sum();
-        long periodVisitCount = dailyVisits.values().stream()
-                .mapToLong(Long::longValue)
-                .sum();
-        long periodActiveUserCount = dailyActiveUsers.values().stream()
-                .mapToLong(Long::longValue)
-                .sum();
-        long periodUniqueVisitorCount = missionLogService.countUniqueVisitors(selectedStartDate, selectedEndDate);
-        long periodPracticeNoteCount = dailyPracticeNotes.values().stream()
-                .mapToLong(Long::longValue)
-                .sum();
-        long periodPracticeLogCount = dailyPracticeLogs.values().stream()
-                .mapToLong(Long::longValue)
-                .sum();
-        long periodProblemCount = dailyProblems.values().stream()
-                .mapToLong(Long::longValue)
-                .sum();
-        long periodCompletedAnalysisCount = periodAnalysisStatusCounts.getOrDefault(AnalysisStatus.COMPLETED, 0L);
-        long periodFailedAnalysisCount = periodAnalysisStatusCounts.getOrDefault(AnalysisStatus.FAILED, 0L);
-        long periodProcessingAnalysisCount = periodAnalysisStatusCounts.getOrDefault(AnalysisStatus.PROCESSING, 0L);
-        long periodNotStartedAnalysisCount = periodAnalysisStatusCounts.getOrDefault(AnalysisStatus.NOT_STARTED, 0L);
-        long periodNoImageAnalysisCount = periodAnalysisStatusCounts.getOrDefault(AnalysisStatus.NO_IMAGE, 0L);
-        long periodRateLimitExceededAnalysisCount = periodAnalysisStatusCounts.getOrDefault(AnalysisStatus.RATE_LIMIT_EXCEEDED, 0L);
-        long periodFinishedAnalysisCount = periodCompletedAnalysisCount + periodFailedAnalysisCount;
-        double periodAnalysisFailureRate = periodFinishedAnalysisCount == 0
-                ? 0.0
-                : (double) periodFailedAnalysisCount * 100 / periodFinishedAnalysisCount;
-
-        long selectedDays = ChronoUnit.DAYS.between(selectedStartDate, selectedEndDate) + 1;
-        double averageDailyVisitors = selectedDays > 0
-                ? (double) periodActiveUserCount / selectedDays
-                : 0.0;
-
-        model.addAttribute("allUserCount", allUserCount);
-        model.addAttribute("allProblemCount", allProblemCount);
-        model.addAttribute("allPracticeNoteCount", allPracticeNoteCount);
-        model.addAttribute("allPracticeLogCount", allPracticeLogCount);
-        model.addAttribute("allProblemAnalysisCount", allProblemAnalysisCount);
-        model.addAttribute("allCompletedAnalysisCount", allAnalysisStatusCounts.getOrDefault(AnalysisStatus.COMPLETED, 0L));
-        model.addAttribute("allFailedAnalysisCount", allAnalysisStatusCounts.getOrDefault(AnalysisStatus.FAILED, 0L));
-        model.addAttribute("allProcessingAnalysisCount", allAnalysisStatusCounts.getOrDefault(AnalysisStatus.PROCESSING, 0L));
-        model.addAttribute("allNotStartedAnalysisCount", allAnalysisStatusCounts.getOrDefault(AnalysisStatus.NOT_STARTED, 0L));
-        model.addAttribute("allNoImageAnalysisCount", allAnalysisStatusCounts.getOrDefault(AnalysisStatus.NO_IMAGE, 0L));
-        model.addAttribute("allRateLimitExceededAnalysisCount", allAnalysisStatusCounts.getOrDefault(AnalysisStatus.RATE_LIMIT_EXCEEDED, 0L));
-        model.addAttribute("dailyActiveUsers", dailyActiveUsers);
-        model.addAttribute("dailyVisits", dailyVisits);
-        model.addAttribute("dailyNewUsers", dailyNewUsers);
-        model.addAttribute("dailyPracticeNotes", dailyPracticeNotes);
-        model.addAttribute("dailyPracticeLogs", dailyPracticeLogs);
-        model.addAttribute("dailyProblems", dailyProblems);
-        model.addAttribute("recentNewUsersCount", recentNewUsersCount);
-        model.addAttribute("periodVisitCount", periodVisitCount);
-        model.addAttribute("periodActiveUserCount", periodActiveUserCount);
-        model.addAttribute("periodUniqueVisitorCount", periodUniqueVisitorCount);
-        model.addAttribute("periodPracticeNoteCount", periodPracticeNoteCount);
-        model.addAttribute("periodPracticeLogCount", periodPracticeLogCount);
-        model.addAttribute("periodProblemCount", periodProblemCount);
-        model.addAttribute("periodCompletedAnalysisCount", periodCompletedAnalysisCount);
-        model.addAttribute("periodFailedAnalysisCount", periodFailedAnalysisCount);
-        model.addAttribute("periodProcessingAnalysisCount", periodProcessingAnalysisCount);
-        model.addAttribute("periodNotStartedAnalysisCount", periodNotStartedAnalysisCount);
-        model.addAttribute("periodNoImageAnalysisCount", periodNoImageAnalysisCount);
-        model.addAttribute("periodRateLimitExceededAnalysisCount", periodRateLimitExceededAnalysisCount);
-        model.addAttribute("periodAnalysisFailureRate", periodAnalysisFailureRate);
-        model.addAttribute("averageDailyVisitors", averageDailyVisitors);
         model.addAttribute("startDate", selectedStartDate);
         model.addAttribute("endDate", selectedEndDate);
+        model.addAttribute("days", period.days());
+        model.addAttribute("previousStartDate", period.previous().start());
+        model.addAttribute("previousEndDate", period.previous().end());
+        model.addAttribute("today", today);
         model.addAttribute("quickStart7Days", today.minusDays(6));
         model.addAttribute("quickStart30Days", today.minusDays(29));
         model.addAttribute("quickStart90Days", today.minusDays(89));
-        model.addAttribute("today", today);
+        model.addAttribute("quickStartMonth", today.withDayOfMonth(1));
+
+        model.addAttribute("dailyActiveUsers", daily.activeUsers());
+        model.addAttribute("dailyNewUsers", daily.newUsers());
+        model.addAttribute("dailyProblems", daily.problems());
+        model.addAttribute("dailySolves", daily.solves());
+        model.addAttribute("dailyPracticeNotes", daily.practiceNotes());
+        model.addAttribute("dailyRows", daily.rowsNewestFirst());
+        model.addAttribute("dailyTotals", daily.totals());
+
+        model.addAttribute("userStats", adminStatsService.userStats(period, daily, today));
+        model.addAttribute("learningStats", adminStatsService.learningStats(period, daily));
+        model.addAttribute("analysisStats", adminStatsService.analysisStats(period));
+        model.addAttribute("growthStats", adminStatsService.growthStats(period, daily));
+        model.addAttribute("roomStats", adminStatsService.roomStats(period));
+        model.addAttribute("topProblemWriters", adminStatsQueryRepository.topProblemWriters(selectedStartDate, selectedEndDate, 10));
+        model.addAttribute("topSolvers", adminStatsQueryRepository.topSolvers(selectedStartDate, selectedEndDate, 10));
 
         return "analysis";
     }

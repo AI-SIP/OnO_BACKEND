@@ -33,6 +33,8 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.hamcrest.Matchers.endsWith;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -574,9 +576,17 @@ class AuthApiTest extends IntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("인증 없이 관리자 경로에 접근하면 401 + 1007 로 막는다")
-        void anonymousCannotAccessAdminPath() throws Exception {
+        @DisplayName("인증 없이 관리자 화면을 열면 로그인 화면으로 보낸다")
+        void anonymousAdminPageRedirectsToLogin() throws Exception {
             mockMvc.perform(get("/admin/main"))
+                    .andExpect(status().isFound())
+                    .andExpect(header().string("Location", endsWith("/login")));
+        }
+
+        @Test
+        @DisplayName("인증 없이 관리자 화면이 아닌 요청을 보내면 401 + 1007 로 막는다")
+        void anonymousCannotCallAdminAction() throws Exception {
+            mockMvc.perform(post("/admin/notice/1/delete"))
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.errorCode").value(AuthErrorCase.AUTHENTICATION_FAILED.getErrorCode()));
         }

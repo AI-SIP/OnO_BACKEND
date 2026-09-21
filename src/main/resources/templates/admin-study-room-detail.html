@@ -1,148 +1,262 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title th:text="|스터디룸 상세 — ${room.name}|">스터디룸 상세 — OnO Admin</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-50 min-h-screen">
+<head th:replace="~{fragments/admin-layout :: head(${room.room().name()})}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{fragments/admin-layout :: sidebar('rooms')}"></aside>
 
-  <!-- Header -->
-  <header class="bg-white shadow-sm sticky top-0 z-10">
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-3">
-      <a th:href="@{/admin/study-rooms}" class="text-gray-400 hover:text-gray-600 transition-colors">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-        </svg>
-      </a>
-      <h1 class="text-xl font-bold text-gray-900" th:text="${room.name}">스터디룸 이름</h1>
-      <span class="text-sm text-gray-400">#<span th:text="${room.id}"></span></span>
+  <main class="main" data-reveal th:with="r=${room.room()}">
+    <div class="page-head">
+      <div>
+        <a class="crumb" th:href="@{/admin/study-rooms}">스터디룸</a>
+        <h1 th:text="${r.name()}">방 이름</h1>
+        <p class="desc">
+          <span th:text="|#${r.id()}|">#1</span>
+          <span> 방장 </span>
+          <a th:if="${r.hostUserId() != null}" class="strong" th:href="@{/admin/user/{id}(id=${r.hostUserId()})}"
+             th:text="${r.hostName() ?: '탈퇴한 유저'}">방장</a>
+          <span th:text="|, ${#temporals.format(r.createdAt(), 'yyyy-MM-dd')}에 만들었어요|">, 2026-09-01에 만들었어요</span>
+        </p>
+      </div>
+      <div class="invite" th:if="${!#lists.isEmpty(room.inviteCodes())}" th:with="code=${room.inviteCodes()[0]}">
+        <span class="muted small">초대 코드</span>
+        <b class="num" th:text="${code.code()}">ABC123</b>
+        <span th:if="${code.expired()}" class="chip">만료</span>
+        <span th:unless="${code.expired()}" class="chip green"
+              th:text="${code.expiredAt() != null} ? |${#temporals.format(code.expiredAt(), 'MM-dd HH:mm')}까지| : '만료 없음'">09-30까지</span>
+      </div>
     </div>
-  </header>
 
-  <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-
-    <!-- 기본 정보 -->
-    <section class="bg-white rounded-lg shadow p-6">
-      <h2 class="text-base font-semibold text-gray-700 mb-4 flex items-center gap-2">
-        <span class="w-1 h-5 bg-teal-500 rounded-full inline-block"></span>기본 정보
-      </h2>
-      <dl class="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-6 text-sm">
-        <div>
-          <dt class="text-gray-500 mb-0.5">룸 ID</dt>
-          <dd class="font-medium text-gray-900" th:text="${room.id}"></dd>
-        </div>
-        <div>
-          <dt class="text-gray-500 mb-0.5">방장 ID</dt>
-          <dd class="font-medium text-gray-900" th:text="${room.hostUserId}"></dd>
-        </div>
-        <div>
-          <dt class="text-gray-500 mb-0.5">생성일</dt>
-          <dd class="font-medium text-gray-900"
-              th:text="${#temporals.format(room.createdAt, 'yyyy-MM-dd HH:mm')}"></dd>
-        </div>
-        <div>
-          <dt class="text-gray-500 mb-0.5">전체 멤버</dt>
-          <dd class="font-medium text-gray-900" th:text="${#lists.size(room.members)} + '명'"></dd>
-        </div>
-        <div>
-          <dt class="text-gray-500 mb-0.5">공유 문제 수</dt>
-          <dd class="font-medium text-gray-900" th:text="${room.sharedProblemCount} + '개'"></dd>
-        </div>
-        <div>
-          <dt class="text-gray-500 mb-0.5">전체 챌린지</dt>
-          <dd class="font-medium text-gray-900" th:text="${#lists.size(room.challenges)} + '개'"></dd>
-        </div>
-      </dl>
-    </section>
-
-    <!-- 멤버 목록 -->
-    <section class="bg-white rounded-lg shadow overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-        <span class="w-1 h-5 bg-teal-500 rounded-full inline-block"></span>
-        <h2 class="text-base font-semibold text-gray-700">멤버 목록</h2>
-        <span class="ml-auto text-sm text-gray-400" th:text="${#lists.size(room.members)} + '명'"></span>
+    <div class="kpis">
+      <div class="kpi">
+        <div class="kpi-label">멤버</div>
+        <div class="kpi-value"><span data-count th:text="${room.members().size()}">0</span><span class="unit">명</span></div>
       </div>
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-          <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">유저 ID</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">이름</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">역할</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">참여일</th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          <tr th:each="m : ${room.members}" class="hover:bg-gray-50 transition-colors">
-            <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500" th:text="${m.userId}"></td>
-            <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900" th:text="${m.userName}"></td>
-            <td class="px-6 py-3 whitespace-nowrap text-sm">
-              <span th:if="${m.role == '방장'}"
-                    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-800">방장</span>
-              <span th:if="${m.role != '방장'}"
-                    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">멤버</span>
-            </td>
-            <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500"
-                th:text="${#temporals.format(m.joinedAt, 'yyyy-MM-dd HH:mm')}"></td>
-          </tr>
-          <tr th:if="${#lists.isEmpty(room.members)}">
-            <td colspan="4" class="px-6 py-8 text-center text-gray-400 text-sm">멤버가 없습니다.</td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
-
-    <!-- 챌린지 목록 -->
-    <section class="bg-white rounded-lg shadow overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-        <span class="w-1 h-5 bg-teal-500 rounded-full inline-block"></span>
-        <h2 class="text-base font-semibold text-gray-700">챌린지 목록</h2>
-        <span class="ml-auto text-sm text-gray-400" th:text="${#lists.size(room.challenges)} + '개'"></span>
+      <div class="kpi">
+        <div class="kpi-label">공유 문제</div>
+        <div class="kpi-value"><span data-count th:text="${room.sharedProblems().size()}">0</span><span class="unit">개</span></div>
       </div>
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">제목</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">유형</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">지표</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">목표</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상태</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">기간</th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <tr th:each="c : ${room.challenges}" class="hover:bg-gray-50 transition-colors">
-              <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500" th:text="${c.id}"></td>
-              <td class="px-6 py-3 text-sm font-medium text-gray-900" th:text="${c.title}"></td>
-              <td class="px-6 py-3 whitespace-nowrap text-sm">
-                <span th:text="${c.type}"
-                      th:classappend="${c.type == '개인'} ? 'bg-blue-100 text-blue-700' : (${c.type == '그룹'} ? 'bg-indigo-100 text-indigo-700' : 'bg-orange-100 text-orange-700')"
-                      class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"></span>
-              </td>
-              <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-600" th:text="${c.metric}"></td>
-              <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-700 font-medium" th:text="${c.targetValue}"></td>
-              <td class="px-6 py-3 whitespace-nowrap text-sm">
-                <span th:text="${c.status}"
-                      th:classappend="${c.status == '진행 중'} ? 'bg-green-100 text-green-700' : (${c.status == '완료'} ? 'bg-blue-100 text-blue-700' : (${c.status == '실패'} ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'))"
-                      class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"></span>
-              </td>
-              <td class="px-6 py-3 whitespace-nowrap text-xs text-gray-500">
-                <span th:text="${#temporals.format(c.startAt, 'MM/dd')}"></span>
-                ~
-                <span th:text="${#temporals.format(c.endAt, 'MM/dd')}"></span>
-              </td>
-            </tr>
-            <tr th:if="${#lists.isEmpty(room.challenges)}">
-              <td colspan="7" class="px-6 py-8 text-center text-gray-400 text-sm">챌린지가 없습니다.</td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="kpi">
+        <div class="kpi-label">댓글</div>
+        <div class="kpi-value"><span data-count th:text="${room.totalCommentCount()}">0</span><span class="unit">개</span></div>
       </div>
-    </section>
+      <div class="kpi">
+        <div class="kpi-label">반응</div>
+        <div class="kpi-value"><span data-count th:text="${room.totalReactionCount()}">0</span><span class="unit">개</span></div>
+        <div class="kpi-sub">공유 문제, 댓글, 피드에 남긴 이모지</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">챌린지</div>
+        <div class="kpi-value"><span data-count th:text="${room.challenges().size()}">0</span><span class="unit">개</span></div>
+        <div class="kpi-sub" th:text="|진행 ${room.inProgressChallengeCount()}, 완료 ${room.completedChallengeCount()}|">진행 0, 완료 0</div>
+      </div>
+    </div>
 
+    <div class="section">
+      <div class="tabs" data-tabs>
+        <button type="button" data-tab="members">멤버<span class="count" th:text="${room.members().size()}">0</span></button>
+        <button type="button" data-tab="challenges">챌린지<span class="count" th:text="${room.challenges().size()}">0</span></button>
+        <button type="button" data-tab="shared">공유 문제<span class="count" th:text="${room.sharedProblems().size()}">0</span></button>
+        <button type="button" data-tab="feed">피드<span class="count" th:text="${room.feeds().size()}">0</span></button>
+        <button type="button" data-tab="reports">주간 리포트<span class="count" th:text="${room.weeklyReports().size()}">0</span></button>
+      </div>
+
+      <section class="tab-panel" data-panel="members">
+        <div class="card flush">
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+              <tr>
+                <th>유저</th>
+                <th>역할</th>
+                <th class="r">주간 목표</th>
+                <th class="r">공유한 문제</th>
+                <th>들어온 날</th>
+              </tr>
+              </thead>
+              <tbody>
+              <tr th:each="m : ${room.members()}" th:attr="data-href=@{/admin/user/{id}(id=${m.userId()})}">
+                <td>
+                  <div class="who">
+                    <b th:text="${m.userName() ?: '탈퇴한 유저'}">이름</b>
+                    <span th:text="${m.email() ?: ('#' + m.userId())}">email</span>
+                  </div>
+                </td>
+                <td><span th:if="${m.host()}" class="chip green">방장</span><span th:unless="${m.host()}" class="chip">멤버</span></td>
+                <td class="r" th:text="${m.weeklyGoal() != null} ? |${m.weeklyGoal()}개| : '-'">5개</td>
+                <td class="r" th:classappend="${m.sharedProblemCount() == 0} ? 'zero'" th:text="${m.sharedProblemCount()}">0</td>
+                <td class="nowrap muted" th:text="${#temporals.format(m.joinedAt(), 'yyyy-MM-dd HH:mm')}">2026-09-01</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <div th:if="${#lists.isEmpty(room.members())}" class="empty">멤버가 없어요</div>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="challenges" hidden>
+        <div class="card flush">
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+              <tr>
+                <th>챌린지</th>
+                <th>방식</th>
+                <th>지표</th>
+                <th>기간</th>
+                <th class="r">목표</th>
+                <th>상태</th>
+                <th>시작</th>
+                <th>끝</th>
+                <th>달성</th>
+              </tr>
+              </thead>
+              <tbody>
+              <tr th:each="c : ${room.challenges()}">
+                <td>
+                  <div class="who">
+                    <b th:text="${c.title()}">제목</b>
+                    <span th:if="${c.createdByName() != null}" th:text="|${c.createdByName()} 님이 만듦|">만든 사람</span>
+                  </div>
+                </td>
+                <td th:text="${c.typeLabel()}">개인</td>
+                <td th:text="${c.metricLabel()}">복습</td>
+                <td th:text="${c.periodLabel()}">일주일</td>
+                <td class="r" th:text="${c.targetValue() ?: '-'}">10</td>
+                <td>
+                  <span class="chip" th:classappend="${c.status() == 'IN_PROGRESS'} ? 'blue' : (${c.status() == 'COMPLETED'} ? 'green' : (${c.status() == 'FAILED'} ? 'red' : ''))"
+                        th:text="${c.statusLabel()}">진행 중</span>
+                </td>
+                <td class="nowrap muted" th:text="${c.startAt() != null} ? ${#temporals.format(c.startAt(), 'MM-dd HH:mm')} : '-'">09-01</td>
+                <td class="nowrap muted" th:text="${c.endAt() != null} ? ${#temporals.format(c.endAt(), 'MM-dd HH:mm')} : '-'">09-07</td>
+                <td class="nowrap muted" th:text="${c.completedAt() != null} ? ${#temporals.format(c.completedAt(), 'MM-dd HH:mm')} : '-'">-</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <div th:if="${#lists.isEmpty(room.challenges())}" class="empty">만든 챌린지가 없어요</div>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="shared" hidden>
+        <div th:if="${#lists.isEmpty(room.sharedProblems())}" class="card empty">공유된 문제가 없어요</div>
+        <div class="card shared" th:each="sp : ${room.sharedProblems()}">
+          <div class="between">
+            <div class="row-main">
+              <div class="row-title">
+                <a th:if="${sp.problemId() != null}" class="link" th:href="@{/admin/problem/{id}(id=${sp.problemId()})}"
+                   th:text="|문제 #${sp.problemId()}|">문제 #1</a>
+                <span th:if="${sp.problemId() == null}" class="muted">지워진 문제</span>
+              </div>
+              <div class="row-sub">
+                <a th:if="${sp.sharedByUserId() != null}" th:href="@{/admin/user/{id}(id=${sp.sharedByUserId()})}"
+                   th:text="${sp.sharedByName() ?: '탈퇴한 유저'}">공유자</a>
+                <span th:text="| 님이 ${#temporals.format(sp.sharedAt(), 'yyyy-MM-dd HH:mm')}에 공유|">님이 공유</span>
+              </div>
+            </div>
+            <div class="gap-8">
+              <span class="chip" th:text="|반응 ${sp.reactionCount()}|">반응 0</span>
+              <span class="chip" th:classappend="${sp.commentCount() > 0} ? 'blue'" th:text="|댓글 ${sp.commentCount()}|">댓글 0</span>
+            </div>
+          </div>
+          <div th:if="${sp.comment() != null and !#strings.isEmpty(sp.comment())}" class="quote mt-12" th:text="${sp.comment()}">코멘트</div>
+          <details th:if="${!#lists.isEmpty(sp.comments())}" class="comments mt-12">
+            <summary th:text="|댓글 ${sp.comments().size()}개 보기|">댓글 보기</summary>
+            <div class="rows">
+              <div class="row" th:each="cm : ${sp.comments()}">
+                <div class="row-main">
+                  <div class="row-sub">
+                    <a th:if="${cm.authorId() != null}" class="strong" th:href="@{/admin/user/{id}(id=${cm.authorId()})}"
+                       th:text="${cm.authorName() ?: '탈퇴한 유저'}">작성자</a>
+                    <span th:text="| ${#temporals.format(cm.createdAt(), 'MM-dd HH:mm')}|">09-01</span>
+                    <span th:if="${cm.reactionCount() > 0}" th:text="|, 반응 ${cm.reactionCount()}|"></span>
+                  </div>
+                  <div class="comment-body" th:text="${cm.content()}">댓글 내용</div>
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="feed" hidden>
+        <div class="card flush">
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+              <tr>
+                <th>시각</th>
+                <th>유저</th>
+                <th>이벤트</th>
+                <th>내용</th>
+                <th class="r">반응</th>
+              </tr>
+              </thead>
+              <tbody>
+              <tr th:each="f : ${room.feeds()}">
+                <td class="nowrap muted" th:text="${#temporals.format(f.createdAt(), 'MM-dd HH:mm')}">09-01 10:00</td>
+                <td>
+                  <a th:if="${f.userId() != null}" class="link" th:href="@{/admin/user/{id}(id=${f.userId()})}"
+                     th:text="${f.userName() ?: '탈퇴한 유저'}">유저</a>
+                </td>
+                <td><span class="chip" th:text="${f.eventLabel()}">복습 완료</span></td>
+                <td class="ellipsis" th:text="${f.summary()}">3회</td>
+                <td class="r" th:classappend="${f.reactionCount() == 0} ? 'zero'" th:text="${f.reactionCount()}">0</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <div th:if="${#lists.isEmpty(room.feeds())}" class="empty">쌓인 피드가 없어요</div>
+          <div th:if="${room.feeds().size() >= 100}" class="pager"><span class="pager-info">최근 100개만 보여 줘요</span></div>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="reports" hidden>
+        <div th:if="${#lists.isEmpty(room.weeklyReports())}" class="card empty">아직 만들어진 주간 리포트가 없어요</div>
+        <div class="grid grid-2">
+          <div class="card" th:each="w : ${room.weeklyReports()}">
+            <div class="card-title">
+              <span th:text="|${#temporals.format(w.weekStart(), 'MM.dd')} ~ ${#temporals.format(w.weekEnd(), 'MM.dd')}|">09.01 ~ 09.07</span>
+              <small th:text="|${w.readCount()}명이 읽음|">0명이 읽음</small>
+            </div>
+            <div class="stats">
+              <div>
+                <div class="stat-label">가장 많이 적은 멤버</div>
+                <div class="stat-value" th:text="${w.topMemberName() ?: '-'}">이름</div>
+                <div class="small muted" th:if="${w.topMemberProblemCount() != null}" th:text="|${w.topMemberProblemCount()}개|">3개</div>
+              </div>
+              <div>
+                <div class="stat-label">가장 오래 연속</div>
+                <div class="stat-value" th:text="${w.longestStreakName() ?: '-'}">이름</div>
+                <div class="small muted" th:if="${w.longestStreakDays() != null}" th:text="|${w.longestStreakDays()}일|">3일</div>
+              </div>
+              <div>
+                <div class="stat-label">방 전체 오답노트</div>
+                <div class="stat-value" th:text="${w.totalProblems() ?: 0}">0</div>
+              </div>
+              <div>
+                <div class="stat-label">달성한 챌린지</div>
+                <div class="stat-value" th:text="${w.challengesCompleted() ?: 0}">0</div>
+              </div>
+            </div>
+            <div th:if="${w.cheerMessage() != null}" class="quote mt-20" th:text="${w.cheerMessage()}">응원 문구</div>
+          </div>
+        </div>
+      </section>
+    </div>
   </main>
+</div>
+<style>
+  .invite { display: flex; align-items: center; gap: 8px; background: var(--surface); border-radius: var(--radius-m); padding: 10px 14px; }
+  .invite b { font-size: 16px; letter-spacing: .04em; }
+  .card.shared + .card.shared { margin-top: 12px; }
+  .comments summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--t2); list-style: none; }
+  .comments summary::-webkit-details-marker { display: none; }
+  .comments summary::before { content: "›"; display: inline-block; margin-right: 6px; transition: transform .2s; }
+  .comments[open] summary::before { transform: rotate(90deg); }
+  .comments .rows { margin-top: 8px; }
+  .comment-body { margin-top: 2px; font-size: 14px; color: var(--t1); white-space: pre-wrap; word-break: break-word; }
+</style>
+<th:block th:replace="~{fragments/admin-layout :: scripts}"></th:block>
 </body>
 </html>

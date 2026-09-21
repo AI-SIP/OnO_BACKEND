@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/admin-layout :: head('업적')}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{fragments/admin-layout :: sidebar('achievements')}"></aside>
+
+  <main class="main" data-reveal>
+    <div class="page-head">
+      <div>
+        <h1>업적</h1>
+        <p class="desc">훈장마다 몇 명이 받았는지, 최근에 누가 받았는지 볼 수 있어요.</p>
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi">
+        <div class="kpi-label">받은 훈장</div>
+        <div class="kpi-value"><span data-count th:text="${overview.totalEarned()}">0</span><span class="unit">개</span></div>
+        <div class="kpi-sub">유저별 훈장 수를 모두 더한 값</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">하나 이상 받은 유저</div>
+        <div class="kpi-value"><span data-count th:text="${overview.usersWithAny()}">0</span><span class="unit">명</span></div>
+        <div class="kpi-sub" th:text="|전체 ${overview.totalUsers()}명 중 ${overview.totalUsers() == 0 ? 0 : #numbers.formatDecimal(overview.usersWithAny() * 100.0 / overview.totalUsers(), 1, 1)}%|">전체 0명 중 0%</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">최근 7일 획득</div>
+        <div class="kpi-value"><span data-count th:text="${overview.earnedLast7Days()}">0</span><span class="unit">개</span></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="card">
+        <h2 class="card-title">훈장별 획득 <small>탈퇴한 유저와 관리자 계정은 빼고 셉니다</small></h2>
+        <div class="medal-list">
+          <div class="medal-row" th:each="a : ${achievements}">
+            <div class="medal">
+              <div class="medal-img" th:text="${#strings.substring(a.nameKo(), 0, 1)}">첫</div>
+              <div class="row-main">
+                <div class="row-title" th:text="${a.nameKo()}">첫 걸음</div>
+                <div class="row-sub" th:text="|${a.descriptionKo()} (기준 ${a.threshold()})|">설명</div>
+              </div>
+            </div>
+            <div class="bar-track"><div class="bar-fill" th:style="|width: ${a.rate()}%|"></div></div>
+            <div class="medal-num">
+              <b class="num" th:text="|${a.earnedUsers()}명|">0명</b>
+              <span class="small muted" th:text="|${#numbers.formatDecimal(a.rate(), 1, 1)}%|">0%</span>
+            </div>
+            <div class="small muted nowrap medal-last"
+                 th:text="${a.lastEarnedAt() != null} ? |마지막 ${#temporals.format(a.lastEarnedAt(), 'MM-dd HH:mm')}| : '아직 없음'">-</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>최근 받은 훈장</h2></div>
+      <div class="card flush">
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+            <tr>
+              <th>받은 시각</th>
+              <th>유저</th>
+              <th>훈장</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="e : ${recent}" th:attr="data-href=@{/admin/user/{id}(id=${e.userId()})}">
+              <td class="nowrap muted" th:text="${#temporals.format(e.earnedAt(), 'yyyy-MM-dd HH:mm')}">2026-09-21</td>
+              <td><b th:text="${e.userName() ?: ('#' + e.userId())}">유저</b></td>
+              <td><span class="chip green" th:text="${e.achievementName()}">첫 걸음</span></td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+        <div th:if="${#lists.isEmpty(recent)}" class="empty">아직 받은 훈장이 없어요</div>
+      </div>
+    </div>
+  </main>
+</div>
+<style>
+  .medal-list { display: flex; flex-direction: column; }
+  .medal-row { display: grid; grid-template-columns: minmax(220px, 1.4fr) 1fr 90px 110px; gap: 16px; align-items: center; padding: 12px 0; }
+  .medal-row + .medal-row { border-top: 1px solid var(--surface-3); }
+  .medal-num { display: flex; flex-direction: column; align-items: flex-end; }
+  .medal-last { text-align: right; }
+  .nowrap { white-space: nowrap; }
+  @media (max-width: 860px) {
+    .medal-row { grid-template-columns: 1fr 80px; }
+    .medal-row .bar-track, .medal-last { display: none; }
+  }
+</style>
+<th:block th:replace="~{fragments/admin-layout :: scripts}"></th:block>
+</body>
+</html>

@@ -1,88 +1,106 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>스터디룸 관리 — OnO Admin</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-50 min-h-screen">
+<head th:replace="~{fragments/admin-layout :: head('스터디룸')}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{fragments/admin-layout :: sidebar('rooms')}"></aside>
 
-  <!-- Header -->
-  <header class="bg-white shadow-sm sticky top-0 z-10">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <a th:href="@{/admin/main}" class="text-gray-400 hover:text-gray-600 transition-colors">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-          </svg>
-        </a>
-        <h1 class="text-xl font-bold text-gray-900">스터디룸 관리</h1>
+  <main class="main" data-reveal>
+    <div class="page-head">
+      <div>
+        <h1>스터디룸</h1>
+        <p class="desc">방마다 누가 모여서 무엇을 하고 있는지 볼 수 있어요.</p>
       </div>
-      <span class="text-sm text-gray-500">전체 <strong th:text="${totalCount}">0</strong> 개</span>
-    </div>
-  </header>
-
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-    <!-- Table -->
-    <div class="bg-white rounded-lg shadow overflow-hidden">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-          <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">룸 이름</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">멤버 수</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">공유 문제 수</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">생성일</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">상세</th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          <tr th:each="room : ${rooms}" class="hover:bg-gray-50 transition-colors">
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" th:text="${room.id}"></td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" th:text="${room.name}"></td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-              <span class="inline-flex items-center gap-1">
-                <svg class="w-4 h-4 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-                </svg>
-                <span th:text="${room.memberCount}"></span>명
-              </span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700" th:text="${room.sharedProblemCount} + '개'"></td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"
-                th:text="${#temporals.format(room.createdAt, 'yyyy-MM-dd HH:mm')}"></td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm">
-              <a th:href="@{/admin/study-rooms/{id}(id=${room.id})}"
-                 class="text-teal-600 hover:text-teal-900 font-medium">상세 보기 →</a>
-            </td>
-          </tr>
-          <tr th:if="${#lists.isEmpty(rooms)}">
-            <td colspan="6" class="px-6 py-12 text-center text-gray-400 text-sm">스터디룸이 없습니다.</td>
-          </tr>
-        </tbody>
-      </table>
     </div>
 
-    <!-- Pagination -->
-    <div th:if="${totalPages > 1}" class="mt-6 flex items-center justify-center gap-1">
-      <a th:if="${hasPreviousBlock}"
-         th:href="@{/admin/study-rooms(page=${pageBlockStart - 1}, size=${size})}"
-         class="px-3 py-2 rounded text-sm text-gray-600 hover:bg-gray-200 transition-colors">«</a>
-
-      <th:block th:each="i : ${#numbers.sequence(pageBlockStart, pageBlockEnd)}">
-        <a th:href="@{/admin/study-rooms(page=${i}, size=${size})}"
-           th:text="${i + 1}"
-           th:classappend="${i == currentPage} ? 'bg-teal-500 text-white' : 'text-gray-600 hover:bg-gray-200'"
-           class="px-3 py-2 rounded text-sm transition-colors"></a>
-      </th:block>
-
-      <a th:if="${hasNextBlock}"
-         th:href="@{/admin/study-rooms(page=${pageBlockEnd + 1}, size=${size})}"
-         class="px-3 py-2 rounded text-sm text-gray-600 hover:bg-gray-200 transition-colors">»</a>
+    <div class="kpis">
+      <div class="kpi">
+        <div class="kpi-label">전체 방</div>
+        <div class="kpi-value"><span data-count th:text="${overview.totalRooms()}">0</span><span class="unit">개</span></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">이번 주 활동한 방</div>
+        <div class="kpi-value"><span data-count th:text="${overview.activeRoomsThisWeek()}">0</span><span class="unit">개</span></div>
+        <div class="kpi-sub">월요일부터 피드가 한 번이라도 쌓인 방</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">참여 중인 멤버</div>
+        <div class="kpi-value"><span data-count th:text="${overview.totalMembers()}">0</span><span class="unit">명</span></div>
+        <div class="kpi-sub">여러 방에 들어간 유저는 방마다 셉니다</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">공유된 문제</div>
+        <div class="kpi-value"><span data-count th:text="${overview.sharedProblems()}">0</span><span class="unit">개</span></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">진행 중인 챌린지</div>
+        <div class="kpi-value"><span data-count th:text="${overview.inProgressChallenges()}">0</span><span class="unit">개</span></div>
+      </div>
     </div>
 
+    <div class="section">
+      <div class="card flush">
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+            <tr>
+              <th>방</th>
+              <th>방장</th>
+              <th class="r">멤버</th>
+              <th class="r">공유 문제</th>
+              <th class="r">댓글</th>
+              <th class="r">챌린지</th>
+              <th>최근 활동</th>
+              <th>만든 날</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="r : ${rooms}" th:attr="data-href=@{/admin/study-rooms/{id}(id=${r.id()})}">
+              <td>
+                <div class="room-name">
+                  <span class="room-thumb">
+                    <img th:if="${r.thumbnailUrl() != null and r.thumbnailUrl().startsWith('http')}"
+                         th:src="${r.thumbnailUrl()}" alt="" loading="lazy">
+                  </span>
+                  <div class="who">
+                    <b th:text="${r.name()}">방 이름</b>
+                    <span th:text="|#${r.id()}|">#1</span>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <a th:if="${r.hostUserId() != null}" class="link" th:href="@{/admin/user/{id}(id=${r.hostUserId()})}"
+                   th:text="${r.hostName() ?: '탈퇴한 유저'}">방장</a>
+                <span th:if="${r.hostUserId() == null}" class="muted">-</span>
+              </td>
+              <td class="r" th:text="${r.memberCount()}">1</td>
+              <td class="r" th:classappend="${r.sharedProblemCount() == 0} ? 'zero'" th:text="${r.sharedProblemCount()}">0</td>
+              <td class="r" th:classappend="${r.commentCount() == 0} ? 'zero'" th:text="${r.commentCount()}">0</td>
+              <td class="r nowrap">
+                <span th:if="${r.inProgressChallengeCount() > 0}" class="chip green" th:text="|진행 ${r.inProgressChallengeCount()}|">진행 1</span>
+                <span th:if="${r.completedChallengeCount() > 0}" class="chip" th:text="|완료 ${r.completedChallengeCount()}|">완료 1</span>
+                <span th:if="${r.inProgressChallengeCount() == 0 and r.completedChallengeCount() == 0}" class="zero">0</span>
+              </td>
+              <td class="nowrap">
+                <span th:if="${r.lastActivityAt() != null}" th:text="${#temporals.format(r.lastActivityAt(), 'yyyy-MM-dd HH:mm')}">2026-09-21 10:00</span>
+                <span th:if="${r.lastActivityAt() == null}" class="muted">활동 없음</span>
+              </td>
+              <td class="nowrap muted" th:text="${#temporals.format(r.createdAt(), 'yyyy-MM-dd')}">2026-09-01</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+        <div th:if="${#lists.isEmpty(rooms)}" class="empty">아직 만들어진 스터디룸이 없어요</div>
+        <div th:replace="~{fragments/admin-layout :: pager(${pager})}"></div>
+      </div>
+    </div>
   </main>
+</div>
+<style>
+  .room-name { display: flex; align-items: center; gap: 12px; }
+  .room-thumb { flex: none; width: 36px; height: 36px; border-radius: 10px; background: var(--surface-3); overflow: hidden; }
+  .room-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+</style>
+<th:block th:replace="~{fragments/admin-layout :: scripts}"></th:block>
 </body>
 </html>

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<!--/* 통계 화면과 홈에서 쓰는 지표 카드. m 은 AdminStatsDto.Metric 이다. */-->
+
+<div th:fragment="kpi(label, m, decimal, compareLabel)" class="kpi" th:with="d=${m.deltaPercent()}">
+  <div class="kpi-label" th:text="${label}">가입</div>
+  <div class="kpi-value">
+    <span data-count th:text="${decimal} ? ${#numbers.formatDecimal(m.value(), 1, 'COMMA', 1, 'POINT')} : ${#numbers.formatInteger(m.value(), 1, 'COMMA')}">0</span>
+  </div>
+  <div class="kpi-sub">
+    <span th:if="${d == null}" th:text="|${compareLabel} 기록 없음|">직전 기간 기록 없음</span>
+    <th:block th:if="${d != null}"><th:block th:text="|${compareLabel}보다|">직전보다</th:block>
+      <span th:classappend="${d >= 0} ? 'up' : 'down'"
+            th:text="${(d >= 0 ? '+' : '') + #numbers.formatDecimal(d, 1, 1)} + '%'">+0%</span>
+    </th:block>
+  </div>
+</div>
+
+</html>

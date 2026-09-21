@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/admin-layout :: head('복습노트 상세')}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{fragments/admin-layout :: sidebar('notes')}"></aside>
+  <main class="main" data-reveal>
+
+    <div class="page-head">
+      <div>
+        <a class="crumb" th:href="@{/admin/practice-notes}">복습노트</a>
+        <h1 th:text="${note.title != null and !#strings.isEmpty(note.title)} ? ${note.title} : '제목 없음'">복습노트</h1>
+        <p class="desc" th:text="|#${note.noteId} · ${#temporals.format(note.createdAt, 'yyyy-MM-dd HH:mm')} 만듦|">#1</p>
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi">
+        <div class="kpi-label">문제</div>
+        <div class="kpi-value"><span data-count th:text="${note.problemCount}">0</span><span class="unit">개</span></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">복습 횟수</div>
+        <div class="kpi-value"><span data-count th:text="${note.practiceCount}">0</span><span class="unit">회</span></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">마지막 복습</div>
+        <div class="kpi-value" th:text="${note.lastSolvedAt != null} ? ${#temporals.format(note.lastSolvedAt, 'MM.dd')} : '-'">-</div>
+        <div class="kpi-sub" th:if="${note.lastSolvedAt != null}" th:text="${#temporals.format(note.lastSolvedAt, 'yyyy-MM-dd HH:mm')}">날짜</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">마지막 세션 기분</div>
+        <div class="kpi-value small-value" th:text="${note.lastMoodEmojiKey ?: '-'}">-</div>
+      </div>
+    </div>
+
+    <div class="grid grid-2 section">
+      <div class="card">
+        <h2 class="card-title">노트 정보</h2>
+        <dl class="kv">
+          <dt>유저</dt>
+          <dd>
+            <a th:if="${note.userId != null}" class="strong" th:href="@{/admin/user/{id}(id=${note.userId})}" th:text="${note.userName ?: '이름 없음'}">이름</a>
+            <span class="small muted" th:if="${note.userId != null}" th:text="|ID ${note.userId}|">ID</span>
+          </dd>
+          <dt>이메일</dt>
+          <dd th:text="${note.userEmail ?: '-'}">email</dd>
+          <dt>만든 날</dt>
+          <dd th:text="${#temporals.format(note.createdAt, 'yyyy-MM-dd HH:mm')}">날짜</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h2 class="card-title">복습 알림</h2>
+        <dl class="kv" th:if="${note.hasNotification()}">
+          <dt>알림</dt>
+          <dd><span class="chip blue" th:text="${note.notificationText()}">매일 21:00</span></dd>
+          <dt>반복</dt>
+          <dd th:switch="${note.repeatType}">
+            <span th:case="'daily'">매일</span>
+            <span th:case="'weekly'">요일마다</span>
+            <span th:case="*" th:text="${note.repeatType ?: '지정 안 함'}">-</span>
+          </dd>
+          <dt>간격</dt>
+          <dd th:text="${note.intervalDays != null} ? |${note.intervalDays}일| : '-'">-</dd>
+        </dl>
+        <p class="muted" th:unless="${note.hasNotification()}">알림을 켜지 않았어요.</p>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="section-head"><h2>들어 있는 문제</h2><span class="hint" th:text="|${#lists.size(problems)}개|">0개</span></div>
+      <div class="card flush">
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+            <tr><th>ID</th><th>출처 / 메모</th><th>과목</th><th class="r">복습</th><th>마지막 결과</th><th>마지막 복습</th><th>등록일</th></tr>
+            </thead>
+            <tbody>
+            <tr th:each="p : ${problems}" th:attr="data-href=@{/admin/problem/{id}(id=${p.problemId})}">
+              <td class="num muted" th:text="${p.problemId}">1</td>
+              <td>
+                <div class="ellipsis strong" th:text="${p.reference != null and !#strings.isEmpty(p.reference)} ? ${p.reference} : '출처 없음'">출처</div>
+                <div class="ellipsis small muted" th:if="${p.memo != null and !#strings.isEmpty(p.memo)}" th:text="${p.memo}">메모</div>
+              </td>
+              <td th:text="${p.subject ?: '-'}">수학</td>
+              <td class="r" th:classappend="${p.solveCount == 0} ? 'zero'" th:text="${p.solveCount}">0</td>
+              <td><th:block th:replace="~{fragments/admin-learning :: answerChip(${p.lastAnswerStatus})}"></th:block></td>
+              <td class="nowrap" th:classappend="${p.lastPracticedAt == null} ? 'muted'"
+                  th:text="${p.lastPracticedAt != null} ? ${#temporals.format(p.lastPracticedAt, 'yyyy-MM-dd HH:mm')} : '-'">-</td>
+              <td class="nowrap muted" th:text="${#temporals.format(p.createdAt, 'yyyy-MM-dd')}">날짜</td>
+            </tr>
+            </tbody>
+          </table>
+          <div class="empty" th:if="${#lists.isEmpty(problems)}">문제가 없는 복습노트예요.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>최근 복습 기록</h2>
+        <a class="hint" th:if="${note.userId != null}" th:href="@{/admin/practice-logs(userId=${note.userId})}">이 유저의 전체 기록 보기</a>
+      </div>
+      <div class="card flush">
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+            <tr><th>복습 시각</th><th>문제</th><th>결과</th><th>소요 시간</th><th>회고</th><th>기분</th></tr>
+            </thead>
+            <tbody>
+            <tr th:each="s : ${recentSolves}" th:attr="data-href=@{/admin/problem/{id}(id=${s.problemId})}">
+              <td class="nowrap num" th:text="${#temporals.format(s.practicedAt, 'yyyy-MM-dd HH:mm')}">날짜</td>
+              <td class="ellipsis strong" th:text="${s.problemReference != null and !#strings.isEmpty(s.problemReference)} ? ${s.problemReference} : |오답노트 #${s.problemId}|">문제</td>
+              <td><th:block th:replace="~{fragments/admin-learning :: answerChip(${s.answerStatus})}"></th:block></td>
+              <td class="nowrap" th:classappend="${s.timeSpentText() == null} ? 'muted'" th:text="${s.timeSpentText() ?: '-'}">-</td>
+              <td class="ellipsis" th:classappend="${s.reflection == null} ? 'muted'" th:text="${s.reflection != null and !#strings.isEmpty(s.reflection)} ? ${s.reflection} : '-'">회고</td>
+              <td class="small" th:classappend="${s.moodEmojiKey == null} ? 'muted'" th:text="${s.moodEmojiKey ?: '-'}">기분</td>
+            </tr>
+            </tbody>
+          </table>
+          <div class="empty" th:if="${#lists.isEmpty(recentSolves)}">이 노트의 문제로 남긴 복습 기록이 없어요.</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+<style>
+  .kpi-value.small-value { font-size: 17px; word-break: break-all; }
+</style>
+<th:block th:replace="~{fragments/admin-layout :: scripts}"></th:block>
+</body>
+</html>

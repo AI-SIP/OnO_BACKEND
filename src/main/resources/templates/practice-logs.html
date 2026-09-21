@@ -1,119 +1,147 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OnO 관리자 - 복습 기록</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
-  <nav class="bg-white shadow-lg">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between h-16">
-        <div class="flex items-center">
-          <a th:href="@{/admin/main}">
-            <h1 class="text-2xl font-bold text-indigo-600">OnO 관리자</h1>
-          </a>
-        </div>
-        <div class="flex items-center space-x-4">
-          <a th:href="@{/admin/main}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">대시보드</a>
-          <a th:href="@{/admin/users}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">유저</a>
-          <a th:href="@{/admin/problems}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">문제</a>
-          <a th:href="@{/admin/practice-notes}" class="text-indigo-600 px-3 py-2 rounded-md text-sm font-medium border-b-2 border-indigo-600">복습</a>
-          <a th:href="@{/admin/analysis}" class="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium">통계</a>
-          <form th:action="@{/logout}" method="post">
-            <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium transition duration-150">
-              로그아웃
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
-  </nav>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/admin-layout :: head('복습 기록')}"></head>
+<body>
+<div class="shell">
+  <aside th:replace="~{fragments/admin-layout :: sidebar('solves')}"></aside>
+  <main class="main" data-reveal>
 
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="mb-6 flex items-start justify-between">
+    <div class="page-head">
       <div>
-        <h2 class="text-2xl font-bold text-gray-900">복습 기록</h2>
-        <p class="text-gray-600 mt-1">
-          총 <span class="font-semibold text-pink-600" th:text="${totalPracticeLogs}">0</span>개
-        </p>
+        <h1>복습 기록</h1>
+        <p class="desc">유저가 오답노트를 다시 풀 때마다 남긴 기록이에요.</p>
       </div>
-      <a th:href="@{/admin/practice-notes}" class="px-4 py-2 bg-white border border-gray-200 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-        복습노트 목록
-      </a>
     </div>
 
-    <section class="bg-white rounded-lg shadow-md overflow-hidden">
-      <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-        <h3 class="text-lg font-semibold text-gray-900">복습 기록 목록</h3>
-        <form th:action="@{/admin/practice-logs}" method="get" class="flex items-center space-x-2">
-          <input type="hidden" name="logPage" value="0">
-          <select name="size" class="rounded-md border-gray-300 text-sm">
-            <option value="20" th:selected="${size == 20}">20개</option>
-            <option value="50" th:selected="${size == 50}">50개</option>
-            <option value="100" th:selected="${size == 100}">100개</option>
-          </select>
-          <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md text-sm font-medium">적용</button>
-        </form>
+    <div class="kpis">
+      <div class="kpi">
+        <div class="kpi-label" th:text="${filtered} ? '조건에 맞는 복습' : '전체 복습'">전체 복습</div>
+        <div class="kpi-value"><span data-count th:text="${#numbers.formatInteger(summary.total(), 1, 'COMMA')}">0</span><span class="unit">회</span></div>
       </div>
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">기록 ID</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">유저</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">복습노트</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">포인트</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">완료일</th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <tr th:each="log : ${practiceLogs}" class="hover:bg-gray-50">
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" th:text="${log.missionLogId}">1</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                <a th:href="@{/admin/user/{userId}(userId=${log.userId})}" class="text-indigo-600 hover:text-indigo-800 font-medium" th:text="${log.userName}">유저</a>
-                <p class="text-xs text-gray-500" th:text="${log.userEmail}">user@example.com</p>
-              </td>
-              <td class="px-6 py-4 text-sm text-gray-900">
-                <span th:text="${log.practiceTitle}">복습노트</span>
-                <span class="text-xs text-gray-500" th:text="'#' + ${log.practiceNoteId}">#1</span>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600" th:text="${log.point} + 'pt'">15pt</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600" th:text="${#temporals.format(log.createdAt, 'yyyy-MM-dd HH:mm')}">2024-01-01 00:00</td>
-            </tr>
-            <tr th:if="${#lists.isEmpty(practiceLogs)}">
-              <td colspan="5" class="px-6 py-8 text-center text-gray-500">복습 기록이 없습니다</td>
-            </tr>
-          </tbody>
-        </table>
+      <a class="kpi" th:href="@{/admin/practice-logs(date=${#temporals.format(#temporals.createToday(), 'yyyy-MM-dd')})}">
+        <div class="kpi-label">오늘</div>
+        <div class="kpi-value"><span data-count th:text="${#numbers.formatInteger(todaySolveCount, 1, 'COMMA')}">0</span><span class="unit">회</span></div>
+      </a>
+      <div class="kpi">
+        <div class="kpi-label">정답률</div>
+        <div class="kpi-value"><span data-count th:text="${#numbers.formatDecimal(summary.correctRate(), 1, 1)}">0.0</span><span class="unit">%</span></div>
+        <div class="kpi-sub">결과를 남긴 기록 기준</div>
       </div>
+      <div class="kpi">
+        <div class="kpi-label">평균 소요 시간</div>
+        <div class="kpi-value" th:text="${summary.averageTimeText() ?: '-'}">-</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">회고를 쓴 기록</div>
+        <div class="kpi-value"><span data-count th:text="${#numbers.formatInteger(summary.withReflection(), 1, 'COMMA')}">0</span><span class="unit">회</span></div>
+      </div>
+    </div>
 
-      <div th:if="${logTotalPages > 1}" class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex flex-wrap justify-end gap-2">
-        <a th:if="${logPage > 0}" th:href="@{/admin/practice-logs(logPage=${logPage - 1}, size=${size})}"
-           class="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">이전</a>
-        <span th:if="${logPage == 0}" class="px-4 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-400">이전</span>
-
-        <a th:if="${hasPreviousLogBlock}" th:href="@{/admin/practice-logs(logPage=${logPageBlockStart - 10}, size=${size})}"
-           class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">&lt;&lt;</a>
-        <span th:unless="${hasPreviousLogBlock}" class="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-400">&lt;&lt;</span>
-
-        <span th:each="page : ${#numbers.sequence(logPageBlockStart, logPageBlockEnd)}">
-          <a th:if="${page == logPage}"
-             class="px-4 py-2 bg-indigo-600 border border-indigo-600 rounded-md text-sm font-medium text-white" th:text="${page + 1}">1</a>
-          <a th:if="${page != logPage}" th:href="@{/admin/practice-logs(logPage=${page}, size=${size})}"
-             class="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50" th:text="${page + 1}">1</a>
-        </span>
-
-        <a th:if="${hasNextLogBlock}" th:href="@{/admin/practice-logs(logPage=${logPageBlockStart + 10}, size=${size})}"
-           class="px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">&gt;&gt;</a>
-        <span th:unless="${hasNextLogBlock}" class="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-400">&gt;&gt;</span>
-
-        <a th:if="${logPage < logTotalPages - 1}" th:href="@{/admin/practice-logs(logPage=${logPage + 1}, size=${size})}"
-           class="px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">다음</a>
-        <span th:if="${logPage >= logTotalPages - 1}" class="px-4 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-400">다음</span>
+    <section class="section" th:if="${summary.total() > 0}">
+      <div class="card">
+        <h2 class="card-title">결과 분포</h2>
+        <div class="stack">
+          <span th:style="|width: ${summary.correct() * 100.0 / summary.total()}%; background: var(--brand)|"></span>
+          <span th:style="|width: ${summary.partial() * 100.0 / summary.total()}%; background: var(--orange)|"></span>
+          <span th:style="|width: ${summary.wrong() * 100.0 / summary.total()}%; background: var(--red)|"></span>
+          <span th:style="|width: ${summary.unknown() * 100.0 / summary.total()}%; background: var(--t4)|"></span>
+        </div>
+        <div class="legend">
+          <a th:href="@{/admin/practice-logs(date=${filterDate}, userId=${filterUserId}, answerStatus='CORRECT')}"><i style="background: var(--brand)"></i>정답 <b class="num" th:text="${summary.correct()}">0</b></a>
+          <a th:href="@{/admin/practice-logs(date=${filterDate}, userId=${filterUserId}, answerStatus='PARTIAL')}"><i style="background: var(--orange)"></i>부분 정답 <b class="num" th:text="${summary.partial()}">0</b></a>
+          <a th:href="@{/admin/practice-logs(date=${filterDate}, userId=${filterUserId}, answerStatus='WRONG')}"><i style="background: var(--red)"></i>오답 <b class="num" th:text="${summary.wrong()}">0</b></a>
+          <a th:href="@{/admin/practice-logs(date=${filterDate}, userId=${filterUserId}, answerStatus='UNKNOWN')}"><i style="background: var(--t4)"></i>결과 없음 <b class="num" th:text="${summary.unknown()}">0</b></a>
+        </div>
       </div>
     </section>
-  </div>
+
+    <section class="section">
+      <div class="card">
+        <form class="toolbar" th:action="@{/admin/practice-logs}" method="get">
+          <div class="field">
+            <label for="date">복습일</label>
+            <input class="input" type="date" id="date" name="date" th:value="${filterDate}">
+          </div>
+          <div class="field">
+            <label for="userId">유저 ID</label>
+            <input class="input" type="number" id="userId" name="userId" min="1" placeholder="예: 519" th:value="${filterUserId}">
+          </div>
+          <div class="field">
+            <label for="answerStatus">결과</label>
+            <select class="select" id="answerStatus" name="answerStatus">
+              <option value="">전체</option>
+              <option th:each="s : ${answerStatuses}" th:value="${s.name()}" th:selected="${s.name() == filterStatus}">
+                <th:block th:replace="~{fragments/admin-learning :: answerLabel(${s.name()})}"></th:block>
+              </option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="size">한 번에</label>
+            <select class="select" id="size" name="size">
+              <option th:each="n : ${ {20, 50, 100} }" th:value="${n}" th:text="|${n}개|" th:selected="${n == size}">20개</option>
+            </select>
+          </div>
+          <button type="submit" class="btn primary">조회</button>
+          <a th:if="${filtered}" class="btn" th:href="@{/admin/practice-logs}">초기화</a>
+        </form>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="filter-bar" th:if="${filtered}">
+        <span th:if="${filterDate != null}" class="chip green" th:text="|복습일 ${filterDate}|">복습일</span>
+        <span th:if="${filterUserId != null}" class="chip green"
+              th:text="${filterUserName != null} ? |${filterUserName} (ID ${filterUserId})| : |유저 ID ${filterUserId}|">유저</span>
+        <span th:if="${filterStatus != null}" class="chip green">
+          <th:block th:replace="~{fragments/admin-learning :: answerLabel(${filterStatus})}"></th:block>
+        </span>
+        <a class="clear" th:href="@{/admin/practice-logs}">필터 해제</a>
+      </div>
+
+      <div class="card flush">
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+            <tr>
+              <th>복습 시각</th>
+              <th>유저</th>
+              <th>문제</th>
+              <th>결과</th>
+              <th>소요 시간</th>
+              <th>회고</th>
+              <th>기분</th>
+              <th class="r">사진</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="s : ${solves}" th:attr="data-href=${s.problemId != null} ? @{/admin/problem/{id}(id=${s.problemId})} : null">
+              <td class="nowrap num" th:text="${#temporals.format(s.practicedAt, 'yyyy-MM-dd HH:mm')}">날짜</td>
+              <td th:insert="~{fragments/admin-learning :: who(${s.userId}, ${s.userName}, ${s.userEmail})}"></td>
+              <td>
+                <div class="ellipsis strong" th:text="${s.problemReference != null and !#strings.isEmpty(s.problemReference)} ? ${s.problemReference} : |오답노트 #${s.problemId}|">문제</div>
+                <div class="ellipsis small muted" th:if="${s.problemMemo != null and !#strings.isEmpty(s.problemMemo)}" th:text="${s.problemMemo}">메모</div>
+              </td>
+              <td>
+                <div class="gap-8">
+                  <th:block th:replace="~{fragments/admin-learning :: answerChip(${s.answerStatus})}"></th:block>
+                  <span class="chip" th:if="${s.migratedFromLegacy}">이관</span>
+                </div>
+              </td>
+              <td class="nowrap" th:classappend="${s.timeSpentText() == null} ? 'muted'" th:text="${s.timeSpentText() ?: '-'}">-</td>
+              <td class="ellipsis" th:classappend="${s.reflection == null} ? 'muted'" th:text="${s.reflection != null and !#strings.isEmpty(s.reflection)} ? ${s.reflection} : '-'">회고</td>
+              <td class="small" th:classappend="${s.moodEmojiKey == null} ? 'muted'" th:text="${s.moodEmojiKey ?: '-'}">기분</td>
+              <td class="r" th:classappend="${s.imageCount == 0} ? 'zero'" th:text="${s.imageCount}">0</td>
+            </tr>
+            </tbody>
+          </table>
+          <div class="empty" th:if="${#lists.isEmpty(solves)}">조건에 맞는 복습 기록이 없어요.</div>
+        </div>
+        <div th:replace="~{fragments/admin-layout :: pager(${pager})}"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+<th:block th:replace="~{fragments/admin-layout :: scripts}"></th:block>
 </body>
 </html>
