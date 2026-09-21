@@ -13,7 +13,6 @@
         <p class="desc num"
            th:text="|${#temporals.format(startDate, 'yyyy. M. d')} ~ ${#temporals.format(endDate, 'yyyy. M. d')} (${days}일), 직전 비교 ${#temporals.format(previousStartDate, 'M. d')} ~ ${#temporals.format(previousEndDate, 'M. d')}|">
           2026. 8. 23 ~ 2026. 9. 21 (30일)</p>
-        <p class="small muted" style="margin: 4px 0 0;">게스트와 관리자 계정은 빼고 셌어요.</p>
       </div>
       <div class="seg">
         <a th:href="@{/admin/analysis(startDate=${quickStart7Days}, endDate=${today})}"
