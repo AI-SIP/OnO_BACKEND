@@ -11,6 +11,7 @@
       <div>
         <h1>오늘</h1>
         <p class="desc num" th:text="${#temporals.format(today, 'yyyy년 M월 d일 E요일', T(java.util.Locale).KOREAN)}">2026년 9월 21일 월요일</p>
+        <p class="small muted" style="margin: 4px 0 0;">숫자는 게스트와 관리자 계정을 빼고 셌어요.</p>
       </div>
       <a class="btn" th:href="@{/admin/analysis}">통계 자세히 보기</a>
     </div>

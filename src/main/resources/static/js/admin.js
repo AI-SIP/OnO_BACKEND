@@ -18,39 +18,49 @@
     });
   }
 
-  // 카드와 표가 위에서부터 차례로 올라오게 한다.
-  function reveal() {
-    if (reduceMotion) return;
-    var targets = document.querySelectorAll('[data-reveal] > *');
-    targets.forEach(function (el, i) {
-      el.style.setProperty('--i', Math.min(i, 12));
-      el.classList.add('reveal');
-    });
-  }
+  // 화면이 뜬 뒤에 카드를 투명하게 만들었다 다시 올리거나 숫자를 0 으로 되돌렸다 세면,
+  // 이동할 때마다 한 번 그려진 화면이 사라졌다 다시 나타나 깜빡이는 것처럼 보였다. 그래서 첫 화면은 그대로 둔다.
 
-  // 숫자는 0 에서 목표값까지 짧게 올라간다. 소수점 자릿수는 원래 글자를 따른다.
-  function countUp() {
-    var els = document.querySelectorAll('[data-count]');
-    els.forEach(function (el) {
-      var raw = el.textContent.trim().replace(/,/g, '');
-      var target = parseFloat(raw);
-      if (!isFinite(target) || reduceMotion || target === 0) return;
-      var decimals = (raw.split('.')[1] || '').length;
-      var start = null;
-      var duration = 700;
-      var format = function (v) {
-        return v.toLocaleString('ko-KR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-      };
-      el.textContent = format(0);
-      function step(ts) {
-        if (start === null) start = ts;
-        var p = Math.min((ts - start) / duration, 1);
-        var eased = 1 - Math.pow(1 - p, 3);
-        el.textContent = format(target * eased);
-        if (p < 1) requestAnimationFrame(step);
-        else el.textContent = format(target);
-      }
-      requestAnimationFrame(step);
+  // 사이드바 접기와 펼치기. 데스크톱은 접힘 상태를 기억하고, 모바일은 서랍처럼 열고 닫는다.
+  function bindNav() {
+    var root = document.documentElement;
+    var mobile = window.matchMedia('(max-width: 860px)');
+
+    function remember(collapsed) {
+      try { localStorage.setItem('ono-admin-nav', collapsed ? 'collapsed' : 'open'); } catch (e) {}
+    }
+
+    document.querySelectorAll('[data-nav-open]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (mobile.matches) {
+          root.classList.add('nav-open');
+        } else {
+          root.classList.remove('nav-collapsed');
+          remember(false);
+        }
+      });
+    });
+    document.querySelectorAll('[data-nav-close]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (mobile.matches) {
+          root.classList.remove('nav-open');
+        } else {
+          root.classList.add('nav-collapsed');
+          remember(true);
+        }
+      });
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') root.classList.remove('nav-open');
+    });
+    // 화면 폭이 바뀌어 서랍이 필요 없어지면 열린 서랍 상태를 지운다.
+    mobile.addEventListener('change', function () { root.classList.remove('nav-open'); });
+    // 뒤로 가기로 돌아왔을 때 서랍이 열린 채로 보이지 않게 한다.
+    window.addEventListener('pageshow', function () { root.classList.remove('nav-open'); });
+
+    // 첫 화면이 그려진 다음에야 움직임을 켠다. 그래야 새로고침할 때 사이드바가 미끄러지지 않는다.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { root.classList.add('nav-ready'); });
     });
   }
 
@@ -151,11 +161,17 @@
     }
   });
 
-  document.addEventListener('DOMContentLoaded', function () {
+  // 이 스크립트는 body 맨 끝에서 읽히므로 화면 요소가 이미 다 있다. DOMContentLoaded 까지 기다리면
+  // 모든 탭 패널이 한 번 그려졌다가 숨겨져서 깜빡이므로 바로 붙인다.
+  function init() {
     bindRowLinks();
-    reveal();
-    countUp();
+    bindNav();
     bindTabs();
     bindSegments();
-  });
+  }
+  if (document.readyState === 'loading' && !document.querySelector('.shell, .login')) {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();

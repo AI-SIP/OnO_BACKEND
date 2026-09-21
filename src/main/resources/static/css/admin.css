@@ -61,14 +61,18 @@ button, input, select, textarea { font: inherit; color: inherit; letter-spacing:
 
 .num { font-variant-numeric: tabular-nums; }
 
-/* 페이지 전환: 같은 출처 안에서 이동할 때 브라우저가 이전 화면과 새 화면을 겹쳐서 부드럽게 바꾼다. */
+/*
+ * 페이지 전환. 예전에는 이전 화면을 투명하게 지운 뒤 새 화면을 올려서 중간에 바탕이 한 번 비쳤다.
+ * 브라우저 기본 교차 전환은 두 화면을 더해서 섞기 때문에 중간에 비는 순간이 없다.
+ * 사이드바는 화면마다 같으므로 전환에서 빼서 제자리에 둔다.
+ */
 @view-transition { navigation: auto; }
-::view-transition-old(root) { animation: vt-out .16s var(--ease) both; }
-::view-transition-new(root) { animation: vt-in .24s var(--ease) both; }
-@keyframes vt-out { to { opacity: 0; } }
-@keyframes vt-in { from { opacity: 0; transform: translateY(6px); } }
+::view-transition-group(root) { animation-duration: .14s; }
 .sidebar { view-transition-name: sidebar; }
-::view-transition-old(sidebar), ::view-transition-new(sidebar) { animation: none; }
+.topbar { view-transition-name: topbar; }
+::view-transition-group(sidebar), ::view-transition-group(topbar),
+::view-transition-old(sidebar), ::view-transition-new(sidebar),
+::view-transition-old(topbar), ::view-transition-new(topbar) { animation: none; }
 
 /* ---------- 레이아웃 ---------- */
 
@@ -82,27 +86,79 @@ button, input, select, textarea { font: inherit; color: inherit; letter-spacing:
   border-right: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  padding: 22px 14px 18px;
-  z-index: 20;
+  padding: 18px 14px 18px;
+  z-index: 40;
+}
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 12px;
 }
 
 .brand {
   display: flex;
   align-items: baseline;
   gap: 6px;
-  padding: 0 10px 22px;
+  padding: 0 10px;
 }
+
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--t3);
+  cursor: pointer;
+  transition: background .15s, color .15s, transform .12s var(--ease);
+}
+.icon-btn:hover { background: var(--surface-3); color: var(--t1); }
+.icon-btn:active { transform: scale(.94); }
+.icon-btn svg { width: 20px; height: 20px; }
+
+/* 접힌 상태에서 사이드바를 다시 여는 버튼. 데스크톱에서 접었을 때만 보인다. */
+.nav-float {
+  position: fixed;
+  top: 28px;
+  left: 20px;
+  z-index: 30;
+  display: none;
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+}
+.topbar { display: none; }
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  background: rgba(0, 0, 0, .36);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s;
+}
+
+/* 접힘 상태는 첫 화면을 그리기 전에 head 의 스크립트가 붙인다. 그래서 새로고침해도 사이드바가 튀지 않는다.
+   움직임은 nav-ready 가 붙은 뒤에만 켜서 처음 그릴 때는 애니메이션 없이 제자리에 놓인다. */
+.nav-ready .sidebar { transition: transform .28s var(--ease); }
+.nav-ready .main { transition: margin-left .28s var(--ease), padding-left .28s var(--ease); }
+.nav-collapsed .sidebar { transform: translateX(-100%); }
+.nav-collapsed .main { margin-left: 0; padding-left: 76px; }
+.nav-collapsed .nav-float { display: inline-flex; }
 .brand-mark {
   font-size: 22px;
   font-weight: 800;
   letter-spacing: -.04em;
-  color: var(--t1);
+  color: var(--brand);
 }
-.brand-mark b { color: var(--brand); font-weight: 800; }
 .brand-sub { font-size: 13px; color: var(--t3); font-weight: 600; }
 
 .nav { flex: 1; overflow-y: auto; }
-.nav-group + .nav-group { margin-top: 18px; }
+.nav-group + .nav-group { margin-top: 12px; }
 .nav-label {
   padding: 0 10px 6px;
   font-size: 12px;
@@ -113,7 +169,7 @@ button, input, select, textarea { font: inherit; color: inherit; letter-spacing:
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 38px;
+  height: 36px;
   padding: 0 10px;
   border-radius: var(--radius-s);
   font-size: 15px;
@@ -199,6 +255,8 @@ button, input, select, textarea { font: inherit; color: inherit; letter-spacing:
   padding: 24px;
 }
 .card + .card { margin-top: 12px; }
+/* 그리드 안에서는 간격을 gap 이 맡는다. 위 규칙이 두 번째 카드만 12px 내려서 나란한 카드 높이가 어긋났다. */
+.grid > .card + .card, .grid > * + .card { margin-top: 0; }
 .card-title {
   margin: 0 0 16px;
   font-size: 17px;
@@ -734,29 +792,35 @@ table.table {
 }
 
 @media (max-width: 860px) {
-  .sidebar {
+  /* 모바일은 상단 바의 메뉴 버튼으로 여닫는 서랍이다. 데스크톱 접힘 상태와는 따로 움직인다. */
+  .topbar {
     position: sticky;
     top: 0;
-    inset: auto;
-    width: auto;
-    height: auto;
-    flex-direction: row;
+    z-index: 30;
+    display: flex;
     align-items: center;
-    padding: 10px 12px;
-    border-right: 0;
+    gap: 6px;
+    height: 56px;
+    padding: 0 8px;
+    background: rgba(255, 255, 255, .92);
+    backdrop-filter: saturate(180%) blur(12px);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
     border-bottom: 1px solid var(--line);
-    gap: 8px;
   }
-  .brand { padding: 0 6px 0 4px; flex: none; }
-  .brand-sub { display: none; }
-  .nav { display: flex; overflow-x: auto; scrollbar-width: none; gap: 2px; }
-  .nav::-webkit-scrollbar { display: none; }
-  .nav-group { display: contents; }
-  .nav-label { display: none; }
-  .nav a { flex: none; height: 34px; font-size: 14px; }
-  .sidebar-foot { border-top: 0; padding-top: 0; flex: none; }
-  .logout { width: auto; height: 34px; font-size: 13px; }
-  .main { margin-left: 0; padding: 22px 16px 60px; }
+  .topbar .brand-mark { font-size: 19px; }
+  .sidebar {
+    width: min(280px, 84vw);
+    transform: translateX(-100%);
+    box-shadow: none;
+  }
+  .nav-ready .sidebar { transition: transform .28s var(--ease), box-shadow .28s; }
+  .nav-open .sidebar { transform: none; box-shadow: 0 0 40px rgba(0, 0, 0, .12); }
+  .nav-open .scrim { opacity: 1; pointer-events: auto; }
+  .nav-open body { overflow: hidden; }
+  .nav-collapsed .sidebar { transform: translateX(-100%); }
+  .nav-collapsed.nav-open .sidebar { transform: none; }
+  .nav-float, .nav-collapsed .nav-float { display: none; }
+  .main, .nav-collapsed .main { margin-left: 0; padding: 20px 16px 60px; }
   .grid-2, .grid-3, .grid-4 { grid-template-columns: minmax(0, 1fr); }
   .span-2 { grid-column: auto; }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }

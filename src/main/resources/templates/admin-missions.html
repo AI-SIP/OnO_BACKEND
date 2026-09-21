@@ -9,7 +9,7 @@
     <div class="page-head">
       <div>
         <h1>미션</h1>
-        <p class="desc" th:text="|오늘(${dailyKey})과 이번 주(${weeklyKey}) 기준으로 진행 상황을 보여 줘요.|">오늘과 이번 주 기준</p>
+        <p class="desc" th:text="|오늘(${dailyKey})과 이번 주(${weeklyKey}) 기준이에요. 게스트와 관리자 계정은 빼고 셌어요.|">오늘과 이번 주 기준</p>
       </div>
     </div>
 
@@ -40,6 +40,7 @@
           <span class="hint" th:text="${block == 'DAILY'} ? |이번 기간 ${dailyKey}| : |이번 기간 ${weeklyKey}|">기간</span>
         </div>
         <div class="card flush">
+          <p class="small muted mission-help" th:if="${block == 'DAILY'}">진행도는 유저가 해당 행동을 한 번이라도 해야 생겨요. 그래서 시작 대비 달성은 이번 기간에 시작한 유저 가운데 목표까지 채운 비율이에요.</p>
           <div class="table-wrap">
             <table class="table">
               <thead>
@@ -48,10 +49,10 @@
                 <th>지표</th>
                 <th class="r">목표</th>
                 <th>보상</th>
-                <th class="r">이번 기간 진행</th>
-                <th class="r">달성</th>
+                <th class="r" title="이번 기간에 이 미션 진행도가 한 번이라도 올라간 유저 수">시작한 유저</th>
+                <th class="r">목표 달성</th>
                 <th class="r">보상 받음</th>
-                <th>달성률</th>
+                <th title="시작한 유저 가운데 목표를 채운 유저의 비율">시작 대비 달성</th>
                 <th class="r">누적 달성</th>
                 <th class="r">누적 받음</th>
               </tr>
@@ -128,6 +129,7 @@
   .off-row td { opacity: .55; }
   .who b { display: flex; align-items: center; gap: 6px; }
   .rate-cell { min-width: 140px; }
+  .mission-help { margin: 0; padding: 16px 16px 4px; }
   .rate { display: grid; grid-template-columns: 1fr 40px; align-items: center; gap: 8px; }
   .rate .num { text-align: right; font-weight: 600; font-size: 13px; }
   .trend { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }

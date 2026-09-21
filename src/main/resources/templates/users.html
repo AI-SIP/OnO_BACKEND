@@ -9,7 +9,7 @@
     <div class="page-head">
       <div>
         <h1>유저</h1>
-        <p class="desc">탈퇴하지 않은 계정만 보여요</p>
+        <p class="desc">탈퇴하지 않은 계정만 보여요. 위 숫자는 게스트와 관리자 계정을 빼고 셌어요.</p>
       </div>
     </div>
 
@@ -25,11 +25,6 @@
       <div class="kpi">
         <div class="kpi-label">최근 7일 출석</div>
         <div class="kpi-value"><span data-count th:text="${#numbers.formatInteger(summary.activeUsersLast7Days(), 1, 'COMMA')}">0</span><span class="unit">명</span></div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">게스트 비율</div>
-        <div class="kpi-value"><span data-count th:text="${#numbers.formatDecimal(summary.guestRate(), 1, 1)}">0.0</span><span class="unit">%</span></div>
-        <div class="kpi-sub num" th:text="|게스트 ${#numbers.formatInteger(summary.guestUsers(), 1, 'COMMA')}명|">게스트 0명</div>
       </div>
     </div>
 

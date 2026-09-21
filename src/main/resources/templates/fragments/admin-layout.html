@@ -10,13 +10,37 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
   <link rel="stylesheet" th:href="@{/css/admin.css}">
+  <script>
+    // 사이드바를 접어 둔 상태는 첫 화면을 그리기 전에 붙여야 이동할 때마다 펼쳐졌다 접히지 않는다.
+    try {
+      if (localStorage.getItem('ono-admin-nav') === 'collapsed') {
+        document.documentElement.classList.add('nav-collapsed');
+      }
+    } catch (e) {}
+  </script>
 </head>
 
-<aside th:fragment="sidebar(active)" class="sidebar">
-  <a class="brand" th:href="@{/admin/main}">
-    <span class="brand-mark">On<b>O</b></span>
-    <span class="brand-sub">관리자</span>
-  </a>
+<th:block th:fragment="sidebar(active)">
+<header class="topbar">
+  <button type="button" class="icon-btn" data-nav-open aria-label="메뉴 열기" aria-controls="adminSidebar">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3.5 6h13M3.5 10h13M3.5 14h13"/></svg>
+  </button>
+  <a class="brand-mark" th:href="@{/admin/main}">OnO</a>
+</header>
+<button type="button" class="icon-btn nav-float" data-nav-open aria-label="메뉴 펼치기" title="메뉴 펼치기" aria-controls="adminSidebar">
+  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3.5 6h13M3.5 10h13M3.5 14h13"/></svg>
+</button>
+<div class="scrim" data-nav-close></div>
+<aside class="sidebar" id="adminSidebar">
+  <div class="sidebar-head">
+    <a class="brand" th:href="@{/admin/main}">
+      <span class="brand-mark">OnO</span>
+      <span class="brand-sub">관리자</span>
+    </a>
+    <button type="button" class="icon-btn" data-nav-close aria-label="메뉴 접기" title="메뉴 접기">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 5l-5 5 5 5"/></svg>
+    </button>
+  </div>
   <nav class="nav">
     <div class="nav-group">
       <div class="nav-label">한눈에 보기</div>
@@ -55,6 +79,7 @@
     </form>
   </div>
 </aside>
+</th:block>
 
 <th:block th:fragment="scripts">
   <script th:src="@{/js/admin.js}"></script>
