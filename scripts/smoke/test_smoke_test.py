@@ -15,9 +15,11 @@ import hmac
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -27,6 +29,7 @@ import smoke_test  # noqa: E402
 
 SERVER_SECRET = base64.b64encode(b"s" * 64).decode()
 OTHER_SECRET = base64.b64encode(b"x" * 64).decode()
+REFRESH_SECRET = base64.b64encode(b"r" * 64).decode()
 NOW = 1_800_000_000
 SMOKE_USER = "42"
 REAL_USER = "7"
@@ -54,7 +57,8 @@ def issued_token(user_id: str) -> str:
 class FakeOnO:
     """스모크 테스트가 부르는 API 만 흉내 내는 OnO 서버.
 
-    사용자마다 루트 폴더와 하위 폴더, 복습노트를 들고 있고, 소유권과 에러 코드를 실제 서버처럼 돌려준다.
+    사용자마다 루트 폴더와 하위 폴더, 복습노트, 오답노트를 들고 있고, 소유권과 에러 코드를 실제 서버처럼 돌려준다.
+    refresh token 은 서버가 발급해 저장한 것만 갱신되고(stored_refresh_tokens), 나머지는 1002 다.
     override(method, path_regex) 로 특정 요청의 응답을 바꿔 실패 상황을 만든다.
     """
 
@@ -64,8 +68,11 @@ class FakeOnO:
         self.lock = threading.Lock()
         self.next_id = 100
         self.users = {}
+        self.stored_refresh_tokens = set()
+        self.now = NOW  # 만료 판정 기준. 스크립트를 별도 프로세스로 돌리는 시험은 실제 시각으로 바꾼다
         self.add_user(SMOKE_USER, marker=True)
         self.add_user(REAL_USER, marker=False, extra_folders=["수학", "__smoke_run_looks_like_but_real_user"])
+        self.add_problem(REAL_USER, "__smoke_run_looks_like_but_real_user")
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -116,13 +123,23 @@ class FakeOnO:
             folders[fid] = {"folderId": fid, "folderName": name, "parent": root, "deleted": False}
         nid = self.new_id()
         notes = {nid: {"practiceNoteId": nid, "practiceTitle": "복습 세트", "deleted": False}}
-        self.users[user_id] = {"root": root, "folders": folders, "notes": notes}
+        self.users[user_id] = {"root": root, "folders": folders, "notes": notes, "problems": {}}
+        self.add_problem(user_id, "근의 공식")
+
+    def add_problem(self, user_id, memo):
+        user = self.users[user_id]
+        pid = self.new_id()
+        user["problems"][pid] = {"problemId": pid, "memo": memo, "folderId": user["root"], "deleted": False}
+        return pid
 
     def live_folder_names(self, user_id):
         return sorted(f["folderName"] for f in self.users[user_id]["folders"].values() if not f["deleted"])
 
     def live_note_titles(self, user_id):
         return sorted(n["practiceTitle"] for n in self.users[user_id]["notes"].values() if not n["deleted"])
+
+    def live_problem_memos(self, user_id):
+        return sorted(p["memo"] for p in self.users[user_id]["problems"].values() if not p["deleted"])
 
     def override(self, method, path_regex, response, times=None):
         self.overrides.append({"method": method, "path": path_regex, "response": response, "times": times})
@@ -145,6 +162,21 @@ class FakeOnO:
             self.add_user(uid, marker=False)
             return ok({"accessToken": issued_token(uid), "refreshToken": "refresh-" + uid})
 
+        if method == "POST" and path == "/api/auth/refresh":
+            # JwtTokenService.refreshAccessToken: 서명과 만료를 보고, 저장된 토큰인지 찾는다.
+            token = (body or {}).get("refreshToken") or ""
+            try:
+                claims = verify_token(token, REFRESH_SECRET)
+            except ValueError:  # 형식이 깨진 토큰. binascii.Error 도 ValueError 다
+                claims = None
+            if claims is None:
+                return error(400, 1001)
+            if claims["exp"] < self.now:
+                return error(401, 1006)
+            if token not in self.stored_refresh_tokens:
+                return error(401, 1002)
+            return ok({"accessToken": "Bearer new", "refreshToken": "new"})
+
         auth = headers.get("Authorization")
         if not auth:
             return error(401, 1007)
@@ -157,7 +189,7 @@ class FakeOnO:
                 return ok(0)
             return error(404, 5001)
         user = self.users[uid]
-        folders, notes = user["folders"], user["notes"]
+        folders, notes, problems = user["folders"], user["notes"], user["problems"]
 
         def folder_view(f):
             parent = folders.get(f["parent"])
@@ -174,6 +206,15 @@ class FakeOnO:
             if m:
                 f = folders.get(int(m.group(1)))
                 return ok(folder_view(f)) if f and not f["deleted"] else error(404, 5001)
+            pm = re.fullmatch(r"/api/problems/(\d+)", path)
+            if pm:
+                problem = problems.get(int(pm.group(1)))
+                if not problem or problem["deleted"]:
+                    return error(404, 4001)
+                return ok({k: problem[k] for k in ("problemId", "memo", "folderId")})
+            if path == "/api/fileUpload/presigned-urls":
+                return ok([{"presignedUrl": "https://bucket.s3.amazonaws.com/x.png?X-Amz-Signature=secretsig",
+                            "fileUrl": "https://bucket.s3.amazonaws.com/x.png"}])
             n = re.fullmatch(r"/api/practiceNotes/(\d+)", path)
             if n:
                 note = notes.get(int(n.group(1)))
@@ -186,7 +227,8 @@ class FakeOnO:
                 "/api/folders/thumbnails/V2": page,
                 "/api/problems/problemCount": 0,
                 "/api/problems/review-due": {"dueCount": 0, "overdueCount": 0, "problems": []},
-                "/api/problems/user": [],
+                "/api/problems/user": [{k: p[k] for k in ("problemId", "memo", "folderId")}
+                                       for p in problems.values() if not p["deleted"]],
                 "/api/practiceNotes/thumbnail": [{"practiceNoteId": x["practiceNoteId"], "practiceTitle": x["practiceTitle"]}
                                                  for x in notes.values() if not x["deleted"]],
                 "/api/practiceNotes/thumbnail/V2": page,
@@ -234,6 +276,20 @@ class FakeOnO:
             for i in ids:
                 notes[i]["deleted"] = True
             return ok("선택한 복습 노트가 삭제되었습니다.")
+        if method == "POST" and path == "/api/problems/v2":
+            folder = folders.get(body.get("folderId"))
+            if not folder or folder["deleted"]:
+                return error(404, 5001)
+            pid = self.new_id()
+            problems[pid] = {"problemId": pid, "memo": body.get("memo"), "folderId": folder["folderId"], "deleted": False}
+            return ok(pid)
+        if method == "DELETE" and path == "/api/problems":
+            ids = body.get("deleteProblemIdList", [])
+            if any(i not in problems or problems[i]["deleted"] for i in ids):
+                return error(404, 4001)
+            for i in ids:
+                problems[i]["deleted"] = True
+            return ok("문제 삭제가 완료되었습니다.")
         return error(404, 9999)
 
 
@@ -383,6 +439,56 @@ class AuthTest(SmokeTestBase):
         self.assertEqual(1, self.run_smoke(user_id=None))
 
 
+class RefreshTest(SmokeTestBase):
+
+    def refresh_requests(self):
+        return [r for r in self.server.requests if r[1] == smoke_test.REFRESH_PATH]
+
+    def test_passes_when_server_answers_not_found(self):
+        self.assertEqual(0, self.run_smoke(level="read", SMOKE_REFRESH_TOKEN_SECRET=REFRESH_SECRET))
+        (method, _, headers, body), = self.refresh_requests()
+        self.assertEqual("POST", method)
+        self.assertNotIn("Authorization", headers)
+        claims = verify_token(body["refreshToken"], REFRESH_SECRET)
+        self.assertEqual("0", claims["sub"], "스모크 계정이 아니라 없는 사용자로 만든다")
+        self.assertIn("jti", claims)
+        self.assertNotIn(body["refreshToken"], self.server.stored_refresh_tokens)
+        self.assert_only_allowed_requests()
+        self.assertEqual(18, len(self.server.requests))
+
+    def test_runs_even_without_access_secret_or_user(self):
+        self.assertEqual(0, self.run_smoke(level="read", secret=None, user_id=None, SMOKE_REFRESH_TOKEN_SECRET=REFRESH_SECRET))
+        self.assertEqual([("GET", smoke_test.PROBE_PATH), ("POST", smoke_test.REFRESH_PATH)], self.server.paths())
+
+    def test_reach_level_does_not_check_refresh(self):
+        self.assertEqual(0, self.run_smoke(level="reach", SMOKE_REFRESH_TOKEN_SECRET=REFRESH_SECRET))
+        self.assertEqual([], self.refresh_requests())
+
+    def test_fails_when_refresh_key_differs(self):
+        smoke = smoke_test.SmokeRun(self.env(SMOKE_REFRESH_TOKEN_SECRET=OTHER_SECRET), self.sleeps.append, lambda: NOW)
+        smoke.execute()
+        failed = [r for r in smoke.results if not r.passed]
+        self.assertEqual(1, len(failed))
+        self.assertIn("refresh 서명 키", failed[0].detail)
+
+    def test_fails_when_unknown_token_is_accepted(self):
+        self.server.override("POST", smoke_test.REFRESH_PATH, ok({"accessToken": "Bearer a", "refreshToken": "b"}))
+        self.assertEqual(1, self.run_smoke(level="read", SMOKE_REFRESH_TOKEN_SECRET=REFRESH_SECRET))
+
+    def test_server_error_is_retried_because_nothing_is_written(self):
+        self.server.override("POST", smoke_test.REFRESH_PATH, (500, {"Content-Type": "application/json"}, b'{"errorCode":9000}'))
+        self.assertEqual(1, self.run_smoke(level="read", SMOKE_REFRESH_TOKEN_SECRET=REFRESH_SECRET))
+        self.assertEqual(smoke_test.MAX_ATTEMPTS, len(self.refresh_requests()))
+
+    def test_recovers_when_new_container_is_slow_once(self):
+        self.server.override("POST", smoke_test.REFRESH_PATH, (503, {}, b""), times=1)
+        self.assertEqual(0, self.run_smoke(level="read", SMOKE_REFRESH_TOKEN_SECRET=REFRESH_SECRET))
+
+    def test_refresh_failure_does_not_stop_reads(self):
+        self.assertEqual(1, self.run_smoke(level="read", SMOKE_REFRESH_TOKEN_SECRET=OTHER_SECRET))
+        self.assertIn(("GET", "/api/learning-reports/summary"), self.server.paths())
+
+
 class ReadTest(SmokeTestBase):
 
     def test_read_level_passes_and_sends_only_gets(self):
@@ -450,13 +556,16 @@ class WriteTest(SmokeTestBase):
     def test_full_level_creates_and_removes_only_its_own_data(self):
         before_folders = self.server.live_folder_names(SMOKE_USER)
         before_notes = self.server.live_note_titles(SMOKE_USER)
-        real_before = self.server.live_folder_names(REAL_USER)
+        before_problems = self.server.live_problem_memos(SMOKE_USER)
+        real_before = (self.server.live_folder_names(REAL_USER), self.server.live_problem_memos(REAL_USER))
 
         self.assertEqual(0, self.run_smoke(level="full"))
 
         self.assertEqual(before_folders, self.server.live_folder_names(SMOKE_USER))
         self.assertEqual(before_notes, self.server.live_note_titles(SMOKE_USER))
-        self.assertEqual(real_before, self.server.live_folder_names(REAL_USER))
+        self.assertEqual(before_problems, self.server.live_problem_memos(SMOKE_USER))
+        self.assertEqual(real_before, (self.server.live_folder_names(REAL_USER), self.server.live_problem_memos(REAL_USER)))
+        self.assertIn(("POST", "/api/problems/v2"), self.server.paths())
         self.assert_only_allowed_requests()
         for method, path, headers, body in self.server.requests:
             if method == "POST" and path == "/api/practiceNotes":
@@ -484,11 +593,13 @@ class WriteTest(SmokeTestBase):
         user["folders"][leftover] = {"folderId": leftover, "folderName": "__smoke_run_old", "parent": user["root"], "deleted": False}
         note = self.server.new_id()
         user["notes"][note] = {"practiceNoteId": note, "practiceTitle": "__smoke_run_old", "deleted": False}
+        self.server.add_problem(SMOKE_USER, "__smoke_run_old")
 
         self.assertEqual(0, self.run_smoke(level="full"))
 
         self.assertEqual(["__smoke_account__", "공책", "책장"], self.server.live_folder_names(SMOKE_USER))
         self.assertEqual(["복습 세트"], self.server.live_note_titles(SMOKE_USER))
+        self.assertEqual(["근의 공식"], self.server.live_problem_memos(SMOKE_USER))
         deleted_ids = [i for m, p, _, b in self.server.requests if m == "DELETE" for i in
                        (b.get("deleteFolderIdList") or b.get("deletePracticeIdList") or [])]
         marker_id = next(f["folderId"] for f in user["folders"].values() if f["folderName"] == "__smoke_account__")
@@ -521,6 +632,133 @@ class WriteTest(SmokeTestBase):
         self.assertLessEqual(len(self.server.requests), 10)
 
 
+class ProblemWriteTest(SmokeTestBase):
+
+    def test_register_sends_new_app_version_so_no_xp_accrues(self):
+        self.assertEqual(0, self.run_smoke(level="full"))
+        register = [r for r in self.server.requests if r[0] == "POST" and r[1] == "/api/problems/v2"]
+        self.assertEqual(1, len(register))
+        _, _, headers, body = register[0]
+        self.assertEqual(smoke_test.SMOKE_APP_VERSION, headers.get("X-App-Version"))
+        self.assertTrue(body["memo"].startswith(smoke_test.RUN_PREFIX))
+        self.assertEqual([], body["problemImageUrls"], "이미지를 붙이면 분석 요청과 S3 삭제 메시지가 생길 수 있다")
+        others = [r for r in self.server.requests if not (r[0] == "POST" and r[1] == "/api/problems/v2")]
+        self.assertTrue(all("X-App-Version" not in h for _, _, h, _ in others), "다른 요청의 동작은 바꾸지 않는다")
+
+    def test_presigned_url_is_not_logged_when_shape_is_unexpected(self):
+        self.server.override("GET", "/api/fileUpload/presigned-urls",
+                             ok([{"presignedUrl": "http://x/?X-Amz-Signature=secretsig"}]))
+        with tempfile.TemporaryDirectory() as d:
+            summary, output = os.path.join(d, "summary.md"), os.path.join(d, "output.txt")
+            self.assertEqual(1, self.run_smoke(level="full", GITHUB_STEP_SUMMARY=summary, GITHUB_OUTPUT=output))
+            for path in (summary, output):
+                with open(path, encoding="utf-8") as f:
+                    self.assertNotIn("secretsig", f.read())
+        self.assertIn(("POST", "/api/problems/v2"), self.server.paths(), "발급 실패는 등록 확인을 막지 않는다")
+
+    def test_presigned_rate_limit_is_reported(self):
+        self.server.override("GET", "/api/fileUpload/presigned-urls", error(429, 2005))
+        self.assertEqual(1, self.run_smoke(level="full"))
+        # 호출마다 카운터가 오르는 GET 이라 재시도하지 않는다.
+        self.assertEqual(1, self.server.paths().count(("GET", "/api/fileUpload/presigned-urls")))
+        self.assertEqual(["근의 공식"], self.server.live_problem_memos(SMOKE_USER))
+
+    def test_register_failure_stops_flow_without_leftovers(self):
+        self.server.override("POST", "/api/problems/v2", (500, {"Content-Type": "application/json"}, b'{"errorCode":9000}'))
+        self.assertEqual(1, self.run_smoke(level="full"))
+        self.assertEqual(1, self.server.paths("POST").count(("POST", "/api/problems/v2")), "쓰기는 재시도하지 않는다")
+        self.assertEqual(["근의 공식"], self.server.live_problem_memos(SMOKE_USER))
+
+    def test_delete_refused_is_retried_in_cleanup_and_then_by_next_run(self):
+        self.server.override("DELETE", "/api/problems", error(400, 4002), times=2)
+        self.assertEqual(1, self.run_smoke(level="full"))
+        self.assertEqual(2, self.server.paths("DELETE").count(("DELETE", "/api/problems")), "흐름의 삭제 한 번, 마무리 정리 한 번")
+        self.assertEqual(2, len(self.server.live_problem_memos(SMOKE_USER)))
+
+        self.assertEqual(0, self.run_smoke(level="full"), "다음 실행이 흔적을 지운다")
+        self.assertEqual(["근의 공식"], self.server.live_problem_memos(SMOKE_USER))
+
+    def test_never_deletes_other_problems(self):
+        self.server.add_problem(SMOKE_USER, "smoke 가 들어가지만 흔적 이름은 아님")
+        self.assertEqual(0, self.run_smoke(level="full"))
+        deleted = [i for m, p, _, b in self.server.requests if m == "DELETE" and p == "/api/problems"
+                   for i in b["deleteProblemIdList"]]
+        kept = [pid for pid, pr in self.server.users[SMOKE_USER]["problems"].items()
+                if not pr["memo"].startswith(smoke_test.RUN_PREFIX)]
+        self.assertFalse(set(deleted) & set(kept))
+
+
+class PreSwitchCheckTest(SmokeTestBase):
+    """ci-prod.yml 이 nginx 전환 직전에 부르는 pre_switch_check.sh. docker 는 가짜 명령으로 바꿔 끼운다."""
+
+    HEALTH_UP = ('{"status":"UP","components":{"db":{"status":"UP","details":{"database":"MySQL","validationQuery":"isValid()"}},'
+                 '"diskSpace":{"status":"UP","details":{"total":994662584320,"free":123456789}},'
+                 '"rabbit":{"status":"UP","details":{"version":"3.13.7"}},"redis":{"status":"UP","details":{"version":"7.4.1"}}}}')
+
+    def run_check(self, health_exit=0, health_body=HEALTH_UP, user_id=SMOKE_USER, fake_python_exit=None):
+        script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pre_switch_check.sh")
+        with tempfile.TemporaryDirectory() as d:
+            docker = os.path.join(d, "docker")
+            body = os.path.join(d, "health.json")
+            with open(body, "w", encoding="utf-8") as f:
+                f.write(health_body)
+            with open(docker, "w", encoding="utf-8") as f:
+                f.write(f'#!/bin/sh\necho "$@" >> "{d}/calls"\ncat "{body}"\nexit {health_exit}\n')
+            os.chmod(docker, 0o755)
+            port = self.server.url.rsplit(":", 1)[1]
+            self.server.now = int(time.time())
+            env = {k: v for k, v in os.environ.items() if not k.startswith(("SMOKE_", "GITHUB_"))}
+            env.update(DOCKER=docker, SMOKE_ACCESS_TOKEN_SECRET=SERVER_SECRET, SMOKE_REFRESH_TOKEN_SECRET=REFRESH_SECRET)
+            if fake_python_exit is not None:
+                # 버전 확인에서 실패하는 python3 를 PATH 맨 앞에 둔다. 3.9 보다 오래된 python3 가 있는 러너와 같다.
+                with open(os.path.join(d, "python3"), "w", encoding="utf-8") as f:
+                    f.write(f"#!/bin/sh\nexit {fake_python_exit}\n")
+                os.chmod(os.path.join(d, "python3"), 0o755)
+                env["PATH"] = d + os.pathsep + env.get("PATH", "")
+            if user_id:
+                env["SMOKE_USER_ID"] = user_id
+            done = subprocess.run(["bash", script, "ono-app-prod-green", port], env=env,
+                                  capture_output=True, text=True, timeout=120)
+            with open(os.path.join(d, "calls"), encoding="utf-8") as f:
+                calls = f.read()
+        return done, calls
+
+    def test_passes_and_runs_read_level_against_the_new_port(self):
+        done, calls = self.run_check()
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertIn("exec ono-app-prod-green wget", calls)
+        self.assertIn("db UP, diskSpace UP, rabbit UP, redis UP", done.stdout)
+        self.assertIn("(단계: read)", done.stdout)
+        self.assertEqual(set(), {m for m, _ in self.server.paths()} - {"GET", "POST"})
+        self.assertEqual(["/api/auth/refresh"], [p for m, p in self.server.paths() if m == "POST"])
+
+    def test_does_not_print_health_details(self):
+        done, _ = self.run_check()
+        for secret_ish in ("994662584320", "3.13.7", "isValid()"):
+            self.assertNotIn(secret_ish, done.stdout + done.stderr)
+
+    def test_fails_without_smoke_when_health_is_down(self):
+        done, _ = self.run_check(health_exit=1, health_body='{"status":"DOWN"}')
+        self.assertNotEqual(0, done.returncode)
+        self.assertEqual([], self.server.requests, "health 가 실패하면 앱에 요청을 보내지 않는다")
+
+    def test_fails_when_smoke_fails(self):
+        done, _ = self.run_check(user_id=REAL_USER)
+        self.assertNotEqual(0, done.returncode)
+        self.assertIn("스모크 테스트 실패", done.stdout)
+
+    def test_skips_smoke_with_warning_when_python_is_too_old(self):
+        done, _ = self.run_check(fake_python_exit=1)
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertIn("::warning::", done.stdout)
+        self.assertEqual([], self.server.requests, "스모크를 건너뛰었으니 앱에 요청하지 않는다")
+
+    def test_passes_when_health_details_are_hidden(self):
+        done, _ = self.run_check(health_body='{"status":"UP"}')
+        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
+        self.assertIn("show-details 가 꺼져", done.stdout)
+
+
 class ClientGuardTest(SmokeTestBase):
 
     def client(self, **kwargs):
@@ -529,7 +767,9 @@ class ClientGuardTest(SmokeTestBase):
     def test_blocks_requests_outside_allowlist_before_sending(self):
         client = self.client(token="Bearer x", allow_writes=True)
         for method, path in [("GET", "/api/users"), ("PATCH", "/api/users"), ("DELETE", "/api/users"),
-                             ("POST", "/api/auth/logout"), ("POST", "/api/problems/v2"), ("GET", "/actuator/health")]:
+                             ("POST", "/api/auth/logout"), ("POST", "/api/problems"), ("DELETE", "/api/problems/all"),
+                             ("POST", "/api/problems/1/analysis"), ("POST", "/api/fileUpload/image"),
+                             ("GET", "/actuator/health")]:
             with self.assertRaises(smoke_test.SmokeAbort):
                 client.request(method, path)
         self.assertEqual([], self.server.requests)
@@ -537,6 +777,27 @@ class ClientGuardTest(SmokeTestBase):
     def test_blocks_writes_unless_full_level(self):
         with self.assertRaises(smoke_test.SmokeAbort):
             self.client(token="Bearer x").request("POST", "/api/folders", {"folderName": "x"})
+        self.assertEqual([], self.server.requests)
+
+    def test_refresh_is_the_only_write_method_allowed_below_full(self):
+        client = self.client()
+        probe = smoke_test.mint_refresh_token(REFRESH_SECRET, NOW)
+        self.assertEqual(401, client.request("POST", smoke_test.REFRESH_PATH, {"refreshToken": probe}, auth=False).status)
+        for method, path in [("POST", "/api/problems/v2"), ("DELETE", "/api/problems"),
+                             ("GET", "/api/fileUpload/presigned-urls")]:
+            with self.assertRaises(smoke_test.SmokeAbort):
+                client.request(method, path, {})
+        self.assertEqual(1, len(self.server.requests))
+
+    def test_refresh_only_accepts_probe_tokens(self):
+        # 서버에 저장된 진짜 토큰을 보내면 회전(쓰기)이 일어난다. 실제 사용자로 서명된 토큰, 형식이 다른 값, 인증 헤더를 막는다.
+        real_user_token = smoke_test._sign(REFRESH_SECRET, {"authority": "ROLE_GUEST", "sub": SMOKE_USER,
+                                                             "iat": NOW, "exp": NOW + 60})
+        client = self.client(token="Bearer x", allow_writes=True)
+        for body, auth in [({"refreshToken": real_user_token}, False), ({"refreshToken": "refresh-42"}, False),
+                           ({}, False), ({"refreshToken": smoke_test.mint_refresh_token(REFRESH_SECRET, NOW)}, True)]:
+            with self.assertRaises(smoke_test.SmokeAbort):
+                client.request("POST", smoke_test.REFRESH_PATH, body, auth=auth)
         self.assertEqual([], self.server.requests)
 
     def test_blocks_signup_outside_bootstrap(self):
@@ -553,6 +814,9 @@ class ClientGuardTest(SmokeTestBase):
         self.assertEqual(2, smoke_test.run(self.env(SMOKE_LEVEL="everything"), sleep=self.sleeps.append))
         self.assertEqual(2, smoke_test.run(self.env(SMOKE_USER_ID="abc"), sleep=self.sleeps.append))
         self.assertEqual(2, smoke_test.run(self.env(SMOKE_ACCESS_TOKEN_SECRET="not base64 !!"), sleep=self.sleeps.append))
+        self.assertEqual(2, smoke_test.run(self.env(SMOKE_REFRESH_TOKEN_SECRET="not base64 !!"), sleep=self.sleeps.append))
+        self.assertEqual(2, smoke_test.run({"SMOKE_BASE_URL": "http://ono-dev.seungminki.shop",
+                                            "SMOKE_REFRESH_TOKEN_SECRET": REFRESH_SECRET}, sleep=self.sleeps.append))
         self.assertEqual([], self.server.requests)
 
 

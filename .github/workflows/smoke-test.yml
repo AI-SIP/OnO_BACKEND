@@ -15,10 +15,12 @@ name: Smoke Test
 #  - 보낼 수 있는 요청과 요청 수 상한은 스크립트에 고정되어 있다.
 #
 # 필요한 Secrets (없으면 할 수 있는 단계까지만 한다)
-#   JWT_ACCESS_TOKEN_SECRET, SMOKE_PROD_USER_ID, SMOKE_DEV_USER_ID, DISCORD_WEBHOOK_URL
+#   JWT_ACCESS_TOKEN_SECRET, JWT_REFRESH_TOKEN_SECRET, SMOKE_PROD_USER_ID, SMOKE_DEV_USER_ID, DISCORD_WEBHOOK_URL
 #
-#   JWT_ACCESS_TOKEN_SECRET 은 배포 워크플로가 서버에 넘기는 그 키다(ci-dev.yml, ci-prod.yml). 스모크는 같은 키로
-#   토큰을 직접 만들어 쓰기 때문에 값이 같아야 하고, 따로 복사해 두면 키를 바꿀 때 한쪽만 남아 알림이 계속 울린다.
+#   JWT_*_TOKEN_SECRET 은 배포 워크플로가 컨테이너에 환경변수로 넘기는 값이지만, 서버가 실제로 쓰는 서명 키는
+#   APPLICATION_PROD 안의 jwt.accessToken.secret, jwt.refreshToken.secret 이다(환경변수 이름이 Spring 설정 키와 이어지지 않는다).
+#   스모크는 이 시크릿으로 토큰을 직접 만들기 때문에 두 곳의 값이 같아야 한다. 서버 키를 바꾸면 이 시크릿도 같이 바꾼다.
+#   refresh 키로는 서버에 저장된 적 없는 토큰을 만들어 갱신 경로가 1002 로 답하는지만 본다(서버에 쓰기 없음).
 #
 # workflow_run 과 schedule 은 이 파일이 기본 브랜치(main)에 있어야 동작한다.
 
@@ -128,10 +130,11 @@ jobs:
           SMOKE_BASE_URL: ${{ steps.plan.outputs.url }}
           SMOKE_LEVEL: ${{ steps.plan.outputs.level }}
           SMOKE_ACCESS_TOKEN_SECRET: ${{ secrets.JWT_ACCESS_TOKEN_SECRET }}
+          SMOKE_REFRESH_TOKEN_SECRET: ${{ secrets.JWT_REFRESH_TOKEN_SECRET }}
           SMOKE_USER_ID: ${{ secrets.SMOKE_PROD_USER_ID }}
         run: |
           if [ "$SMOKE_LEVEL" = "bootstrap" ]; then
-            unset SMOKE_ACCESS_TOKEN_SECRET
+            unset SMOKE_ACCESS_TOKEN_SECRET SMOKE_REFRESH_TOKEN_SECRET
             python3 scripts/smoke/smoke_test.py bootstrap
           else
             python3 scripts/smoke/smoke_test.py
@@ -144,10 +147,11 @@ jobs:
           SMOKE_BASE_URL: ${{ steps.plan.outputs.url }}
           SMOKE_LEVEL: ${{ steps.plan.outputs.level }}
           SMOKE_ACCESS_TOKEN_SECRET: ${{ secrets.JWT_ACCESS_TOKEN_SECRET }}
+          SMOKE_REFRESH_TOKEN_SECRET: ${{ secrets.JWT_REFRESH_TOKEN_SECRET }}
           SMOKE_USER_ID: ${{ secrets.SMOKE_DEV_USER_ID }}
         run: |
           if [ "$SMOKE_LEVEL" = "bootstrap" ]; then
-            unset SMOKE_ACCESS_TOKEN_SECRET
+            unset SMOKE_ACCESS_TOKEN_SECRET SMOKE_REFRESH_TOKEN_SECRET
             python3 scripts/smoke/smoke_test.py bootstrap
           else
             python3 scripts/smoke/smoke_test.py
