@@ -211,9 +211,7 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "red", "value": null},
-              {"color": "orange", "value": 0.6},
-              {"color": "green", "value": 0.9}
+              {"color": "blue", "value": null}
             ]
           },
           "unit": "percentunit"
@@ -243,6 +241,7 @@
           "refId": "A"
         }
       ],
+      "description": "Redis 조회 중 키가 있었던 비율. 인증이 필요한 요청마다 로그아웃 토큰 블랙리스트와 탈퇴 사용자 블랙리스트를 조회하는데(RedisTokenService.isBlacklisted, isUserBlacklisted), 두 키 모두 대부분 없는 것이 정상이라 이 값은 낮게 나온다. 낮다고 장애가 아니라서 경고색을 두지 않는다.",
       "title": "Redis Hit Ratio",
       "type": "stat"
     },
@@ -366,6 +365,9 @@
               {"color": "green", "value": 0.99}
             ]
           },
+          "mappings": [
+            {"type": "special", "options": {"match": "null", "result": {"text": "최근 1시간 호출 없음", "color": "#808080", "index": 0}}}
+          ],
           "noValue": "최근 1시간 호출 없음",
           "unit": "percentunit"
         },

@@ -564,14 +564,14 @@
       },
       "targets": [
         {
-          "expr": "topk(20, 1000 * (sum by (uri, method) (rate(http_server_requests_seconds_sum{job=~\"$job\",uri=~\"/api.*\"}[1h])) / clamp_min(sum by (uri, method) (rate(http_server_requests_seconds_count{job=~\"$job\",uri=~\"/api.*\"}[1h])), 1e-9)))",
+          "expr": "topk(20, 1000 * (sum by (uri, method) (rate(http_server_requests_seconds_sum{job=~\"$job\",uri=~\"/api.*\"}[1h])) / (sum by (uri, method) (rate(http_server_requests_seconds_count{job=~\"$job\",uri=~\"/api.*\"}[1h])) > 0)))",
           "legendFormat": "{{method}} {{uri}}",
           "refId": "A"
         }
       ],
       "title": "API 평균 응답시간 (URI Top20, 1h)",
       "type": "timeseries",
-      "description": "URI 별 평균. 느린 API 를 찾는 용도다."
+      "description": "URI 별 평균. 느린 API 를 찾는 용도다. 최근 1시간 요청 수가 늘지 않은 URI 는 값을 비운다. 앱이 재시작되면 요청 수는 그대로인데 시간 합만 늘어나는 경우가 있어서, 0 대신 1e-9 로 나누면 수백만 ms 가 나온다."
     },
     {
       "datasource": {
