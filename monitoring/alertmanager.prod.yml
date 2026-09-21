@@ -1,0 +1,19 @@
+# Prometheus 가 평가한 알림(monitoring/alerts/ono-alerts.yml)을 디스코드로 보낸다.
+# 웹훅 주소는 앱 에러 알림과 같은 DISCORD_WEBHOOK_URL 을 쓰고, 컨테이너가 뜰 때
+# 환경변수를 파일로 옮겨 둔다(docker-compose.prod.yml 의 alertmanager-prod 참고).
+# 설정 파일에 비밀값을 적지 않기 위해 webhook_url 대신 webhook_url_file 을 쓴다.
+
+route:
+  receiver: discord
+  group_by: [alertname, job]
+  # 같은 알림이 여러 개 동시에 뜨면 30초 모아서 한 번에 보낸다.
+  group_wait: 30s
+  group_interval: 5m
+  # 해결되지 않은 알림은 4시간마다 다시 알린다.
+  repeat_interval: 4h
+
+receivers:
+  - name: discord
+    discord_configs:
+      - webhook_url_file: /tmp/discord_webhook_url
+        send_resolved: true
