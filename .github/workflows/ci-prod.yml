@@ -219,13 +219,13 @@ jobs:
       - name: Deploy Monitoring Stack
         run: |
           docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring pull \
-            mysql-exporter-prod prometheus-prod loki-prod promtail-prod grafana-prod
-          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring stop prometheus-prod grafana-prod loki-prod promtail-prod mysql-exporter-prod || true
-          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring rm -f prometheus-prod grafana-prod loki-prod promtail-prod mysql-exporter-prod || true
+            mysql-exporter-prod redis-exporter-prod alertmanager-prod prometheus-prod loki-prod promtail-prod grafana-prod
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring stop prometheus-prod grafana-prod loki-prod promtail-prod mysql-exporter-prod redis-exporter-prod alertmanager-prod || true
+          docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring rm -f prometheus-prod grafana-prod loki-prod promtail-prod mysql-exporter-prod redis-exporter-prod alertmanager-prod || true
           docker-compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring up -d --force-recreate \
-            mysql-exporter-prod prometheus-prod loki-prod promtail-prod grafana-prod
+            mysql-exporter-prod redis-exporter-prod alertmanager-prod prometheus-prod loki-prod promtail-prod grafana-prod
           docker-compose -f docker-compose.prod.yml --env-file .env.prod ps \
-            mysql-exporter-prod prometheus-prod loki-prod promtail-prod grafana-prod
+            mysql-exporter-prod redis-exporter-prod alertmanager-prod prometheus-prod loki-prod promtail-prod grafana-prod
         shell: bash
 
       - name: Verify Monitoring Integration

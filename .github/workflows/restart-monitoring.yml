@@ -45,6 +45,7 @@ jobs:
           RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_PASSWORD }}
           GRAFANA_ADMIN_USER=${{ secrets.GRAFANA_ADMIN_USER }}
           GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+          DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}
           GRAFANA_PROD_ROOT_URL=https://ono-prod.seungminki.shop/grafana/
           GRAFANA_PROD_SERVE_FROM_SUB_PATH=true
           PROMETHEUS_PROD_EXTERNAL_URL=https://ono-prod.seungminki.shop/prometheus/
@@ -56,16 +57,16 @@ jobs:
         if: ${{ github.event.inputs.target == 'dev' }}
         run: |
           docker compose -f docker-compose.dev.yml --env-file .env.dev --profile monitoring up -d --force-recreate \
-            mysql-exporter-dev prometheus-dev loki-dev promtail-dev grafana-dev
+            mysql-exporter-dev redis-exporter-dev prometheus-dev loki-dev promtail-dev grafana-dev
           docker compose -f docker-compose.dev.yml --env-file .env.dev ps \
-            mysql-exporter-dev prometheus-dev loki-dev promtail-dev grafana-dev
+            mysql-exporter-dev redis-exporter-dev prometheus-dev loki-dev promtail-dev grafana-dev
         shell: bash
 
       - name: Restart monitoring stack (prod)
         if: ${{ github.event.inputs.target == 'prod' }}
         run: |
           docker compose -f docker-compose.prod.yml --env-file .env.prod --profile monitoring up -d --force-recreate \
-            mysql-exporter-prod prometheus-prod loki-prod promtail-prod grafana-prod
+            mysql-exporter-prod redis-exporter-prod alertmanager-prod prometheus-prod loki-prod promtail-prod grafana-prod
           docker compose -f docker-compose.prod.yml --env-file .env.prod ps \
-            mysql-exporter-prod prometheus-prod loki-prod promtail-prod grafana-prod
+            mysql-exporter-prod redis-exporter-prod alertmanager-prod prometheus-prod loki-prod promtail-prod grafana-prod
         shell: bash
