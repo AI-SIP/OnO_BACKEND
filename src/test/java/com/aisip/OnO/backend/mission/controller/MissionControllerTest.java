@@ -145,7 +145,7 @@ class MissionControllerTest extends MissionSystemTestSupport {
                 .andExpect(jsonPath("$.data.totalClaimedCount").value(1))
                 .andExpect(jsonPath("$.data.content[0].progressId").value(progressId))
                 .andExpect(jsonPath("$.data.content[0].code").value(WEEKLY_NOTE_10))
-                .andExpect(jsonPath("$.data.content[0].title").value("열 권의 노트"))
+                .andExpect(jsonPath("$.data.content[0].title").value("오답노트 10개"))
                 .andExpect(jsonPath("$.data.content[0].iconKey").value("note_write"))
                 .andExpect(jsonPath("$.data.content[0].category").value("WEEKLY"))
                 .andExpect(jsonPath("$.data.content[0].periodKey").value("2020-W36"))

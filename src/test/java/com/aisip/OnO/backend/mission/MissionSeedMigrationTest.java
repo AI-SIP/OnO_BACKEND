@@ -36,6 +36,7 @@ class MissionSeedMigrationTest extends MissionSystemTestSupport {
     private static final String CLAIMED_INDEX_MIGRATION = "db/migration/V31__add_mission_progress_claimed_index.sql";
     private static final String REWARD_SNAPSHOT_MIGRATION = "db/migration/V32__add_mission_progress_reward_snapshot.sql";
     private static final String WORDING_MIGRATION = "db/migration/V33__refine_mission_definition_wording.sql";
+    private static final String DIGIT_TITLE_MIGRATION = "db/migration/V47__use_digits_in_mission_titles.sql";
 
     @Autowired
     private MissionDefinitionSeeder missionDefinitionSeeder;
@@ -125,10 +126,12 @@ class MissionSeedMigrationTest extends MissionSystemTestSupport {
     @DisplayName("문구 수정은 V30 을 고치지 않고 새 마이그레이션의 UPDATE 로 얹는다")
     void wordingIsAppliedAsUpdate() {
         // V30 을 고치면 이미 적용된 환경에서 Flyway 체크섬이 어긋나 앱이 뜨지 않는다.
-        String wording = statementsOf(WORDING_MIGRATION);
+        for (String migration : List.of(WORDING_MIGRATION, DIGIT_TITLE_MIGRATION)) {
+            String wording = statementsOf(migration);
 
-        assertThat(wording).contains("UPDATE MISSION_DEFINITION");
-        assertThat(wording).doesNotContain("INSERT INTO");
+            assertThat(wording).as(migration).contains("UPDATE MISSION_DEFINITION");
+            assertThat(wording).as(migration).doesNotContain("INSERT INTO");
+        }
     }
 
     @Test
@@ -145,10 +148,13 @@ class MissionSeedMigrationTest extends MissionSystemTestSupport {
         assertThat(definitionOf("WEEKLY_REVIEW_30").getDescription()).isEqualTo("오답 30문제 복습하기");
         assertThat(definitionOf("WEEKLY_SET_3").getDescription()).isEqualTo("복습 세트 3개 끝내기");
 
-        assertThat(definitionOf("DAILY_CORRECT_3").getTitle()).isEqualTo("세 문제 맞히기");
+        assertThat(definitionOf("DAILY_REVIEW_3").getTitle()).isEqualTo("3문제만");
+        assertThat(definitionOf("DAILY_CORRECT_3").getTitle()).isEqualTo("3문제 맞히기");
         assertThat(definitionOf("DAILY_PRACTICE_SET").getTitle()).isEqualTo("복습 세트 완주");
-        assertThat(definitionOf("WEEKLY_ATTEND_5").getTitle()).isEqualTo("닷새 접속하기");
-        assertThat(definitionOf("WEEKLY_REVIEW_30").getTitle()).isEqualTo("서른 문제 복습");
+        assertThat(definitionOf("WEEKLY_ATTEND_5").getTitle()).isEqualTo("5일 접속하기");
+        assertThat(definitionOf("WEEKLY_NOTE_10").getTitle()).isEqualTo("오답노트 10개");
+        assertThat(definitionOf("WEEKLY_REVIEW_30").getTitle()).isEqualTo("30문제 복습");
+        assertThat(definitionOf("WEEKLY_SET_3").getTitle()).isEqualTo("복습 세트 3번 완주");
     }
 
     @Test

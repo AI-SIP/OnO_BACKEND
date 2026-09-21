@@ -62,7 +62,7 @@ class MissionClaimHistoryTest extends MissionSystemTestSupport {
 
             assertThat(item.progressId()).isEqualTo(progressId);
             assertThat(item.code()).isEqualTo(WEEKLY_NOTE_10);
-            assertThat(item.title()).isEqualTo("열 권의 노트");
+            assertThat(item.title()).isEqualTo("오답노트 10개");
             assertThat(item.iconKey()).isEqualTo("note_write");
             assertThat(item.category().name()).isEqualTo("WEEKLY");
             assertThat(item.periodKey()).isEqualTo("2020-W36");
