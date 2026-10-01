@@ -196,6 +196,23 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
         }
 
         @Test
+        @DisplayName("중간에 틀려도 정답이 3번 쌓이면 다음 복습일을 비운다")
+        void marksProblemAsMasteredAfterThreeCorrectAnswersWithWrongInBetween() {
+            AnswerStatus[] history = {
+                    AnswerStatus.CORRECT, AnswerStatus.WRONG, AnswerStatus.CORRECT, AnswerStatus.WRONG, AnswerStatus.CORRECT
+            };
+            for (int i = 0; i < history.length; i++) {
+                problemSolveService.createProblemSolve(
+                        new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT.plusDays(i), history[i], null, List.of(), null, null),
+                        user.getId());
+            }
+
+            Problem updated = problemRepository.findById(problem.getId()).orElseThrow();
+            assertThat(updated.getConsecutiveCorrectCount()).isEqualTo(1);
+            assertThat(updated.getNextReviewAt()).isNull();
+        }
+
+        @Test
         @DisplayName("복습 기록을 남겨도 실제 푸시 발송은 일어나지 않는다")
         void neverSendsPushNotification() {
             problemSolveService.createProblemSolve(registerDto(problem.getId(), AnswerStatus.CORRECT), user.getId());

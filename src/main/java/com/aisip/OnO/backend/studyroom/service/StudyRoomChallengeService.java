@@ -234,24 +234,28 @@ public class StudyRoomChallengeService {
             return new AggregationRange(startAt, endAt);
         }
         LocalDateTime anchor = clamp(now, startAt, endAt);
+        // 구간 경계는 늘 시작 시각에서 n 주기 뒤로 센다. 앞 경계에 한 달씩 이어 붙이면
+        // 31일에 시작한 월간 챌린지가 짧은 달을 한 번 지난 뒤로 30일·28일에 굳어 하루 이상 일찍 끝난다.
+        int count = 1;
         LocalDateTime windowStart = startAt;
-        LocalDateTime windowEnd = addPeriod(windowStart, period, periodDays);
+        LocalDateTime windowEnd = addPeriods(startAt, period, periodDays, count);
         while (!windowEnd.isAfter(anchor) && windowEnd.isBefore(endAt)) {
+            count++;
             windowStart = windowEnd;
-            windowEnd = addPeriod(windowStart, period, periodDays);
+            windowEnd = addPeriods(startAt, period, periodDays, count);
         }
         return new AggregationRange(windowStart, windowEnd.isAfter(endAt) ? endAt : windowEnd);
     }
 
-    private LocalDateTime addPeriod(LocalDateTime base, StudyRoomChallengePeriod period, Integer periodDays) {
+    private LocalDateTime addPeriods(LocalDateTime base, StudyRoomChallengePeriod period, Integer periodDays, int count) {
         if (period != null) {
             return switch (period) {
-                case DAILY -> base.plusDays(1);
-                case WEEKLY -> base.plusDays(7);
-                case MONTHLY -> base.plusMonths(1);
+                case DAILY -> base.plusDays(count);
+                case WEEKLY -> base.plusDays(7L * count);
+                case MONTHLY -> base.plusMonths(count);
             };
         }
-        return base.plusDays(periodDays);
+        return base.plusDays((long) periodDays * count);
     }
 
     private LocalDateTime clamp(LocalDateTime value, LocalDateTime lower, LocalDateTime upper) {

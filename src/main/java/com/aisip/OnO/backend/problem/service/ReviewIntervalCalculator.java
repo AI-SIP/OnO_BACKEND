@@ -8,7 +8,12 @@ import java.time.ZoneId;
 public class ReviewIntervalCalculator {
 
     private static final int MAX_INTERVAL_DAYS = 30;
-    static final int MASTERY_THRESHOLD = 3;
+
+    /**
+     * 이만큼 맞히면 추천 복습에서 뺀다. 연속일 필요는 없고, 중간에 틀려도 정답 기록이 이만큼 쌓이면 된다.
+     * 추천 목록과 복습 알림 쿼리도 같은 값으로 거른다.
+     */
+    public static final int MASTERY_THRESHOLD = 3;
 
     public record ReviewSchedule(LocalDate nextReviewAt, int reviewInterval, int consecutiveCorrectCount) {
         public boolean isMastered() {
@@ -16,11 +21,15 @@ public class ReviewIntervalCalculator {
         }
     }
 
-    public static ReviewSchedule calculate(AnswerStatus status, int currentInterval, int currentConsecutiveCorrect) {
+    /**
+     * @param previousCorrectCount 이번 기록을 빼고 지금까지 남긴 정답 기록 수
+     */
+    public static ReviewSchedule calculate(AnswerStatus status, int currentInterval, int currentConsecutiveCorrect,
+                                           long previousCorrectCount) {
         return switch (status) {
             case CORRECT -> {
                 int newConsecutive = currentConsecutiveCorrect + 1;
-                if (newConsecutive >= MASTERY_THRESHOLD) {
+                if (previousCorrectCount + 1 >= MASTERY_THRESHOLD) {
                     yield new ReviewSchedule(null, currentInterval, newConsecutive);
                 }
                 int newInterval = Math.min(currentInterval * 2, MAX_INTERVAL_DAYS);

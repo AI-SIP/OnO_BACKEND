@@ -6,6 +6,9 @@ import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemAnalysis;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.service.ProblemService;
+import com.aisip.OnO.backend.problemsolve.entity.AnswerStatus;
+import com.aisip.OnO.backend.problemsolve.entity.ProblemSolve;
+import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveRepository;
 import com.aisip.OnO.backend.problem.support.ProblemTestSupport;
 import com.aisip.OnO.backend.tag.entity.Tag;
 import com.aisip.OnO.backend.user.entity.User;
@@ -19,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 
@@ -34,8 +38,13 @@ import static org.assertj.core.api.Assertions.tuple;
 @DisplayName("ProblemRepository")
 class ProblemRepositoryTest extends ProblemTestSupport {
 
+    private static final long MASTERY_THRESHOLD = 3;
+
     @Autowired
     private ProblemService problemService;
+
+    @Autowired
+    private ProblemSolveRepository problemSolveRepository;
 
     private User owner;
     private User intruder;
@@ -211,7 +220,7 @@ class ProblemRepositoryTest extends ProblemTestSupport {
             saveProblemWithReviewSchedule(owner.getId(), ownerRoot, today.minusDays(5), 2, 1);
             saveProblemWithReviewSchedule(owner.getId(), ownerRoot, today.plusDays(1), 4, 2);
 
-            List<ReviewDueProblemProjection> due = problemRepository.findReviewDueProblems(owner.getId(), today);
+            List<ReviewDueProblemProjection> due = problemRepository.findReviewDueProblems(owner.getId(), today, MASTERY_THRESHOLD);
 
             assertThat(due).hasSize(2);
             assertThat(due)
@@ -224,7 +233,7 @@ class ProblemRepositoryTest extends ProblemTestSupport {
         void excludesNullSchedule() {
             saveProblemWithReviewSchedule(owner.getId(), ownerRoot, null, 8, 3);
 
-            assertThat(problemRepository.findReviewDueProblems(owner.getId(), LocalDate.now())).isEmpty();
+            assertThat(problemRepository.findReviewDueProblems(owner.getId(), LocalDate.now(), MASTERY_THRESHOLD)).isEmpty();
         }
 
         @Test
@@ -232,7 +241,7 @@ class ProblemRepositoryTest extends ProblemTestSupport {
         void isUserScoped() {
             saveProblemWithReviewSchedule(intruder.getId(), intruderRoot, LocalDate.now(), 1, 0);
 
-            assertThat(problemRepository.findReviewDueProblems(owner.getId(), LocalDate.now())).isEmpty();
+            assertThat(problemRepository.findReviewDueProblems(owner.getId(), LocalDate.now(), MASTERY_THRESHOLD)).isEmpty();
         }
 
         @Test
@@ -270,7 +279,7 @@ class ProblemRepositoryTest extends ProblemTestSupport {
             saveProblemWithReviewSchedule(owner.getId(), ownerRoot, today.minusDays(1), 1, 0);
             saveProblemWithReviewSchedule(intruder.getId(), intruderRoot, today, 1, 0);
 
-            List<ReviewDueSummary> summaries = problemRepository.findReviewDueSummaryByDate(today);
+            List<ReviewDueSummary> summaries = problemRepository.findReviewDueSummaryByDate(today, MASTERY_THRESHOLD);
 
             assertThat(summaries)
                     .extracting(ReviewDueSummary::getUserId, ReviewDueSummary::getDueCount)
@@ -278,6 +287,37 @@ class ProblemRepositoryTest extends ProblemTestSupport {
                             tuple(owner.getId(), 2L),
                             tuple(intruder.getId(), 1L)
                     );
+        }
+
+        @Test
+        @DisplayName("중간에 틀렸어도 정답 기록이 3개면 복습 대상과 알림 집계에서 빠진다")
+        void excludesProblemsWithEnoughCorrectSolves() {
+            LocalDate today = LocalDate.now();
+            Problem mastered = saveProblemWithReviewSchedule(owner.getId(), ownerRoot, today, 1, 0);
+            saveSolves(mastered, AnswerStatus.CORRECT, AnswerStatus.WRONG, AnswerStatus.CORRECT,
+                    AnswerStatus.WRONG, AnswerStatus.CORRECT);
+            Problem stillDue = saveProblemWithReviewSchedule(owner.getId(), ownerRoot, today, 1, 0);
+            saveSolves(stillDue, AnswerStatus.CORRECT, AnswerStatus.WRONG, AnswerStatus.CORRECT, AnswerStatus.PARTIAL);
+
+            List<ReviewDueProblemProjection> due =
+                    problemRepository.findReviewDueProblems(owner.getId(), today, MASTERY_THRESHOLD);
+
+            assertThat(due)
+                    .extracting(ReviewDueProblemProjection::problemId, ReviewDueProblemProjection::correctCount)
+                    .as("정답만 세고 오답·부분 정답은 세지 않는다")
+                    .containsExactly(tuple(stillDue.getId(), 2L));
+            assertThat(problemRepository.findReviewDueSummaryByDate(today, MASTERY_THRESHOLD))
+                    .extracting(ReviewDueSummary::getUserId, ReviewDueSummary::getDueCount)
+                    .containsExactly(tuple(owner.getId(), 1L));
+        }
+
+        private void saveSolves(Problem problem, AnswerStatus... statuses) {
+            LocalDateTime practicedAt = LocalDateTime.of(2026, 1, 10, 9, 0);
+            for (int i = 0; i < statuses.length; i++) {
+                problemSolveRepository.save(ProblemSolve.create(
+                        problem, problem.getUserId(), practicedAt.plusDays(i), statuses[i], null, null, null, null));
+            }
+            problemSolveRepository.flush();
         }
     }
 

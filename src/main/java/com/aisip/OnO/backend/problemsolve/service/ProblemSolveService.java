@@ -143,6 +143,9 @@ public class ProblemSolveService {
                 ? dto.practicedAt()
                 : LocalDateTime.now(ZoneId.of("Asia/Seoul"));
 
+        // 새 기록을 저장하기 전에 센다. 저장 뒤에 세면 자동 flush 여부에 따라 이번 기록이 들어갈 수도 있다.
+        long previousCorrectCount = problemSolveRepository.countCorrectByProblemId(problem.getId());
+
         ProblemSolve problemSolve = ProblemSolve.create(
                 problem,
                 userId,
@@ -165,7 +168,8 @@ public class ProblemSolveService {
         ReviewIntervalCalculator.ReviewSchedule schedule = ReviewIntervalCalculator.calculate(
                 dto.answerStatus(),
                 problem.getReviewInterval(),
-                problem.getConsecutiveCorrectCount()
+                problem.getConsecutiveCorrectCount(),
+                previousCorrectCount
         );
         problem.updateReviewSchedule(schedule.nextReviewAt(), schedule.reviewInterval(), schedule.consecutiveCorrectCount());
         eventPublisher.publishEvent(new StudyRoomActivityEvent(

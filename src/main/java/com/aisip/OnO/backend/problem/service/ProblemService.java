@@ -962,7 +962,8 @@ public class ProblemService {
     @Transactional(readOnly = true)
     public ReviewDueResponseDto getReviewDueProblems(Long userId) {
         LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
-        List<ReviewDueProblemProjection> dueProblems = problemRepository.findReviewDueProblems(userId, today);
+        List<ReviewDueProblemProjection> dueProblems = problemRepository.findReviewDueProblems(
+                userId, today, ReviewIntervalCalculator.MASTERY_THRESHOLD);
 
         long overdueCount = dueProblems.stream()
                 .filter(p -> p.nextReviewAt().isBefore(today))
@@ -971,6 +972,7 @@ public class ProblemService {
         return ReviewDueResponseDto.builder()
                 .dueCount(dueProblems.size())
                 .overdueCount(overdueCount)
+                .requiredCorrectCount(ReviewIntervalCalculator.MASTERY_THRESHOLD)
                 .problems(dueProblems.stream()
                         .map(ReviewDueResponseDto.ReviewDueProblemDto::from)
                         .toList())
