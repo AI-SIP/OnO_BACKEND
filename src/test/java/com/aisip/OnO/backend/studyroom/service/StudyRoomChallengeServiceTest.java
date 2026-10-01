@@ -150,6 +150,29 @@ class StudyRoomChallengeServiceTest {
         }
 
         @Test
+        @DisplayName("31일에 시작한 월간 주기는 짧은 달을 지나도 경계가 시작일에서 n 달 뒤로 잡힌다")
+        void monthlyWindowDoesNotDriftAfterShortMonth() {
+            // 1월 31일에 시작하면 2월을 지나는 순간 앞 경계에 한 달씩 이어 붙이는 계산은 28·29일로 굳는다.
+            LocalDateTime startAt = LocalDateTime.now().minusYears(1).withMonth(1).withDayOfMonth(31)
+                    .truncatedTo(ChronoUnit.DAYS);
+            LocalDateTime endAt = startAt.plusYears(3);
+            StudyRoomMember member = member("멤버");
+            StudyRoomChallenge challenge = challenge(StudyRoomChallengeType.INDIVIDUAL,
+                    StudyRoomChallengeMetric.PROBLEM_COUNT, StudyRoomChallengePeriod.MONTHLY, null, 1, startAt, endAt);
+            stubRoom(member, challenge);
+            stubStats(member, new StudyRoomStats(1, 0, 0));
+
+            challengeService.getChallenges(ROOM_ID, member.getUser().getId());
+
+            LocalDateTime now = LocalDateTime.now();
+            int months = 0;
+            while (!startAt.plusMonths(months + 1).isAfter(now)) {
+                months++;
+            }
+            assertRange(startAt.plusMonths(months), startAt.plusMonths(months + 1));
+        }
+
+        @Test
         @DisplayName("periodDays 를 쓰면 그 일수 단위로 구간이 잘린다")
         void customPeriodDaysWindow() {
             LocalDateTime startAt = truncated(LocalDateTime.now().minusDays(7));
