@@ -1565,6 +1565,13 @@ class ProblemServiceTest extends ProblemTestSupport {
             assertThat(dto.nextReviewAt()).isEqualTo(today);
             assertThat(dto.reviewInterval()).isEqualTo(4);
             assertThat(dto.consecutiveCorrectCount()).isEqualTo(2);
+            assertThat(dto.correctCount()).isZero();
+        }
+
+        @Test
+        @DisplayName("추천에서 빠지는 정답 횟수를 함께 내려준다")
+        void exposesRequiredCorrectCount() {
+            assertThat(problemService.getReviewDueProblems(owner.getId()).requiredCorrectCount()).isEqualTo(3);
         }
 
         @Test
