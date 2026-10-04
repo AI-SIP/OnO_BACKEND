@@ -7,6 +7,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import org.jetbrains.annotations.NotNull;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +34,12 @@ public record ProblemResponseDto (
     Long solveCount,
 
     LocalDateTime lastSolvedAt,
+
+    /**
+     * 다음 추천 복습일. 정답을 남긴 날이 3일이 되어 추천에서 빠졌으면 null 이다.
+     * 앱이 복습 기록을 저장한 뒤 다음 복습이 언제인지 알려 줄 때 쓴다.
+     */
+    LocalDate nextReviewAt,
 
     ProblemAnalysisResponseDto analysis,
 
@@ -79,6 +86,7 @@ public record ProblemResponseDto (
                 .imageUrlList(problemImageDataList)
                 .solveCount(solveCount)
                 .lastSolvedAt(lastSolvedAt)
+                .nextReviewAt(problem.getNextReviewAt())
                 .analysis(analysisDto)
                 .tagIdList(tagIds)
                 .tags(tags)
