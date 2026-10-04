@@ -104,6 +104,16 @@ class ProblemServiceTest extends ProblemTestSupport {
         }
 
         @Test
+        @DisplayName("다음 복습일을 함께 내려준다")
+        void returnsNextReviewAt() {
+            LocalDate nextReviewAt = LocalDate.of(2026, 1, 12);
+            Problem problem = saveProblemWithReviewSchedule(owner.getId(), ownerRoot, nextReviewAt, 2, 1);
+
+            assertThat(problemService.findProblem(problem.getId(), owner.getId()).nextReviewAt())
+                    .isEqualTo(nextReviewAt);
+        }
+
+        @Test
         @DisplayName("다른 사용자의 문제는 조회할 수 없다")
         void rejectsOtherUsersProblem() {
             Problem othersProblem = saveProblem(intruder.getId(), intruderRoot);
