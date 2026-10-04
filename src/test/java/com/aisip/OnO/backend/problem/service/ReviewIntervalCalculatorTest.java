@@ -9,6 +9,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -190,6 +191,77 @@ class ReviewIntervalCalculatorTest {
 
             assertThat(ReviewIntervalCalculator.calculate(AnswerStatus.CORRECT, interval, consecutive, consecutive).isMastered())
                     .isTrue();
+        }
+    }
+
+    @Nested
+    @DisplayName("기록 전체로 다시 계산")
+    class Replay {
+
+        private static final LocalDate DAY = LocalDate.of(2026, 1, 10);
+
+        private ReviewIntervalCalculator.SolveMark mark(int dayOffset, AnswerStatus status) {
+            return new ReviewIntervalCalculator.SolveMark(DAY.plusDays(dayOffset), status);
+        }
+
+        @Test
+        @DisplayName("기록이 없으면 등록한 날이 복습일이고 간격은 1일이다")
+        void startsFromFirstReviewDate() {
+            var schedule = ReviewIntervalCalculator.replay(DAY, List.of());
+
+            assertThat(schedule.nextReviewAt()).isEqualTo(DAY);
+            assertThat(schedule.reviewInterval()).isEqualTo(1);
+            assertThat(schedule.consecutiveCorrectCount()).isZero();
+        }
+
+        @Test
+        @DisplayName("다음 복습일은 마지막 기록을 남긴 날부터 센다")
+        void countsFromPracticedDate() {
+            var schedule = ReviewIntervalCalculator.replay(DAY, List.of(
+                    mark(0, AnswerStatus.CORRECT), mark(5, AnswerStatus.CORRECT)));
+
+            assertThat(schedule.reviewInterval()).isEqualTo(4);
+            assertThat(schedule.nextReviewAt()).isEqualTo(DAY.plusDays(5 + 4));
+        }
+
+        @Test
+        @DisplayName("같은 날 다시 맞힌 기록은 건너뛰어 하루에 한 번만 센다")
+        void skipsRepeatedCorrectOnSameDay() {
+            var schedule = ReviewIntervalCalculator.replay(DAY, List.of(
+                    mark(0, AnswerStatus.CORRECT), mark(0, AnswerStatus.CORRECT), mark(0, AnswerStatus.CORRECT)));
+
+            assertThat(schedule.isMastered()).isFalse();
+            assertThat(schedule.reviewInterval()).isEqualTo(2);
+            assertThat(schedule.consecutiveCorrectCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("같은 날이라도 틀린 기록은 반영해 다음 날로 되돌린다")
+        void appliesWrongEvenOnSameDay() {
+            var schedule = ReviewIntervalCalculator.replay(DAY, List.of(
+                    mark(0, AnswerStatus.CORRECT), mark(0, AnswerStatus.WRONG)));
+
+            assertThat(schedule.nextReviewAt()).isEqualTo(DAY.plusDays(1));
+            assertThat(schedule.reviewInterval()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("정답을 남긴 날이 서로 다른 3일이 되면 마스터다")
+        void masteredAfterThreeCorrectDays() {
+            var schedule = ReviewIntervalCalculator.replay(DAY, List.of(
+                    mark(0, AnswerStatus.CORRECT), mark(0, AnswerStatus.CORRECT),
+                    mark(2, AnswerStatus.CORRECT), mark(6, AnswerStatus.CORRECT)));
+
+            assertThat(schedule.isMastered()).isTrue();
+        }
+
+        @Test
+        @DisplayName("판정 불가 기록은 3일 뒤로 미루기만 한다")
+        void unknownOnlyPostpones() {
+            var schedule = ReviewIntervalCalculator.replay(DAY, List.of(mark(0, AnswerStatus.UNKNOWN)));
+
+            assertThat(schedule.nextReviewAt()).isEqualTo(DAY.plusDays(3));
+            assertThat(schedule.reviewInterval()).isEqualTo(1);
         }
     }
 }
