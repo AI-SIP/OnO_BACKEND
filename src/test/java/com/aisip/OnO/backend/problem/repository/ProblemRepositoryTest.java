@@ -311,6 +311,27 @@ class ProblemRepositoryTest extends ProblemTestSupport {
                     .containsExactly(tuple(owner.getId(), 1L));
         }
 
+        @Test
+        @DisplayName("같은 날 여러 번 맞힌 것은 하루로 센다")
+        void countsCorrectSolvesOncePerDay() {
+            LocalDate today = LocalDate.now();
+            Problem crammed = saveProblemWithReviewSchedule(owner.getId(), ownerRoot, today, 1, 0);
+            LocalDateTime sameDay = LocalDateTime.of(2026, 1, 10, 9, 0);
+            for (int i = 0; i < 3; i++) {
+                problemSolveRepository.save(ProblemSolve.create(
+                        crammed, owner.getId(), sameDay.plusMinutes(i), AnswerStatus.CORRECT, null, null, null, null));
+            }
+            problemSolveRepository.flush();
+
+            assertThat(problemRepository.findReviewDueProblems(owner.getId(), today, MASTERY_THRESHOLD))
+                    .extracting(ReviewDueProblemProjection::problemId, ReviewDueProblemProjection::correctCount)
+                    .as("하루에 세 번 맞혀도 정답을 남긴 날은 하루라 추천에 남는다")
+                    .containsExactly(tuple(crammed.getId(), 1L));
+            assertThat(problemRepository.findReviewDueSummaryByDate(today, MASTERY_THRESHOLD))
+                    .extracting(ReviewDueSummary::getUserId, ReviewDueSummary::getDueCount)
+                    .containsExactly(tuple(owner.getId(), 1L));
+        }
+
         private void saveSolves(Problem problem, AnswerStatus... statuses) {
             LocalDateTime practicedAt = LocalDateTime.of(2026, 1, 10, 9, 0);
             for (int i = 0; i < statuses.length; i++) {
