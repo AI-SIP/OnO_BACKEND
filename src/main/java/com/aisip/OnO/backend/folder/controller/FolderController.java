@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.folder.controller;
 
+import com.aisip.OnO.backend.common.response.CursorSort;
 import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.folder.dto.FolderDeleteRequestDto;
@@ -43,11 +44,12 @@ public class FolderController {
     public CommonResponse<CursorPageResponse<FolderThumbnailResponseDto>> getSubFoldersWithCursor(
             @PathVariable("folderId") Long folderId,
             @RequestParam(value = "cursor", required = false) Long cursor,
-            @RequestParam(value = "size", defaultValue = "20") int size) {
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestParam(value = "sort", defaultValue = "OLDEST") CursorSort sort) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} get subfolders for folderId: {} with cursor: {}, size: {}", userId, folderId, cursor, size);
 
-        return CommonResponse.success(folderService.findSubFoldersWithCursor(folderId, userId, cursor, size));
+        return CommonResponse.success(folderService.findSubFoldersWithCursor(folderId, userId, cursor, size, sort));
     }
 
     // ✅ 모든 폴더 조회

@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.problem.repository;
 
+import com.aisip.OnO.backend.common.response.CursorSort;
 import com.aisip.OnO.backend.admin.dto.AdminProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.Problem;
@@ -40,7 +41,11 @@ public interface ProblemRepositoryCustom {
      * @param size 조회할 개수
      * @return 문제 리스트 (size+1개 조회하여 hasNext 판단)
      */
-    List<Problem> findProblemsByFolderWithCursor(Long folderId, Long cursor, int size);
+    default List<Problem> findProblemsByFolderWithCursor(Long folderId, Long cursor, int size) {
+        return findProblemsByFolderWithCursor(folderId, cursor, size, CursorSort.OLDEST);
+    }
+
+    List<Problem> findProblemsByFolderWithCursor(Long folderId, Long cursor, int size, CursorSort sort);
 
     /**
      * 커서 기반 태그의 문제 조회
@@ -50,7 +55,11 @@ public interface ProblemRepositoryCustom {
      * @param size 조회할 개수
      * @return 문제 리스트 (size+1개 조회하여 hasNext 판단)
      */
-    List<Problem> findProblemsByTagWithCursor(Long tagId, Long userId, Long cursor, int size);
+    default List<Problem> findProblemsByTagWithCursor(Long tagId, Long userId, Long cursor, int size) {
+        return findProblemsByTagWithCursor(tagId, userId, cursor, size, CursorSort.OLDEST);
+    }
+
+    List<Problem> findProblemsByTagWithCursor(Long tagId, Long userId, Long cursor, int size, CursorSort sort);
 
     /**
      * 커서 기반 제목(contains) 문제 조회
@@ -60,5 +69,9 @@ public interface ProblemRepositoryCustom {
      * @param size 조회할 개수
      * @return 문제 리스트 (size+1개 조회하여 hasNext 판단)
      */
-    List<Problem> findProblemsByTitleWithCursor(String titleQuery, Long userId, Long cursor, int size);
+    default List<Problem> findProblemsByTitleWithCursor(String titleQuery, Long userId, Long cursor, int size) {
+        return findProblemsByTitleWithCursor(titleQuery, userId, cursor, size, CursorSort.OLDEST);
+    }
+
+    List<Problem> findProblemsByTitleWithCursor(String titleQuery, Long userId, Long cursor, int size, CursorSort sort);
 }

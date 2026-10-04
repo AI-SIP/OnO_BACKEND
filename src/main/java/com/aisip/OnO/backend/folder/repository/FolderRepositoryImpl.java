@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.folder.repository;
 
+import com.aisip.OnO.backend.common.response.CursorSort;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.entity.QFolder;
 import com.querydsl.core.Tuple;
@@ -95,18 +96,18 @@ public class FolderRepositoryImpl implements FolderRepositoryCustom {
     }
 
     @Override
-    public List<Folder> findSubFoldersWithCursor(Long folderId, Long cursor, int size) {
+    public List<Folder> findSubFoldersWithCursor(Long folderId, Long cursor, int size, CursorSort sort) {
         var query = queryFactory
                 .selectFrom(folder)
                 .where(folder.parentFolder.id.eq(folderId));
 
-        // 커서가 있으면 해당 ID 이후부터 조회
+        // 커서가 있으면 해당 ID 다음부터 조회. 최근 순이면 더 작은 id 쪽이 다음이다.
         if (cursor != null) {
-            query.where(folder.id.gt(cursor));
+            query.where(sort.isNewest() ? folder.id.lt(cursor) : folder.id.gt(cursor));
         }
 
         return query
-                .orderBy(folder.id.asc())
+                .orderBy(sort.isNewest() ? folder.id.desc() : folder.id.asc())
                 .limit(size + 1)  // hasNext 판단을 위해 +1개 조회
                 .fetch();
     }

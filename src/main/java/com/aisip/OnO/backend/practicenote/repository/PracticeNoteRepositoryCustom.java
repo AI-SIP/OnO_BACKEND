@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.practicenote.repository;
 
+import com.aisip.OnO.backend.common.response.CursorSort;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 
 import java.util.List;
@@ -29,5 +30,9 @@ public interface PracticeNoteRepositoryCustom {
      * @param size 조회할 개수
      * @return 복습노트 리스트 (size+1개 조회하여 hasNext 판단)
      */
-    List<PracticeNote> findPracticeNotesByUserWithCursor(Long userId, Long cursor, int size);
+    default List<PracticeNote> findPracticeNotesByUserWithCursor(Long userId, Long cursor, int size) {
+        return findPracticeNotesByUserWithCursor(userId, cursor, size, CursorSort.OLDEST);
+    }
+
+    List<PracticeNote> findPracticeNotesByUserWithCursor(Long userId, Long cursor, int size, CursorSort sort);
 }

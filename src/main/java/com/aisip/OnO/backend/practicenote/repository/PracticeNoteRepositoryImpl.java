@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.practicenote.repository;
 
+import com.aisip.OnO.backend.common.response.CursorSort;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
@@ -96,18 +97,18 @@ public class PracticeNoteRepositoryImpl implements PracticeNoteRepositoryCustom 
      * 무한 스크롤 API 에서 페이지 크기와 무관하게 전체를 읽는 셈이라 fetch join 을 걷어냈다.
      */
     @Override
-    public List<PracticeNote> findPracticeNotesByUserWithCursor(Long userId, Long cursor, int size) {
+    public List<PracticeNote> findPracticeNotesByUserWithCursor(Long userId, Long cursor, int size, CursorSort sort) {
         var query = queryFactory
                 .selectFrom(practiceNote)
                 .where(practiceNote.userId.eq(userId));
 
-        // 커서가 있으면 해당 ID 이후부터 조회
+        // 커서가 있으면 해당 ID 다음부터 조회. 최근 순이면 더 작은 id 쪽이 다음이다.
         if (cursor != null) {
-            query.where(practiceNote.id.gt(cursor));
+            query.where(sort.isNewest() ? practiceNote.id.lt(cursor) : practiceNote.id.gt(cursor));
         }
 
         return query
-                .orderBy(practiceNote.id.asc())
+                .orderBy(sort.isNewest() ? practiceNote.id.desc() : practiceNote.id.asc())
                 .limit(size + 1)  // hasNext 판단을 위해 +1개 조회
                 .fetch();
     }
