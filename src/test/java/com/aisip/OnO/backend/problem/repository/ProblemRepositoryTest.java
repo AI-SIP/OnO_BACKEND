@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.problem.repository;
 
+import com.aisip.OnO.backend.common.response.CursorSort;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.Problem;
@@ -157,6 +158,43 @@ class ProblemRepositoryTest extends ProblemTestSupport {
             assertThat(page)
                     .extracting(Problem::getId)
                     .containsExactly(problems.get(1).getId(), problems.get(2).getId());
+        }
+
+        @Test
+        @DisplayName("최근 순이면 최근에 만든 문제부터 주고 커서는 더 오래된 쪽으로 넘어간다")
+        void newestFirst() {
+            List<Problem> problems = List.of(
+                    saveProblem(owner.getId(), ownerRoot, "1", null),
+                    saveProblem(owner.getId(), ownerRoot, "2", null),
+                    saveProblem(owner.getId(), ownerRoot, "3", null)
+            );
+
+            List<Problem> firstPage = problemRepository.findProblemsByFolderWithCursor(
+                    ownerRoot.getId(), null, 1, CursorSort.NEWEST);
+
+            assertThat(firstPage)
+                    .as("size 1 이라 다음 페이지 확인용으로 하나 더 읽는다")
+                    .extracting(Problem::getId)
+                    .containsExactly(problems.get(2).getId(), problems.get(1).getId());
+
+            List<Problem> secondPage = problemRepository.findProblemsByFolderWithCursor(
+                    ownerRoot.getId(), problems.get(2).getId(), 10, CursorSort.NEWEST);
+
+            assertThat(secondPage)
+                    .extracting(Problem::getId)
+                    .containsExactly(problems.get(1).getId(), problems.get(0).getId());
+        }
+
+        @Test
+        @DisplayName("제목 검색도 최근 순으로 줄 수 있다")
+        void titleNewestFirst() {
+            Problem older = saveProblem(owner.getId(), ownerRoot, "메모", "미적분 1");
+            Problem newer = saveProblem(owner.getId(), ownerRoot, "메모", "미적분 2");
+
+            assertThat(problemRepository.findProblemsByTitleWithCursor(
+                    "미적분", owner.getId(), null, 10, CursorSort.NEWEST))
+                    .extracting(Problem::getId)
+                    .containsExactly(newer.getId(), older.getId());
         }
 
         @Test

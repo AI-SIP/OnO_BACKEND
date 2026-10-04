@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.folder.repository;
 
+import com.aisip.OnO.backend.common.response.CursorSort;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.folder.support.FolderTestSupport;
 import com.aisip.OnO.backend.problem.entity.Problem;
@@ -212,6 +213,22 @@ class FolderRepositoryTest extends FolderTestSupport {
             assertThat(secondPage)
                     .extracting(Folder::getId)
                     .containsExactly(tree.leafA2().getId());
+        }
+
+        @Test
+        @DisplayName("최근 순이면 최근에 만든 하위 폴더부터 준다")
+        void findSubFoldersNewestFirst() {
+            List<Folder> firstPage = folderRepository.findSubFoldersWithCursor(
+                    tree.notebookA().getId(), null, 1, CursorSort.NEWEST);
+
+            assertThat(firstPage)
+                    .extracting(Folder::getId)
+                    .containsExactly(tree.leafA2().getId(), tree.leafA1().getId());
+
+            assertThat(folderRepository.findSubFoldersWithCursor(
+                    tree.notebookA().getId(), tree.leafA2().getId(), 1, CursorSort.NEWEST))
+                    .extracting(Folder::getId)
+                    .containsExactly(tree.leafA1().getId());
         }
 
         @Test

@@ -1,5 +1,7 @@
 package com.aisip.OnO.backend.problem.repository;
 
+import com.aisip.OnO.backend.common.response.CursorSort;
+import com.querydsl.core.types.OrderSpecifier;
 import com.aisip.OnO.backend.admin.dto.AdminProblemResponseDto;
 import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.Problem;
@@ -210,11 +212,18 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
      *
      * 그래서 1단계에서 id 만 limit 으로 뽑고, 2단계에서 그 id 로 fetch join 한다.
      */
-    private BooleanExpression cursorAfter(Long cursor) {
-        return cursor == null ? null : problem.id.gt(cursor);
+    private BooleanExpression cursorAfter(Long cursor, CursorSort sort) {
+        if (cursor == null) {
+            return null;
+        }
+        return sort.isNewest() ? problem.id.lt(cursor) : problem.id.gt(cursor);
     }
 
-    private List<Problem> fetchProblemsWithImages(List<Long> problemIds) {
+    private OrderSpecifier<Long> idOrder(CursorSort sort) {
+        return sort.isNewest() ? problem.id.desc() : problem.id.asc();
+    }
+
+    private List<Problem> fetchProblemsWithImages(List<Long> problemIds, CursorSort sort) {
         if (problemIds.isEmpty()) {
             return List.of();
         }
@@ -225,28 +234,28 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
                 .leftJoin(problem.folder).fetchJoin()
                 .leftJoin(problem.problemImageDataList, problemImageData).fetchJoin()
                 .where(problem.id.in(problemIds))
-                .orderBy(problem.id.asc())
+                .orderBy(idOrder(sort))
                 .fetch();
     }
 
     @Override
-    public List<Problem> findProblemsByFolderWithCursor(Long folderId, Long cursor, int size) {
+    public List<Problem> findProblemsByFolderWithCursor(Long folderId, Long cursor, int size, CursorSort sort) {
         List<Long> problemIds = queryFactory
                 .select(problem.id)
                 .from(problem)
                 .where(
                         problem.folder.id.eq(folderId),
-                        cursorAfter(cursor)
+                        cursorAfter(cursor, sort)
                 )
-                .orderBy(problem.id.asc())
+                .orderBy(idOrder(sort))
                 .limit(size + 1)  // hasNext 판단을 위해 +1개 조회
                 .fetch();
 
-        return fetchProblemsWithImages(problemIds);
+        return fetchProblemsWithImages(problemIds, sort);
     }
 
     @Override
-    public List<Problem> findProblemsByTagWithCursor(Long tagId, Long userId, Long cursor, int size) {
+    public List<Problem> findProblemsByTagWithCursor(Long tagId, Long userId, Long cursor, int size, CursorSort sort) {
         List<Long> problemIds = queryFactory
                 .selectDistinct(problem.id)
                 .from(problem)
@@ -254,29 +263,29 @@ public class ProblemRepositoryImpl implements ProblemRepositoryCustom {
                 .where(
                         problemTagMapping.tag.id.eq(tagId),
                         problem.userId.eq(userId),
-                        cursorAfter(cursor)
+                        cursorAfter(cursor, sort)
                 )
-                .orderBy(problem.id.asc())
+                .orderBy(idOrder(sort))
                 .limit(size + 1)
                 .fetch();
 
-        return fetchProblemsWithImages(problemIds);
+        return fetchProblemsWithImages(problemIds, sort);
     }
 
     @Override
-    public List<Problem> findProblemsByTitleWithCursor(String titleQuery, Long userId, Long cursor, int size) {
+    public List<Problem> findProblemsByTitleWithCursor(String titleQuery, Long userId, Long cursor, int size, CursorSort sort) {
         List<Long> problemIds = queryFactory
                 .select(problem.id)
                 .from(problem)
                 .where(
                         problem.userId.eq(userId),
                         problem.reference.containsIgnoreCase(titleQuery),
-                        cursorAfter(cursor)
+                        cursorAfter(cursor, sort)
                 )
-                .orderBy(problem.id.asc())
+                .orderBy(idOrder(sort))
                 .limit(size + 1)
                 .fetch();
 
-        return fetchProblemsWithImages(problemIds);
+        return fetchProblemsWithImages(problemIds, sort);
     }
 }

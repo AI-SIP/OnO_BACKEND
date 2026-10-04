@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.folder.repository;
 
+import com.aisip.OnO.backend.common.response.CursorSort;
 import com.aisip.OnO.backend.folder.entity.Folder;
 
 import java.util.Collection;
@@ -28,7 +29,11 @@ public interface FolderRepositoryCustom {
      * @param size 조회할 개수
      * @return 하위 폴더 리스트 (size+1개 조회하여 hasNext 판단)
      */
-    List<Folder> findSubFoldersWithCursor(Long folderId, Long cursor, int size);
+    default List<Folder> findSubFoldersWithCursor(Long folderId, Long cursor, int size) {
+        return findSubFoldersWithCursor(folderId, cursor, size, CursorSort.OLDEST);
+    }
+
+    List<Folder> findSubFoldersWithCursor(Long folderId, Long cursor, int size, CursorSort sort);
 
     /**
      * 커서 기반 유저의 모든 폴더 썸네일 조회
