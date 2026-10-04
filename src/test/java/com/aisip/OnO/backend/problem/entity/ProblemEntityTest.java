@@ -108,11 +108,11 @@ class ProblemEntityTest {
 
         @ParameterizedTest(name = "memo=\"{0}\"")
         @ValueSource(strings = {"", " ", "\t", "\n"})
-        @DisplayName("메모가 공백뿐이면 기존 메모를 유지한다")
-        void keepsMemoOnBlankInput(String blankMemo) {
+        @DisplayName("메모가 비어 있거나 공백뿐이면 메모를 지운다 - 예전에는 무시해서 앱에서 메모를 지울 수 없었다")
+        void clearsMemoOnBlankInput(String blankMemo) {
             problem.updateProblem(registerDto(blankMemo, "새 출처", null));
 
-            assertThat(problem.getMemo()).isEqualTo("최초 메모");
+            assertThat(problem.getMemo()).isNull();
             assertThat(problem.getReference()).as("다른 필드는 갱신된다").isEqualTo("새 출처");
         }
 

@@ -99,8 +99,11 @@ public class Problem extends BaseEntity {
             this.solvedAt = problemRegisterDto.solvedAt();
         }
 
-        if (problemRegisterDto.memo() != null && !problemRegisterDto.memo().isBlank()) {
-            this.memo = problemRegisterDto.memo();
+        // null 이면 바꾸지 않고, 비어 있으면 지운다. 전에는 빈 메모도 무시해서
+        // 앱 수정 화면에서 메모를 지워도 그대로 남았다. 제목은 앱에서 필수라
+        // 아래처럼 빈 값을 계속 무시한다.
+        if (problemRegisterDto.memo() != null) {
+            this.memo = problemRegisterDto.memo().isBlank() ? null : problemRegisterDto.memo();
         }
 
         if (problemRegisterDto.reference() != null && !problemRegisterDto.reference().isBlank()) {
