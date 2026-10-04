@@ -41,11 +41,6 @@ public interface ProblemSolveRepository extends JpaRepository<ProblemSolve, Long
             "WHERE pr.problem.id = :problemId")
     Long countByProblemId(@Param("problemId") Long problemId);
 
-    @Query("SELECT COUNT(pr) FROM ProblemSolve pr " +
-            "WHERE pr.problem.id = :problemId " +
-            "AND pr.answerStatus = com.aisip.OnO.backend.problemsolve.entity.AnswerStatus.CORRECT")
-    long countCorrectByProblemId(@Param("problemId") Long problemId);
-
     @Query("SELECT MAX(pr.practicedAt) FROM ProblemSolve pr " +
             "WHERE pr.problem.id = :problemId")
     LocalDateTime findLastSolvedAtByProblemId(@Param("problemId") Long problemId);
