@@ -732,18 +732,27 @@ class ProblemServiceTest extends ProblemTestSupport {
         }
 
         @Test
-        @DisplayName("null/공백 메모는 기존 값을 덮어쓰지 않는다")
-        void keepsExistingValueOnBlankInput() {
+        @DisplayName("메모가 null 이면 그대로 두고, 공백이면 지운다. 제목은 공백이어도 그대로다")
+        void keepsOnNullAndClearsMemoOnBlank() {
             Problem problem = saveProblem(owner.getId(), ownerRoot, "원래 메모", "원래 출처");
+
+            problemService.updateProblemInfo(
+                    new ProblemRegisterDto(problem.getId(), null, "  ", null, null),
+                    owner.getId()
+            );
+            ProblemResponseDto untouched = problemService.findProblem(problem.getId(), owner.getId());
+            assertThat(untouched.memo()).isEqualTo("원래 메모");
+            assertThat(untouched.reference()).isEqualTo("원래 출처");
 
             problemService.updateProblemInfo(
                     new ProblemRegisterDto(problem.getId(), "   ", null, null, null),
                     owner.getId()
             );
-
-            ProblemResponseDto updated = problemService.findProblem(problem.getId(), owner.getId());
-            assertThat(updated.memo()).isEqualTo("원래 메모");
-            assertThat(updated.reference()).isEqualTo("원래 출처");
+            ProblemResponseDto cleared = problemService.findProblem(problem.getId(), owner.getId());
+            assertThat(cleared.memo())
+                    .as("예전에는 무시해서 앱 수정 화면에서 메모를 지울 수 없었다")
+                    .isNull();
+            assertThat(cleared.reference()).isEqualTo("원래 출처");
         }
 
         @Test
