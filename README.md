@@ -58,6 +58,18 @@ OnO 는 문제를 사진으로 올리면 한 장이 완성되고, 복습할 때�
     <td align="center"><b>학습 리포트</b><br/><sub>학습 지표를 모아 다음 주 목표를 추천하고<br/>AI 가 실패하면 규칙 기반으로 채웁니다</sub></td>
     <td align="center"><b>미션과 레벨</b><br/><sub>일일, 주간 미션 진행도와<br/>경험치, 꾸미기 잠금 해제</sub></td>
   </tr>
+  <tr>
+    <td align="center"><img src=".github/readme/screens/closet.png" width="180" alt="옷장" /></td>
+    <td align="center"><img src=".github/readme/screens/decorate.png" width="180" alt="개구리 꾸미기" /></td>
+    <td align="center"><img src=".github/readme/screens/medals.png" width="180" alt="훈장" /></td>
+    <td align="center"><img src=".github/readme/screens/calendar.png" width="180" alt="학습 달력" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>옷장</b><br/><sub>출석, 오답노트, 문제 복습, 복습 세트<br/>네 가지 능력치와 총 레벨</sub></td>
+    <td align="center"><b>개구리 꾸미기</b><br/><sub>레벨에 따라 치장 63종을 열고<br/>입은 상태를 저장합니다</sub></td>
+    <td align="center"><b>훈장</b><br/><sub>공부한 기록으로<br/>훈장 12종을 줍니다</sub></td>
+    <td align="center"><b>학습 달력</b><br/><sub>공부한 날마다 도장과 기분,<br/>연속 학습일을 남깁니다</sub></td>
+  </tr>
 </table>
 
 화면별 설명은 [앱 저장소 README](https://github.com/AI-SIP/OnO_FRONT) 에 더 자세히 있습니다.
