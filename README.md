@@ -106,14 +106,6 @@ OnO 는 문제를 사진으로 올리면 한 장이 완성되고, 복습할 때�
 
 ![서비스 아키텍처](.github/readme/architecture.png)
 
-서버는 클라우드가 아니라 직접 운영하는 Mac mini 한 대에 Docker Compose 로 올라가 있고, dev 와 prod 가 포트만 달리해서 같이 돌고 있습니다.
-요청은 호스트의 Nginx 가 받아서 Blue(8080) 와 Green(8081) 중 지금 살아 있는 쪽 컨테이너로 넘깁니다.
-오답노트의 문제 이미지는 앱이 presigned URL 로 S3 에 직접 올리고, 서버는 그 주소를 받아 저장합니다.
-
-main 에 머지되면 GitHub Actions 가 이미지를 빌드해 Docker Hub 에 올리고, 서버에 붙어 있는 self-hosted runner 가 그 이미지로 안 쓰는 쪽 색을 띄웁니다.
-헬스체크와 전환 전 확인을 통과해야 Nginx upstream 을 바꾸고, 하나라도 실패하면 이전 색이 그대로 요청을 받습니다.
-배포가 끝나면 스모크 테스트가 실제 API 를 한 번 더 호출해 보고, 그 뒤로도 매시간 확인해서 상태가 바뀌면 Discord 로 알려 줍니다.
-
 <br>
 
 ## 프로젝트 구조
