@@ -198,8 +198,8 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
         }
 
         @Test
-        @DisplayName("중간에 틀려도 정답이 3번 쌓이면 다음 복습일을 비운다")
-        void marksProblemAsMasteredAfterThreeCorrectAnswersWithWrongInBetween() {
+        @DisplayName("중간에 틀리면 정답을 다시 세서, 틀린 뒤 정답 3일을 채워야 다음 복습일을 비운다")
+        void marksProblemAsMasteredOnlyAfterThreeCorrectDaysSinceLastWrong() {
             AnswerStatus[] history = {
                     AnswerStatus.CORRECT, AnswerStatus.WRONG, AnswerStatus.CORRECT, AnswerStatus.WRONG, AnswerStatus.CORRECT
             };
@@ -208,10 +208,36 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
                         new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT.plusDays(i), history[i], null, List.of(), null, null),
                         user.getId());
             }
+            assertThat(problemRepository.findById(problem.getId()).orElseThrow().getNextReviewAt())
+                    .as("마지막으로 틀린 뒤 정답은 1일뿐이다")
+                    .isNotNull();
 
+            for (int i = history.length; i < history.length + 2; i++) {
+                problemSolveService.createProblemSolve(
+                        new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT.plusDays(i), AnswerStatus.CORRECT, null, List.of(), null, null),
+                        user.getId());
+            }
             Problem updated = problemRepository.findById(problem.getId()).orElseThrow();
-            assertThat(updated.getConsecutiveCorrectCount()).isEqualTo(1);
+            assertThat(updated.getConsecutiveCorrectCount()).isEqualTo(3);
             assertThat(updated.getNextReviewAt()).isNull();
+        }
+
+        @Test
+        @DisplayName("추천에서 빠진 문제를 틀리면 다음 날 다시 복습일이 잡힌다")
+        void reschedulesMasteredProblemAfterWrong() {
+            for (int i = 0; i < 3; i++) {
+                problemSolveService.createProblemSolve(
+                        new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT.plusDays(i * 2), AnswerStatus.CORRECT, null, List.of(), null, null),
+                        user.getId());
+            }
+            assertThat(problemRepository.findById(problem.getId()).orElseThrow().getNextReviewAt()).isNull();
+
+            problemSolveService.createProblemSolve(
+                    new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT.plusDays(7), AnswerStatus.WRONG, null, List.of(), null, null),
+                    user.getId());
+
+            assertThat(problemRepository.findById(problem.getId()).orElseThrow().getNextReviewAt())
+                    .isEqualTo(PRACTICED_AT.toLocalDate().plusDays(8));
         }
 
         @Test

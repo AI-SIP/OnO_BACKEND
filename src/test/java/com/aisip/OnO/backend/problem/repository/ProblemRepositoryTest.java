@@ -328,22 +328,38 @@ class ProblemRepositoryTest extends ProblemTestSupport {
         }
 
         @Test
-        @DisplayName("중간에 틀렸어도 정답 기록이 3개면 복습 대상과 알림 집계에서 빠진다")
+        @DisplayName("마지막으로 틀린 뒤에 정답 날이 3일이면 복습 대상과 알림 집계에서 빠진다")
         void excludesProblemsWithEnoughCorrectSolves() {
             LocalDate today = LocalDate.now();
             Problem mastered = saveProblemWithReviewSchedule(owner.getId(), ownerRoot, today, 1, 0);
             saveSolves(mastered, AnswerStatus.CORRECT, AnswerStatus.WRONG, AnswerStatus.CORRECT,
-                    AnswerStatus.WRONG, AnswerStatus.CORRECT);
+                    AnswerStatus.CORRECT, AnswerStatus.CORRECT);
             Problem stillDue = saveProblemWithReviewSchedule(owner.getId(), ownerRoot, today, 1, 0);
-            saveSolves(stillDue, AnswerStatus.CORRECT, AnswerStatus.WRONG, AnswerStatus.CORRECT, AnswerStatus.PARTIAL);
+            saveSolves(stillDue, AnswerStatus.WRONG, AnswerStatus.CORRECT, AnswerStatus.CORRECT);
 
             List<ReviewDueProblemProjection> due =
                     problemRepository.findReviewDueProblems(owner.getId(), today, MASTERY_THRESHOLD);
 
             assertThat(due)
                     .extracting(ReviewDueProblemProjection::problemId, ReviewDueProblemProjection::correctCount)
-                    .as("정답만 세고 오답·부분 정답은 세지 않는다")
+                    .as("마지막으로 틀린 뒤의 정답 날만 센다")
                     .containsExactly(tuple(stillDue.getId(), 2L));
+            assertThat(problemRepository.findReviewDueSummaryByDate(today, MASTERY_THRESHOLD))
+                    .extracting(ReviewDueSummary::getUserId, ReviewDueSummary::getDueCount)
+                    .containsExactly(tuple(owner.getId(), 1L));
+        }
+
+        @Test
+        @DisplayName("추천에서 빠진 뒤에 틀리면 다시 추천하고 정답 날을 처음부터 센다")
+        void includesMasteredProblemAgainAfterWrong() {
+            LocalDate today = LocalDate.now();
+            Problem relearning = saveProblemWithReviewSchedule(owner.getId(), ownerRoot, today, 1, 0);
+            saveSolves(relearning, AnswerStatus.CORRECT, AnswerStatus.CORRECT, AnswerStatus.CORRECT,
+                    AnswerStatus.PARTIAL);
+
+            assertThat(problemRepository.findReviewDueProblems(owner.getId(), today, MASTERY_THRESHOLD))
+                    .extracting(ReviewDueProblemProjection::problemId, ReviewDueProblemProjection::correctCount)
+                    .containsExactly(tuple(relearning.getId(), 0L));
             assertThat(problemRepository.findReviewDueSummaryByDate(today, MASTERY_THRESHOLD))
                     .extracting(ReviewDueSummary::getUserId, ReviewDueSummary::getDueCount)
                     .containsExactly(tuple(owner.getId(), 1L));

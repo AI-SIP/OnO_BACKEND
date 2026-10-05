@@ -256,6 +256,37 @@ class ReviewIntervalCalculatorTest {
         }
 
         @Test
+        @DisplayName("마스터한 뒤에 틀리면 다음 날 다시 보고, 그 뒤로 정답 3일을 다시 채워야 마스터다")
+        void relearnsAfterWrongFollowingMastery() {
+            var marks = new java.util.ArrayList<>(List.of(
+                    mark(0, AnswerStatus.CORRECT), mark(2, AnswerStatus.CORRECT),
+                    mark(6, AnswerStatus.CORRECT), mark(8, AnswerStatus.WRONG)));
+
+            var afterWrong = ReviewIntervalCalculator.replay(DAY, marks);
+            assertThat(afterWrong.isMastered()).isFalse();
+            assertThat(afterWrong.nextReviewAt()).isEqualTo(DAY.plusDays(9));
+
+            marks.add(mark(9, AnswerStatus.CORRECT));
+            marks.add(mark(11, AnswerStatus.CORRECT));
+            assertThat(ReviewIntervalCalculator.replay(DAY, marks).isMastered())
+                    .as("틀린 뒤 정답이 2일뿐이라 아직 아니다")
+                    .isFalse();
+
+            marks.add(mark(15, AnswerStatus.CORRECT));
+            assertThat(ReviewIntervalCalculator.replay(DAY, marks).isMastered()).isTrue();
+        }
+
+        @Test
+        @DisplayName("중간에 틀리면 그 앞의 정답 날은 세지 않는다")
+        void wrongResetsCorrectDays() {
+            var schedule = ReviewIntervalCalculator.replay(DAY, List.of(
+                    mark(0, AnswerStatus.CORRECT), mark(2, AnswerStatus.CORRECT),
+                    mark(4, AnswerStatus.PARTIAL), mark(5, AnswerStatus.CORRECT)));
+
+            assertThat(schedule.isMastered()).isFalse();
+        }
+
+        @Test
         @DisplayName("판정 불가 기록은 3일 뒤로 미루기만 한다")
         void unknownOnlyPostpones() {
             var schedule = ReviewIntervalCalculator.replay(DAY, List.of(mark(0, AnswerStatus.UNKNOWN)));
