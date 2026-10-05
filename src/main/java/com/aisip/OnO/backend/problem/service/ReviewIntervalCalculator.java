@@ -13,8 +13,10 @@ public class ReviewIntervalCalculator {
     private static final int MAX_INTERVAL_DAYS = 30;
 
     /**
-     * 정답을 남긴 날이 이만큼 되면 추천 복습에서 뺀다. 연속일 필요는 없고, 중간에 틀려도 된다.
-     * 같은 날 여러 번 맞힌 것은 하루로 센다. 추천 목록과 복습 알림 쿼리도 같은 값으로 거른다.
+     * 마지막으로 틀린 뒤에 정답을 남긴 날이 이만큼 되면 추천 복습에서 뺀다. 연속일 필요는 없다.
+     * 틀리거나 부분 정답이면 처음부터 다시 센다. 그래야 추천에서 빠진 뒤에 틀린 문제가 다시
+     * 추천에 나온다. 같은 날 여러 번 맞힌 것은 하루로 센다. 추천 목록과 복습 알림 쿼리도 같은
+     * 값으로 거른다.
      */
     public static final int MASTERY_THRESHOLD = 3;
 
@@ -29,7 +31,7 @@ public class ReviewIntervalCalculator {
     }
 
     /**
-     * @param previousCorrectDayCount 이번 기록을 빼고 지금까지 정답을 남긴 날 수
+     * @param previousCorrectDayCount 이번 기록을 빼고, 마지막으로 틀린 뒤에 정답을 남긴 날 수
      */
     public static ReviewSchedule calculate(AnswerStatus status, int currentInterval, int currentConsecutiveCorrect,
                                            long previousCorrectDayCount) {
@@ -38,7 +40,7 @@ public class ReviewIntervalCalculator {
     }
 
     /**
-     * @param previousCorrectDayCount 이번 기록을 빼고 지금까지 정답을 남긴 날 수
+     * @param previousCorrectDayCount 이번 기록을 빼고, 마지막으로 틀린 뒤에 정답을 남긴 날 수
      * @param practicedDate           이번 기록을 남긴 날. 다음 복습일은 이 날부터 센다
      */
     public static ReviewSchedule calculate(AnswerStatus status, int currentInterval, int currentConsecutiveCorrect,
@@ -64,7 +66,7 @@ public class ReviewIntervalCalculator {
      * 그래서 남기기, 고치기, 지우기 모두 처음부터 다시 계산한다.
      *
      * <p>이미 정답을 남긴 날에 다시 맞힌 기록은 건너뛴다. 같은 날 몰아 맞힌 것을 간격 복습으로
-     * 보지 않기 위해서다.
+     * 보지 않기 위해서다. 틀리거나 부분 정답이면 정답을 남긴 날을 처음부터 다시 센다.
      *
      * @param firstReviewDate 기록이 하나도 없을 때의 복습일(등록한 날)
      * @param solves          시간순으로 정렬된 풀이 기록
@@ -81,6 +83,9 @@ public class ReviewIntervalCalculator {
                     schedule.consecutiveCorrectCount(), correctDays.size(), solve.practicedDate());
             if (solve.answerStatus() == AnswerStatus.CORRECT) {
                 correctDays.add(solve.practicedDate());
+            } else if (solve.answerStatus() == AnswerStatus.WRONG
+                    || solve.answerStatus() == AnswerStatus.PARTIAL) {
+                correctDays.clear();
             }
         }
         return schedule;
