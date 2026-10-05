@@ -21,7 +21,7 @@
 - [서비스 소개](#서비스-소개)
 - [기술 스택](#기술-스택)
 - [서비스 아키텍처](#서비스-아키텍처)
-- [작업 규칙](#작업-규칙)
+- [프로젝트 구조](#프로젝트-구조)
 
 <br>
 
@@ -116,11 +116,39 @@ main 에 머지되면 GitHub Actions 가 이미지를 빌드해 Docker Hub 에 �
 
 <br>
 
-## 작업 규칙
+## 프로젝트 구조
 
-- `develop` 에서 `feat/<이슈 번호>-<내용>` 이나 `fix/<이슈 번호>-<내용>` 브랜치를 따고, `develop` 으로 PR 을 올립니다. `main` 은 운영 배포용입니다.
-- 커밋 메시지는 `[Feat]`, `[Fix]`, `[Refactor]`, `[Chore]`, `[Test]`, `[Docs]`, `[Perf]` 중 하나로 시작합니다.
-- DB 스키마는 `src/main/resources/db/migration` 에 Flyway 파일(`V<번호>__<설명>.sql`)로만 바꿉니다.
+```
+OnO_BACKEND
+├── src/main/java/com/aisip/OnO/backend
+│   ├── auth               # JWT 발급과 갱신, Security 설정
+│   ├── user               # 계정, 프로필, 탈퇴
+│   ├── problem            # 오답노트, AI 분석, 복습 일정 계산과 복습 알림
+│   ├── problemsolve       # 다시 푼 기록
+│   ├── practicenote       # 복습 세트와 복습 시간 알림
+│   ├── folder             # 공책
+│   ├── tag                # 태그와 검색
+│   ├── learningcalendar   # 학습 달력
+│   ├── learningreport     # 학습 리포트와 AI 추천
+│   ├── mission            # 일일, 주간 미션과 레벨
+│   ├── achievement        # 훈장
+│   ├── cosmetic           # 개구리 꾸미기
+│   ├── studyroom          # 스터디룸, 챌린지, 문제 공유, 주간 리포트
+│   ├── notice             # 공지
+│   ├── feedback           # 사용자 피드백
+│   ├── admin              # 관리자 화면 (/admin)
+│   ├── common             # 공통 응답과 예외, JWT 필터, 사용량 제한
+│   ├── config             # RabbitMQ 큐와 Producer, Consumer, Flyway 설정
+│   └── util               # S3, FCM, OpenAI, Redis, Quartz, Discord 연동
+├── src/main/resources
+│   ├── db/migration       # Flyway 마이그레이션
+│   └── templates          # 관리자 화면 Thymeleaf 템플릿
+├── src/test               # Testcontainers 기반 테스트
+├── monitoring             # Prometheus, Grafana, Loki, Alertmanager 설정
+├── scripts/smoke          # 배포 후와 매시간 도는 스모크 테스트
+├── .github/workflows      # 테스트, 빌드와 배포, 스모크 테스트
+└── docker-compose.*.yml   # local, dev, prod 컨테이너 구성
+```
 
 <br>
 
