@@ -35,10 +35,10 @@ OnO 는 문제를 사진으로 올리면 한 장이 완성되고, 복습할 때�
 
 <table>
   <tr>
-    <td align="center" width="25%"><img src="https://raw.githubusercontent.com/AI-SIP/OnO_FRONT/main/.github/readme/06-write-images.png" width="180" alt="오답노트 작성" /></td>
-    <td align="center" width="25%"><img src="https://raw.githubusercontent.com/AI-SIP/OnO_FRONT/main/.github/readme/17-ai-analysis.png" width="180" alt="AI 오답분석" /></td>
-    <td align="center" width="25%"><img src="https://raw.githubusercontent.com/AI-SIP/OnO_FRONT/main/.github/readme/13-review-due.png" width="180" alt="추천 복습 문제" /></td>
-    <td align="center" width="25%"><img src="https://raw.githubusercontent.com/AI-SIP/OnO_FRONT/main/.github/readme/20-retry-history.png" width="180" alt="복습 기록" /></td>
+    <td align="center" width="25%"><img src=".github/readme/screens/write.png" width="180" alt="오답노트 작성" /></td>
+    <td align="center" width="25%"><img src=".github/readme/screens/ai-analysis.png" width="180" alt="AI 오답분석" /></td>
+    <td align="center" width="25%"><img src=".github/readme/screens/review-due.png" width="180" alt="추천 복습 문제" /></td>
+    <td align="center" width="25%"><img src=".github/readme/screens/retry-history.png" width="180" alt="복습 기록" /></td>
   </tr>
   <tr>
     <td align="center"><b>오답노트 작성</b><br/><sub>사진은 앱이 S3 에 바로 올리고<br/>서버는 문제와 이미지 주소를 저장합니다</sub></td>
@@ -47,10 +47,10 @@ OnO 는 문제를 사진으로 올리면 한 장이 완성되고, 복습할 때�
     <td align="center"><b>다시 풀기</b><br/><sub>회차마다 정답, 오답, 부분 정답과<br/>풀이 시간을 남깁니다</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="https://raw.githubusercontent.com/AI-SIP/OnO_FRONT/main/.github/readme/25-set-run.png" width="180" alt="복습 세트" /></td>
-    <td align="center"><img src="https://raw.githubusercontent.com/AI-SIP/OnO_FRONT/main/.github/readme/28-room-rank.png" width="180" alt="스터디룸" /></td>
-    <td align="center"><img src="https://raw.githubusercontent.com/AI-SIP/OnO_FRONT/main/.github/readme/35-report.png" width="180" alt="학습 리포트" /></td>
-    <td align="center"><img src="https://raw.githubusercontent.com/AI-SIP/OnO_FRONT/main/.github/readme/43-mission-daily.png" width="180" alt="미션" /></td>
+    <td align="center"><img src=".github/readme/screens/set-run.png" width="180" alt="복습 세트" /></td>
+    <td align="center"><img src=".github/readme/screens/room-rank.png" width="180" alt="스터디룸" /></td>
+    <td align="center"><img src=".github/readme/screens/report.png" width="180" alt="학습 리포트" /></td>
+    <td align="center"><img src=".github/readme/screens/mission.png" width="180" alt="미션" /></td>
   </tr>
   <tr>
     <td align="center"><b>복습 세트</b><br/><sub>정해 둔 시간이 되면<br/>예약 작업이 푸시를 보냅니다</sub></td>
