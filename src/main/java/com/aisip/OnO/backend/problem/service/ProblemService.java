@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.problem.service;
 
+import com.aisip.OnO.backend.common.response.CursorSort;
 import com.aisip.OnO.backend.admin.dto.AdminProblemResponseDto;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.ratelimit.RateLimitService;
@@ -821,8 +822,13 @@ public class ProblemService {
      */
     @Transactional(readOnly = true)
     public CursorPageResponse<ProblemResponseDto> findProblemsByFolderWithCursor(Long folderId, Long userId, Long cursor, int size) {
+        return findProblemsByFolderWithCursor(folderId, userId, cursor, size, CursorSort.OLDEST);
+    }
+
+    @Transactional(readOnly = true)
+    public CursorPageResponse<ProblemResponseDto> findProblemsByFolderWithCursor(Long folderId, Long userId, Long cursor, int size, CursorSort sort) {
         validateFolderOwner(folderId, userId);
-        List<Problem> problems = problemRepository.findProblemsByFolderWithCursor(folderId, cursor, size);
+        List<Problem> problems = problemRepository.findProblemsByFolderWithCursor(folderId, cursor, size, sort);
 
         boolean hasNext = problems.size() > size;
         List<Problem> content = hasNext ? problems.subList(0, size) : problems;
@@ -844,6 +850,11 @@ public class ProblemService {
      */
     @Transactional(readOnly = true)
     public CursorPageResponse<ProblemResponseDto> findProblemsByTagWithCursor(Long tagId, Long userId, Long cursor, int size) {
+        return findProblemsByTagWithCursor(tagId, userId, cursor, size, CursorSort.OLDEST);
+    }
+
+    @Transactional(readOnly = true)
+    public CursorPageResponse<ProblemResponseDto> findProblemsByTagWithCursor(Long tagId, Long userId, Long cursor, int size, CursorSort sort) {
         Tag tag = tagRepository.findById(tagId)
                 .orElseThrow(() -> new ApplicationException(TagErrorCase.TAG_NOT_FOUND));
 
@@ -851,7 +862,7 @@ public class ProblemService {
             throw new ApplicationException(TagErrorCase.TAG_USER_UNMATCHED);
         }
 
-        List<Problem> problems = problemRepository.findProblemsByTagWithCursor(tagId, userId, cursor, size);
+        List<Problem> problems = problemRepository.findProblemsByTagWithCursor(tagId, userId, cursor, size, sort);
 
         boolean hasNext = problems.size() > size;
         List<Problem> content = hasNext ? problems.subList(0, size) : problems;
@@ -872,12 +883,19 @@ public class ProblemService {
     public CursorPageResponse<ProblemResponseDto> findProblemsByTitleWithCursor(
             String titleQuery, Long userId, Long cursor, int size
     ) {
+        return findProblemsByTitleWithCursor(titleQuery, userId, cursor, size, CursorSort.OLDEST);
+    }
+
+    @Transactional(readOnly = true)
+    public CursorPageResponse<ProblemResponseDto> findProblemsByTitleWithCursor(
+            String titleQuery, Long userId, Long cursor, int size, CursorSort sort
+    ) {
         String query = titleQuery == null ? "" : titleQuery.trim();
         if (query.isEmpty()) {
             return CursorPageResponse.of(List.of(), null, false, size);
         }
 
-        List<Problem> problems = problemRepository.findProblemsByTitleWithCursor(query, userId, cursor, size);
+        List<Problem> problems = problemRepository.findProblemsByTitleWithCursor(query, userId, cursor, size, sort);
 
         boolean hasNext = problems.size() > size;
         List<Problem> content = hasNext ? problems.subList(0, size) : problems;
@@ -962,7 +980,8 @@ public class ProblemService {
     @Transactional(readOnly = true)
     public ReviewDueResponseDto getReviewDueProblems(Long userId) {
         LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
-        List<ReviewDueProblemProjection> dueProblems = problemRepository.findReviewDueProblems(userId, today);
+        List<ReviewDueProblemProjection> dueProblems = problemRepository.findReviewDueProblems(
+                userId, today, ReviewIntervalCalculator.MASTERY_THRESHOLD);
 
         long overdueCount = dueProblems.stream()
                 .filter(p -> p.nextReviewAt().isBefore(today))
@@ -971,6 +990,7 @@ public class ProblemService {
         return ReviewDueResponseDto.builder()
                 .dueCount(dueProblems.size())
                 .overdueCount(overdueCount)
+                .requiredCorrectCount(ReviewIntervalCalculator.MASTERY_THRESHOLD)
                 .problems(dueProblems.stream()
                         .map(ReviewDueResponseDto.ReviewDueProblemDto::from)
                         .toList())

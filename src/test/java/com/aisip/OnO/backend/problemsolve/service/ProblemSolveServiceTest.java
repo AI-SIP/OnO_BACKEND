@@ -174,7 +174,9 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
             problemSolveService.createProblemSolve(registerDto(problem.getId(), AnswerStatus.WRONG), user.getId());
 
             Problem updated = problemRepository.findById(problem.getId()).orElseThrow();
-            assertThat(updated.getNextReviewAt()).isEqualTo(LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(1));
+            assertThat(updated.getNextReviewAt())
+                    .as("다음 복습일은 기록을 남긴 날부터 센다")
+                    .isEqualTo(PRACTICED_AT.toLocalDate().plusDays(1));
             assertThat(updated.getReviewInterval()).isEqualTo(1);
             assertThat(updated.getConsecutiveCorrectCount()).isZero();
         }
@@ -193,6 +195,66 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
             assertThat(updated.getNextReviewAt())
                     .as("마스터한 문제는 더 이상 복습 대상이 아니다")
                     .isNull();
+        }
+
+        @Test
+        @DisplayName("중간에 틀리면 정답을 다시 세서, 틀린 뒤 정답 3일을 채워야 다음 복습일을 비운다")
+        void marksProblemAsMasteredOnlyAfterThreeCorrectDaysSinceLastWrong() {
+            AnswerStatus[] history = {
+                    AnswerStatus.CORRECT, AnswerStatus.WRONG, AnswerStatus.CORRECT, AnswerStatus.WRONG, AnswerStatus.CORRECT
+            };
+            for (int i = 0; i < history.length; i++) {
+                problemSolveService.createProblemSolve(
+                        new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT.plusDays(i), history[i], null, List.of(), null, null),
+                        user.getId());
+            }
+            assertThat(problemRepository.findById(problem.getId()).orElseThrow().getNextReviewAt())
+                    .as("마지막으로 틀린 뒤 정답은 1일뿐이다")
+                    .isNotNull();
+
+            for (int i = history.length; i < history.length + 2; i++) {
+                problemSolveService.createProblemSolve(
+                        new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT.plusDays(i), AnswerStatus.CORRECT, null, List.of(), null, null),
+                        user.getId());
+            }
+            Problem updated = problemRepository.findById(problem.getId()).orElseThrow();
+            assertThat(updated.getConsecutiveCorrectCount()).isEqualTo(3);
+            assertThat(updated.getNextReviewAt()).isNull();
+        }
+
+        @Test
+        @DisplayName("추천에서 빠진 문제를 틀리면 다음 날 다시 복습일이 잡힌다")
+        void reschedulesMasteredProblemAfterWrong() {
+            for (int i = 0; i < 3; i++) {
+                problemSolveService.createProblemSolve(
+                        new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT.plusDays(i * 2), AnswerStatus.CORRECT, null, List.of(), null, null),
+                        user.getId());
+            }
+            assertThat(problemRepository.findById(problem.getId()).orElseThrow().getNextReviewAt()).isNull();
+
+            problemSolveService.createProblemSolve(
+                    new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT.plusDays(7), AnswerStatus.WRONG, null, List.of(), null, null),
+                    user.getId());
+
+            assertThat(problemRepository.findById(problem.getId()).orElseThrow().getNextReviewAt())
+                    .isEqualTo(PRACTICED_AT.toLocalDate().plusDays(8));
+        }
+
+        @Test
+        @DisplayName("같은 날 세 번 맞혀도 하루로 세서 추천에서 빠지지 않는다")
+        void countsSameDayCorrectAnswersOnce() {
+            for (int i = 0; i < 3; i++) {
+                problemSolveService.createProblemSolve(
+                        new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT.plusMinutes(i), AnswerStatus.CORRECT, null, List.of(), null, null),
+                        user.getId());
+            }
+
+            Problem updated = problemRepository.findById(problem.getId()).orElseThrow();
+            assertThat(updated.getNextReviewAt())
+                    .as("첫 정답 한 번만 반영해 2일 뒤로 잡힌다")
+                    .isEqualTo(PRACTICED_AT.toLocalDate().plusDays(2));
+            assertThat(updated.getReviewInterval()).isEqualTo(2);
+            assertThat(updated.getConsecutiveCorrectCount()).isEqualTo(1);
         }
 
         @Test
@@ -369,6 +431,29 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
         }
 
         @Test
+        @DisplayName("추천에서 빠진 문제의 정답을 오답으로 고치면 그 날 다음 날로 다시 잡힌다")
+        void reschedulesWhenMasteredSolveIsChangedToWrong() {
+            Long lastSolveId = null;
+            for (int i = 0; i < 3; i++) {
+                lastSolveId = problemSolveService.createProblemSolve(
+                        new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT.plusDays(i), AnswerStatus.CORRECT, null, List.of(), null, null),
+                        user.getId());
+            }
+            assertThat(problemRepository.findById(problem.getId()).orElseThrow().getNextReviewAt()).isNull();
+
+            problemSolveService.updateProblemSolve(
+                    new ProblemSolveUpdateDto(lastSolveId, AnswerStatus.WRONG, null, List.of(), null, null),
+                    user.getId());
+
+            Problem updated = problemRepository.findById(problem.getId()).orElseThrow();
+            assertThat(updated.getNextReviewAt())
+                    .as("예전에는 일정을 다시 계산하지 않아 영영 추천에 돌아오지 않았다")
+                    .isEqualTo(PRACTICED_AT.toLocalDate().plusDays(3));
+            assertThat(updated.getReviewInterval()).isEqualTo(1);
+            assertThat(updated.getConsecutiveCorrectCount()).isZero();
+        }
+
+        @Test
         @DisplayName("다른 사용자의 기록은 수정할 수 없고 값도 그대로다")
         void rejectsOtherUsersSolve() {
             ProblemSolve othersSolve = saveSolve(othersProblem, other.getId(), PRACTICED_AT, AnswerStatus.WRONG);
@@ -423,6 +508,25 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
             assertThat(countRowsIncludingDeleted(problem.getId()))
                     .as("소프트 삭제라 행 자체는 남는다")
                     .isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("세 번째 정답 기록을 지우면 두 번째 정답 기준으로 다시 잡힌다")
+        void reschedulesWhenSolveIsDeleted() {
+            Long lastSolveId = null;
+            for (int i = 0; i < 3; i++) {
+                lastSolveId = problemSolveService.createProblemSolve(
+                        new ProblemSolveRegisterDto(problem.getId(), PRACTICED_AT.plusDays(i), AnswerStatus.CORRECT, null, List.of(), null, null),
+                        user.getId());
+            }
+
+            problemSolveService.deleteProblemSolve(lastSolveId, user.getId());
+
+            Problem updated = problemRepository.findById(problem.getId()).orElseThrow();
+            assertThat(updated.getNextReviewAt())
+                    .as("둘째 날 정답으로 간격이 4일이 된 상태로 돌아간다")
+                    .isEqualTo(PRACTICED_AT.toLocalDate().plusDays(1 + 4));
+            assertThat(updated.getReviewInterval()).isEqualTo(4);
         }
 
         @Test

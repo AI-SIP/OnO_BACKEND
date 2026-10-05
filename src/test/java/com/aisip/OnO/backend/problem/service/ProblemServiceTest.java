@@ -104,6 +104,16 @@ class ProblemServiceTest extends ProblemTestSupport {
         }
 
         @Test
+        @DisplayName("다음 복습일을 함께 내려준다")
+        void returnsNextReviewAt() {
+            LocalDate nextReviewAt = LocalDate.of(2026, 1, 12);
+            Problem problem = saveProblemWithReviewSchedule(owner.getId(), ownerRoot, nextReviewAt, 2, 1);
+
+            assertThat(problemService.findProblem(problem.getId(), owner.getId()).nextReviewAt())
+                    .isEqualTo(nextReviewAt);
+        }
+
+        @Test
         @DisplayName("다른 사용자의 문제는 조회할 수 없다")
         void rejectsOtherUsersProblem() {
             Problem othersProblem = saveProblem(intruder.getId(), intruderRoot);
@@ -722,18 +732,27 @@ class ProblemServiceTest extends ProblemTestSupport {
         }
 
         @Test
-        @DisplayName("null/공백 메모는 기존 값을 덮어쓰지 않는다")
-        void keepsExistingValueOnBlankInput() {
+        @DisplayName("메모가 null 이면 그대로 두고, 공백이면 지운다. 제목은 공백이어도 그대로다")
+        void keepsOnNullAndClearsMemoOnBlank() {
             Problem problem = saveProblem(owner.getId(), ownerRoot, "원래 메모", "원래 출처");
+
+            problemService.updateProblemInfo(
+                    new ProblemRegisterDto(problem.getId(), null, "  ", null, null),
+                    owner.getId()
+            );
+            ProblemResponseDto untouched = problemService.findProblem(problem.getId(), owner.getId());
+            assertThat(untouched.memo()).isEqualTo("원래 메모");
+            assertThat(untouched.reference()).isEqualTo("원래 출처");
 
             problemService.updateProblemInfo(
                     new ProblemRegisterDto(problem.getId(), "   ", null, null, null),
                     owner.getId()
             );
-
-            ProblemResponseDto updated = problemService.findProblem(problem.getId(), owner.getId());
-            assertThat(updated.memo()).isEqualTo("원래 메모");
-            assertThat(updated.reference()).isEqualTo("원래 출처");
+            ProblemResponseDto cleared = problemService.findProblem(problem.getId(), owner.getId());
+            assertThat(cleared.memo())
+                    .as("예전에는 무시해서 앱 수정 화면에서 메모를 지울 수 없었다")
+                    .isNull();
+            assertThat(cleared.reference()).isEqualTo("원래 출처");
         }
 
         @Test
@@ -1565,6 +1584,13 @@ class ProblemServiceTest extends ProblemTestSupport {
             assertThat(dto.nextReviewAt()).isEqualTo(today);
             assertThat(dto.reviewInterval()).isEqualTo(4);
             assertThat(dto.consecutiveCorrectCount()).isEqualTo(2);
+            assertThat(dto.correctCount()).isZero();
+        }
+
+        @Test
+        @DisplayName("추천에서 빠지는 정답 횟수를 함께 내려준다")
+        void exposesRequiredCorrectCount() {
+            assertThat(problemService.getReviewDueProblems(owner.getId()).requiredCorrectCount()).isEqualTo(3);
         }
 
         @Test

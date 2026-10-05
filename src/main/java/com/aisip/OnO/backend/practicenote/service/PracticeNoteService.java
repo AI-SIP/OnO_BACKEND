@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.practicenote.service;
 
+import com.aisip.OnO.backend.common.response.CursorSort;
 import com.aisip.OnO.backend.admin.dto.AdminPracticeNoteResponseDto;
 import com.aisip.OnO.backend.common.emoji.CustomEmojiValidator;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
@@ -297,7 +298,12 @@ public class PracticeNoteService {
      */
     @Transactional(readOnly = true)
     public CursorPageResponse<PracticeNoteThumbnailResponseDto> findPracticeThumbnailsByUserWithCursor(Long userId, Long cursor, int size) {
-        List<PracticeNote> practiceNotes = practiceNoteRepository.findPracticeNotesByUserWithCursor(userId, cursor, size);
+        return findPracticeThumbnailsByUserWithCursor(userId, cursor, size, CursorSort.OLDEST);
+    }
+
+    @Transactional(readOnly = true)
+    public CursorPageResponse<PracticeNoteThumbnailResponseDto> findPracticeThumbnailsByUserWithCursor(Long userId, Long cursor, int size, CursorSort sort) {
+        List<PracticeNote> practiceNotes = practiceNoteRepository.findPracticeNotesByUserWithCursor(userId, cursor, size, sort);
 
         boolean hasNext = practiceNotes.size() > size;
         List<PracticeNote> content = hasNext ? practiceNotes.subList(0, size) : practiceNotes;

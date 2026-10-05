@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.folder.service;
 
+import com.aisip.OnO.backend.common.response.CursorSort;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
@@ -298,8 +299,13 @@ public class FolderService {
      */
     @Transactional(readOnly = true)
     public CursorPageResponse<FolderThumbnailResponseDto> findSubFoldersWithCursor(Long folderId, Long userId, Long cursor, int size) {
+        return findSubFoldersWithCursor(folderId, userId, cursor, size, CursorSort.OLDEST);
+    }
+
+    @Transactional(readOnly = true)
+    public CursorPageResponse<FolderThumbnailResponseDto> findSubFoldersWithCursor(Long folderId, Long userId, Long cursor, int size, CursorSort sort) {
         findFolderEntity(folderId, userId);
-        List<Folder> folders = folderRepository.findSubFoldersWithCursor(folderId, cursor, size);
+        List<Folder> folders = folderRepository.findSubFoldersWithCursor(folderId, cursor, size, sort);
 
         boolean hasNext = folders.size() > size;
         List<Folder> content = hasNext ? folders.subList(0, size) : folders;

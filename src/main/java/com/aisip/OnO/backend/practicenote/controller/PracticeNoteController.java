@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.practicenote.controller;
 
+import com.aisip.OnO.backend.common.response.CursorSort;
 import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.practicenote.dto.*;
@@ -44,11 +45,12 @@ public class PracticeNoteController {
     @GetMapping("/thumbnail/V2")
     public CommonResponse<CursorPageResponse<PracticeNoteThumbnailResponseDto>> getAllPracticeThumbnailWithCursor(
             @RequestParam(value = "cursor", required = false) Long cursor,
-            @RequestParam(value = "size", defaultValue = "20") int size) {
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestParam(value = "sort", defaultValue = "OLDEST") CursorSort sort) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} get practice thumbnails with cursor: {}, size: {}", userId, cursor, size);
 
-        return CommonResponse.success(practiceNoteService.findPracticeThumbnailsByUserWithCursor(userId, cursor, size));
+        return CommonResponse.success(practiceNoteService.findPracticeThumbnailsByUserWithCursor(userId, cursor, size, sort));
     }
 
     @ResponseStatus(HttpStatus.OK)

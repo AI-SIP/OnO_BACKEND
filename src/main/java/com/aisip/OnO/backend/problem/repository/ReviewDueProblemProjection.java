@@ -15,6 +15,7 @@ public record ReviewDueProblemProjection(
         String reference,
         LocalDate nextReviewAt,
         int reviewInterval,
-        int consecutiveCorrectCount
+        int consecutiveCorrectCount,
+        long correctCount
 ) {
 }

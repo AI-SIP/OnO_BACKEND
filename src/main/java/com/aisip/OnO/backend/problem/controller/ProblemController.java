@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.problem.controller;
 
+import com.aisip.OnO.backend.common.response.CursorSort;
 import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.problem.dto.AddProblemImageUrlsRequest;
@@ -69,11 +70,12 @@ public class ProblemController {
     public CommonResponse<CursorPageResponse<ProblemResponseDto>> getProblemsWithCursorByUserId(
             @PathVariable("folderId") Long folderId,
             @RequestParam(value = "cursor", required = false) Long cursor,
-            @RequestParam(value = "size", defaultValue = "20") int size) {
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestParam(value = "sort", defaultValue = "OLDEST") CursorSort sort) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} get problems for folderId: {} with cursor: {}, size: {}", userId, folderId, cursor, size);
 
-        return CommonResponse.success(problemService.findProblemsByFolderWithCursor(folderId, userId, cursor, size));
+        return CommonResponse.success(problemService.findProblemsByFolderWithCursor(folderId, userId, cursor, size, sort));
     }
 
     // ✅ V2 API: 커서 기반 태그의 문제 조회 (무한 스크롤)
@@ -81,11 +83,12 @@ public class ProblemController {
     public CommonResponse<CursorPageResponse<ProblemResponseDto>> getProblemsWithCursorByTag(
             @PathVariable("tagId") Long tagId,
             @RequestParam(value = "cursor", required = false) Long cursor,
-            @RequestParam(value = "size", defaultValue = "20") int size) {
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestParam(value = "sort", defaultValue = "OLDEST") CursorSort sort) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} get problems for tagId: {} with cursor: {}, size: {}", userId, tagId, cursor, size);
 
-        return CommonResponse.success(problemService.findProblemsByTagWithCursor(tagId, userId, cursor, size));
+        return CommonResponse.success(problemService.findProblemsByTagWithCursor(tagId, userId, cursor, size, sort));
     }
 
     // ✅ V2 API: 제목(contains) 기반 문제 조회 (무한 스크롤)
@@ -93,12 +96,13 @@ public class ProblemController {
     public CommonResponse<CursorPageResponse<ProblemResponseDto>> getProblemsWithCursorByTitle(
             @RequestParam("query") String query,
             @RequestParam(value = "cursor", required = false) Long cursor,
-            @RequestParam(value = "size", defaultValue = "20") int size) {
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestParam(value = "sort", defaultValue = "OLDEST") CursorSort sort) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} search problems by title query: '{}' with cursor: {}, size: {}",
                 userId, query, cursor, size);
 
-        return CommonResponse.success(problemService.findProblemsByTitleWithCursor(query, userId, cursor, size));
+        return CommonResponse.success(problemService.findProblemsByTitleWithCursor(query, userId, cursor, size, sort));
     }
 
     // ✅ 사용자의 문제 개수 조회

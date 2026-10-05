@@ -32,9 +32,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -162,12 +164,7 @@ public class ProblemSolveService {
             missionProgressUpdater.increase(userId, MissionMetric.SOLVE_CORRECT);
         }
 
-        ReviewIntervalCalculator.ReviewSchedule schedule = ReviewIntervalCalculator.calculate(
-                dto.answerStatus(),
-                problem.getReviewInterval(),
-                problem.getConsecutiveCorrectCount()
-        );
-        problem.updateReviewSchedule(schedule.nextReviewAt(), schedule.reviewInterval(), schedule.consecutiveCorrectCount());
+        ReviewIntervalCalculator.ReviewSchedule schedule = rescheduleProblem(problem);
         eventPublisher.publishEvent(new StudyRoomActivityEvent(
                 userId, StudyRoomFeedEventType.PRACTICE_COMPLETED, java.util.Map.of()));
 
@@ -272,6 +269,7 @@ public class ProblemSolveService {
                 dto.timeSpentSeconds(),
                 dto.moodEmojiKey()
         );
+        rescheduleProblem(problemSolve.getProblem());
 
         log.info("userId: {} updated problem solve: {}", userId, problemSolve.getId());
     }
@@ -287,7 +285,9 @@ public class ProblemSolveService {
 
         List<ProblemSolveImageData> images = problemSolve.getImages();
 
+        Problem problem = problemSolve.getProblem();
         problemSolveRepository.delete(problemSolve);
+        rescheduleProblem(problem);
         streakCacheService.evict(userId);
         log.info("userId: {} deleted problem solve: {}", userId, problemSolveId);
 
@@ -301,6 +301,31 @@ public class ProblemSolveService {
         });
 
         log.info("problemSolveId: {} S3 삭제 메시지 전송 완료 ({}개)", problemSolveId, images.size());
+    }
+
+    /**
+     * 그 문제의 풀이 기록 전체를 시간순으로 다시 계산해 복습 일정을 맞춘다.
+     *
+     * <p>기록을 남길 때만 일정을 이어 붙이면, 정답을 오답으로 고치거나 기록을 지웠을 때 일정이 그대로 남아
+     * 추천에서 빠진 문제가 돌아오지 않았다. 호출자의 트랜잭션 안에서 불린다. 조회 쿼리가 나가기 전에
+     * 자동 flush 가 되므로 방금 남기거나 지운 기록도 반영된다.
+     */
+    private ReviewIntervalCalculator.ReviewSchedule rescheduleProblem(Problem problem) {
+        List<ReviewIntervalCalculator.SolveMark> marks = problemSolveRepository.findAllByProblemId(problem.getId())
+                .stream()
+                .sorted(Comparator.comparing(ProblemSolve::getPracticedAt)
+                        .thenComparing(ProblemSolve::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(solve -> new ReviewIntervalCalculator.SolveMark(
+                        solve.getPracticedAt().toLocalDate(), solve.getAnswerStatus()))
+                .toList();
+
+        LocalDate firstReviewDate = problem.getCreatedAt() != null
+                ? problem.getCreatedAt().toLocalDate()
+                : LocalDate.now(ZoneId.of("Asia/Seoul"));
+
+        ReviewIntervalCalculator.ReviewSchedule schedule = ReviewIntervalCalculator.replay(firstReviewDate, marks);
+        problem.updateReviewSchedule(schedule.nextReviewAt(), schedule.reviewInterval(), schedule.consecutiveCorrectCount());
+        return schedule;
     }
 
     @Transactional

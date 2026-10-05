@@ -10,6 +10,7 @@ import java.util.List;
 public record ReviewDueResponseDto(
         long dueCount,
         long overdueCount,
+        int requiredCorrectCount,
         List<ReviewDueProblemDto> problems
 ) {
     @Builder
@@ -19,7 +20,8 @@ public record ReviewDueResponseDto(
             String reference,
             LocalDate nextReviewAt,
             int reviewInterval,
-            int consecutiveCorrectCount
+            int consecutiveCorrectCount,
+            long correctCount
     ) {
         public static ReviewDueProblemDto from(ReviewDueProblemProjection projection) {
             return ReviewDueProblemDto.builder()
@@ -29,6 +31,7 @@ public record ReviewDueResponseDto(
                     .nextReviewAt(projection.nextReviewAt())
                     .reviewInterval(projection.reviewInterval())
                     .consecutiveCorrectCount(projection.consecutiveCorrectCount())
+                    .correctCount(projection.correctCount())
                     .build();
         }
     }

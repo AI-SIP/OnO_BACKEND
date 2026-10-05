@@ -2,6 +2,7 @@ package com.aisip.OnO.backend.problem.quartz;
 
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.problem.repository.ReviewDueSummary;
+import com.aisip.OnO.backend.problem.service.ReviewIntervalCalculator;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.util.fcm.NotificationType;
@@ -53,7 +54,8 @@ public class ReviewDueNotificationJob extends QuartzJobBean {
 
     // 흐름 1: 복습 예정일이 된 문제가 있는 활성 유저에게 복습 알림
     private void sendReviewNotifications(LocalDate today, LocalDateTime reengagementCutoff) {
-        List<ReviewDueSummary> summaries = problemRepository.findReviewDueSummaryByDate(today);
+        List<ReviewDueSummary> summaries = problemRepository.findReviewDueSummaryByDate(
+                today, ReviewIntervalCalculator.MASTERY_THRESHOLD);
         if (summaries.isEmpty()) return;
 
         Map<Long, Long> dueCountByUserId = summaries.stream()

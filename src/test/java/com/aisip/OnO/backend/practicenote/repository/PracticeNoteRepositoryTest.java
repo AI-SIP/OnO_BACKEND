@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.practicenote.repository;
 
+import com.aisip.OnO.backend.common.response.CursorSort;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.practicenote.entity.PracticeNote;
 import com.aisip.OnO.backend.practicenote.entity.ProblemPracticeNoteMapping;
@@ -252,6 +253,24 @@ class PracticeNoteRepositoryTest extends PracticeNoteTestSupport {
             assertThat(secondPage)
                     .extracting(PracticeNote::getId)
                     .containsExactly(third.getId());
+        }
+
+        @Test
+        @DisplayName("최근 순이면 최근에 만든 복습노트부터 준다")
+        void findPracticeNotesNewestFirst() {
+            PracticeNote first = savePracticeNote(userId, "복습 1", List.of());
+            PracticeNote second = savePracticeNote(userId, "복습 2", List.of());
+            PracticeNote third = savePracticeNote(userId, "복습 3", List.of());
+
+            assertThat(practiceNoteRepository.findPracticeNotesByUserWithCursor(
+                    userId, null, 1, CursorSort.NEWEST))
+                    .extracting(PracticeNote::getId)
+                    .containsExactly(third.getId(), second.getId());
+
+            assertThat(practiceNoteRepository.findPracticeNotesByUserWithCursor(
+                    userId, second.getId(), 10, CursorSort.NEWEST))
+                    .extracting(PracticeNote::getId)
+                    .containsExactly(first.getId());
         }
 
         @Test
