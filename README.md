@@ -10,7 +10,7 @@
 <a href="https://play.google.com/store/apps/details?id=com.ono.app"><img src="https://img.shields.io/badge/Google%20Play-000000?style=for-the-badge&logo=googleplay&logoColor=white" height="32" alt="Google Play" /></a>
 <a href="https://github.com/AI-SIP/OnO_FRONT"><img src="https://img.shields.io/badge/Flutter%20%EC%95%B1-02569B?style=for-the-badge&logo=flutter&logoColor=white" height="32" alt="Flutter 앱 저장소" /></a>
 
-<img src="https://raw.githubusercontent.com/AI-SIP/OnO_FRONT/main/.github/readme/hero.png" width="820" alt="OnO 주요 화면" />
+<img src=".github/readme/hero.png" width="900" alt="한 번 틀린 문제, 두 번은 안 틀리게" />
 
 </div>
 
@@ -21,8 +21,8 @@
 - [서비스 소개](#서비스-소개)
 - [기술 스택](#기술-스택)
 - [서비스 아키텍처](#서비스-아키텍처)
-- [서버에서 신경 쓴 부분](#서버에서-신경-쓴-부분)
-- [로컬에서 실행하기](#로컬에서-실행하기)
+- [운영하면서 고친 것](#운영하면서-고친-것)
+- [남아 있는 문제](#남아-있는-문제)
 - [작업 규칙](#작업-규칙)
 
 <br>
@@ -108,9 +108,9 @@ OnO 는 문제를 사진으로 올리면 한 장이 완성되고, 복습할 때�
 
 ![서비스 아키텍처](.github/readme/architecture.png)
 
-서버는 클라우드가 아니라 직접 운영하는 서버 한 대에 Docker Compose 로 올라가 있고, dev 와 prod 가 포트만 달리해서 같이 돌고 있습니다.
+서버는 클라우드가 아니라 직접 운영하는 Mac mini 한 대에 Docker Compose 로 올라가 있고, dev 와 prod 가 포트만 달리해서 같이 돌고 있습니다.
 요청은 호스트의 Nginx 가 받아서 Blue(8080) 와 Green(8081) 중 지금 살아 있는 쪽 컨테이너로 넘깁니다.
-문제 이미지는 앱이 presigned URL 로 S3 에 직접 올리기 때문에, 서버는 이미지 파일을 직접 받지 않고 주소만 저장합니다.
+오답노트의 문제 이미지는 앱이 presigned URL 로 S3 에 직접 올리고, 서버는 그 주소를 받아 저장합니다.
 
 main 에 머지되면 GitHub Actions 가 이미지를 빌드해 Docker Hub 에 올리고, 서버에 붙어 있는 self-hosted runner 가 그 이미지로 안 쓰는 쪽 색을 띄웁니다.
 헬스체크와 전환 전 확인을 통과해야 Nginx upstream 을 바꾸고, 하나라도 실패하면 이전 색이 그대로 요청을 받습니다.
@@ -118,76 +118,28 @@ main 에 머지되면 GitHub Actions 가 이미지를 빌드해 Docker Hub 에 �
 
 <br>
 
-## 서버에서 신경 쓴 부분
+## 운영하면서 고친 것
 
-### AI 분석은 등록 요청과 분리했습니다
+2024년 8월에 출시한 뒤로 실사용자가 쓰는 동안 실제로 문제가 됐던 것들이고, 지금은 아래처럼 돌고 있습니다.
 
-처음에는 문제를 등록하는 요청 안에서 OpenAI 를 기다렸는데, 분석이 길어지면 등록 응답도 같이 늦어졌습니다.
-지금은 등록은 바로 끝내고 분석 요청만 RabbitMQ `gpt.analysis` 큐에 넣어 두면, Consumer 가 따로 OpenAI 를 불러 결과를 채웁니다.
-OpenAI 호출 한도 때문에 이 Consumer 는 동시에 1~2개만 돌게 제한했습니다.
-
-푸시 발송(`fcm.notification`), S3 이미지 삭제(`s3.delete`), 운영 알림(`discord.webhook`)도 같은 방식으로 큐를 거칩니다.
-큐마다 DLQ 를 두었고, 실패하면 1초, 2초, 4초 간격으로 세 번까지 다시 시도한 뒤 DLQ 로 보냅니다.
-예전에 실패한 메시지가 끝없이 재전달되면서 Discord 알림이 쏟아진 적이 있어서, 재큐잉은 꺼 두었습니다.
-
-### 복습 일정은 다시 푼 기록으로 계산합니다
-
-| 다시 푼 결과 | 다음 복습 |
+| 문제 | 원인과 조치 |
 | --- | --- |
-| 정답 | 간격을 두 배로 늘립니다 (최대 30일) |
-| 오답이나 부분 정답 | 다음 날로 되돌리고 간격도 1일부터 다시 셉니다 |
-
-마지막으로 틀린 뒤 서로 다른 3일에 맞히면 추천에서 빠지고, 그 뒤에 다시 틀리면 처음부터 다시 셉니다.
-기록 하나를 고치거나 지우면 그 문제의 기록 전체를 처음부터 다시 따라가며 계산하기 때문에, 중간 기록이 바뀌어도 일정이 어긋나지 않습니다.
-계산은 `ReviewIntervalCalculator` 한 곳에 모여 있습니다.
-
-### 푸시는 Quartz 예약 작업이 보냅니다
-
-| 작업 | 언제 | 하는 일 |
-| --- | --- | --- |
-| `ProblemReviewReminderJob` | 5분마다 | 복습할 때가 된 문제 알림 (09시부터 21시 사이에만) |
-| `ReviewDueNotificationJob` | 매일 09시 | 오늘 복습할 문제 수, 오래 접속하지 않은 사용자에게 다시 오라는 알림 |
-| `PracticeNotificationJob` | 사용자가 정한 시각 | 복습 세트마다 걸어 둔 알림 |
-| `StudyRoomWeeklyReportJob` | 매주 월요일 08시 | 지난주 스터디룸 리포트 생성 |
-| `ChallengeNotificationJob` | 챌린지마다 한 번 | 챌린지 중간 지점과 D-1 알림 |
-
-JDBC JobStore 를 써서 서버를 다시 띄워도 예약이 남아 있고, 모든 시각은 한국 시간 기준입니다.
-실제 사용자에게 푸시가 나가는 경로라, 발송 쪽 코드를 고칠 때는 dev 서버에서 먼저 확인합니다.
-
-### 사용자는 자기 데이터에만 접근할 수 있습니다
-
-모든 조회와 수정은 JWT 에서 꺼낸 `userId` 로 소유권을 확인하고, 관리자 화면(`/admin`)은 별도 로그인을 거칩니다.
-Access Token 은 30분, Refresh Token 은 7일이고, 갱신할 때마다 둘 다 새로 발급합니다.
-로그아웃하거나 탈퇴한 사용자의 Access Token 은 Redis 블랙리스트에 올려서 만료 전이라도 막습니다.
-
-### 이미 배포된 앱 버전을 깨지 않는 것을 먼저 봅니다
-
-스토어에 올라간 예전 버전 앱이 계속 이 서버를 호출하기 때문에, 응답 필드를 지우거나 이름을 바꾸는 변경은 하지 않는 쪽을 택합니다.
-모든 응답은 `{ "data": ... }` 또는 `{ "errorCode": ..., "message": ... }` 형태로 감싸고, 에러 코드는 도메인마다 `ErrorCase` enum 에 모아 두었습니다.
+| **실패한 Discord 알림이 끝없이 다시 전송됐습니다** | 전송에 성공한 뒤 로깅에서 난 예외가 실패로 잡혔고, 실패한 메시지가 백오프 없이 큐로 바로 돌아가 5분 동안 같은 웹훅을 계속 보냈습니다. 지금은 1초, 2초, 4초 간격으로 세 번까지만 다시 시도하고, 그래도 실패하면 DLQ 로 보냅니다. 큐 4개 모두 같은 규칙입니다 |
+| **Blue-Green 배포 중에 복습 알림이 멈췄습니다** | 내려가는 쪽 컨테이너가 자기 이미지에 없는 잡을 집으면서 Quartz 트리거가 ERROR 로 굳었는데, Quartz 는 이를 스스로 풀지 않습니다. 5분마다 ERROR 트리거를 찾아 되돌리는 작업을 붙였습니다 |
+| **RabbitMQ 가 멈추면 스터디룸 공유와 댓글까지 500 으로 끝났습니다** | 푸시를 큐에 넣다 난 예외가 바깥 트랜잭션을 롤백시켰기 때문입니다. 큐 적재를 트랜잭션 밖으로 빼서, 푸시가 안 나가도 공유와 댓글은 저장되게 했습니다 |
+| **챌린지 알림이 한밤중에 나갈 수 있었습니다** | D-1 알림이 마감 시각(그날 23시 59분)을 그대로 따라가고 있었습니다. 지금은 같은 날 09시와 18시 중 가까운 시각으로 맞춰 보냅니다 |
+| **추천 복습에서 빠진 문제는 다시 틀려도 돌아오지 않았습니다** | 정답을 맞힌 날이 3일을 넘으면 계속 걸러지고 있었습니다. 마지막으로 틀린 뒤의 정답 날만 세도록 바꿔서, 다시 틀리면 처음부터 다시 추천합니다 |
+| **한국 시간 0시부터 9시 사이에만 생기는 날짜 버그를 테스트가 못 잡았습니다** | 운영 JVM 은 `Asia/Seoul` 인데 CI 는 UTC 로 돌고 있었습니다. 테스트 JVM 도 `Asia/Seoul` 로 맞췄습니다 |
 
 <br>
 
-## 로컬에서 실행하기
+## 남아 있는 문제
 
-`application-local.yml` 과 `FirebaseAdminKey.json` 은 키가 들어 있어서 저장소에 올리지 않습니다. 팀원에게 받아 각각 `src/main/resources/` 와 프로젝트 루트에 두고, 루트의 `.env` 에 `MYSQL_ROOT_PASSWORD` 와 `RABBITMQ_PASSWORD` 를 적어 주세요.
-
-```bash
-make up                                                  # MySQL, Redis, RabbitMQ 띄우기
-./gradlew bootRun --args='--spring.profiles.active=local'
-```
-
-로컬에서는 Redis 가 6380, RabbitMQ 가 5673 포트를 씁니다.
-local 프로필은 RabbitMQ Listener 를 꺼 두었기 때문에, 실제 AI 분석이나 푸시는 나가지 않습니다.
-API 문서는 서버를 띄운 뒤 `http://localhost:8080/swagger-ui/index.html` 에서 볼 수 있습니다.
-
-테스트는 Testcontainers 로 MySQL, Redis, RabbitMQ 를 따로 띄우기 때문에 Docker 만 켜져 있으면 됩니다.
-
-```bash
-make test                                        # 전체 테스트와 커버리지 리포트
-make test-only T='com.aisip.OnO.backend.tag.*'   # 일부만
-```
-
-PR 마다 같은 테스트가 GitHub Actions 에서 돌고, 라인 커버리지 85% 나 브랜치 커버리지 70% 아래로 내려가면 머지할 수 없습니다.
+| 내용 | 지금 상태 |
+| --- | --- |
+| [**#266**](https://github.com/AI-SIP/OnO_BACKEND/issues/266) **Refresh Token 교체에 유예가 없습니다** | 갱신 응답이 한 번 유실되면 세션이 끊기고, 게스트는 계정을 잃습니다 |
+| [**#238**](https://github.com/AI-SIP/OnO_BACKEND/issues/238) **주간 리포트 배치가 다중 인스턴스에서 중복 생성됩니다** | 인스턴스를 둘 이상 띄우면 같은 배치가 양쪽에서 돌다 유니크 제약에 걸려, 그 주 리포트가 하나도 생기지 않습니다. 지금은 한 대만 돌아 드러나지 않습니다 |
+| [**#232**](https://github.com/AI-SIP/OnO_BACKEND/issues/232) **문제 등록이 커넥션을 2개 잡습니다** | 동시 요청이 몰리면 커넥션 풀이 고갈될 수 있습니다 |
 
 <br>
 
