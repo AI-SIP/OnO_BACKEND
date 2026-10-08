@@ -101,6 +101,8 @@ services:
       # sentry-java 기본값(1)로 되돌린다. 자세한 이유는 docker-compose.prod.yml 참고
       SENTRY_EXCEPTIONRESOLVERORDER: "1"
       ADMIN_IDENTIFIER: ${ADMIN_IDENTIFIER}
+      # /mcp/admin 관리자 토큰. 비어 있으면 MCP 요청은 전부 401 로 막힌다.
+      MCP_ADMIN_TOKEN: ${MCP_ADMIN_TOKEN:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
       MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED: "true"

@@ -104,6 +104,8 @@ services:
       # 5xx 는 GlobalExceptionHandler 의 log.error 를 통해 Logback appender 로 계속 보고된다.
       SENTRY_EXCEPTIONRESOLVERORDER: "1"
       ADMIN_IDENTIFIER: ${ADMIN_IDENTIFIER}
+      # /mcp/admin 관리자 토큰. 비어 있으면 MCP 요청은 전부 401 로 막힌다.
+      MCP_ADMIN_TOKEN: ${MCP_ADMIN_TOKEN:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
       MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED: "true"
@@ -164,6 +166,8 @@ services:
       # 5xx 는 GlobalExceptionHandler 의 log.error 를 통해 Logback appender 로 계속 보고된다.
       SENTRY_EXCEPTIONRESOLVERORDER: "1"
       ADMIN_IDENTIFIER: ${ADMIN_IDENTIFIER}
+      # /mcp/admin 관리자 토큰. 비어 있으면 MCP 요청은 전부 401 로 막힌다.
+      MCP_ADMIN_TOKEN: ${MCP_ADMIN_TOKEN:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,metrics,prometheus
       MANAGEMENT_ENDPOINT_PROMETHEUS_ENABLED: "true"
