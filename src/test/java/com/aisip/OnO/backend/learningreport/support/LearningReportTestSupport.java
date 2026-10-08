@@ -2,6 +2,8 @@ package com.aisip.OnO.backend.learningreport.support;
 
 import com.aisip.OnO.backend.learningreport.dto.LearningTrendPoint;
 import com.aisip.OnO.backend.learningreport.dto.LearningWeakArea;
+import com.aisip.OnO.backend.folder.entity.Folder;
+import com.aisip.OnO.backend.learningreport.service.LearningOverviewService;
 import com.aisip.OnO.backend.learningreport.service.LearningReportService;
 import com.aisip.OnO.backend.mission.dto.MissionRegisterDto;
 import com.aisip.OnO.backend.mission.entity.MissionLog;
@@ -46,6 +48,9 @@ public abstract class LearningReportTestSupport extends IntegrationTestSupport {
     protected LearningReportService learningReportService;
 
     @Autowired
+    protected LearningOverviewService learningOverviewService;
+
+    @Autowired
     protected ProblemRepository problemRepository;
 
     @Autowired
@@ -67,6 +72,18 @@ public abstract class LearningReportTestSupport extends IntegrationTestSupport {
         ));
         jdbcTemplate.update("UPDATE problem SET created_at = ? WHERE id = ?", createdAt, problem.getId());
         return problem;
+    }
+
+    /** 자주 틀린 폴더 집계는 문제의 직접 소속 폴더로 묶는다. */
+    protected Problem saveNoteInFolder(Long userId, Folder folder, LocalDateTime createdAt) {
+        Problem problem = saveNoteWrittenAt(userId, createdAt);
+        jdbcTemplate.update("UPDATE problem SET folder_id = ? WHERE id = ?", folder.getId(), problem.getId());
+        return problem;
+    }
+
+    /** 앱에서 문제를 지운 것과 같게 소프트 삭제만 한다. 풀이 기록은 그대로 남는다. */
+    protected void softDeleteNote(Problem problem) {
+        jdbcTemplate.update("UPDATE problem SET deleted_at = NOW() WHERE id = ?", problem.getId());
     }
 
     /** 취약 유형 집계에 잡히려면 문제에 분석 결과(problemType)가 붙어 있어야 한다. */
