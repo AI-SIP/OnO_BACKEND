@@ -1,5 +1,6 @@
 package com.aisip.OnO.backend.config.rabbitmq;
 
+import com.aisip.OnO.backend.config.rabbitmq.message.ProblemAnalysisMessage;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.config.RetryInterceptorBuilder;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
@@ -46,10 +47,14 @@ public class RabbitMQConfig {
 
     /**
      * JSON 메시지 컨버터 (객체를 JSON으로 직렬화/역직렬화)
+     *
+     * <p>spring-amqp 3.1 까지는 인자 없는 생성자가 모든 패키지("*")를 신뢰했는데 3.2 부터는 아무 패키지도
+     * 신뢰하지 않는다. {@code @RabbitListener} 는 메서드 파라미터 타입으로 역직렬화해서 영향이 없지만,
+     * {@code __TypeId__} 헤더로 타입을 고르는 경로는 전부 거부된다. 우리 메시지 패키지만 신뢰한다.
      */
     @Bean
     public MessageConverter messageConverter() {
-        return new Jackson2JsonMessageConverter();
+        return new Jackson2JsonMessageConverter(ProblemAnalysisMessage.class.getPackageName());
     }
 
     /**

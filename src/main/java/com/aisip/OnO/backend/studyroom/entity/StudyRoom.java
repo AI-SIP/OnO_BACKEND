@@ -50,6 +50,14 @@ public class StudyRoom extends BaseEntity {
         member.updateRoom(this);
     }
 
+    /**
+     * 멤버를 컬렉션에서도 뺀다. {@code members} 가 cascade ALL 이라, 행만 지우고 컬렉션에 남겨 두면
+     * flush 때 persist cascade 가 그 삭제를 되돌린다.
+     */
+    public void removeMember(StudyRoomMember member) {
+        members.remove(member);
+    }
+
     public void updateHostUserId(Long hostUserId) {
         this.hostUserId = hostUserId;
     }

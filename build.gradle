@@ -5,8 +5,8 @@ plugins {
 	// 뮤테이션 테스트. 커버리지는 "그 줄이 실행됐다"만 말하지만
 	// 뮤테이션 점수는 "코드가 틀렸을 때 테스트가 실제로 실패하는가"를 측정한다.
 	id 'info.solidsoft.pitest' version '1.15.0'
-	id 'org.springframework.boot' version '3.3.1'
-	id 'io.spring.dependency-management' version '1.1.5'
+	id 'org.springframework.boot' version '3.5.16'
+	id 'io.spring.dependency-management' version '1.1.7'
 	id "io.sentry.jvm.gradle" version "4.11.0"
 }
 
@@ -35,8 +35,11 @@ jar {
 }
 
 dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter-data-jpa:3.1.0'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
+	// LoggingAspect, RateLimitAspect 가 쓴다. Boot 3.3 까지는 data-jpa 스타터가 이걸 끌고 왔는데
+	// 3.4 부터 빠져서, 지금은 spring-aspects 를 거쳐 aspectjweaver 만 우연히 남아 있다. 직접 적어 둔다.
+	implementation 'org.springframework.boot:spring-boot-starter-aop'
 	// Bean Validation 구현체. 이게 없으면 jakarta.validation-api 만 클래스패스에 있어서
 	// 코드에 붙은 @NotNull/@Valid/@Validated 가 전부 무시되고, 잘못된 요청이 검증 없이
 	// 서비스로 들어가 500 이 된다.
@@ -48,16 +51,14 @@ dependencies {
 	implementation 'com.auth0:java-jwt:4.4.0'
 	implementation group: 'com.google.auth', name: 'google-auth-library-oauth2-http', version: '1.23.0'
 	implementation group: 'com.google.http-client', name: 'google-http-client-jackson2', version: '1.44.2'
-	implementation group: 'org.springframework.security', name: 'spring-security-core', version: '6.3.1'
 	implementation group: 'com.auth0', name: 'jwks-rsa', version: '0.22.1'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
-	implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.17.2'
-	implementation group: 'org.springframework.boot', name: 'spring-boot-starter-thymeleaf', version: '3.3.3'
+	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 	implementation 'io.sentry:sentry-spring-boot-starter-jakarta:7.14.0'
 	implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
 	implementation 'io.jsonwebtoken:jjwt-impl:0.11.5'
 	implementation 'io.jsonwebtoken:jjwt-jackson:0.11.5'
-	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.17'
 	implementation 'com.google.firebase:firebase-admin:9.2.0'
 	implementation group: 'com.squareup.okhttp3', name: 'okhttp', version: '4.2.2'
 	implementation 'org.springframework.boot:spring-boot-starter-quartz'
@@ -68,8 +69,6 @@ dependencies {
 	implementation 'org.flywaydb:flyway-mysql'
 	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 
-	// Hibernate Core
-	implementation 'org.hibernate:hibernate-core:6.5.2.Final'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'com.mysql:mysql-connector-j'
 	annotationProcessor 'org.projectlombok:lombok'
@@ -77,9 +76,6 @@ dependencies {
 	testImplementation 'org.springframework.security:spring-security-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
-	// Spring Boot 3.3.1 이 관리하는 1.19.8 은 docker-java 3.3.x 를 쓰는데,
-	// Docker Engine 29 의 /info 응답에 400 을 내며 컨테이너를 띄우지 못한다. 버전을 고정해 올린다.
-	testImplementation platform('org.testcontainers:testcontainers-bom:1.21.3')
 	testImplementation 'org.testcontainers:junit-jupiter'
 	testImplementation 'org.testcontainers:mysql'
 	testImplementation 'org.testcontainers:rabbitmq'
@@ -89,7 +85,7 @@ dependencies {
 	testAnnotationProcessor 'org.projectlombok:lombok'
 
 	//Querydsl 추가
-	implementation 'com.querydsl:querydsl-jpa:5.0.0:jakarta'
+	implementation "com.querydsl:querydsl-jpa:${dependencyManagement.importedProperties['querydsl.version']}:jakarta"
 	annotationProcessor "com.querydsl:querydsl-apt:${dependencyManagement.importedProperties['querydsl.version']}:jakarta"
 	annotationProcessor "jakarta.annotation:jakarta.annotation-api"
 	annotationProcessor "jakarta.persistence:jakarta.persistence-api"
