@@ -128,6 +128,20 @@ public class StudyRoomStatsService {
         return result;
     }
 
+    /**
+     * 한 사용자가 오늘까지 공부한 날 전체. {@link #currentStreaks} 와 같은 기준(풀이 날짜 ∪ 오답노트 작성 날짜,
+     * 삭제 제외)이다. 학습 보고서가 연속일, 기간 안 공부한 날, 처음 공부한 날을 이 집합 하나로 내려고 쓴다.
+     * 연속일을 따로 부르면 같은 날짜 쿼리가 두 번 나간다.
+     */
+    public TreeSet<LocalDate> studyDates(Long userId, LocalDate today) {
+        LocalDateTime startAt = LocalDate.of(1970, 1, 1).atStartOfDay();
+        List<Long> ids = List.of(userId);
+        Map<Long, TreeSet<LocalDate>> studyDates = new HashMap<>();
+        addStudyDates(studyDates, findProblemStudyDates(ids, today, startAt));
+        addStudyDates(studyDates, findPracticeStudyDates(ids, today, startAt));
+        return studyDates.getOrDefault(userId, new TreeSet<>());
+    }
+
     private Map<Long, Integer> countProblems(Collection<Long> userIds, LocalDateTime start, LocalDateTime end) {
         if (userIds.isEmpty()) {
             return Map.of();
@@ -220,7 +234,7 @@ public class StudyRoomStatsService {
         return LocalDate.parse(value.toString());
     }
 
-    private int currentStreak(TreeSet<LocalDate> dates, LocalDate today) {
+    public int currentStreak(TreeSet<LocalDate> dates, LocalDate today) {
         LocalDate cursor = dates.contains(today) ? today : today.minusDays(1);
         int streak = 0;
         while (dates.contains(cursor)) {
