@@ -145,7 +145,7 @@ public class StudyRoomService {
     @Transactional
     public void leaveRoom(Long roomId, Long userId) {
         StudyRoomMember member = accessService.getMemberOrThrow(roomId, userId);
-        removeMembership(roomId, userId, member.getRole());
+        removeMembership(member, userId);
     }
 
     /**
@@ -161,16 +161,23 @@ public class StudyRoomService {
     public void leaveAllRoomsForWithdrawal(Long userId) {
         memberRepository.findAllWithRoomByUserId(userId).stream()
                 .sorted(Comparator.comparing(member -> member.getRoom().getId()))
-                .forEach(member -> removeMembership(member.getRoom().getId(), userId, member.getRole()));
+                .forEach(member -> removeMembership(member, userId));
     }
 
     /**
      * 멤버십 하나를 정리한다. 방장이면 가장 먼저 들어온 멤버에게 방장을 넘기고,
      * 남은 멤버가 없으면 방을 지운다.
+     *
+     * <p>멤버 행은 벌크 delete 가 아니라 이미 읽어 온 엔티티로 지운다. 벌크 delete 는 행만 지우고
+     * 엔티티는 영속성 컨텍스트에 그대로 남겨 두는데, 탈퇴에서는 그 엔티티가 곧이어 소프트 삭제되는
+     * {@code User} 를 가리키게 된다. Hibernate 6.6 부터는 이 상태로 flush 하면
+     * {@code TransientObjectException} 을 던져 탈퇴 자체가 실패한다. 방의 {@code members} 컬렉션에서도
+     * 함께 빼야 cascade 가 삭제를 되돌리지 않는다.
      */
-    private void removeMembership(Long roomId, Long userId, StudyRoomMemberRole role) {
-        if (role != StudyRoomMemberRole.HOST) {
-            memberRepository.deleteByRoomIdAndUserId(roomId, userId);
+    private void removeMembership(StudyRoomMember member, Long userId) {
+        Long roomId = member.getRoom().getId();
+        if (member.getRole() != StudyRoomMemberRole.HOST) {
+            deleteMember(member);
             return;
         }
 
@@ -188,7 +195,12 @@ public class StudyRoomService {
         }
         nextHost.promoteToHost();
         room.updateHostUserId(nextHost.getUser().getId());
-        memberRepository.deleteByRoomIdAndUserId(roomId, userId);
+        deleteMember(member);
+    }
+
+    private void deleteMember(StudyRoomMember member) {
+        member.getRoom().removeMember(member);
+        memberRepository.delete(member);
     }
 
     @Transactional
