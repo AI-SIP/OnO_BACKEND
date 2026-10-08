@@ -53,7 +53,9 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                  path.startsWith("/css/") ||
                  path.startsWith("/js/") ||
                  path.startsWith("/swagger-ui/") ||
-                 path.startsWith("/v3/api-docs/");
+                 path.startsWith("/v3/api-docs/") ||
+                 // MCP 는 앱 JWT 가 아니라 관리자 MCP 토큰으로 인증한다(McpAdminTokenFilter).
+                 path.startsWith("/mcp/");
       }
 
     @Override
