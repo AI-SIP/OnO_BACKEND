@@ -37,6 +37,24 @@ done
 require_file ".codex/skills/perf-audit/SKILL.md"
 require_file ".codex/skills/test-writer/SKILL.md"
 
+# 팀 공유 Claude Code 설정과 훅. settings.local.json 은 개인 파일이라 여기서 보지 않는다.
+require_file ".claude/settings.json"
+require_file ".claude/hooks/db_safety_check.py"
+require_file ".claude/hooks/compile_check.sh"
+require_file ".claude/hooks/test_db_safety_check.py"
+
+if [ -f ".claude/settings.json" ] && ! python3 -m json.tool ".claude/settings.json" >/dev/null 2>&1; then
+  error ".claude/settings.json is not valid JSON"
+fi
+
+if [ -f ".claude/hooks/test_db_safety_check.py" ] && ! python3 ".claude/hooks/test_db_safety_check.py" >/dev/null 2>&1; then
+  error "db_safety_check hook tests failed: run python3 .claude/hooks/test_db_safety_check.py"
+fi
+
+if git ls-files --error-unmatch ".claude/settings.local.json" >/dev/null 2>&1; then
+  error ".claude/settings.local.json is personal and must not be tracked"
+fi
+
 for required in "사용자 영향" "API 호환성" "DB migration" "인증/권한" "검증 결과" "배포 리스크" "롤백"; do
   if ! grep -q "$required" .github/PULL_REQUEST_TEMPLATE.md; then
     error "PR template is missing section text: $required"
