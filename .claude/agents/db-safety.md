@@ -1,6 +1,6 @@
 ---
 name: db-safety
-description: 부수효과·무결성 검증. FCM 실발송 경로, 잘못된 MySQL 쓰기, 데이터 오염을 검사한다. /check 명령 시 자동 위임.
+description: 읽기 전용(코드 수정·커밋 금지). 부수효과·무결성 검증. FCM 실발송 경로, 잘못된 MySQL 쓰기, 데이터 오염을 검사한다. /check 에서 항상, /analysis, /plan 에서 필요 시 위임.
 tools: Read, Grep, Glob, Bash
 ---
 

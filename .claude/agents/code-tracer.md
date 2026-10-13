@@ -1,6 +1,6 @@
 ---
 name: code-tracer
-description: Spring 레이어 호출 경로·데이터 흐름 추적. Controller → Service → Repository → 쿼리 순서로 흐름 지도를 만든다. 코드 흐름 파악, 원인 조사, 계획 수립 시 자동 위임.
+description: 읽기 전용(코드 수정·커밋 금지). Spring 레이어 호출 경로·데이터 흐름 추적. Controller → Service → Repository → 쿼리 순서로 흐름 지도를 만든다. /analysis, /plan, /feat, /explain, /perf, /report, /migrate 에서 위임.
 tools: Read, Grep, Glob, Bash
 ---
 
