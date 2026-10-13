@@ -295,4 +295,92 @@ class ReviewIntervalCalculatorTest {
             assertThat(schedule.reviewInterval()).isEqualTo(1);
         }
     }
+
+    @Nested
+    @DisplayName("정답 날 수와 졸업한 날")
+    class MasteryProgress {
+
+        private static final LocalDate DAY = LocalDate.of(2026, 1, 10);
+
+        private ReviewIntervalCalculator.SolveMark mark(int dayOffset, AnswerStatus status) {
+            return new ReviewIntervalCalculator.SolveMark(DAY.plusDays(dayOffset), status);
+        }
+
+        @Test
+        @DisplayName("같은 날 두 번 맞힌 것은 하루로 센다")
+        void countsSameDayOnce() {
+            var progress = ReviewIntervalCalculator.masteryProgress(List.of(
+                    mark(0, AnswerStatus.CORRECT), mark(0, AnswerStatus.CORRECT), mark(1, AnswerStatus.CORRECT)));
+
+            assertThat(progress.correctDayCount()).isEqualTo(2);
+            assertThat(progress.isMastered()).isFalse();
+            assertThat(progress.masteredOn()).isNull();
+        }
+
+        @Test
+        @DisplayName("정답 날이 3일째가 된 날이 졸업한 날이고, 그 뒤 정답은 날짜를 바꾸지 않는다")
+        void masteredOnThirdCorrectDay() {
+            var progress = ReviewIntervalCalculator.masteryProgress(List.of(
+                    mark(0, AnswerStatus.CORRECT), mark(2, AnswerStatus.CORRECT), mark(5, AnswerStatus.CORRECT),
+                    mark(9, AnswerStatus.CORRECT)));
+
+            assertThat(progress.correctDayCount()).isEqualTo(4);
+            assertThat(progress.isMastered()).isTrue();
+            assertThat(progress.masteredOn()).isEqualTo(DAY.plusDays(5));
+        }
+
+        @Test
+        @DisplayName("졸업한 뒤 틀리거나 부분 정답이면 처음부터 다시 센다")
+        void wrongOrPartialAfterMasteryResets() {
+            var wrong = ReviewIntervalCalculator.masteryProgress(List.of(
+                    mark(0, AnswerStatus.CORRECT), mark(2, AnswerStatus.CORRECT), mark(5, AnswerStatus.CORRECT),
+                    mark(6, AnswerStatus.WRONG), mark(7, AnswerStatus.CORRECT)));
+            var partial = ReviewIntervalCalculator.masteryProgress(List.of(
+                    mark(0, AnswerStatus.CORRECT), mark(2, AnswerStatus.CORRECT), mark(5, AnswerStatus.CORRECT),
+                    mark(6, AnswerStatus.PARTIAL)));
+
+            assertThat(wrong.correctDayCount()).isEqualTo(1);
+            assertThat(wrong.masteredOn()).isNull();
+            assertThat(partial.correctDayCount()).isZero();
+            assertThat(partial.masteredOn()).isNull();
+        }
+
+        @Test
+        @DisplayName("UNKNOWN 은 정답 날도 졸업한 날도 건드리지 않는다")
+        void unknownKeepsProgress() {
+            var progress = ReviewIntervalCalculator.masteryProgress(List.of(
+                    mark(0, AnswerStatus.CORRECT), mark(2, AnswerStatus.CORRECT), mark(5, AnswerStatus.CORRECT),
+                    mark(6, AnswerStatus.UNKNOWN)));
+
+            assertThat(progress.isMastered()).isTrue();
+            assertThat(progress.masteredOn()).isEqualTo(DAY.plusDays(5));
+        }
+
+        /**
+         * 졸업 규칙이 replay 와 따로 놀면 문제 상세의 정답 n/3 과 보고서가 어긋난다.
+         * 하루에 두 기록씩, 세 가지 결과로 만들 수 있는 길이 6의 기록 729 가지를 모두 비교한다.
+         *
+         * <p>UNKNOWN 은 뺀다. replay 는 졸업 뒤 UNKNOWN 이 오면 3일 뒤 복습일을 잡아 isMastered 가 false 가
+         * 되지만, 추천 쿼리는 마지막 오답 이후 정답 날만 세서 그대로 졸업으로 본다. 보고서는 추천 쿼리 쪽을 따른다.
+         */
+        @Test
+        @DisplayName("UNKNOWN 이 없는 모든 짧은 기록에서 replay 의 졸업 판정과 같다")
+        void agreesWithReplay() {
+            AnswerStatus[] statuses = {AnswerStatus.CORRECT, AnswerStatus.WRONG, AnswerStatus.PARTIAL};
+            int length = 6;
+            int combinations = (int) Math.pow(statuses.length, length);
+            for (int code = 0; code < combinations; code++) {
+                List<ReviewIntervalCalculator.SolveMark> marks = new java.util.ArrayList<>();
+                int rest = code;
+                for (int i = 0; i < length; i++) {
+                    marks.add(mark(i / 2, statuses[rest % statuses.length]));
+                    rest /= statuses.length;
+                }
+
+                assertThat(ReviewIntervalCalculator.masteryProgress(marks).isMastered())
+                        .as("기록 %s", marks)
+                        .isEqualTo(ReviewIntervalCalculator.replay(DAY, marks).isMastered());
+            }
+        }
+    }
 }

@@ -1,87 +1,161 @@
-<br>
+<div align="center">
 
-# 💫 손쉽게 작성하는 나만의 AI 오답노트, OnO를 소개합니다!
-<img width="750" alt="image" src="https://github.com/user-attachments/assets/0adfc057-e86e-4388-98d9-ef649834f5f5" />
+# OnO Backend
 
+### 손쉽게 작성하는 나만의 AI 오답노트, OnO 의 API 서버
 
-#### 이전에 본 문제를 틀린 경험, 있으신가요?
-#### 무작정 진도만 달리는 것이 올바를까요?
-### 제대로 된 오답과 복습이 이루어지지 않으면 틀린 문제를 또! 틀립니다.
-```
-“이제부터는 꼭 오답노트 해야지~”
-많이들 다짐하지만 오답노트 작성은 만만치 않죠.
+틀린 문제를 찍어 두면 AI 가 분석해 주고, 다시 풀 때가 되면 먼저 알려 줍니다.
 
-🤔 문제랑 출처를 옮겨적기가 시간이 오래걸려요.
-🤔 과목별 오답노트를 들고 다니기 귀찮고 무거워요.
-🤔 저의 오답분석이 맞는지 모르겠어요.
-🤔 제 글씨가 마음에 안들어요.
-🤔 오답노트에서 원하는 복습문제를 찾기 번거로워요.
-🤔 다시 풀기 위해 책을 또 구매해요.
-```
-#### 위 고민들 중 2가지 이상 해당된다면,
-### 이젠 OnO에서 진정한 오답노트를 경험하세요!
-```
-✅ '손쉬운 찰칵'만으로 뚝딱! 문제를 직접 옮겨적던 단순노동은 이제 그만
-✅ 휴대폰과 태블릿 연동으로 '언제 어디서든'
-✅ 단순 문제풀이를 넘어 내 교과과정에 맞는 'AI 오답분석'으로 문제에서 얻어가는 개념!
-✅ '복습 리스트'를 만들어서 다가오는 시험을 체계적으로 준비!
-✅ 나만의 태그와 폴더 분류로 원하는 문제를 쉽게 발견
+<a href="https://apps.apple.com/kr/app/오노-ono-손쉬운-나만의-오답노트/id6602886624"><img src="https://img.shields.io/badge/App%20Store-000000?style=for-the-badge&logo=apple&logoColor=white" height="32" alt="App Store" /></a>
+<a href="https://play.google.com/store/apps/details?id=com.ono.app"><img src="https://img.shields.io/badge/Google%20Play-000000?style=for-the-badge&logo=googleplay&logoColor=white" height="32" alt="Google Play" /></a>
+<a href="https://github.com/AI-SIP/OnO_FRONT"><img src="https://img.shields.io/badge/Flutter%20%EC%95%B1-02569B?style=for-the-badge&logo=flutter&logoColor=white" height="32" alt="Flutter 앱 저장소" /></a>
 
-```
+<img src=".github/readme/hero.png" width="900" alt="한 번 틀린 문제, 두 번은 안 틀리게" />
 
-## 🛠 Tech Stack
-
-### Backend
-<div>
-<img src="https://img.shields.io/badge/Java-007396?style=for-the-badge&logo=OpenJDK&logoColor=white">
-<img src="https://img.shields.io/badge/Spring%20Boot-6DB33F?style=for-the-badge&logo=springboot&logoColor=white">
-<img src="https://img.shields.io/badge/Spring%20Security-6DB33F?style=for-the-badge&logo=springsecurity&logoColor=white">
-<img src="https://img.shields.io/badge/Spring Data JPA-6DB33F?style=for-the-badge&logo=Spring&logoColor=white">
-<img src="https://img.shields.io/badge/Hibernate-59666C?style=for-the-badge&logo=Hibernate&logoColor=white">
 </div>
-
-### Database
-<div>
-<img src="https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=MySQL&logoColor=white">
-<img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=Redis&logoColor=white">
-</div>
-
-### Infrastructure
-<div>
-<img src="https://img.shields.io/badge/AWS S3-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white">
-<img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=Docker&logoColor=white">
-<img src="https://img.shields.io/badge/Nginx-009639?style=for-the-badge&logo=NGINX&logoColor=white">
-<img src="https://img.shields.io/badge/GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white">
-<img src="https://img.shields.io/badge/RabbitMQ-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white">
-<img src="https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=prometheus&logoColor=white">
-<img src="https://img.shields.io/badge/Grafana-F46800?style=for-the-badge&logo=grafana&logoColor=white">
-</div>
-
-### External API
-<div>
-<img src="https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=OpenAI&logoColor=white">
-<img src="https://img.shields.io/badge/FCM-FFCA28?style=for-the-badge&logo=Firebase&logoColor=black">
-<img src="https://img.shields.io/badge/OAuth 2.0-EB5424?style=for-the-badge&logo=Auth0&logoColor=white">
-</div>
-
-## - 주요 기능
----
-<br>
-
-|기능|화면1|화면2|화면3|화면4|
-|---|---|---|---|---|
-|소셜 로그인|<img width="220" alt="image" src="https://github.com/user-attachments/assets/7cfc0061-d8cc-422f-ae43-fa40353698bb" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/24b0ee35-6a61-4ffc-a236-c973aa52368e" />|
-|오답노트 작성|<img width="220" alt="image" src="https://github.com/user-attachments/assets/656f26bf-8f05-47b7-aa5c-cd4826d8320c" />| <img width="220" alt="image" src="https://github.com/user-attachments/assets/a09c9d02-f004-421c-b14e-32b8a5c76dc2" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/c283b17b-a9b4-4b05-97e4-32a610296292" />|
-|복습노트 생성|<img width="220" alt="image" src="https://github.com/user-attachments/assets/7f20c547-c812-4524-b26e-55636c6f46ca" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/cc9f3985-d2cb-43be-96a5-d52ae73201c5" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/471dcfac-4df3-48fc-8702-da70d576f7e1" />|
-|복습노트 실행|<img width="220" alt="image" src="https://github.com/user-attachments/assets/1ac3827a-8b49-4836-8c39-26eb476f9bd9" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/4e0614dd-f5a8-4722-83dd-7bdd6438dac0" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/53434407-b1b0-4e32-bba8-374e6b98bcf9" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/4cb0c88e-01c8-437a-a85c-d6c57055b072" />|
-|오답 복습|<img width="220" alt="image" src="https://github.com/user-attachments/assets/b0038427-1e8f-461e-a1a8-ab0ed39d6ad2" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/2aea42ae-cac7-46ec-ad1f-bf5fad153437" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/8d9f244d-ceb9-4880-8966-4bce5ed07a08" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/4c8e7cff-3171-408b-a9a1-df32e508a64b" />|
-|학습 리포트|<img width="220" alt="image" src="https://github.com/user-attachments/assets/8b338b12-a68f-452d-8fb5-4bedb9e49333" />|<img width="220" alt="image" src="https://github.com/user-attachments/assets/fde9e21c-83a9-4264-b1b6-a84b03c7285d" />|
 
 <br>
 
-# 😮 기타 기능
+## 목차
 
-|기능|설명|화면1|화면2|
-|---|---|---|---|
-|캐릭터 육성 & 테마 변경 기능|- 열심히 복습을 하고, 나만의 캐릭터를 성장시켜요! <br> - 레벨이 오르면 다양한 색상 테마를 사용할 수 있습니다! <br> - 오답노트를 작성해 레벨을 달성하고, 24개의 다양한 테마를 잠금 해제해보세요!|<img width = "220" src ="https://github.com/user-attachments/assets/29624628-4db9-4a8b-b85b-7cc24839d806"/>|<img width="220" alt="image" src="https://github.com/user-attachments/assets/7627d060-c34d-4ff6-8066-29384ff62d47" />|
+- [서비스 소개](#서비스-소개)
+- [기술 스택](#기술-스택)
+- [서비스 아키텍처](#서비스-아키텍처)
+- [프로젝트 구조](#프로젝트-구조)
 
+<br>
+
+## 서비스 소개
+
+오답노트가 좋다는 건 다들 알지만, 문제를 옮겨 적고 다시 찾아 푸는 일이 번거로워서 오래 가지 못합니다.
+OnO 는 문제를 사진으로 올리면 한 장이 완성되고, 복습할 때가 된 문제를 먼저 모아 주는 앱입니다.
+2024년 8월 앱 스토어에 처음 출시했고, 지금도 실사용자가 쓰고 있는 서비스입니다.
+
+아래는 앱의 주요 화면과, 그 화면 뒤에서 이 서버가 하는 일입니다.
+
+<table>
+  <tr>
+    <td align="center" width="25%"><img src=".github/readme/screens/write.png" width="180" alt="오답노트 작성" /></td>
+    <td align="center" width="25%"><img src=".github/readme/screens/ai-analysis.png" width="180" alt="AI 오답분석" /></td>
+    <td align="center" width="25%"><img src=".github/readme/screens/review-due.png" width="180" alt="추천 복습 문제" /></td>
+    <td align="center" width="25%"><img src=".github/readme/screens/retry-history.png" width="180" alt="복습 기록" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>오답노트 작성</b><br/><sub>사진은 앱이 S3 에 바로 올리고<br/>서버는 문제와 이미지 주소를 저장합니다</sub></td>
+    <td align="center"><b>AI 오답분석</b><br/><sub>등록 응답과 분리해 큐로 넘기고<br/>OpenAI 결과를 나중에 채웁니다</sub></td>
+    <td align="center"><b>추천 복습 문제</b><br/><sub>다시 푼 기록으로 다음 복습일을<br/>계산해서 그날 모아 줍니다</sub></td>
+    <td align="center"><b>다시 풀기</b><br/><sub>회차마다 정답, 오답, 부분 정답과<br/>풀이 시간을 남깁니다</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src=".github/readme/screens/set-run.png" width="180" alt="복습 세트" /></td>
+    <td align="center"><img src=".github/readme/screens/room-rank.png" width="180" alt="스터디룸" /></td>
+    <td align="center"><img src=".github/readme/screens/report.png" width="180" alt="학습 리포트" /></td>
+    <td align="center"><img src=".github/readme/screens/mission.png" width="180" alt="미션" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>복습 세트</b><br/><sub>정해 둔 시간이 되면<br/>예약 작업이 푸시를 보냅니다</sub></td>
+    <td align="center"><b>스터디룸</b><br/><sub>랭킹과 챌린지, 문제 공유,<br/>매주 월요일 주간 리포트</sub></td>
+    <td align="center"><b>학습 리포트</b><br/><sub>학습 지표를 모아 다음 주 목표를 추천하고<br/>AI 가 실패하면 규칙 기반으로 채웁니다</sub></td>
+    <td align="center"><b>미션과 레벨</b><br/><sub>일일, 주간 미션 진행도와<br/>경험치, 꾸미기 잠금 해제</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src=".github/readme/screens/closet.png" width="180" alt="옷장" /></td>
+    <td align="center"><img src=".github/readme/screens/decorate.png" width="180" alt="개구리 꾸미기" /></td>
+    <td align="center"><img src=".github/readme/screens/medals.png" width="180" alt="훈장" /></td>
+    <td align="center"><img src=".github/readme/screens/calendar.png" width="180" alt="학습 달력" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>옷장</b><br/><sub>출석, 오답노트, 문제 복습, 복습 세트<br/>네 가지 능력치와 총 레벨</sub></td>
+    <td align="center"><b>개구리 꾸미기</b><br/><sub>레벨에 따라 치장 63종을 열고<br/>입은 상태를 저장합니다</sub></td>
+    <td align="center"><b>훈장</b><br/><sub>공부한 기록으로<br/>훈장 12종을 줍니다</sub></td>
+    <td align="center"><b>학습 달력</b><br/><sub>공부한 날마다 도장과 기분,<br/>연속 학습일을 남깁니다</sub></td>
+  </tr>
+</table>
+
+화면별 설명은 [앱 저장소 README](https://github.com/AI-SIP/OnO_FRONT) 에 더 자세히 있습니다.
+
+<br>
+
+## 기술 스택
+
+**Backend**
+
+![Java](https://img.shields.io/badge/Java_17-ED8B00?style=flat-square&logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot_3.3-6DB33F?style=flat-square&logo=springboot&logoColor=white)
+![Spring Security](https://img.shields.io/badge/Spring_Security-6DB33F?style=flat-square&logo=springsecurity&logoColor=white)
+![JPA](https://img.shields.io/badge/Spring_Data_JPA-6DB33F?style=flat-square&logo=spring&logoColor=white)
+![QueryDSL](https://img.shields.io/badge/QueryDSL-0769AD?style=flat-square)
+![Quartz](https://img.shields.io/badge/Quartz-1F4E79?style=flat-square)
+![Thymeleaf](https://img.shields.io/badge/Thymeleaf-005F0F?style=flat-square&logo=thymeleaf&logoColor=white)
+
+**Data**
+
+![MySQL](https://img.shields.io/badge/MySQL_8.0-4479A1?style=flat-square&logo=mysql&logoColor=white)
+![Flyway](https://img.shields.io/badge/Flyway-CC0200?style=flat-square&logo=flyway&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis_7.2-DC382D?style=flat-square&logo=redis&logoColor=white)
+![RabbitMQ](https://img.shields.io/badge/RabbitMQ_3.13-FF6600?style=flat-square&logo=rabbitmq&logoColor=white)
+![Amazon S3](https://img.shields.io/badge/Amazon_S3-569A31?style=flat-square&logo=amazons3&logoColor=white)
+
+**Infra**
+
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)
+![Nginx](https://img.shields.io/badge/Nginx-009639?style=flat-square&logo=nginx&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white)
+![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?style=flat-square&logo=prometheus&logoColor=white)
+![Grafana](https://img.shields.io/badge/Grafana-F46800?style=flat-square&logo=grafana&logoColor=white)
+![Loki](https://img.shields.io/badge/Loki-F2A900?style=flat-square&logo=grafana&logoColor=white)
+![Sentry](https://img.shields.io/badge/Sentry-362D59?style=flat-square&logo=sentry&logoColor=white)
+
+**External**
+
+![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=flat-square&logo=openai&logoColor=white)
+![FCM](https://img.shields.io/badge/Firebase_Cloud_Messaging-FFCA28?style=flat-square&logo=firebase&logoColor=black)
+![Discord](https://img.shields.io/badge/Discord_Webhook-5865F2?style=flat-square&logo=discord&logoColor=white)
+
+<br>
+
+## 서비스 아키텍처
+
+![서비스 아키텍처](.github/readme/architecture.png)
+
+<br>
+
+## 프로젝트 구조
+
+```
+OnO_BACKEND
+├── src/main/java/com/aisip/OnO/backend
+│   ├── auth               # JWT 발급과 갱신, Security 설정
+│   ├── user               # 계정, 프로필, 탈퇴
+│   ├── problem            # 오답노트, AI 분석, 복습 일정 계산과 복습 알림
+│   ├── problemsolve       # 다시 푼 기록
+│   ├── practicenote       # 복습 세트와 복습 시간 알림
+│   ├── folder             # 공책
+│   ├── tag                # 태그와 검색
+│   ├── learningcalendar   # 학습 달력
+│   ├── learningreport     # 학습 리포트와 AI 추천
+│   ├── mission            # 일일, 주간 미션과 레벨
+│   ├── achievement        # 훈장
+│   ├── cosmetic           # 개구리 꾸미기
+│   ├── studyroom          # 스터디룸, 챌린지, 문제 공유, 주간 리포트
+│   ├── notice             # 공지
+│   ├── feedback           # 사용자 피드백
+│   ├── admin              # 관리자 화면 (/admin)
+│   ├── common             # 공통 응답과 예외, JWT 필터, 사용량 제한
+│   ├── config             # RabbitMQ 큐와 Producer, Consumer, Flyway 설정
+│   └── util               # S3, FCM, OpenAI, Redis, Quartz, Discord 연동
+├── src/main/resources
+│   ├── db/migration       # Flyway 마이그레이션
+│   └── templates          # 관리자 화면 Thymeleaf 템플릿
+├── src/test               # Testcontainers 기반 테스트
+├── monitoring             # Prometheus, Grafana, Loki, Alertmanager 설정
+├── scripts/smoke          # 배포 후와 매시간 도는 스모크 테스트
+├── .github/workflows      # 테스트, 빌드와 배포, 스모크 테스트
+└── docker-compose.*.yml   # local, dev, prod 컨테이너 구성
+```
+
+<br>
+
+<div align="center">
+<sub>문의 ono.dev.team@gmail.com</sub>
+</div>

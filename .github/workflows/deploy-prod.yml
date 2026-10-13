@@ -48,6 +48,7 @@ jobs:
           OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
           SENTRY_DSN=${{ secrets.SENTRY_DSN }}
           ADMIN_IDENTIFIER=${{ secrets.ADMIN_IDENTIFIER }}
+          MCP_ADMIN_TOKEN=${{ secrets.MCP_ADMIN_TOKEN_PROD }}
           ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
           GRAFANA_ADMIN_USER=${{ secrets.GRAFANA_ADMIN_USER }}
           GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
@@ -133,8 +134,8 @@ jobs:
           echo "Switching Nginx to $TARGET environment (port $TARGET_PORT)..."
           sudo /opt/ono/scripts/switch-nginx.sh $TARGET_PORT
 
-          if sudo /opt/homebrew/bin/nginx -t; then
-            sudo /opt/homebrew/bin/nginx -s reload
+          if sudo /usr/local/sbin/nginx-ctl -t; then
+            sudo /usr/local/sbin/nginx-ctl -s reload
             echo "Nginx successfully switched to $TARGET environment"
           else
             echo "ERROR: Nginx configuration test failed"

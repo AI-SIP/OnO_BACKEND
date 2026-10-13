@@ -91,5 +91,50 @@ public class ReviewIntervalCalculator {
         return schedule;
     }
 
+    /**
+     * 정답 날 수와 졸업한 날.
+     *
+     * @param correctDayCount 마지막으로 틀린 뒤에 정답을 남긴 서로 다른 날 수
+     * @param masteredOn      지금 졸업한 상태일 때, 정답 날이 {@link #MASTERY_THRESHOLD} 일째가 된 날.
+     *                        졸업하지 않았으면 {@code null}
+     */
+    public record MasteryProgress(int correctDayCount, LocalDate masteredOn) {
+        public boolean isMastered() {
+            return correctDayCount >= MASTERY_THRESHOLD;
+        }
+    }
+
+    /**
+     * 풀이 기록 전체로 지금 졸업했는지와 언제 졸업했는지를 센다.
+     *
+     * <p>{@link #replay} 와 같은 규칙이다. 같은 날 정답은 하루로 세고, 틀리거나 부분 정답이면 정답 날을
+     * 비우고, UNKNOWN 은 건드리지 않는다. 학습 보고서가 "확실히 아는 문제"와 "이번 기간에 졸업한 문제"를
+     * 세는 데 쓴다. 일정 계산과 졸업 판정이 따로 놀면 문제 상세의 정답 n/3 과 보고서 숫자가 어긋나서
+     * 같은 클래스에 둔다.
+     *
+     * @param solves 시간순으로 정렬된 풀이 기록
+     */
+    public static MasteryProgress masteryProgress(List<SolveMark> solves) {
+        Set<LocalDate> correctDays = new HashSet<>();
+        LocalDate masteredOn = null;
+
+        for (SolveMark solve : solves) {
+            switch (solve.answerStatus()) {
+                case CORRECT -> {
+                    if (correctDays.add(solve.practicedDate()) && correctDays.size() == MASTERY_THRESHOLD) {
+                        masteredOn = solve.practicedDate();
+                    }
+                }
+                case WRONG, PARTIAL -> {
+                    correctDays.clear();
+                    masteredOn = null;
+                }
+                default -> {
+                }
+            }
+        }
+        return new MasteryProgress(correctDays.size(), masteredOn);
+    }
+
     private ReviewIntervalCalculator() {}
 }

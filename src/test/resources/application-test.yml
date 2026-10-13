@@ -109,6 +109,11 @@ jwt:
     secret: dGVzdC1yZWZyZXNoLXRva2VuLXNlY3JldC10ZXN0LXJlZnJlc2gtdG9rZW4tc2VjcmV0LTMyYnl0ZXM=
     expiration: 604800000
 
+mcp:
+  admin:
+    # 테스트 전용 값. 운영 값은 MCP_ADMIN_TOKEN 환경 변수로만 넣는다.
+    token: test-mcp-admin-token-0123456789abcdef
+
 admin:
   identifier: ono_admin
   password: ono_admin_test

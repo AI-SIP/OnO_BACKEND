@@ -105,6 +105,7 @@ jobs:
           SENTRY_DSN=${{ secrets.SENTRY_DSN }}
           SENTRY_DSN_DEV=${{ secrets.SENTRY_DSN }}
           ADMIN_IDENTIFIER=${{ secrets.ADMIN_IDENTIFIER }}
+          MCP_ADMIN_TOKEN=${{ secrets.MCP_ADMIN_TOKEN_DEV }}
           ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
           GRAFANA_ADMIN_USER=${{ secrets.GRAFANA_ADMIN_USER }}
           GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}

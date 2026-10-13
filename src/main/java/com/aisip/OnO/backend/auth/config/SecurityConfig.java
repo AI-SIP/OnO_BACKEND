@@ -82,8 +82,12 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * 앱과 관리자 페이지를 다루는 기본 체인. 경로를 가리지 않고 받기 때문에 맨 뒤에 둔다.
+     * 이보다 앞에 actuator(0)와 MCP(1, McpSecurityConfig) 체인이 있다.
+     */
     @Bean
-    @Order(1)
+    @Order(2)
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http.cors(cors -> cors.configurationSource(corsConfigurationSource()));
