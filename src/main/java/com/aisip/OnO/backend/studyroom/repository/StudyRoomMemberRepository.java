@@ -2,7 +2,9 @@ package com.aisip.OnO.backend.studyroom.repository;
 
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomMember;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomMemberRole;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,6 +16,14 @@ import java.util.Collection;
 public interface StudyRoomMemberRepository extends JpaRepository<StudyRoomMember, Long> {
 
     Optional<StudyRoomMember> findByRoomIdAndUserId(Long roomId, Long userId);
+
+    /**
+     * 멤버 행을 잠그고 다시 읽는다. 잠금 읽기라 트랜잭션 스냅숏이 아니라 커밋된 최신 행을 본다.
+     * 다른 요청이 먼저 지우고 커밋했으면 비어 있다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select m from StudyRoomMember m where m.id = :memberId")
+    Optional<StudyRoomMember> findByIdForUpdate(@Param("memberId") Long memberId);
 
     boolean existsByRoomIdAndUserId(Long roomId, Long userId);
 
