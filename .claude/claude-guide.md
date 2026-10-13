@@ -1,18 +1,18 @@
 # OnO 백엔드 — Claude Code 사용 가이드
 
 > **대상**: 이 레포에서 Claude Code를 사용하는 개발자  
-> **설정 위치**: `.claude/` (커맨드·에이전트·권한) + `CLAUDE.md` (프로젝트 규칙)
+> **설정 위치**: `.claude/` (커맨드·에이전트·공유 설정·훅) + `CLAUDE.md` (프로젝트 규칙)
 
 ---
 
 ## 목차
 
 1. [설정 파일 구조](#1-설정-파일-구조)
-2. [커스텀 커맨드 9종](#2-커스텀-커맨드-9종)
-3. [전문가 에이전트 7종](#3-전문가-에이전트-7종)
+2. [커스텀 커맨드 12종](#2-커스텀-커맨드-12종)
+3. [전문가 에이전트 9종](#3-전문가-에이전트-9종)
 4. [커맨드 ↔ 에이전트 연결 구조](#4-커맨드--에이전트-연결-구조)
 5. [작업 파이프라인](#5-작업-파이프라인)
-6. [권한 설정](#6-권한-설정)
+6. [권한 설정과 훅](#6-권한-설정과-훅)
 7. [CLAUDE.md — 프로젝트 가드레일](#7-claudemd--프로젝트-가드레일)
 8. [실전 사용 예시](#8-실전-사용-예시)
 
@@ -24,26 +24,36 @@
 backend/
 ├── CLAUDE.md                          # 프로젝트 규칙 (매 세션 자동 로드)
 ├── .claude/
-│   ├── settings.local.json            # 권한 allowlist/denylist
-│   ├── commands/                      # 커스텀 슬래시 커맨드 (9종)
+│   ├── settings.json                  # 팀 공유 설정: 훅, deny/ask 규칙 (커밋됨)
+│   ├── settings.local.json            # 개인 설정: 개인 allow 등 (gitignore, 커밋 안 함)
+│   ├── hooks/
+│   │   ├── db_safety_check.py         # PreToolUse: 위험한 SQL 실행 차단
+│   │   ├── test_db_safety_check.py    # 위 훅의 회귀 테스트
+│   │   └── compile_check.sh           # Stop: 바뀐 .java 가 있으면 compileJava
+│   ├── commands/                      # 커스텀 슬래시 커맨드 (12종)
 │   │   ├── analysis.md
 │   │   ├── plan.md
 │   │   ├── feat.md
 │   │   ├── test.md
 │   │   ├── check.md
+│   │   ├── commit.md
+│   │   ├── pr.md
+│   │   ├── issue.md
 │   │   ├── report.md
 │   │   ├── perf.md
-│   │   ├── commit.md
+│   │   ├── migrate.md
 │   │   └── explain.md
-│   └── agents/                        # 전문가 서브에이전트 (7종)
+│   └── agents/                        # 전문가 서브에이전트 (9종)
 │       ├── code-tracer.md
 │       ├── permission-auditor.md
 │       ├── perf-reviewer.md
 │       ├── logic-reviewer.md
 │       ├── db-safety.md
+│       ├── api-contract-checker.md
+│       ├── migration-safety.md
 │       ├── test-writer.md
 │       └── report-writer.md
-└── docs/
+└── docs/                              # 로컬 전용 (.gitignore 대상, 커밋되지 않음)
     ├── plans/                         # /plan 커맨드가 계획서를 저장하는 위치
     └── reports/                       # /report 커맨드가 보고서를 저장하는 위치
 ```
@@ -55,11 +65,14 @@ backend/
 | `CLAUDE.md` | 프로젝트 컨텍스트·가드레일·빌드 명령 | 매 세션 자동 |
 | `commands/*.md` | `/커맨드명` 입력 시 실행할 프롬프트 템플릿 | 해당 커맨드 호출 시 |
 | `agents/*.md` | 커맨드가 내부적으로 위임하는 전문 AI | 커맨드에서 호출 시 |
-| `settings.local.json` | 승인 없이 실행 가능한 도구 범위 제한 | 매 세션 자동 |
+| `settings.json` | 팀 공유 훅과 deny/ask 권한 규칙 | 매 세션 자동 |
+| `settings.local.json` | 개인 allow 목록 등 (각자 관리) | 매 세션 자동 |
+
+> `docs/` 는 `.gitignore` 로 제외돼 있습니다. `/plan` 계획서와 `/report` 보고서는 **로컬 전용**이라 다른 clone 이나 워크트리, 팀원에게 공유되지 않습니다. 공유가 필요하면 이슈나 PR 본문으로 옮기세요.
 
 ---
 
-## 2. 커스텀 커맨드 9종
+## 2. 커스텀 커맨드 12종
 
 Claude Code에서 `/커맨드명 인자` 형식으로 호출합니다.
 
@@ -128,10 +141,10 @@ Claude Code에서 `/커맨드명 인자` 형식으로 호출합니다.
 **동작 흐름**:
 1. `docs/plans/`에서 관련 계획서 탐색. 없으면 `code-tracer`로 파악 후 간략 계획 제시 → **승인 대기**
 2. 계획 승인 전 구현 시작 금지
-3. 승인 후 구현. 엔티티 변경 시 `./gradlew compileJava` 자동 실행
+3. 승인 후 구현. 엔티티 변경 시 `./gradlew compileJava`로 컴파일 확인
 4. FCM·프로덕션 DB 파괴 작업 시 사전 경고
 5. `./gradlew compileJava`로 최종 컴파일 확인
-6. 논리 단위별 커밋 메시지 초안 제시 → 확인 후 커밋
+6. **커밋하지 않는다.** 변경 파일과 커밋 분할 제안만 보고 → 테스트는 `/test`, 커밋은 `/commit`
 
 ---
 
@@ -148,7 +161,7 @@ Claude Code에서 `/커맨드명 인자` 형식으로 호출합니다.
 **동작 흐름**:
 1. 대상 도메인의 기존 테스트 품질 확인 → 좋으면 관례 따름, 아니면 새로 작성
 2. `test-writer` 에이전트 투입:
-   - test 프로필 + H2 격리 DB
+   - test 프로필 + Testcontainers MySQL (H2 아님, Docker 필요)
    - **사용자 격리 케이스 필수**: 본인 데이터 성공 / 타인 데이터 차단 / 인증 없음 401
    - 단위 테스트 + DB 연동 테스트
    - FCM·S3 등 외부 연동은 mock
@@ -196,7 +209,7 @@ Claude Code에서 `/커맨드명 인자` 형식으로 호출합니다.
 **동작 흐름**:
 1. `code-tracer`로 `<커밋>..HEAD` 범위 변경 분석
 2. `report-writer` 에이전트로 보고서 작성 (존댓말, Before/After 표, 테스트 코드 내용 제외)
-3. 파일명 제안 후 저장 위치 확인 → `docs/reports/<개발사항>_보고서.md` 저장
+3. `docs/reports/<개발사항>_보고서.md` 에만 저장 (로컬 전용, 커밋 안 함)
 
 ---
 
@@ -246,6 +259,49 @@ Claude Code에서 `/커맨드명 인자` 형식으로 호출합니다.
 
 ---
 
+### `/pr` — PR 생성 (→ develop)
+
+**목적**: 현재 브랜치를 develop 대상 PR 로 올린다.
+
+```
+/pr
+/pr 리뷰어에게 남길 말
+```
+
+**동작 흐름**:
+1. 현재 브랜치가 main/develop 이면 중단, 미커밋 변경이 있으면 알림
+2. 커밋·diff 분석, open 이슈에서 `close #번호` 대상 찾기
+3. `.github/PULL_REQUEST_TEMPLATE.md` 형식으로 본문 작성, label 은 `gh label list` 로 존재 확인한 것만
+4. 필요하면 `git push -u origin <브랜치>` 후 **미리보기 확인 없이 바로** PR 생성
+5. assignee(`KiSeungMin`)와 label 설정 후 URL 보고
+
+**merge 는 하지 않는다** — 사용자가 명시적으로 요청할 때만. main 대상 PR 은 만들지 않는다.
+
+---
+
+### `/issue` — 이슈 생성
+
+**목적**: 설명이나 파일 내용을 이슈 템플릿에 맞춰 `AI-SIP/OnO_BACKEND` 이슈로 만든다.
+
+```
+/issue 문제 목록 조회가 느리다
+/issue docs/plans/tag_filter_plan.md
+```
+
+**동작 흐름**: 유형 판단(bug / feat / refactor / chore / docs / test) → 템플릿 채우기 → label 존재 확인 → 미리보기 확인 → 생성
+
+---
+
+### `/migrate` — Flyway 마이그레이션 작성
+
+**목적**: 스키마 변경용 `V*.sql` 초안을 쓰고 안전성을 검토한다.
+
+**동작 흐름**: `code-tracer`로 현재 엔티티·쿼리 파악 → 마이그레이션 초안 → `migration-safety` 검토 → API 가 바뀌면 `api-contract-checker` 추가
+
+**주의**: 운영 DB 에 직접 실행하지 않는다. 적용은 dev 서버 기동으로 먼저 확인한다.
+
+---
+
 ### `/explain` — 코드 흐름·원리 설명
 
 **목적**: 특정 기능·클래스의 동작 원리와 설계 이유를 설명한다.
@@ -265,19 +321,21 @@ Claude Code에서 `/커맨드명 인자` 형식으로 호출합니다.
 
 ---
 
-## 3. 전문가 에이전트 7종
+## 3. 전문가 에이전트 9종
 
 커맨드가 내부적으로 호출하는 전문 서브에이전트입니다. 직접 호출하지 않고 커맨드를 통해 사용합니다.
 
 | 에이전트 | 역할 | 도구 권한 | 호출 커맨드 |
 |---|---|---|---|
-| `code-tracer` | Controller→Service→Repository→쿼리 호출 경로 추적 | 읽기 전용 | analysis, plan, feat, explain, report, perf |
-| `permission-auditor` | userId 소유권 검증·인증·인가 누락·필터 조건 검사 | 읽기 전용 | check, analysis |
-| `perf-reviewer` | N+1·풀스캔·커넥션풀·배치 누락·인덱스 검사 | 읽기 전용 | check, perf, analysis |
+| `code-tracer` | Controller→Service→Repository→쿼리 호출 경로 추적 | 읽기 전용 | analysis, plan, feat, explain, report, perf, migrate |
+| `permission-auditor` | userId 소유권 검증·인증·인가 누락·필터 조건 검사 | 읽기 전용 | check, analysis, plan |
+| `perf-reviewer` | N+1·풀스캔·커넥션풀·배치 누락·인덱스 검사 | 읽기 전용 | check, perf, analysis, plan |
 | `logic-reviewer` | 엣지·널·동시성·예외·롤백·비즈 규칙 검사 | 읽기 전용 | check, analysis |
-| `db-safety` | FCM 실발송·잘못된 쓰기·데이터 오염·S3 정합성 검사 | 읽기 전용 | check, analysis |
+| `db-safety` | FCM 실발송·잘못된 쓰기·데이터 오염·S3 정합성 검사 | 읽기 전용 | check, analysis, plan |
+| `api-contract-checker` | DTO·엔드포인트 변경이 Flutter 앱을 깨는지 검사 | 읽기 전용 | check, plan, migrate (API 변경 시) |
+| `migration-safety` | Flyway 마이그레이션의 데이터 손실·락·롤백 위험 검사 | 읽기 전용 | migrate, check, plan (스키마 변경 시) |
 | `test-writer` | test 프로필+격리 DB, 사용자 격리 케이스 포함 테스트 작성 | 읽기+쓰기 | test |
-| `report-writer` | 존댓말·Before/After 표·외부 공유용 보고서 작성 | 읽기+쓰기 | report |
+| `report-writer` | 존댓말·Before/After 표·외부 공유용 보고서 작성 (`docs/reports/` 에만 저장) | 읽기+쓰기 | report |
 
 ### 검증 에이전트 상세
 
@@ -320,7 +378,12 @@ FCM은 실사용자에게 즉시 도달하며 되돌릴 수 없다.
 /check ──────┬── permission-auditor  ┐
              ├── perf-reviewer       │ 4개 동시 병렬
              ├── logic-reviewer      │
-             └── db-safety          ┘
+             ├── db-safety          ┘
+             └── migration-safety, api-contract-checker (해당 변경이 있을 때)
+
+/migrate ────┬── code-tracer
+             ├── migration-safety
+             └── api-contract-checker (API 변경 시)
 
 /report ─────┬── code-tracer (변경 분석)
              └── report-writer (보고서 작성)
@@ -330,7 +393,7 @@ FCM은 실사용자에게 즉시 도달하며 되돌릴 수 없다.
 
 /explain ────── code-tracer
 
-/commit ─── (에이전트 없음, 경량 명령)
+/commit, /pr, /issue ─── (에이전트 없음, 경량 명령)
 ```
 
 ---
@@ -340,27 +403,28 @@ FCM은 실사용자에게 즉시 도달하며 되돌릴 수 없다.
 ### 일반 기능 개발
 
 ```
-analysis → plan → feat → test → check → commit → report
-  (선택)     🔴     🟠     │       🟡      │         🟢
+analysis → plan → feat → test → check → commit → pr → (report)
+  (선택)     🔴     🟠     │       🟡      │              🟢
                           └── 통과 필수 ──┘
 ```
 
 - **analysis**: 요구가 명확하면 생략 가능
 - **plan** 후 🔴: 가장 중요한 검토 포인트. 사람이 직접 계획서 확인 후 진행
-- **feat** 후 🟠: 구현 완료 후 바로 test → check
+- **feat** 후 🟠: 구현만 하고 커밋하지 않음. 이어서 test → check
+- **commit**: 실제 커밋은 여기서만. **pr**: 미리보기 없이 develop 대상 PR 생성, merge 는 하지 않음
 - **check** 후 🟡: 🔴·🟠 항목은 반드시 수정 후 재확인
 - **report** 🟢: 완료 후 공유 필요 시
 
 ### 성능 개선 작업
 
 ```
-perf(진단) → plan → feat → test → check → commit → report
+perf(진단) → plan → feat → test → check → commit → pr → (report)
 ```
 
 ### 단발성 작업
 
 ```
-feat → check → commit
+feat → test → check → commit → pr
 ```
 
 ### 아무 때나 사용
@@ -370,32 +434,40 @@ feat → check → commit
 
 ---
 
-## 6. 권한 설정
+## 6. 권한 설정과 훅
 
-`.claude/settings.local.json`에서 도구 실행 권한을 제어합니다.
+권한과 훅은 두 파일로 나뉩니다.
 
-### 자동 허용 (승인 팝업 없음)
+| 파일 | 커밋 | 담는 것 |
+|---|---|---|
+| `.claude/settings.json` | O (팀 공유) | 훅, 팀 공통 deny/ask 규칙 |
+| `.claude/settings.local.json` | X (gitignore) | 개인 allow 목록. 훅과 deny 는 여기 중복으로 넣지 않는다 |
 
-| 도구 | 이유 |
+### 공유 훅 (`.claude/settings.json`)
+
+| 훅 | 언제 | 하는 일 |
+|---|---|---|
+| `hooks/db_safety_check.py` | Bash, `mcp__mysql.*` 실행 전 | SQL 을 실제로 실행하는 명령(mysql 계열 클라이언트, docker exec, flyway, MySQL MCP)에서 되돌릴 수 없는 삭제·변경 문장을 막는다. ddl-auto 를 바꾸는 실행 인자와 DB 볼륨 삭제도 막는다. 차단 사유는 stderr 로 Claude 에게 전달된다 |
+| `hooks/compile_check.sh` | Claude 가 응답을 마칠 때(Stop) | 바뀐 `.java` 가 있을 때만 `./gradlew compileJava -q`. 실패하면 에러를 Claude 에게 돌려줘 고치게 한다 |
+
+훅을 고치면 `python3 .claude/hooks/test_db_safety_check.py` 로 회귀 테스트를 돌립니다(Agent Config Lint 에서도 돈다).
+
+### 차단 (deny)
+
+| 규칙 | 이유 |
 |---|---|
-| `Read`, `Grep`, `Glob` | 읽기 전용, 부작용 없음 |
-| `git status/diff/log/show/branch` | 조회만, 변경 없음 |
-| `ls`, `find` | 파일 탐색, 변경 없음 |
-| `./gradlew compileJava` | 컴파일 확인, 안전 |
-| `./gradlew test --tests` | 테스트 실행, 안전 |
-| `./gradlew build` | 전체 빌드 |
+| `mcp__github__merge_pull_request`, `gh pr merge` | merge 는 사용자가 명시적으로 요청할 때만, 직접 한다 |
+| `git push origin main/develop` | 보호 브랜치 직접 push 금지. 작업 브랜치 → PR 로만 |
+| `git push --force`, `git push -f` | 원격 히스토리 파괴 위험 |
+| `.env*`, `application.yml`, `application-dev/prod/local.yml`, `application*.properties`, `FirebaseAdminKey.json` 읽기 | 실제 비밀값이 든 gitignore 파일. 더미 값만 있는 `application-test.yml` 은 읽을 수 있다 |
 
-### 차단 (실행 불가)
+### 실행 전 확인 (ask)
 
-| 도구 | 이유 |
-|---|---|
-| `git push --force` | 원격 히스토리 파괴 위험 |
-| `git reset --hard` | 로컬 변경 손실 위험 |
-| `git clean` | 추적 안 된 파일 삭제 위험 |
+`docker`, `ssh`, `gh workflow run` 은 실행 전에 한 번 묻습니다. 배포와 운영 서버 접근으로 이어지기 때문입니다.
 
-### 승인 팝업이 뜨는 경우
+### 그 밖의 명령
 
-allowlist에 없는 Bash 명령(실제 커밋, 파일 쓰기, 서버 시작 등)은 실행 전 팝업이 뜹니다. 승인하면 그 명령만 1회 실행됩니다.
+공유 설정에는 allow 목록이 없습니다. Claude Code 기본 동작대로 읽기 도구(`Read`, `Grep`, `Glob`)와 일부 읽기 전용 명령은 바로 실행되고, 나머지 Bash 명령(`./gradlew test`, `git commit`, `git push` 등)은 승인 팝업이 뜹니다. 자주 쓰는 명령을 매번 승인하기 번거로우면 각자 `settings.local.json` 의 allow 에 넣습니다.
 
 ---
 
@@ -412,8 +484,12 @@ allowlist에 없는 Bash 명령(실제 커밋, 파일 쓰기, 서버 시작 등)
 - 프로덕션 DB 파괴 작업은 명시적 확인 후
 
 **자유롭게 하는 것**:
-- git 커밋·push·브랜치·머지
-- Docker 배포·인프라 설정
+- 읽기 전용 조사, 로컬 테스트·빌드
+- `/commit` 요청에 따른 커밋, `/pr` 에서 필요한 작업 브랜치 push
+
+**확인 받고 하는 것**:
+- merge (사용자가 명시적으로 요청할 때만)
+- Docker 배포·인프라 설정·스키마 변경·외부 발송 (영향 범위와 롤백 방법 설명 후)
 
 **응답 방식**:
 - 한국어 응답·주석·커밋
@@ -436,8 +512,8 @@ allowlist에 없는 Bash 명령(실제 커밋, 파일 쓰기, 서버 시작 등)
 # 2. 구현
 /feat 문제 등록 태그 복수 추가
 
-# → 컴파일 자동 확인
-# → 커밋 전 요약 보고
+# → 컴파일 확인
+# → 커밋하지 않고 변경 요약과 커밋 분할 제안만 보고
 
 # 3. 테스트
 /test ProblemService
@@ -452,6 +528,9 @@ allowlist에 없는 Bash 명령(실제 커밋, 파일 쓰기, 서버 시작 등)
 
 # 5. 커밋
 /commit
+
+# 6. PR (develop 대상, 미리보기 없이 바로 생성)
+/pr
 ```
 
 ### 예시 2: 버그 조사
@@ -486,7 +565,7 @@ allowlist에 없는 Bash 명령(실제 커밋, 파일 쓰기, 서버 시작 등)
 # 기준 커밋 이후 변경사항 보고서
 /report 7edc25a
 
-# → docs/reports/문제등록개선_보고서.md 생성
+# → docs/reports/문제등록개선_보고서.md 생성 (로컬 전용)
 ```
 
 ---
