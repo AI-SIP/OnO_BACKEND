@@ -1,0 +1,7 @@
+interface:
+  display_name: "OnO Deploy Verify"
+  short_description: "배포 직후 읽기 전용 점검"
+  default_prompt: "Use $deploy-verify prod to check the latest production deployment read-only."
+
+policy:
+  allow_implicit_invocation: false
