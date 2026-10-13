@@ -15,6 +15,7 @@ import com.aisip.OnO.backend.user.exception.UserErrorCase;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.util.fileupload.exception.FileUploadErrorCase;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +45,7 @@ public class StudyRoomService {
     private final StudyRoomMapper mapper;
     private final FileUploadService fileUploadService;
     private final S3DeleteProducer s3DeleteProducer;
+    private final EntityManager entityManager;
 
     @Transactional(readOnly = true)
     public List<StudyRoomListResponse> getMyRooms(Long userId) {
@@ -198,7 +200,19 @@ public class StudyRoomService {
         deleteMember(member);
     }
 
+    /**
+     * 지우기 직전에 멤버 행을 잠그고 다시 읽는다. 같은 멤버의 나가기가 동시에 두 번 오거나 강퇴와 겹치면
+     * 앞선 요청이 이미 행을 지웠을 수 있다. 그대로 엔티티로 지우면 0행 삭제가 낙관적 락 예외로 올라가
+     * 500 이 되므로, 이미 없으면 지운 것으로 보고 넘어간다. 벌크 delete 를 쓰던 때와 같은 결과다.
+     *
+     * <p>넘어갈 때는 엔티티를 영속성 컨텍스트에서 떼어 낸다. 탈퇴에서는 곧 지워질 {@code User} 를
+     * 가리키는 관리 엔티티로 남아 flush 때 {@code TransientObjectException} 이 나기 때문이다.
+     */
     private void deleteMember(StudyRoomMember member) {
+        if (memberRepository.findByIdForUpdate(member.getId()).isEmpty()) {
+            entityManager.detach(member);
+            return;
+        }
         member.getRoom().removeMember(member);
         memberRepository.delete(member);
     }
