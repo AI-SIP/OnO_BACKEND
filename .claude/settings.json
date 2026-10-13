@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "mcp__github__merge_pull_request",
+      "Bash(gh pr merge:*)",
+      "Bash(git push origin main*)",
+      "Bash(git push origin develop*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(application.yml)",
+      "Read(application-dev.yml)",
+      "Read(application-prod.yml)",
+      "Read(application-local.yml)",
+      "Read(application*.properties)",
+      "Read(FirebaseAdminKey.json)"
+    ],
+    "ask": [
+      "Bash(docker:*)",
+      "Bash(ssh:*)",
+      "Bash(gh workflow run:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/db_safety_check.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__mysql.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/db_safety_check.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/compile_check.sh",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  }
+}
