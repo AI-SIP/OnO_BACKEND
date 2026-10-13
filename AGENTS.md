@@ -84,151 +84,54 @@ OnO 작업 에이전트 지침
 
 ## 4. 문서 위치
 
-백엔드 기능 문서와 PR 초안은 아래 경로를 기준으로 작성한다.
+백엔드 문서는 레포 루트의 `docs/` 아래에 둔다. `docs/` 는 `.gitignore` 대상이라 로컬에만 남는다.
 
-```text
-/Users/ksm/programing/sw_maestro/OnO_BACKEND/backend/docs
-```
-
-- 기능별로 새 폴더를 만든다.
-- 폴더명은 기능을 알아볼 수 있게 작성한다.
-- 같은 기능의 구현 명세서와 PR 초안은 같은 폴더에 둔다.
+- 구현 계획서는 `docs/plans/<작업명>_plan.md`, 작업 보고서는 `docs/reports/<개발사항>_보고서.md` 에 둔다.
+- 그 밖의 기능 문서는 기능을 알아볼 수 있는 이름으로 `docs/<기능 폴더>/` 를 만든다.
 - 다른 에이전트가 이어서 작업할 수 있도록 배경, 범위, 결정 사항, 검증 방법을 문서에 남긴다.
 
-## 5. 커스텀 명령어
+## 5. 커스텀 명령어 (스킬)
 
-아래 명령어는 실제 CLI 명령이 아니라, 사용자가 대화에서 입력하는 작업 모드다. 에이전트는 명령어의 의도를 해석해 필요한 파일 확인, 문서 작성, 구현, 검토를 수행한다.
+사용자가 대화에서 `plan`, `feat` 처럼 부르는 작업 모드는 레포의 스킬로 정의돼 있다. **절차는 `.agents/skills/<이름>/SKILL.md` 에만 적는다.** Codex 는 이 경로를 직접 읽고(`$이름` 또는 `/skills`), Claude Code 는 `.claude/skills/<이름>` 심볼릭 링크로 같은 파일을 읽는다(`/이름`). 이 문서에는 절차를 다시 적지 않는다.
 
-### `plan <기능 설명>`
+| 스킬 | 하는 일 | 자동 호출 |
+|---|---|---|
+| `analysis` | 원인 규명 (읽기 전용) | 허용 |
+| `plan` | 구현 계획서 작성, `docs/plans/` 저장 | 허용 |
+| `feat` | 승인된 계획 기준 구현. 커밋하지 않는다 | 차단 |
+| `test` | Testcontainers MySQL 기반 테스트 작성과 실행 | 허용 |
+| `check` | 데이터 격리, 성능, 로직, FCM 과 DB 쓰기 관점 교차 검증 (읽기 전용) | 허용 |
+| `commit` | 논리 단위로 나눠 실제 커밋 | 차단 |
+| `pr` | push 후 develop 대상 PR 생성. main 대상 금지, merge 는 명시 요청 시에만 | 차단 |
+| `issue` | 템플릿 형식으로 GitHub 이슈 생성 | 차단 |
+| `report` | 결과 보고서 작성, `docs/reports/` 저장 | 허용 |
+| `perf` | 성능 병목 진단 (읽기 전용) | 허용 |
+| `migrate` | Flyway 마이그레이션 작성과 안전성 검토 | 차단 |
+| `explain` | 코드 흐름과 설계 이유 설명 (읽기 전용) | 허용 |
 
-해당 기능을 어떻게 구현할지에 관한 개요 및 구현 명세서를 markdown으로 작성한다.
+- "차단" 은 사용자가 명시적으로 부를 때만 실행한다는 뜻이다(Claude `disable-model-invocation: true`, Codex `agents/openai.yaml` 의 `allow_implicit_invocation: false`).
+- 작업 흐름은 `plan → feat → test → check → commit → pr` 순서다. 단계 경계에서 사용자가 검토한 뒤 넘어간다.
+- 새 스킬은 `.agents/skills/<이름>/` 에 `SKILL.md` 와 `agents/openai.yaml` 을 만들고, `.claude/skills/<이름>` 을 `../../.agents/skills/<이름>` 으로 링크한다. `.codex/scripts/agent-config-lint.sh` 가 구조를 검사한다.
 
-- 코드를 구현하지 않는다.
-- 관련 기존 문서와 코드를 먼저 확인한다.
-- `/Users/ksm/programing/sw_maestro/OnO_BACKEND/backend/docs` 안에 해당 기능과 관련된 새 폴더를 만든다.
-- 새 폴더 안에 markdown 구현 명세서를 작성한다.
-- 문서에는 최소한 다음 내용을 포함한다.
-  - 기능 목적과 사용자 시나리오
-  - 구현 범위와 제외 범위
-  - 관련 화면, 라우팅, 상태 관리, API 영향
-  - 데이터 흐름과 에러 처리
+### 커밋 메시지 형식
 
-  - 구현 단계
-  - 검증 방법
-  - 배포 리스크와 확인이 필요한 질문
-- 이후 `feat` 명령에서 바로 구현을 시작할 수 있을 만큼 구체적으로 작성한다.
-
-### `feat`
-
-`plan`으로 작성한 구현 명세서를 바탕으로 기능을 구현한다.
-
-- 먼저 어떤 구현 명세서를 기준으로 작업할지 확인한다.
-- 명세서가 명확하지 않으면 사용자에게 물어본다.
-- 명세서의 범위를 벗어나는 기능을 임의로 추가하지 않는다.
-- 명세서와 실제 코드가 다르면 실제 코드 기준으로 판단하되, 차이를 사용자에게 설명한다.
-- 구현 후 사용자 영향, 반응형 처리, 배포 리스크를 점검한다.
-- 가능한 범위에서 포맷팅, 정적 검사(최소 `./gradlew compileJava`)를 수행한다. 테스트 작성과 실행은 `test` 단계에서 한다.
-- 커밋하지 않는다. 변경은 작업 트리에 남기고, 완료 후 추천 커밋 단위와 커밋 메시지를 제안한다. 실제 커밋은 `commit` 단계에서 한다.
-- 작업 흐름은 `plan → feat → test → check → commit → pr` 순서다. merge 는 사용자가 명시적으로 요청할 때만 한다.
-- 필요에 따라 멀티 에이전트를 활용한다.
-
-프론트엔드와 백엔드 모두 커밋 메시지는 아래 형식으로 통일한다.
+프론트엔드와 백엔드 모두 아래 여러 줄 형식으로 통일한다. 이슈가 있으면 요약 끝에 번호를 붙인다.
 
 ```text
-[Feat] 구현 타이틀 - 구현 상세1 구현 상세2
+[Feat] 한 줄 요약 (#이슈)
+- 상세 1
+- 상세 2
 ```
+
+태그: `[Feat]` / `[Fix]` / `[Refactor]` / `[Chore]` / `[Test]` / `[Docs]` / `[Perf]`
 
 예시:
 
 ```text
-[Feat] 학습 달력 주간 뷰 추가 - 태블릿 레이아웃 대응 빈 상태 처리
-[Fix] 오답노트 PDF 내보내기 오류 수정 - null 응답 방어 로딩 상태 개선
+[Fix] 같은 멤버 행을 두 요청이 지우면 스터디룸 나가기가 500 이 되지 않게 한다 (#368)
+- 지우기 직전에 멤버 행을 PESSIMISTIC_WRITE 로 다시 읽고, 이미 없으면 지운 것으로 보고 넘어간다
+- 넘어갈 때 엔티티를 detach 해서 flush 때 TransientObjectException 이 나지 않게 한다
 ```
-
-### `pr`
-
-현재 브랜치의 개발 내역을 바탕으로 `AI-SIP/OnO_BACKEND` GitHub Repository에 `develop` 브랜치로 merge 요청하는 Pull Request를 직접 생성한다.
-
-- `codex_apps` GitHub 도구가 아니라 `mcp__github__` MCP 서버의 `create_pull_request` 도구를 사용한다.
-- Repository는 항상 `owner=AI-SIP`, `repo=OnO_BACKEND`를 사용한다.
-- base branch는 항상 `develop`으로 지정한다.
-- `main` branch를 base로 하는 PR은 절대 생성하지 않는다. `main` merge와 production 배포는 항상 사용자가 직접 담당한다.
-- 현재 브랜치가 `main` 또는 `develop`이면 PR을 생성하지 말고, 작업 브랜치에서 실행해야 한다고 보고한다.
-- 현재 브랜치 이름과 원격 브랜치 존재 여부를 확인한다.
-- 작업 트리에 아직 커밋되지 않은 변경사항이 있으면 PR을 생성하지 말고, 먼저 커밋 또는 정리가 필요하다고 보고한다.
-- 현재 브랜치가 원격에 없거나 미push 커밋이 있으면 `git push -u origin 현재브랜치`로 직접 push해 원격 브랜치를 만든 뒤 PR을 생성한다.
-- `develop..현재브랜치`의 커밋 로그와 diff를 확인해 PR 제목과 본문을 작성한다.
-- PR 생성 전에 GitHub에서 open issue를 검색해 현재 변경사항과 관련된 이슈가 있는지 확인한다.
-- 관련 이슈가 있으면 PR 본문 `연관 이슈` 항목에 `close #이슈번호`를 포함해 merge 시 자동 종료되도록 작성한다.
-- 관련 이슈가 없으면 `연관 이슈` 항목에는 관련 이슈 없음이라고 명시한다.
-- 아래 PR 템플릿을 반드시 확인한다.
-
-```text
-/Users/ksm/programing/sw_maestro/OnO_BACKEND/backend/.github/PULL_REQUEST_TEMPLATE.md
-```
-
-- PR 제목과 본문은 템플릿 양식에 맞춰 작성하고, PR markdown 파일은 별도로 만들지 않는다.
-- PR 본문에는 변경사항 요약, 사용자 영향, 검증 결과, 배포 리스크를 포함한다.
-- Reviewers는 지정하지 않는다.
-- PR 생성 후 생성된 PR 번호에 `mcp__github__` MCP 서버의 `issue_write` 도구를 `method=update`로 호출해 Assignees와 Labels를 설정한다.
-- Assignees는 항상 `KiSeungMin`으로 지정한다.
-- Labels는 변경 성격에 맞게 `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `bug` 중 적절한 후보를 고르되, `get_label`로 존재 여부를 확인한 label만 적용한다.
-- milestone, project, issue fields, type 등 나머지 항목은 지정하지 않는다.
-- PR 생성 후에는 PR 번호, URL, base/head branch, assignee, 적용한 label, main을 target으로 사용하지 않았다는 점을 간결하게 보고한다.
-
-### `/issue <내용 또는 파일 경로>`
-
-사용자가 자유롭게 작성한 내용이나 파일 내용을 바탕으로 `AI-SIP/OnO_BACKEND` GitHub Repository에 이슈를 생성한다.
-
-- `codex_apps` GitHub 도구가 아니라 `mcp__github__` MCP 서버의 `issue_write` 도구를 사용한다.
-- Repository는 항상 `owner=AI-SIP`, `repo=OnO_BACKEND`를 사용한다.
-- Assignees는 항상 `KiSeungMin`으로 지정한다.
-- 사용자가 파일 경로를 전달하면 먼저 해당 파일을 읽고, 파일 내용을 이슈 원문으로 사용한다.
-- 사용자가 직접 내용을 입력하면 그 내용을 이슈 원문으로 사용한다.
-- 원문이 부족해도 가능한 범위에서 이슈를 생성하되, 운영 영향이나 재현 조건처럼 필수 판단에 필요한 정보가 없으면 이슈 본문에 "확인 필요"로 명시한다.
-- 아래 이슈 템플릿을 반드시 확인하고, 입력 성격에 맞는 템플릿을 선택해 본문을 채운다.
-
-```text
-/Users/ksm/programing/sw_maestro/OnO_BACKEND/backend/.github/ISSUE_TEMPLATE/bug-report-template.md
-/Users/ksm/programing/sw_maestro/OnO_BACKEND/backend/.github/ISSUE_TEMPLATE/common-issue-template.md
-```
-
-- 버그, 오류, 예외, 장애, 잘못된 동작, 회귀 이슈는 `bug-report-template.md` 형식을 사용한다.
-  - 제목은 `[bug] ...` 형식으로 작성한다.
-  - label은 `bug`를 포함한다.
-  - 본문에는 버그 설명, 발생 상황, 예상 결과를 템플릿 항목에 맞춰 정리한다.
-- 기능 추가, 개선, 리팩터링, 문서, 설정, 운영 작업은 `common-issue-template.md` 형식을 사용한다.
-  - 제목은 `[feat]`, `[fix]`, `[refactor]`, `[chore]`, `[docs]`, `[test]` 중 가장 적절한 타입을 골라 작성한다.
-  - label은 선택한 타입과 이슈 성격에 맞게 적용하되, 존재 여부가 불확실한 label은 무리하게 붙이지 않는다.
-  - 본문에는 Description, TODO, ETC를 템플릿 항목에 맞춰 정리한다.
-- GitHub issue type 기능이 사용 가능하면 입력 성격에 맞는 type을 설정한다. 유효한 type을 확인할 수 없거나 Repository가 issue type을 지원하지 않으면 `type` 필드는 생략한다.
-- 이슈 생성 후에는 이슈 번호, URL, 적용한 assignee, label, type을 사용자에게 간결하게 보고한다.
-
-### `check <커밋 번호>`
-
-해당 커밋부터 현재까지의 변경사항을 모두 분석한 뒤, 위험한 사항이나 에러 가능성이 없는지 검증한다.
-
-- `<커밋 번호>`가 있으면 해당 커밋부터 현재까지의 변경사항을 확인한다.
-- 커밋 번호가 없으면 현재 작업 중인 변경사항만 검토한다.
-- 프로젝트 전체를 대충 훑지 말고, 변경된 파일과 영향받는 사용자 흐름을 기준으로 검토한다.
-- 검사는 반드시 2중으로 수행한다.
-- 1차 검사는 diff 기반으로 수행한다.
-  - 변경된 코드의 의도와 실제 동작이 맞는지 확인한다.
-  - API 연동, 상태 관리, null 처리, 에러 처리, 로딩 상태, 데이터 손실 가능성을 확인한다.
-  - UI 변경이 있으면 폰과 태블릿에서 overflow, 잘림, 스크롤 불가 가능성을 확인한다.
-- 2차 검사는 실행 가능한 검증으로 수행한다.
-  - 가능한 경우 포맷팅 검사, 정적 분석, 관련 테스트, 빌드 영향 파일 확인을 진행한다.
-  - 실행 검증이 어렵다면 구조 검토로 대체하고, 대체한 이유를 적는다.
-- 검토 결과는 위험도 순서로 정리한다.
-- 문제를 발견하면 파일과 라인 근거를 포함한다.
-- 발견한 문제가 없더라도 남은 리스크와 실행하지 못한 검증을 명확히 적는다.
-
-### `commit`
-
-- 현재 변경사항에 대해 커밋 단위 및 커밋 메시지를 양식에 맞게 정리한 뒤 직접 커밋까지 수행한다.
-- 커밋 전 `git status`와 `git diff HEAD`로 변경 범위를 확인하고, 사용자 변경과 이번 작업 변경을 구분한다.
-- 관련 없는 변경이 섞여 있으면 하나의 커밋에 포함하지 않는다. 필요한 경우 논리 단위별로 `git add` 대상을 나눠 커밋한다.
-- 커밋 메시지는 OnO 형식을 따른다.
 
 ## 6. 작업 보고
 

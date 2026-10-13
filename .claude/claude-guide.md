@@ -1,16 +1,16 @@
 # OnO 백엔드 — Claude Code 사용 가이드
 
 > **대상**: 이 레포에서 Claude Code를 사용하는 개발자  
-> **설정 위치**: `.claude/` (커맨드·에이전트·공유 설정·훅) + `CLAUDE.md` (프로젝트 규칙)
+> **설정 위치**: `.agents/skills/` (스킬 본문, Codex 와 공유) + `.claude/` (스킬 링크·에이전트·공유 설정·훅) + `CLAUDE.md` (프로젝트 규칙)
 
 ---
 
 ## 목차
 
 1. [설정 파일 구조](#1-설정-파일-구조)
-2. [커스텀 커맨드 12종](#2-커스텀-커맨드-12종)
+2. [커스텀 스킬 12종](#2-커스텀-스킬-12종)
 3. [전문가 에이전트 9종](#3-전문가-에이전트-9종)
-4. [커맨드 ↔ 에이전트 연결 구조](#4-커맨드--에이전트-연결-구조)
+4. [스킬 ↔ 에이전트 연결 구조](#4-스킬--에이전트-연결-구조)
 5. [작업 파이프라인](#5-작업-파이프라인)
 6. [권한 설정과 훅](#6-권한-설정과-훅)
 7. [CLAUDE.md — 프로젝트 가드레일](#7-claudemd--프로젝트-가드레일)
@@ -23,6 +23,10 @@
 ```
 backend/
 ├── CLAUDE.md                          # 프로젝트 규칙 (매 세션 자동 로드)
+├── AGENTS.md                          # Codex 등 다른 에이전트용 규칙 (같은 스킬을 쓴다)
+├── .agents/skills/<이름>/             # 스킬 정본. Claude Code 와 Codex 가 같은 파일을 읽는다
+│   ├── SKILL.md                       # frontmatter + 절차 본문
+│   └── agents/openai.yaml             # Codex 표시 이름과 암묵 호출 정책
 ├── .claude/
 │   ├── settings.json                  # 팀 공유 설정: 훅, deny/ask 규칙 (커밋됨)
 │   ├── settings.local.json            # 개인 설정: 개인 allow 등 (gitignore, 커밋 안 함)
@@ -30,19 +34,9 @@ backend/
 │   │   ├── db_safety_check.py         # PreToolUse: 위험한 SQL 실행 차단
 │   │   ├── test_db_safety_check.py    # 위 훅의 회귀 테스트
 │   │   └── compile_check.sh           # Stop: 바뀐 .java 가 있으면 compileJava
-│   ├── commands/                      # 커스텀 슬래시 커맨드 (12종)
-│   │   ├── analysis.md
-│   │   ├── plan.md
-│   │   ├── feat.md
-│   │   ├── test.md
-│   │   ├── check.md
-│   │   ├── commit.md
-│   │   ├── pr.md
-│   │   ├── issue.md
-│   │   ├── report.md
-│   │   ├── perf.md
-│   │   ├── migrate.md
-│   │   └── explain.md
+│   ├── skills/                        # 슬래시 명령 12종. 전부 ../../.agents/skills/<이름> 심볼릭 링크
+│   │   ├── analysis -> ../../.agents/skills/analysis
+│   │   └── ...                        # plan, feat, test, check, commit, pr, issue, report, perf, migrate, explain
 │   └── agents/                        # 전문가 서브에이전트 (9종)
 │       ├── code-tracer.md
 │       ├── permission-auditor.md
@@ -54,8 +48,8 @@ backend/
 │       ├── test-writer.md
 │       └── report-writer.md
 └── docs/                              # 로컬 전용 (.gitignore 대상, 커밋되지 않음)
-    ├── plans/                         # /plan 커맨드가 계획서를 저장하는 위치
-    └── reports/                       # /report 커맨드가 보고서를 저장하는 위치
+    ├── plans/                         # /plan 스킬이 계획서를 저장하는 위치
+    └── reports/                       # /report 스킬이 보고서를 저장하는 위치
 ```
 
 ### 각 파일이 하는 일
@@ -63,8 +57,8 @@ backend/
 | 파일 | 역할 | 로드 시점 |
 |---|---|---|
 | `CLAUDE.md` | 프로젝트 컨텍스트·가드레일·빌드 명령 | 매 세션 자동 |
-| `commands/*.md` | `/커맨드명` 입력 시 실행할 프롬프트 템플릿 | 해당 커맨드 호출 시 |
-| `agents/*.md` | 커맨드가 내부적으로 위임하는 전문 AI | 커맨드에서 호출 시 |
+| `.agents/skills/<이름>/SKILL.md` | `/이름` 입력 시 실행할 절차. `.claude/skills/<이름>` 링크로 읽힌다 | 호출 시 (설명은 매 세션 목록에 올라감) |
+| `agents/*.md` | 스킬이 내부적으로 위임하는 전문 AI | 스킬에서 호출 시 |
 | `settings.json` | 팀 공유 훅과 deny/ask 권한 규칙 | 매 세션 자동 |
 | `settings.local.json` | 개인 allow 목록 등 (각자 관리) | 매 세션 자동 |
 
@@ -72,16 +66,21 @@ backend/
 
 ---
 
-## 2. 커스텀 커맨드 12종
+## 2. 커스텀 스킬 12종
 
-Claude Code에서 `/커맨드명 인자` 형식으로 호출합니다.
+Claude Code에서 `/스킬명 인자` 형식으로 호출합니다. 예전 `.claude/commands/` 와 이름과 쓰는 법이 같습니다.
+
+- **절차의 정본은 `.agents/skills/<이름>/SKILL.md` 입니다.** 아래 설명은 요약이라, 둘이 다르면 SKILL.md 를 따릅니다. Codex 도 같은 파일을 `$이름` 으로 씁니다.
+- **부수효과가 있는 스킬은 직접 불러야만 실행됩니다.** `/feat`, `/commit`, `/pr`, `/issue`, `/migrate` 는 `disable-model-invocation: true` 라서 Claude 가 대화 흐름을 보고 스스로 실행하지 않습니다.
+- **나머지는 Claude 가 알아서 고를 수도 있습니다.** "이 API 왜 느려?" 라고만 해도 `perf` 가 실행될 수 있습니다. 원치 않으면 슬래시 명령으로 직접 부르세요.
+- **새 스킬은 `.agents/skills/<이름>/` 에 만들고 `.claude/skills/<이름>` 을 `../../.agents/skills/<이름>` 으로 링크합니다.** `agent-config-lint` 가 링크와 frontmatter 를 검사합니다.
 
 ### 사용 방법
 
 ```
-/커맨드명                  # 인자 없이 (선택적 인자인 경우)
-/커맨드명 작업 설명        # 자유 텍스트 인자
-/커맨드명 abc1234          # 커밋 해시 등 특정 값
+/스킬명                  # 인자 없이 (선택적 인자인 경우)
+/스킬명 작업 설명        # 자유 텍스트 인자
+/스킬명 abc1234          # 커밋 해시 등 특정 값
 ```
 
 ---
@@ -91,12 +90,12 @@ Claude Code에서 `/커맨드명 인자` 형식으로 호출합니다.
 **목적**: 버그·이상 동작의 근본 원인을 코드에서 찾는다. 코드 수정 없음.
 
 ```
-/analysis                              # 인자 없으면 3가지 질문을 먼저 물어봄
+/analysis                              # 인자 없으면 현재 변경분, 모호하면 질문
 /analysis 문제 등록 시 500 에러 발생
 ```
 
 **동작 흐름**:
-1. 인자가 없으면 ① 증상 ② 원하는 결과 ③ 관련 경로·로그를 먼저 질문
+1. 인자가 없으면 현재 git 변경분을 대상으로 삼고, 그래도 모호하면 ① 증상 ② 원하는 결과 ③ 관련 경로·로그를 먼저 질문
 2. 가설 3~5개 나열
 3. `code-tracer` + 필요 시 검증 에이전트들을 **병렬**로 투입해 각 가설 독립 검증
 4. 에이전트 결과를 교차 반증 (모순·공백 식별)
@@ -269,7 +268,7 @@ Claude Code에서 `/커맨드명 인자` 형식으로 호출합니다.
 ```
 
 **동작 흐름**:
-1. 현재 브랜치가 main/develop 이면 중단, 미커밋 변경이 있으면 알림
+1. 현재 브랜치가 main/develop 이거나 미커밋 변경이 있으면 중단 (먼저 `/commit`)
 2. 커밋·diff 분석, open 이슈에서 `close #번호` 대상 찾기
 3. `.github/PULL_REQUEST_TEMPLATE.md` 형식으로 본문 작성, label 은 `gh label list` 로 존재 확인한 것만
 4. 필요하면 `git push -u origin <브랜치>` 후 **미리보기 확인 없이 바로** PR 생성
@@ -323,9 +322,9 @@ Claude Code에서 `/커맨드명 인자` 형식으로 호출합니다.
 
 ## 3. 전문가 에이전트 9종
 
-커맨드가 내부적으로 호출하는 전문 서브에이전트입니다. 직접 호출하지 않고 커맨드를 통해 사용합니다.
+스킬이 내부적으로 호출하는 전문 서브에이전트입니다. 직접 호출하지 않고 스킬을 통해 사용합니다.
 
-| 에이전트 | 역할 | 도구 권한 | 호출 커맨드 |
+| 에이전트 | 역할 | 도구 권한 | 호출 스킬 |
 |---|---|---|---|
 | `code-tracer` | Controller→Service→Repository→쿼리 호출 경로 추적 | 읽기 전용 | analysis, plan, feat, explain, report, perf, migrate |
 | `permission-auditor` | userId 소유권 검증·인증·인가 누락·필터 조건 검사 | 읽기 전용 | check, analysis, plan |
@@ -362,7 +361,7 @@ FCM은 실사용자에게 즉시 도달하며 되돌릴 수 없다.
 
 ---
 
-## 4. 커맨드 ↔ 에이전트 연결 구조
+## 4. 스킬 ↔ 에이전트 연결 구조
 
 ```
 /analysis ──┬── code-tracer (항상)
@@ -579,7 +578,7 @@ A: 됩니다. 다만 Claude는 계획 제시 후 승인을 기다립니다. 빠�
 A: `/feat` 완료 직후 습관적으로. 특히 권한·FCM·쓰기 로직이 포함된 경우 필수입니다.
 
 **Q: 에이전트를 직접 호출할 수 있나?**  
-A: 기술적으로는 가능하지만, 커맨드를 통해 호출하는 것이 권장 방식입니다. 커맨드가 올바른 컨텍스트와 제약을 함께 전달합니다.
+A: 기술적으로는 가능하지만, 스킬을 통해 호출하는 것이 권장 방식입니다. 스킬이 올바른 컨텍스트와 제약을 함께 전달합니다.
 
 **Q: `docs/plans/`에 계획서가 쌓이면 어떻게 하나?**  
 A: 완료된 작업의 계획서는 삭제하거나 `docs/plans/archive/`로 이동해도 됩니다.
