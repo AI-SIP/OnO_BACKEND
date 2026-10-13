@@ -8,7 +8,7 @@ description: OnO 현재 브랜치의 개발 내역을 바탕으로 develop 브�
 ## Workflow
 
 1. 현재 브랜치를 확인한다. 현재 브랜치가 `main` 또는 `develop`이면 PR을 생성하지 말고 작업 브랜치에서 실행해야 한다고 보고한다.
-2. base branch는 항상 `develop`으로 고정한다. `main` branch를 base로 하는 PR은 절대 생성하지 않는다. `main` merge와 production 배포는 항상 사용자가 직접 담당한다.
+2. base branch는 항상 `develop`으로 고정한다. `main` branch를 base로 하는 PR은 절대 생성하지 않는다. `main` merge와 production 배포는 항상 사용자가 직접 담당한다. PR 생성 후 merge 는 하지 않는다(사용자가 명시적으로 요청할 때만).
 3. `git status`로 미커밋 변경사항을 확인한다. 미커밋 변경사항이 있으면 PR을 생성하지 말고 먼저 커밋 또는 정리가 필요하다고 보고한다.
 4. 현재 브랜치가 원격에 push되어 있는지 확인한다. 원격 브랜치가 없거나 미push 커밋이 있으면 `git push -u origin 현재브랜치`로 직접 push해 원격 브랜치를 만든 뒤 진행한다.
 5. `develop..현재브랜치`의 `git log`와 `git diff`를 확인해 변경 범위를 파악한다.
