@@ -19,10 +19,19 @@ public class OpenAIHttpClientConfig {
 
     public static final String AI_REST_TEMPLATE = "aiRestTemplate";
 
+    /** 연결 타임아웃 기본값(ms) */
+    public static final int DEFAULT_CONNECT_TIMEOUT_MS = 5_000;
+
+    /**
+     * 응답 읽기 타임아웃 기본값(ms). 2단계(#397)부터 모델이 내부 풀이까지 함께 써서 출력이 길어졌으므로 60초에서 90초로 늘렸다.
+     * 이 값을 바꾸면 ProblemAnalysisDispatchGuard.TTL 도 함께 따져야 한다(큐 TTL + 시도 횟수 x 이 값보다 길어야 한다).
+     */
+    public static final int DEFAULT_READ_TIMEOUT_MS = 90_000;
+
     @Bean(name = AI_REST_TEMPLATE, defaultCandidate = false)
     public RestTemplate aiRestTemplate(
-            @Value("${openai.http.connect-timeout-ms:5000}") int connectTimeoutMs,
-            @Value("${openai.http.read-timeout-ms:60000}") int readTimeoutMs
+            @Value("${openai.http.connect-timeout-ms:" + DEFAULT_CONNECT_TIMEOUT_MS + "}") int connectTimeoutMs,
+            @Value("${openai.http.read-timeout-ms:" + DEFAULT_READ_TIMEOUT_MS + "}") int readTimeoutMs
     ) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(connectTimeoutMs);

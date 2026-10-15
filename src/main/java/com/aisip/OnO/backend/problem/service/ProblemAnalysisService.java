@@ -152,14 +152,15 @@ public class ProblemAnalysisService {
                 log.info("Analysis already completed for problemId: {}", problemId);
                 return;
             }
-            // 요청 뒤 처리 전에 문제 이미지가 모두 지워졌으면 OpenAI 를 부르지 않고 NO_IMAGE 로 끝낸다
-            if (prep.imageUrls().isEmpty()) {
+            // 요청 뒤 처리 전에 문제 이미지가 모두 지워졌으면 OpenAI 를 부르지 않고 NO_IMAGE 로 끝낸다.
+            // 해설 이미지만 남아 있어도 분석할 문제가 없으므로 같다
+            if (prep.input().problemImageUrls().isEmpty()) {
                 problemAnalysisDbService.finishWithoutImage(problemId);
                 return;
             }
 
-            // Phase 2: 트랜잭션 없이 OpenAI 호출 (DB 커넥션 미점유)
-            ProblemAnalysisResult result = openAIClient.analyzeImages(prep.imageUrls());
+            // Phase 2: 트랜잭션 없이 OpenAI 호출 (DB 커넥션 미점유). 해설 이미지, 제목, 메모도 함께 넘긴다
+            ProblemAnalysisResult result = openAIClient.analyze(prep.input());
 
             // Phase 3: 결과를 짧은 쓰기 트랜잭션으로 저장
             String keyPointsJson;

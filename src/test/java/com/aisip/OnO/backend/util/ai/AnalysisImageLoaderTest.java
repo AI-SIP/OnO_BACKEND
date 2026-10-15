@@ -52,7 +52,7 @@ class AnalysisImageLoaderTest {
     @BeforeEach
     void setUp() {
         amazonS3Client = mock(AmazonS3Client.class);
-        loader = new AnalysisImageLoader(amazonS3Client, BUCKET, 5, AnalysisImageLoader.DEFAULT_MAX_TOTAL_BYTES);
+        loader = new AnalysisImageLoader(amazonS3Client, BUCKET, 5, AnalysisImageLoader.DEFAULT_MAX_TOTAL_BYTES, AnalysisImageLoader.DEFAULT_MAX_ANSWER_IMAGES);
     }
 
     // ---- 테스트 데이터 ----
@@ -911,7 +911,7 @@ class AnalysisImageLoaderTest {
         @DisplayName("합계는 보낼 바이트로 센다. 상한과 같으면 통과하고 넘으면 거부한다")
         void countsSentBytesAgainstConfiguredLimit() {
             byte[] webp = webpBytes();
-            AnalysisImageLoader exact = new AnalysisImageLoader(amazonS3Client, BUCKET, 5, webp.length * 2L);
+            AnalysisImageLoader exact = new AnalysisImageLoader(amazonS3Client, BUCKET, 5, webp.length * 2L, AnalysisImageLoader.DEFAULT_MAX_ANSWER_IMAGES);
 
             stubObject("image/1.webp", webp);
             stubObject("image/2.webp", webp);
@@ -931,9 +931,333 @@ class AnalysisImageLoaderTest {
         void resizedImagesCountAfterShrinking() {
             byte[] jpeg = encode(drawImage(4000, 3000, BufferedImage.TYPE_INT_RGB), "jpg");
             stubObject("image/big.jpg", jpeg);
-            AnalysisImageLoader tight = new AnalysisImageLoader(amazonS3Client, BUCKET, 5, jpeg.length - 1L);
+            AnalysisImageLoader tight = new AnalysisImageLoader(amazonS3Client, BUCKET, 5, jpeg.length - 1L, AnalysisImageLoader.DEFAULT_MAX_ANSWER_IMAGES);
 
             assertThat(tight.loadAsDataUrls(List.of(URL_PREFIX + "image/big.jpg"))).hasSize(1);
+        }
+    }
+
+    @Nested
+    @DisplayName("해설 이미지(2단계)")
+    class AnswerImages {
+
+        private String url(String key) {
+            return URL_PREFIX + key;
+        }
+
+        private byte[] webpOfSize(int size) {
+            byte[] bytes = new byte[size];
+            System.arraycopy(webpBytes(), 0, bytes, 0, 16);
+            return bytes;
+        }
+
+        @Test
+        @DisplayName("문제 이미지와 해설 이미지를 나눠 담고, 각자 넘긴 순서를 지킨다")
+        void separatesProblemAndAnswerImages() {
+            stubObject("image/p1.webp", webpOfSize(40));
+            stubObject("image/p2.webp", webpOfSize(41));
+            stubObject("image/a1.webp", webpOfSize(42));
+
+            AnalysisImageLoader.LoadedImages loaded = loader.loadForAnalysis(
+                    List.of(url("image/p1.webp"), url("image/p2.webp")), List.of(url("image/a1.webp")));
+
+            assertThat(loaded.problemImages()).hasSize(2);
+            assertThat(bytesOf(loaded.problemImages().get(0))).hasSize(40);
+            assertThat(bytesOf(loaded.problemImages().get(1))).hasSize(41);
+            assertThat(loaded.answerImages()).hasSize(1);
+            assertThat(bytesOf(loaded.answerImages().get(0))).hasSize(42);
+            assertThat(loaded.answerImages().get(0)).startsWith("data:image/webp;base64,");
+        }
+
+        @Test
+        @DisplayName("해설 이미지가 없거나 null 이어도 문제 이미지만으로 동작한다")
+        void worksWithoutAnswerImages() {
+            stubObject("image/p1.webp", webpBytes());
+            assertThat(loader.loadForAnalysis(List.of(url("image/p1.webp")), null).answerImages()).isEmpty();
+
+            stubObject("image/p1.webp", webpBytes());
+            assertThat(loader.loadForAnalysis(List.of(url("image/p1.webp")), List.of()).answerImages()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("loadAsDataUrls 는 문제 이미지만 읽는 예전 동작 그대로다")
+        void loadAsDataUrlsReadsOnlyProblemImages() {
+            stubObject("image/p1.webp", webpBytes());
+
+            assertThat(loader.loadAsDataUrls(List.of(url("image/p1.webp")))).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("해설 이미지가 상한(기본 3장)을 넘으면 실패시키지 않고 앞 3장만 쓴다. 4번째는 S3 에서 읽지도 않는다")
+        void usesFirstThreeAnswerImages() {
+            stubObject("image/p1.webp", webpBytes());
+            for (int i = 1; i <= 4; i++) {
+                stubObject("image/a" + i + ".webp", webpOfSize(32 + i));
+            }
+
+            AnalysisImageLoader.LoadedImages loaded = loader.loadForAnalysis(List.of(url("image/p1.webp")),
+                    List.of(url("image/a1.webp"), url("image/a2.webp"), url("image/a3.webp"), url("image/a4.webp")));
+
+            assertThat(AnalysisImageLoader.DEFAULT_MAX_ANSWER_IMAGES).isEqualTo(3);
+            assertThat(loaded.answerImages()).hasSize(3);
+            assertThat(loaded.answerImages().stream().map(dataUrl -> bytesOf(dataUrl).length).toList())
+                    .containsExactly(33, 34, 35);
+            verify(amazonS3Client, never()).getObject(BUCKET, "image/a4.webp");
+        }
+
+        @Test
+        @DisplayName("해설 이미지 상한은 설정값을 따른다")
+        void answerLimitIsConfigurable() {
+            AnalysisImageLoader single = new AnalysisImageLoader(amazonS3Client, BUCKET, 5,
+                    AnalysisImageLoader.DEFAULT_MAX_TOTAL_BYTES, 1);
+            stubObject("image/p1.webp", webpBytes());
+            stubObject("image/a1.webp", webpBytes());
+
+            assertThat(single.loadForAnalysis(List.of(url("image/p1.webp")),
+                    List.of(url("image/a1.webp"), url("image/a2.webp"))).answerImages()).hasSize(1);
+            verify(amazonS3Client, never()).getObject(BUCKET, "image/a2.webp");
+        }
+
+        @Test
+        @DisplayName("해설 이미지 장수는 문제 이미지 상한(5장)에 세지 않는다. 문제 5장 + 해설 3장은 통과한다")
+        void answerImagesDoNotCountTowardProblemLimit() {
+            List<String> problems = new java.util.ArrayList<>();
+            for (int i = 0; i < 5; i++) {
+                stubObject("image/p" + i + ".webp", webpBytes());
+                problems.add(url("image/p" + i + ".webp"));
+            }
+            List<String> answers = new java.util.ArrayList<>();
+            for (int i = 0; i < 3; i++) {
+                stubObject("image/a" + i + ".webp", webpBytes());
+                answers.add(url("image/a" + i + ".webp"));
+            }
+
+            AnalysisImageLoader.LoadedImages loaded = loader.loadForAnalysis(problems, answers);
+
+            assertThat(loaded.problemImages()).hasSize(5);
+            assertThat(loaded.answerImages()).hasSize(3);
+        }
+
+        @Test
+        @DisplayName("문제 이미지가 상한을 넘으면 해설 이미지가 있어도 S3 를 읽기 전에 TOO_MANY_IMAGES")
+        void problemLimitStillApplies() {
+            Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(() -> loader.loadForAnalysis(
+                    Collections.nCopies(6, url("image/p.webp")), List.of(url("image/a.webp"))));
+
+            assertReason(thrown, AnalysisFailureReason.TOO_MANY_IMAGES);
+            verifyNoInteractions(amazonS3Client);
+        }
+
+        @Test
+        @DisplayName("해설 이미지만 있고 문제 이미지가 없으면 UNREADABLE_IMAGE 이고 S3 를 읽지 않는다")
+        void answerOnlyIsUnreadable() {
+            Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(
+                    () -> loader.loadForAnalysis(List.of(), List.of(url("image/a.webp"))));
+
+            assertReason(thrown, AnalysisFailureReason.UNREADABLE_IMAGE);
+            verifyNoInteractions(amazonS3Client);
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @ValueSource(strings = {
+                "https://evil.example.com/image/a.webp",
+                "https://test-ono-bucket.s3.ap-northeast-2.amazonaws.com/private/secret.webp",
+                "https://test-ono-bucket.s3.ap-northeast-2.amazonaws.com/image/../private/a.webp"
+        })
+        @DisplayName("해설 이미지에도 key 제한을 그대로 적용한다. 걸린 해설은 S3 를 읽지 않고 빼며, 분석은 계속한다")
+        void appliesKeyRestrictionToAnswerImages(String answerUrl) {
+            stubObject("image/p1.webp", webpBytes());
+
+            AnalysisImageLoader.LoadedImages loaded =
+                    loader.loadForAnalysis(List.of(url("image/p1.webp")), List.of(answerUrl));
+
+            assertThat(loaded.problemImages()).hasSize(1);
+            assertThat(loaded.answerImages()).isEmpty();
+            verify(amazonS3Client, never()).getObject(BUCKET, "private/secret.webp");
+            verify(amazonS3Client, never()).getObject(org.mockito.ArgumentMatchers.eq(BUCKET),
+                    org.mockito.ArgumentMatchers.contains("private"));
+        }
+
+        @Test
+        @DisplayName("해설 이미지가 HEIC 처럼 지원하지 않는 형식이면 그 장만 빼고 다른 해설은 보낸다")
+        void skipsUnsupportedAnswerImage() {
+            stubObject("image/p1.webp", webpBytes());
+            stubObject("image/a1.heic", heifBytes("heic"));
+            stubObject("image/a2.webp", webpOfSize(50));
+
+            AnalysisImageLoader.LoadedImages loaded = loader.loadForAnalysis(List.of(url("image/p1.webp")),
+                    List.of(url("image/a1.heic"), url("image/a2.webp")));
+
+            assertThat(loaded.answerImages()).hasSize(1);
+            assertThat(bytesOf(loaded.answerImages().get(0))).hasSize(50);
+        }
+
+        @Test
+        @DisplayName("같은 HEIC 가 문제 이미지면 지금처럼 UNSUPPORTED_IMAGE 로 실패한다")
+        void unsupportedProblemImageStillFails() {
+            stubObject("image/p1.heic", heifBytes("heic"));
+
+            Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(() -> loader.loadForAnalysis(
+                    List.of(url("image/p1.heic")), List.of()));
+
+            assertReason(thrown, AnalysisFailureReason.UNSUPPORTED_IMAGE);
+        }
+
+        @Test
+        @DisplayName("해설 이미지가 S3 에 없으면(404) 그 장만 뺀다")
+        void skipsMissingAnswerImage() {
+            stubObject("image/p1.webp", webpBytes());
+            AmazonS3Exception notFound = new AmazonS3Exception("Not Found");
+            notFound.setStatusCode(404);
+            notFound.setErrorCode("NoSuchKey");
+            when(amazonS3Client.getObject(BUCKET, "image/gone.webp")).thenThrow(notFound);
+
+            assertThat(loader.loadForAnalysis(List.of(url("image/p1.webp")), List.of(url("image/gone.webp")))
+                    .answerImages()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("해설 이미지의 S3 일시 오류는 문제 이미지와 같이 재시도 대상으로 올린다")
+        void answerImageTransientErrorIsRetryable() {
+            stubObject("image/p1.webp", webpBytes());
+            AmazonS3Exception serverError = new AmazonS3Exception("Internal Error");
+            serverError.setStatusCode(500);
+            when(amazonS3Client.getObject(BUCKET, "image/a1.webp")).thenThrow(serverError);
+
+            assertThatThrownBy(() -> loader.loadForAnalysis(List.of(url("image/p1.webp")), List.of(url("image/a1.webp"))))
+                    .isInstanceOf(RuntimeException.class)
+                    .isNotInstanceOf(NonRetryableAnalysisException.class);
+        }
+
+        @Test
+        @DisplayName("해설 이미지의 S3 403(AccessDenied)은 재시도하지 않고 그 장만 빼며, 다른 해설은 보낸다")
+        void skipsAccessDeniedAnswerImage() {
+            stubObject("image/p1.webp", webpBytes());
+            stubObject("image/a2.webp", webpOfSize(50));
+            AmazonS3Exception denied = new AmazonS3Exception("Access Denied");
+            denied.setStatusCode(403);
+            denied.setErrorCode("AccessDenied");
+            when(amazonS3Client.getObject(BUCKET, "image/a1.webp")).thenThrow(denied);
+
+            AnalysisImageLoader.LoadedImages loaded = loader.loadForAnalysis(List.of(url("image/p1.webp")),
+                    List.of(url("image/a1.webp"), url("image/a2.webp")));
+
+            assertThat(loaded.problemImages()).hasSize(1);
+            assertThat(loaded.answerImages()).hasSize(1);
+            assertThat(bytesOf(loaded.answerImages().get(0))).hasSize(50);
+            assertThat(loaded.skippedAnswerReasons()).containsExactly(AnalysisImageLoader.SKIP_ACCESS_DENIED);
+        }
+
+        @Test
+        @DisplayName("상태 코드 없이 AccessDenied 코드만 와도 해설 이미지는 그 장만 뺀다")
+        void skipsAccessDeniedCodeAnswerImage() {
+            stubObject("image/p1.webp", webpBytes());
+            AmazonS3Exception denied = new AmazonS3Exception("Access Denied");
+            denied.setErrorCode("AccessDenied");
+            when(amazonS3Client.getObject(BUCKET, "image/a1.webp")).thenThrow(denied);
+
+            AnalysisImageLoader.LoadedImages loaded =
+                    loader.loadForAnalysis(List.of(url("image/p1.webp")), List.of(url("image/a1.webp")));
+
+            assertThat(loaded.answerImages()).isEmpty();
+            assertThat(loaded.skippedAnswerReasons()).containsExactly("access_denied");
+        }
+
+        @Test
+        @DisplayName("해설 이미지가 함께 있어도 문제 이미지의 S3 403 은 지금처럼 재시도 대상이고 해설은 읽지 않는다")
+        void problemImageAccessDeniedStaysRetryable() {
+            AmazonS3Exception denied = new AmazonS3Exception("Access Denied");
+            denied.setStatusCode(403);
+            denied.setErrorCode("AccessDenied");
+            when(amazonS3Client.getObject(BUCKET, "image/p1.webp")).thenThrow(denied);
+
+            assertThatThrownBy(() -> loader.loadForAnalysis(List.of(url("image/p1.webp")), List.of(url("image/a1.webp"))))
+                    .isInstanceOf(RuntimeException.class)
+                    .isNotInstanceOf(NonRetryableAnalysisException.class)
+                    .hasCause(denied);
+            verify(amazonS3Client, never()).getObject(BUCKET, "image/a1.webp");
+        }
+
+        @Test
+        @DisplayName("해설 이미지의 IO 오류(본문 읽기 실패)는 재시도 대상으로 올린다")
+        void answerImageIoErrorIsRetryable() {
+            stubObject("image/p1.webp", webpBytes());
+            stubObject("image/a1.webp", new InputStream() {
+                @Override
+                public int read() throws IOException {
+                    throw new IOException("connection reset");
+                }
+            }, 100L);
+
+            assertThatThrownBy(() -> loader.loadForAnalysis(List.of(url("image/p1.webp")), List.of(url("image/a1.webp"))))
+                    .isInstanceOf(RuntimeException.class)
+                    .isNotInstanceOf(NonRetryableAnalysisException.class);
+        }
+
+        @Test
+        @DisplayName("뺀 해설 이미지마다 이유를 남긴다(형식, 총용량, 장수 상한)")
+        void recordsSkipReasons() {
+            AnalysisImageLoader limited = new AnalysisImageLoader(amazonS3Client, BUCKET, 5, 100L, 2);
+            stubObject("image/p1.webp", webpOfSize(40));
+            stubObject("image/a1.heic", heifBytes("heic"));
+            stubObject("image/a2.webp", webpOfSize(70));
+
+            AnalysisImageLoader.LoadedImages loaded = limited.loadForAnalysis(List.of(url("image/p1.webp")),
+                    List.of(url("image/a1.heic"), url("image/a2.webp"), url("image/a3.webp")));
+
+            assertThat(loaded.answerImages()).isEmpty();
+            assertThat(loaded.skippedAnswerReasons()).containsExactlyInAnyOrder(
+                    AnalysisImageLoader.SKIP_OVER_COUNT,
+                    AnalysisFailureReason.UNSUPPORTED_IMAGE.tag(),
+                    AnalysisImageLoader.SKIP_TOTAL_SIZE);
+        }
+
+        @Test
+        @DisplayName("총용량 상한은 해설 이미지까지 합쳐 센다. 넘게 만드는 해설은 빼고, 남은 용량에 맞는 다음 해설은 넣는다")
+        void totalLimitIncludesAnswerImages() {
+            // 상한 110바이트: 문제 40 + 해설 50 = 90 은 통과, 여기에 해설 30 을 더하면 120 이라 뺀다, 해설 16 은 106 이라 넣는다
+            AnalysisImageLoader limited = new AnalysisImageLoader(amazonS3Client, BUCKET, 5, 110L, 5);
+            stubObject("image/p1.webp", webpOfSize(40));
+            stubObject("image/a1.webp", webpOfSize(50));
+            stubObject("image/a2.webp", webpOfSize(30));
+            stubObject("image/a3.webp", webpOfSize(16));
+
+            AnalysisImageLoader.LoadedImages loaded = limited.loadForAnalysis(List.of(url("image/p1.webp")),
+                    List.of(url("image/a1.webp"), url("image/a2.webp"), url("image/a3.webp")));
+
+            assertThat(loaded.problemImages()).hasSize(1);
+            assertThat(loaded.answerImages().stream().map(dataUrl -> bytesOf(dataUrl).length).toList())
+                    .as("합계가 상한을 넘지 않게 담는다")
+                    .containsExactly(50, 16);
+            int total = 40 + loaded.answerImages().stream().mapToInt(dataUrl -> bytesOf(dataUrl).length).sum();
+            assertThat(total).isEqualTo(106).isLessThanOrEqualTo(110);
+        }
+
+        @Test
+        @DisplayName("문제 이미지만으로 총용량을 넘으면 해설이 있어도 지금처럼 IMAGE_TOO_LARGE 로 실패한다")
+        void problemImagesOverTotalStillFail() {
+            AnalysisImageLoader limited = new AnalysisImageLoader(amazonS3Client, BUCKET, 5, 50L, 3);
+            stubObject("image/p1.webp", webpOfSize(40));
+            stubObject("image/p2.webp", webpOfSize(40));
+
+            Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(() -> limited.loadForAnalysis(
+                    List.of(url("image/p1.webp"), url("image/p2.webp")), List.of(url("image/a1.webp"))));
+
+            assertReason(thrown, AnalysisFailureReason.IMAGE_TOO_LARGE);
+            verify(amazonS3Client, never()).getObject(BUCKET, "image/a1.webp");
+        }
+
+        @Test
+        @DisplayName("기본 총용량 30MB 를 해설 이미지가 넘기게 하면 그 해설만 뺀다(문제 16MB + 해설 16MB)")
+        void defaultTotalLimitIncludesAnswerImages() {
+            stubObject("image/p1.webp", webpOfSize(16 * 1024 * 1024));
+            stubObject("image/a1.webp", webpOfSize(16 * 1024 * 1024));
+
+            AnalysisImageLoader.LoadedImages loaded = loader.loadForAnalysis(
+                    List.of(url("image/p1.webp")), List.of(url("image/a1.webp")));
+
+            assertThat(loaded.problemImages()).hasSize(1);
+            assertThat(loaded.answerImages()).isEmpty();
         }
     }
 }

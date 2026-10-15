@@ -47,7 +47,7 @@ public class ProblemAnalysisDispatcher {
             @Override
             public void afterCompletion(int status) {
                 // 요청이 롤백되면 메시지는 나가지 않았고 PROCESSING 도 저장되지 않았다.
-                // 표시와 한도를 남겨 두면 35분 동안 다시 요청하지 못하고 한도만 줄어든다.
+                // 표시와 한도를 남겨 두면 TTL(40분) 동안 다시 요청하지 못하고 한도만 줄어든다.
                 if (status == STATUS_ROLLED_BACK) {
                     dispatchGuard.release(problemId);
                     rateLimitService.refund(rateLimitKey, userId);

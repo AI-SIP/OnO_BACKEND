@@ -66,14 +66,14 @@ class OpenAIHttpClientConfigTest {
     }
 
     @Test
-    @DisplayName("기본 타임아웃은 connect 5초, read 60초")
+    @DisplayName("기본 타임아웃은 connect 5초, read 90초(내부 풀이로 출력이 길어져 60초에서 늘림)")
     void appliesDefaultTimeouts() {
         try (AnnotationConfigApplicationContext context = context(OPENAI_PROPERTIES)) {
             RestTemplate aiRestTemplate = context.getBean(OpenAIHttpClientConfig.AI_REST_TEMPLATE, RestTemplate.class);
 
             SimpleClientHttpRequestFactory factory = (SimpleClientHttpRequestFactory) aiRestTemplate.getRequestFactory();
             assertThat(ReflectionTestUtils.getField(factory, "connectTimeout")).isEqualTo(5000);
-            assertThat(ReflectionTestUtils.getField(factory, "readTimeout")).isEqualTo(60000);
+            assertThat(ReflectionTestUtils.getField(factory, "readTimeout")).isEqualTo(90000);
         }
     }
 
