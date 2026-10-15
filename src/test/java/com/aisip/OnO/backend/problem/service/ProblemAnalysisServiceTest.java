@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.exception.ErrorCase;
 import com.aisip.OnO.backend.common.ratelimit.RateLimitKeys;
 import com.aisip.OnO.backend.common.ratelimit.RateLimitService;
+import com.aisip.OnO.backend.config.rabbitmq.RabbitMQConfig;
 import com.aisip.OnO.backend.config.rabbitmq.RabbitRetryAttempts;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.problem.dto.ProblemAnalysisResponseDto;
@@ -879,9 +880,6 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
             assertThat(AnalysisFailureReason.IMAGE_TOO_LARGE.tag()).isEqualTo("image_too_large");
             assertThat(AnalysisFailureReason.IMAGE_TOO_LARGE.userMessage())
                     .isEqualTo("이미지가 너무 커서 분석하지 못했어요. 사진 수를 줄이거나 더 작은 사진으로 다시 올려 주세요.");
-            assertThat(AnalysisFailureReason.REQUEST_REJECTED.tag()).isEqualTo("request_rejected");
-            assertThat(AnalysisFailureReason.REQUEST_REJECTED.userMessage())
-                    .isEqualTo("AI가 이 요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.");
             assertThat(AnalysisFailureReason.TRANSIENT.userMessage())
                     .isEqualTo("일시적인 문제로 분석하지 못했어요. 잠시 후 다시 시도해 주세요.");
             assertThat(AnalysisFailureReason.UNSUPPORTED_IMAGE.userMessage())
@@ -897,7 +895,7 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
         @DisplayName("처리 중 표시 TTL 은 35분으로, 큐 TTL 30분과 처리 최대 시간을 더한 것보다 길다")
         void guardOutlivesQueueTtlPlusProcessing() {
             assertThat(ProblemAnalysisDispatchGuard.TTL).isEqualTo(Duration.ofMinutes(35));
-            Duration queueTtl = Duration.ofMinutes(30);
+            Duration queueTtl = Duration.ofMillis(RabbitMQConfig.GPT_ANALYSIS_QUEUE_TTL_MS);
             Duration maxProcessing = Duration.ofSeconds(60 * RabbitRetryAttempts.MAX_ATTEMPTS + 1 + 2);
             assertThat(ProblemAnalysisDispatchGuard.TTL).isGreaterThan(queueTtl.plus(maxProcessing));
         }

@@ -30,6 +30,8 @@ public class RabbitMQConfig {
     public static final String S3_DELETE_QUEUE = "s3.delete.queue";
     public static final String S3_DELETE_DLQ = "s3.delete.dlq"; // Dead Letter Queue
 
+    /** GPT 분석 큐 메시지 TTL. ProblemAnalysisDispatchGuard 의 처리 중 표시 TTL 은 이보다 길어야 한다. */
+    public static final int GPT_ANALYSIS_QUEUE_TTL_MS = 1_800_000;
     public static final String GPT_ANALYSIS_QUEUE = "gpt.analysis.queue";
     public static final String GPT_ANALYSIS_DLQ = "gpt.analysis.dlq";
 
@@ -174,7 +176,7 @@ public class RabbitMQConfig {
         return QueueBuilder.durable(GPT_ANALYSIS_QUEUE)
                 .withArgument("x-dead-letter-exchange", "")
                 .withArgument("x-dead-letter-routing-key", GPT_ANALYSIS_DLQ)
-                .withArgument("x-message-ttl", 1800000) // 30분 TTL
+                .withArgument("x-message-ttl", GPT_ANALYSIS_QUEUE_TTL_MS) // 30분 TTL
                 .build();
     }
 

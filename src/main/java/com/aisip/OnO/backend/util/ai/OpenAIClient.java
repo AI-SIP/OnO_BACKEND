@@ -39,11 +39,12 @@ public class OpenAIClient {
             "invalid_image", "invalid_image_format", "image_parse_error", "unsupported_image_media_type");
 
     /**
-     * 같은 요청을 다시 보내도 같은 결과가 나오는 4xx. 400(요청 형식), 404(모델·경로 없음), 413(본문 과대), 422(처리 불가).
-     * 401/403(키·권한 설정 오류)은 넣지 않는다. 재시도를 다 쓰고 DLQ 로 가야 Discord 알림으로 운영자가 알 수 있다.
-     * 408/409/429 는 시간이 지나면 풀릴 수 있어 재시도한다.
+     * 요청 본문이 너무 크다는 413 은 이미지 탓이라 재시도하지 않는다.
+     * 그 밖의 4xx(이미지 코드가 아닌 400, 401, 403, 404, 422 등)는 재시도한다. 스키마나 모델명, 키 같은 우리 쪽 설정이
+     * 잘못돼도 같은 상태 코드가 오는데, 재시도하지 않으면 모든 분석이 DLQ 알림 없이 조용히 실패하기 때문이다.
+     * OpenAI 는 4xx 응답에 과금하지 않으므로 재시도 비용은 S3 를 다시 읽는 정도다.
      */
-    private static final Set<Integer> REJECTED_REQUEST_STATUSES = Set.of(400, 404, 413, 422);
+    private static final int PAYLOAD_TOO_LARGE = 413;
 
     /** 모델 응답이나 오류 본문을 로그에 남길 때의 최대 길이 */
     static final int LOG_PREVIEW_LENGTH = 200;
@@ -137,10 +138,9 @@ public class OpenAIClient {
                 throw new NonRetryableAnalysisException(AnalysisFailureReason.UNSUPPORTED_IMAGE,
                         "OpenAI 가 이미지를 읽지 못했습니다: " + bodyPreview, e);
             }
-            if (REJECTED_REQUEST_STATUSES.contains(status)) {
-                log.warn("OpenAI rejected analysis request - status: {}, body: {}", status, bodyPreview);
-                throw new NonRetryableAnalysisException(AnalysisFailureReason.REQUEST_REJECTED,
-                        "OpenAI 가 분석 요청을 거부했습니다. status=" + status + ", body=" + bodyPreview, e);
+            if (status == PAYLOAD_TOO_LARGE) {
+                throw new NonRetryableAnalysisException(AnalysisFailureReason.IMAGE_TOO_LARGE,
+                        "OpenAI 요청 본문이 너무 큽니다. body=" + bodyPreview, e);
             }
             // 예외 메시지에는 응답 본문이 통째로 들어가므로 상태와 앞부분만 남긴다
             log.error("Error analyzing images - status: {}, body: {}", status, bodyPreview);

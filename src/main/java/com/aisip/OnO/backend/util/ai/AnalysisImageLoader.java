@@ -60,6 +60,8 @@ public class AnalysisImageLoader {
     /**
      * 분석에 쓰는 key 는 FileUploadService 가 만든 업로드 경로만 허용한다. 서버 권한으로 버킷의 다른 객체를 읽지 않게 하기 위해서다.
      * 현재 형식: image/yyyy/MM/dd/{UUID}.{확장자}
+     * 서버 업로드는 원본 파일명의 확장자를 그대로 붙여서, 확장자에 공백이나 한글 같은 문자가 있으면 정상 업로드인데도
+     * 여기서 거부된다. 드물고 그때도 한도는 돌려주므로, 인코딩이나 질의 문자열이 섞인 key 를 막는 쪽을 택한다.
      */
     private static final Pattern UPLOAD_KEY = Pattern.compile("image/[A-Za-z0-9/._-]+");
     /**

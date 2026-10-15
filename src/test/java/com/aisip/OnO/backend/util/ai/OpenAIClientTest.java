@@ -715,43 +715,44 @@ class OpenAIClientTest {
             assertThat(externalTimer("analyze_images", "failure")).isNotNull();
         }
 
-        @Test
-        @DisplayName("이미지와 무관한 400 은 같은 요청을 다시 보내도 같으므로 재시도하지 않는 REQUEST_REJECTED")
-        void otherBadRequestIsRejected() {
+        @ParameterizedTest(name = "{0}")
+        @ValueSource(ints = {400, 404, 422})
+        @DisplayName("이미지 코드가 아닌 400, 404, 422 는 재시도 대상이다. 스키마나 모델명 설정 오류도 DLQ 알림으로 드러나야 한다")
+        void nonImageClientErrorsAreRetryable(int status) {
             server.expect(requestTo(API_URL))
-                    .andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                    .andRespond(withStatus(HttpStatus.valueOf(status))
                             .contentType(MediaType.APPLICATION_JSON)
                             .body("{\"error\":{\"message\":\"Invalid schema for response_format\",\"code\":\"invalid_request_error\"}}"));
 
-            Throwable thrown = catchThrowable(() -> openAIClient.analyzeImage(IMAGE_URL));
-
-            assertThat(reasonOf(thrown)).isEqualTo(AnalysisFailureReason.REQUEST_REJECTED);
+            assertThatThrownBy(() -> openAIClient.analyzeImage(IMAGE_URL))
+                    .isInstanceOf(RuntimeException.class)
+                    .isNotInstanceOf(NonRetryableAnalysisException.class)
+                    .hasMessageContaining("status=" + status);
             assertThat(externalTimer("analyze_images", "failure")).isNotNull();
         }
 
         @Test
-        @DisplayName("본문이 JSON 이 아닌 400 도 REQUEST_REJECTED")
-        void badRequestWithNonJsonBodyIsRejected() {
+        @DisplayName("본문이 JSON 이 아닌 400 은 이미지 코드를 읽을 수 없으니 재시도 대상이다")
+        void badRequestWithNonJsonBodyIsRetryable() {
             server.expect(requestTo(API_URL))
                     .andRespond(withStatus(HttpStatus.BAD_REQUEST).body("invalid_image"));
 
-            assertThat(reasonOf(catchThrowable(() -> openAIClient.analyzeImage(IMAGE_URL))))
-                    .isEqualTo(AnalysisFailureReason.REQUEST_REJECTED);
+            assertThatThrownBy(() -> openAIClient.analyzeImage(IMAGE_URL))
+                    .isInstanceOf(RuntimeException.class)
+                    .isNotInstanceOf(NonRetryableAnalysisException.class);
         }
 
-        @ParameterizedTest(name = "{0}")
-        @ValueSource(ints = {400, 404, 413, 422})
-        @DisplayName("400, 404, 413, 422 는 이미지 코드가 아니어도 재시도하지 않는 REQUEST_REJECTED")
-        void rejectedStatusesAreNonRetryable(int status) {
+        @Test
+        @DisplayName("413(요청 본문 과대)은 이미지 탓이라 재시도하지 않는 IMAGE_TOO_LARGE")
+        void payloadTooLargeIsImageTooLarge() {
             server.expect(requestTo(API_URL))
-                    .andRespond(withStatus(HttpStatus.valueOf(status))
+                    .andRespond(withStatus(HttpStatus.PAYLOAD_TOO_LARGE)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .body("{\"error\":{\"message\":\"rejected\",\"code\":null}}"));
+                            .body("{\"error\":{\"message\":\"Request too large\",\"code\":null}}"));
 
             Throwable thrown = catchThrowable(() -> openAIClient.analyzeImage(IMAGE_URL));
 
-            assertThat(reasonOf(thrown)).isEqualTo(AnalysisFailureReason.REQUEST_REJECTED);
-            assertThat(thrown).hasMessageContaining("status=" + status);
+            assertThat(reasonOf(thrown)).isEqualTo(AnalysisFailureReason.IMAGE_TOO_LARGE);
         }
 
         @ParameterizedTest(name = "{0}")
@@ -779,7 +780,7 @@ class OpenAIClientTest {
 
             Throwable thrown = catchThrowable(() -> openAIClient.analyzeImage(IMAGE_URL));
 
-            assertThat(reasonOf(thrown)).isEqualTo(AnalysisFailureReason.REQUEST_REJECTED);
+            assertThat(thrown).isNotNull().isNotInstanceOf(NonRetryableAnalysisException.class);
             assertThat(thrown.getMessage()).doesNotContain(tail);
         }
 

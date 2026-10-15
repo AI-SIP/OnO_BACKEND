@@ -19,7 +19,6 @@ public enum AnalysisFailureReason {
     INVALID_IMAGE_SOURCE("invalid_image_source", "이미지를 불러오지 못했어요. 이미지를 다시 올려 주세요."),
     // 장수 상한은 설정값(openai.analysis.max-images)이라 문구에 숫자를 넣지 않는다
     TOO_MANY_IMAGES("too_many_images", "문제 이미지가 너무 많아요. 사진 수를 줄인 뒤 다시 분석해 주세요."),
-    REQUEST_REJECTED("request_rejected", "AI가 이 요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요."),
     INVALID_RESPONSE("invalid_response", "AI 분석 결과를 정리하지 못했어요. 잠시 후 다시 시도해 주세요."),
     QUOTA("quota", "지금은 AI 분석을 사용할 수 없어요. 잠시 후 다시 시도해 주세요."),
     DISPATCH("dispatch", "분석 요청을 보내지 못했어요. 다시 시도해 주세요."),
@@ -27,7 +26,9 @@ public enum AnalysisFailureReason {
     TRANSIENT("transient", "일시적인 문제로 분석하지 못했어요. 잠시 후 다시 시도해 주세요.");
 
     /**
-     * OpenAI 를 부르기 전에 이미지 쪽에서 끝난 실패. 사용자가 AI 를 쓰지 않았으므로 하루 한도 1회를 돌려준다.
+     * 이미지 탓으로 끝나 AI 분석이 이뤄지지 않은 실패. 하루 한도 1회를 돌려준다.
+     * 대부분 OpenAI 를 부르기 전에 로더가 판정하고, OpenAI 가 이미지 형식 오류(400)나 본문 과대(413)로
+     * 돌려보낸 경우도 여기에 든다. OpenAI 는 4xx 응답에 과금하지 않으므로 함께 돌려준다.
      */
     private static final Set<AnalysisFailureReason> QUOTA_REFUNDED = EnumSet.of(
             INVALID_IMAGE_SOURCE, UNSUPPORTED_IMAGE, TOO_MANY_IMAGES, IMAGE_TOO_LARGE);
