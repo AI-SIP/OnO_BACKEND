@@ -31,10 +31,12 @@ primary_skills=(
   pr
   report
   test
+  release-check
+  deploy-verify
 )
 
 # 모델이 스스로 부르면 안 되는 스킬(커밋, push, 이슈 생성, 파일 저장처럼 부수효과가 있는 것)
-manual_only_skills=(commit feat issue migrate pr)
+manual_only_skills=(commit feat issue migrate pr release-check deploy-verify)
 
 # SKILL.md 의 frontmatter 를 YAML 로 읽어 "키=값" 줄로 낸다. 파싱에 실패하면 0 이 아닌 값으로 끝난다.
 read_frontmatter() {
