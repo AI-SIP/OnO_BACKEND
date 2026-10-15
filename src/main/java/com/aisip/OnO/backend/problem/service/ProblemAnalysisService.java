@@ -107,6 +107,12 @@ public class ProblemAnalysisService {
         ProblemAnalysis analysis = analysisRepository.findByProblemId(problemId)
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
 
+        // 완료된 분석은 결과를 그대로 둔다. 요청 경로와 실패 기록(markFailed)이 COMPLETED 를 덮지 않는 것과 같은 규칙이다(#390)
+        if (analysis.getStatus() == AnalysisStatus.COMPLETED) {
+            log.info("Analysis already COMPLETED, skipping NO_IMAGE for problemId: {}", problemId);
+            return;
+        }
+
         analysis.updateToNoImage();
         analysisRepository.save(analysis);
         log.info("Updated analysis to NO_IMAGE for problemId: {}", problemId);

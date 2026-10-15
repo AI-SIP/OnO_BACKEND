@@ -298,6 +298,26 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
         }
 
         @Test
+        @DisplayName("updateToNoImage 는 완료된 분석의 상태와 결과를 바꾸지 않는다")
+        void keepsCompletedAnalysisOnNoImage() {
+            Problem problem = saveProblem(owner.getId(), ownerRoot);
+            saveSkippedAnalysis(problem);
+            inTransaction(() -> {
+                ProblemAnalysis analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
+                analysis.updateWithSuccess("수학", "계산", "[\"판별식\"]", "풀이", "실수", "팁");
+                problemAnalysisRepository.save(analysis);
+            });
+
+            analysisService.updateToNoImage(problem.getId());
+
+            ProblemAnalysis analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
+            assertThat(analysis.getStatus()).isEqualTo(AnalysisStatus.COMPLETED);
+            assertThat(analysis.getSubject()).isEqualTo("수학");
+            assertThat(analysis.getSolution()).isEqualTo("풀이");
+            assertThat(analysis.getErrorMessage()).isNotEqualTo("이미지가 없어 분석을 진행할 수 없습니다.");
+        }
+
+        @Test
         @DisplayName("updateToRateLimitExceeded 는 분석 레코드가 없으면 새로 만들어 표시한다")
         void createsRowWhenMarkingRateLimit() {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
