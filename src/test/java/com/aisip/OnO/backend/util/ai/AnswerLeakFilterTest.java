@@ -83,16 +83,24 @@ class AnswerLeakFilterTest {
         }
 
         @Test
-        @DisplayName("3글자 이상 글자 답은 단정 표현 없이도 지운다")
-        void longTextAnswerStandalone() {
-            assertThat(solutionAfter("빛을 받는 곳을 보세요. 이 과정은 광합성이다. 그래프를 해석하세요.", "광합성"))
+        @DisplayName("개념을 묻는 글자 답도 단정 표현 없이 개념을 짚는 힌트 문장은 지우지 않는다")
+        void conceptAnswerHintIsKept() {
+            // 답이 개념이면 그 개념을 짚는 문장이 곧 힌트라, 단독 일치로 지우면 분석 글이 비게 된다
+            String hint = "빛을 받는 곳을 보세요. 이 과정이 광합성과 어떻게 이어지는지 떠올려 보세요. 그래프를 해석하세요.";
+            assertThat(solutionAfter(hint, "광합성")).isEqualTo(hint);
+        }
+
+        @Test
+        @DisplayName("글자 답도 단정 표현과 함께 나오면 지운다")
+        void conceptAnswerWithAssertionIsRemoved() {
+            assertThat(solutionAfter("빛을 받는 곳을 보세요. 따라서 답은 광합성이다. 그래프를 해석하세요.", "광합성"))
                     .isEqualTo("빛을 받는 곳을 보세요. 그래프를 해석하세요.");
         }
 
         @Test
         @DisplayName("답의 공백 차이는 같은 답으로 본다(x = 2 와 x=2)")
         void whitespaceInsensitive() {
-            assertThat(solutionAfter("식을 정리하세요. 그러면 x=2 가 나온다.", "x = 2")).isEqualTo("식을 정리하세요.");
+            assertThat(solutionAfter("식을 정리하세요. 따라서 답은 x=2 이다.", "x = 2")).isEqualTo("식을 정리하세요.");
         }
 
         @Test

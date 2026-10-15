@@ -15,10 +15,10 @@ import java.util.regex.Pattern;
  *
  * 판단 규칙
  * - 문장 단위로 본다. 문장 일부만 잘라 내면 앞뒤가 어색한 글이 남기 때문이다.
- * - 단정 표현(정답, 답은, 따라서 답, 구하는 값은 등)과 답이 한 문장에 함께 있으면 지운다.
- * - 답이 숫자나 선지 번호(3, ③, 3번, -1.5)이거나 공백을 빼고 3글자보다 짧으면 단정 표현이 있을 때만 지운다.
- *   "3" 은 조건 정리("3개의 공")나 단계 번호에도 흔히 나와 단독 일치로 지우면 멀쩡한 문장이 사라진다.
- * - 그보다 긴 글자 답(예: "광합성", "x = 2")은 단정 표현이 없어도 문장에 나오면 지운다. 우연히 겹칠 일이 드물다.
+ * - 단정 표현(정답, 답은, 따라서 답, 구하는 값은 등)과 답이 한 문장에 함께 있을 때만 지운다.
+ *   답만 나오는 문장은 지우지 않는다. 숫자 답 "3" 은 조건 정리("3개의 공")에도 흔히 나오고,
+ *   개념을 묻는 문제(답이 "대동법", "광합성")는 그 개념을 짚는 힌트 문장이 곧 분석의 본문이라
+ *   단독 일치로 지우면 분석 글이 거의 비게 된다. 그런 노출은 프롬프트로 막는다.
  * - 숫자 답은 앞뒤가 다른 숫자로 이어지면 같은 답으로 보지 않는다("3" 은 "13", "3.5" 와 일치하지 않는다).
  * - 지운 뒤 필드가 비면 원문 대신 무난한 안내 문장을 둔다. 원문을 되살리면 걸러 낸 의미가 없다.
  */
@@ -29,9 +29,6 @@ final class AnswerLeakFilter {
     static final String FALLBACK_STUDY_TIPS = "관련 개념을 다시 정리한 뒤 비슷한 문제를 풀어 보세요.";
     static final String FALLBACK_KEY_POINT = "주어진 조건과 구하는 것 정리하기";
 
-    /** 단정 표현 없이 단독 일치만으로 지울 수 있는 글자 답의 최소 길이(공백 제외) */
-    static final int MIN_STANDALONE_LENGTH = 3;
-
     /**
      * 답을 단정하는 표현. "대답은" 처럼 다른 낱말의 끝인 "답" 은 제외한다.
      * 영어 문제 해설이 영어로 나오는 경우를 위해 answer is 도 둔다.
@@ -41,8 +38,6 @@ final class AnswerLeakFilter {
                     + "|구하(?:는|려는)\\s*값\\s*(?:은|는|이)|answer\\s*(?:is|:)",
             Pattern.CASE_INSENSITIVE);
 
-    /** 숫자 답과 선지 번호. 이런 답은 단정 표현이 있을 때만 지운다 */
-    private static final Pattern NUMERIC = Pattern.compile("[-+−]?[0-9]+(?:[.,/][0-9]+)*\\s*번?|[①-⑳]");
     private static final Pattern CHOICE = Pattern.compile("([1-9])\\s*번?|([①-⑨])");
     private static final Pattern TRAILING_PUNCTUATION = Pattern.compile("[.。]+$");
     private static final Pattern LIST_NUMBER = Pattern.compile("[0-9]{1,2}\\.");
@@ -168,21 +163,15 @@ final class AnswerLeakFilter {
     }
 
     static boolean leaksAnswer(String sentence, List<String> tokens) {
-        boolean asserts = ASSERTION.matcher(sentence).find();
+        if (!ASSERTION.matcher(sentence).find()) {
+            return false;
+        }
         for (String token : tokens) {
-            if (containsToken(sentence, token) && (asserts || isStandalone(token))) {
+            if (containsToken(sentence, token)) {
                 return true;
             }
         }
         return false;
-    }
-
-    private static boolean isStandalone(String token) {
-        if (NUMERIC.matcher(token).matches()) {
-            return false;
-        }
-        String compact = token.replaceAll("\\s", "");
-        return compact.codePointCount(0, compact.length()) >= MIN_STANDALONE_LENGTH;
     }
 
     /**

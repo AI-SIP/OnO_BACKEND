@@ -1446,15 +1446,15 @@ class OpenAIClientTest {
         @Test
         @DisplayName("문장을 지워 필드가 비면 원문 대신 무난한 안내 문장을 둔다. keyPoints 도 같다")
         void replacesEmptiedFieldsWithFallback() {
-            respondWithContent(fullAnalysisJson("광합성", "matches", List.of("광합성"),
-                    "정답은 광합성입니다.", "답은 광합성인데 호흡과 헷갈립니다.", "광합성 단원을 다시 보세요."));
+            respondWithContent(fullAnalysisJson("광합성", "matches", List.of("정답: 광합성"),
+                    "정답은 광합성입니다.", "답은 광합성인데 호흡과 헷갈립니다.", "정답인 광합성 단원을 다시 보세요."));
 
             ProblemAnalysisResult result = openAIClient.analyzeImage(IMAGE_URL);
 
             assertThat(result.getSolution()).isEqualTo(AnswerLeakFilter.FALLBACK_SOLUTION).contains("단계별로 접근해 보세요");
             assertThat(result.getCommonMistakes()).isEqualTo(AnswerLeakFilter.FALLBACK_COMMON_MISTAKES);
             assertThat(result.getStudyTips())
-                    .as("3글자 이상 글자 답은 단정 표현이 없어도 지운다")
+                    .as("단정 표현과 답이 함께 있는 문장만 남아 있었으므로 안내 문장으로 바뀐다")
                     .isEqualTo(AnswerLeakFilter.FALLBACK_STUDY_TIPS);
             assertThat(result.getKeyPoints()).containsExactly(AnswerLeakFilter.FALLBACK_KEY_POINT);
             for (String field : List.of("solution", "commonMistakes", "studyTips", "keyPoints")) {
