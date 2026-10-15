@@ -457,19 +457,19 @@ class AnalysisImageLoaderTest {
         }
 
         @Test
-        @DisplayName("S3 403(AccessDenied)도 404 처럼 재시도하지 않는 INVALID_IMAGE_SOURCE")
-        void accessDeniedIsNonRetryable() {
-            // ListBucket 권한이 없으면 없는 key 도 404 가 아니라 403 으로 온다
+        @DisplayName("S3 403(AccessDenied)은 재시도 대상이라 IAM 설정이 깨지면 DLQ 알림까지 간다")
+        void accessDeniedIsRetryable() {
+            // 없는 key 에도 403 이 올 수 있지만, 서버 IAM 설정이 깨졌을 때도 403 이 온다.
+            // 재시도하지 않으면 모든 분석이 알림 없이 조용히 실패하므로 재시도 대상으로 둔다
             AmazonS3Exception denied = new AmazonS3Exception("Access Denied");
             denied.setStatusCode(403);
             denied.setErrorCode("AccessDenied");
             when(amazonS3Client.getObject(BUCKET, "image/gone.jpg")).thenThrow(denied);
 
-            Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(
-                    () -> loader.loadAsDataUrls(List.of(URL_PREFIX + "image/gone.jpg")));
-
-            assertReason(thrown, AnalysisFailureReason.INVALID_IMAGE_SOURCE);
-            assertThat(thrown).hasCause(denied);
+            assertThatThrownBy(() -> loader.loadAsDataUrls(List.of(URL_PREFIX + "image/gone.jpg")))
+                    .isInstanceOf(RuntimeException.class)
+                    .isNotInstanceOf(NonRetryableAnalysisException.class)
+                    .hasCause(denied);
         }
 
         @Test

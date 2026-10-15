@@ -171,12 +171,11 @@ public class AnalysisImageLoader {
                 throw new NonRetryableAnalysisException(AnalysisFailureReason.INVALID_IMAGE_SOURCE,
                         "S3 에 이미지가 없습니다. key=" + key, e);
             }
-            // ListBucket 권한이 없으면 없는 key 도 404 가 아니라 403(AccessDenied)으로 온다.
-            // 서버 IAM 설정이 깨져도 403 이 오므로, 그 경우를 알아챌 수 있게 error 로 남긴다.
+            // 403 은 재시도 대상으로 둔다. 없는 key 에도 403 이 올 수 있지만(ListBucket 권한이 없을 때),
+            // 서버 IAM 설정이 깨진 경우에도 403 이 온다. 재시도하지 않으면 모든 분석이 DLQ 알림 없이
+            // 조용히 실패하므로, 드문 없는 key 의 재시도 비용보다 운영자가 알아채는 쪽을 택한다.
             if (e.getStatusCode() == 403 || "AccessDenied".equals(e.getErrorCode())) {
                 log.error("S3 access denied while loading analysis image - key: {}, errorCode: {}", key, e.getErrorCode());
-                throw new NonRetryableAnalysisException(AnalysisFailureReason.INVALID_IMAGE_SOURCE,
-                        "S3 이미지에 접근할 수 없습니다(403). key=" + key, e);
             }
             throw new RuntimeException("S3 이미지 조회에 실패했습니다. key=" + key, e);
         } catch (RuntimeException e) {
