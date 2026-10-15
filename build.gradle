@@ -89,7 +89,7 @@ dependencies {
 	testImplementation 'org.testcontainers:mysql'
 	testImplementation 'org.testcontainers:rabbitmq'
 	// 아키텍처 규칙을 테스트로 강제한다. 오늘 고친 결함들이 같은 형태로 재발하지 않도록 막는다.
-	testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
+	testImplementation 'com.tngtech.archunit:archunit-junit5:1.5.1'
 	testCompileOnly 'org.projectlombok:lombok'
 	testAnnotationProcessor 'org.projectlombok:lombok'
 
