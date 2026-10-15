@@ -35,7 +35,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * AI 분석에 보낼 문제 이미지를 서버가 S3 에서 직접 읽어 data URL 로 바꾼다.
+ * AI 분석에 보낼 문제 이미지와 해설 이미지를 서버가 S3 에서 직접 읽어 data URL 로 바꾼다.
  *
  * 이전에는 S3 URL 을 그대로 넘겨 OpenAI 가 직접 내려받았는데, 그 다운로드가 타임아웃 나면 400 으로 실패했다.
  * 등록 경로 중 일부는 URL 을 검증하지 않으므로 우리 버킷 URL 만 받고, 읽기는 URL 이 아니라 bucket/key 로 한다.
@@ -75,21 +75,26 @@ public class AnalysisImageLoader {
     private static final String S3_HOST_SUFFIX = ".amazonaws.com/";
     private static final Set<String> HEIF_BRANDS = Set.of("heic", "heix", "hevc", "heim", "heis", "mif1", "msf1");
 
+    static final int DEFAULT_MAX_ANSWER_IMAGES = 3;
+
     private final AmazonS3Client amazonS3Client;
     private final String bucket;
     private final int maxImages;
     private final long maxTotalBytes;
+    private final int maxAnswerImages;
 
     public AnalysisImageLoader(
             AmazonS3Client amazonS3Client,
             @Value("${cloud.aws.s3.bucket}") String bucket,
             @Value("${openai.analysis.max-images:5}") int maxImages,
-            @Value("${openai.analysis.max-total-bytes:" + DEFAULT_MAX_TOTAL_BYTES + "}") long maxTotalBytes
+            @Value("${openai.analysis.max-total-bytes:" + DEFAULT_MAX_TOTAL_BYTES + "}") long maxTotalBytes,
+            @Value("${openai.analysis.max-answer-images:" + DEFAULT_MAX_ANSWER_IMAGES + "}") int maxAnswerImages
     ) {
         this.amazonS3Client = amazonS3Client;
         this.bucket = bucket;
         this.maxImages = maxImages;
         this.maxTotalBytes = maxTotalBytes;
+        this.maxAnswerImages = maxAnswerImages;
     }
 
     enum ImageFormat {
@@ -103,22 +108,41 @@ public class AnalysisImageLoader {
     }
 
     /**
-     * 이미지 URL 목록을 OpenAI image_url.url 에 넣을 data URL 목록으로 바꾼다.
+     * 문제 이미지 URL 목록을 OpenAI image_url.url 에 넣을 data URL 목록으로 바꾼다.
      * 재시도로 해결되지 않는 문제(외부 URL, 형식, 장수, 크기)는 NonRetryableAnalysisException,
      * 그 밖의 S3/IO 오류는 재시도 대상인 일반 RuntimeException 으로 던진다.
      */
     public List<String> loadAsDataUrls(List<String> imageUrls) {
-        if (imageUrls == null || imageUrls.isEmpty()) {
+        return loadForAnalysis(imageUrls, List.of()).problemImages();
+    }
+
+    /**
+     * 문제 이미지와 해설 이미지를 함께 data URL 로 바꾼다. 총용량 상한은 둘을 합쳐 적용한다.
+     *
+     * 문제 이미지는 분석 대상이라 지금까지처럼 하나라도 문제가 있으면 분석을 실패시킨다.
+     * 해설 이미지는 모델이 답을 맞춰 보는 보조 자료라, 해설 때문에 분석 전체가 실패하지 않게 한다.
+     * - 상한(기본 3장)을 넘으면 앞에서부터 상한만큼만 쓴다
+     * - key 제한, 형식, 크기 검증은 문제 이미지와 똑같이 하고, 걸리면 그 해설 이미지만 빼고 보낸다
+     * - 문제 이미지를 먼저 담고, 해설 이미지를 더해 총용량을 넘으면 그 해설 이미지를 뺀다
+     * - S3 일시 오류는 문제 이미지와 같이 재시도 대상으로 올린다. 재시도하면 해설까지 넣어 분석할 수 있다
+     */
+    public LoadedImages loadForAnalysis(List<String> problemImageUrls, List<String> answerImageUrls) {
+        if (problemImageUrls == null || problemImageUrls.isEmpty()) {
             throw new NonRetryableAnalysisException(AnalysisFailureReason.UNREADABLE_IMAGE, "분석할 문제 이미지가 없습니다.");
         }
         // S3 를 읽기 전에 판정해야 많은 장수 요청이 재시도마다 S3 를 두드리지 않는다
-        if (imageUrls.size() > maxImages) {
+        if (problemImageUrls.size() > maxImages) {
             throw new NonRetryableAnalysisException(AnalysisFailureReason.TOO_MANY_IMAGES,
-                    "문제 이미지가 " + imageUrls.size() + "장으로 상한 " + maxImages + "장을 넘습니다.");
+                    "문제 이미지가 " + problemImageUrls.size() + "장으로 상한 " + maxImages + "장을 넘습니다.");
+        }
+        List<String> answers = answerImageUrls == null ? List.of() : answerImageUrls;
+        if (answers.size() > maxAnswerImages) {
+            log.info("Answer images over limit, using first {} of {}", maxAnswerImages, answers.size());
+            answers = answers.subList(0, maxAnswerImages);
         }
 
-        List<String> keys = imageUrls.stream().map(this::extractKey).toList();
-        List<String> dataUrls = new ArrayList<>(keys.size());
+        List<String> keys = problemImageUrls.stream().map(this::extractKey).toList();
+        List<String> problemDataUrls = new ArrayList<>(keys.size());
         long totalBytes = 0;
         for (String key : keys) {
             EncodedImage encoded = encode(key, readObject(key));
@@ -128,9 +152,40 @@ public class AnalysisImageLoader {
                 throw new NonRetryableAnalysisException(AnalysisFailureReason.IMAGE_TOO_LARGE,
                         "분석 이미지 합계가 상한 " + maxTotalBytes + " 바이트를 넘습니다. total=" + totalBytes);
             }
-            dataUrls.add("data:" + encoded.mimeType() + ";base64," + Base64.getEncoder().encodeToString(encoded.bytes()));
+            problemDataUrls.add(toDataUrl(encoded));
         }
-        return dataUrls;
+
+        List<String> answerDataUrls = new ArrayList<>(answers.size());
+        for (String answerUrl : answers) {
+            EncodedImage encoded;
+            try {
+                String key = extractKey(answerUrl);
+                encoded = encode(key, readObject(key));
+            } catch (NonRetryableAnalysisException e) {
+                log.warn("Skipping answer image - reason: {}, message: {}", e.getReason().tag(), e.getMessage());
+                continue;
+            }
+            if (totalBytes + encoded.bytes().length > maxTotalBytes) {
+                log.warn("Skipping answer image over total limit - total: {}, image: {}, limit: {}",
+                        totalBytes, encoded.bytes().length, maxTotalBytes);
+                continue;
+            }
+            totalBytes += encoded.bytes().length;
+            answerDataUrls.add(toDataUrl(encoded));
+        }
+        return new LoadedImages(problemDataUrls, answerDataUrls);
+    }
+
+    /** 분석에 보낼 data URL. 문제 이미지와 해설 이미지를 나눠 담아 프롬프트에서 라벨을 따로 붙인다 */
+    public record LoadedImages(List<String> problemImages, List<String> answerImages) {
+        public LoadedImages {
+            problemImages = List.copyOf(problemImages);
+            answerImages = List.copyOf(answerImages);
+        }
+    }
+
+    private static String toDataUrl(EncodedImage encoded) {
+        return "data:" + encoded.mimeType() + ";base64," + Base64.getEncoder().encodeToString(encoded.bytes());
     }
 
     String extractKey(String imageUrl) {
