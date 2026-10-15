@@ -2,7 +2,6 @@
 name: feat
 description: 승인된 계획서나 작업 설명을 기준으로 OnO 백엔드 기능을 구현한다. 구현만 하고 커밋하지 않는다. 사용자가 구현을 명시적으로 요청할 때만 사용한다.
 argument-hint: "<작업 설명 또는 계획서 경로 — 없으면 현재 변경분 이어서>"
-disable-model-invocation: true
 ---
 
 # feat — 기능 구현

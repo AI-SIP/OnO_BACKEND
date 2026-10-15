@@ -2,7 +2,6 @@
 name: issue
 description: 텍스트 설명이나 파일 내용을 받아 AI-SIP/OnO_BACKEND 에 레포 템플릿 형식의 GitHub 이슈를 생성한다. 사용자가 이슈 생성을 명시적으로 요청할 때만 사용한다.
 argument-hint: "<이슈 설명 또는 파일 경로>"
-disable-model-invocation: true
 ---
 
 # issue — GitHub 이슈 생성

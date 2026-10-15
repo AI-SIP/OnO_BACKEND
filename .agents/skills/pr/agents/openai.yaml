@@ -4,4 +4,4 @@ interface:
   default_prompt: "Use $pr to push the branch if needed and create this OnO pull request."
 
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true
