@@ -12,8 +12,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.http.client.MockClientHttpRequest;
@@ -216,6 +219,36 @@ class OpenAIClientTest {
             for (String field : List.of("subject", "problemType", "solution", "commonMistakes", "studyTips")) {
                 assertThat(properties.get(field).get("type").asText()).as(field).isEqualTo("string");
             }
+        }
+
+        @Test
+        @DisplayName("스키마의 7개 필드에 모두 description 이 있고, 필드 뜻을 모델에 알려 준다")
+        void describesEverySchemaField() {
+            AtomicReference<JsonNode> body = captureRequestAndRespond(chatCompletionJson(analysisJson(), "stop", null));
+
+            openAIClient.analyzeImage(IMAGE_URL);
+
+            JsonNode properties = body.get().get("response_format").get("json_schema").get("schema").get("properties");
+            for (String field : List.of("analyzable", "subject", "problemType", "keyPoints",
+                    "solution", "commonMistakes", "studyTips")) {
+                JsonNode description = properties.get(field).get("description");
+                assertThat(description).as(field + " description").isNotNull();
+                assertThat(description.isTextual()).as(field).isTrue();
+                assertThat(description.asText()).as(field).isNotBlank();
+            }
+            assertThat(properties.get("subject").get("description").asText()).contains("과목");
+            assertThat(properties.get("problemType").get("description").asText())
+                    .as("problemType 은 객관식 같은 형식이 아니라 단원이나 개념 영역이다")
+                    .contains("형식이 아니라")
+                    .contains("단원");
+            assertThat(properties.get("keyPoints").get("description").asText()).contains("2~4");
+            assertThat(properties.get("solution").get("description").asText())
+                    .contains("최종 답")
+                    .contains("단계");
+            assertThat(properties.get("analyzable").get("description").asText()).contains("false");
+            assertThat(properties.get("keyPoints").get("items").get("type").asText())
+                    .as("description 을 넣어도 배열 원소 타입은 그대로다")
+                    .isEqualTo("string");
         }
 
         @Test
@@ -499,6 +532,51 @@ class OpenAIClientTest {
                     .isEqualTo(AnalysisFailureReason.INVALID_RESPONSE);
         }
 
+        @Test
+        @ExtendWith(OutputCaptureExtension.class)
+        @DisplayName("JSON 이 아닌 긴 응답은 warn 로그에 앞 200자만 남긴다")
+        void logsOnlyPreviewOfNonJsonResponse(CapturedOutput output) {
+            String tail = "TAIL_MARKER_SHOULD_NOT_BE_LOGGED";
+            respondWithContent("이 문제는 어렵네요. " + "가".repeat(1000) + tail);
+
+            assertThat(reasonOf(catchThrowable(() -> openAIClient.analyzeImage(IMAGE_URL))))
+                    .isEqualTo(AnalysisFailureReason.INVALID_RESPONSE);
+
+            assertThat(output.getAll()).contains("Non-retryable analysis response detected");
+            assertThat(output.getAll()).doesNotContain(tail);
+        }
+
+        @Test
+        @ExtendWith(OutputCaptureExtension.class)
+        @DisplayName("깨진 JSON 응답도 error 로그와 스택 트레이스에 원문 전체를 남기지 않는다")
+        void logsOnlyPreviewOfBrokenJson(CapturedOutput output) {
+            String tail = "TAIL_MARKER_SHOULD_NOT_BE_LOGGED";
+            respondWithContent("{\"subject\": \"" + "나".repeat(1000) + tail + "\", }");
+
+            Throwable thrown = catchThrowable(() -> openAIClient.analyzeImage(IMAGE_URL));
+
+            assertThat(thrown).isNotInstanceOf(NonRetryableAnalysisException.class).hasMessageContaining("응답 파싱");
+            assertThat(output.getAll()).contains("Error parsing response");
+            assertThat(output.getAll()).doesNotContain(tail);
+            Throwable cause = thrown;
+            while (cause != null) {
+                assertThat(String.valueOf(cause.getMessage())).doesNotContain(tail);
+                cause = cause.getCause();
+            }
+        }
+
+        @Test
+        @DisplayName("preview 는 200자까지만 남기고 null 은 그대로 둔다")
+        void previewTruncates() {
+            assertThat(OpenAIClient.preview(null)).isNull();
+            assertThat(OpenAIClient.preview("짧은 응답")).isEqualTo("짧은 응답");
+            String longText = "a".repeat(OpenAIClient.LOG_PREVIEW_LENGTH) + "b".repeat(500);
+            assertThat(OpenAIClient.preview(longText))
+                    .startsWith("a".repeat(OpenAIClient.LOG_PREVIEW_LENGTH))
+                    .doesNotContain("b")
+                    .hasSizeLessThan(OpenAIClient.LOG_PREVIEW_LENGTH + 20);
+        }
+
         @ParameterizedTest(name = "\"{0}\"")
         @ValueSource(strings = {
                 "이 사진으로는 문제를 분석할 수 없습니다.",
@@ -638,12 +716,52 @@ class OpenAIClientTest {
         }
 
         @Test
-        @DisplayName("이미지와 무관한 400 은 재시도 가능한 RuntimeException")
-        void wrapsOtherBadRequest() {
+        @DisplayName("이미지와 무관한 400 은 같은 요청을 다시 보내도 같으므로 재시도하지 않는 REQUEST_REJECTED")
+        void otherBadRequestIsRejected() {
             server.expect(requestTo(API_URL))
                     .andRespond(withStatus(HttpStatus.BAD_REQUEST)
                             .contentType(MediaType.APPLICATION_JSON)
-                            .body("{\"error\":{\"message\":\"Timeout while downloading image\",\"code\":\"invalid_image_url\"}}"));
+                            .body("{\"error\":{\"message\":\"Invalid schema for response_format\",\"code\":\"invalid_request_error\"}}"));
+
+            Throwable thrown = catchThrowable(() -> openAIClient.analyzeImage(IMAGE_URL));
+
+            assertThat(reasonOf(thrown)).isEqualTo(AnalysisFailureReason.REQUEST_REJECTED);
+            assertThat(externalTimer("analyze_images", "failure")).isNotNull();
+        }
+
+        @Test
+        @DisplayName("본문이 JSON 이 아닌 400 도 REQUEST_REJECTED")
+        void badRequestWithNonJsonBodyIsRejected() {
+            server.expect(requestTo(API_URL))
+                    .andRespond(withStatus(HttpStatus.BAD_REQUEST).body("invalid_image"));
+
+            assertThat(reasonOf(catchThrowable(() -> openAIClient.analyzeImage(IMAGE_URL))))
+                    .isEqualTo(AnalysisFailureReason.REQUEST_REJECTED);
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @ValueSource(ints = {400, 404, 413, 422})
+        @DisplayName("400, 404, 413, 422 는 이미지 코드가 아니어도 재시도하지 않는 REQUEST_REJECTED")
+        void rejectedStatusesAreNonRetryable(int status) {
+            server.expect(requestTo(API_URL))
+                    .andRespond(withStatus(HttpStatus.valueOf(status))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .body("{\"error\":{\"message\":\"rejected\",\"code\":null}}"));
+
+            Throwable thrown = catchThrowable(() -> openAIClient.analyzeImage(IMAGE_URL));
+
+            assertThat(reasonOf(thrown)).isEqualTo(AnalysisFailureReason.REQUEST_REJECTED);
+            assertThat(thrown).hasMessageContaining("status=" + status);
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @ValueSource(ints = {401, 403, 408, 409})
+        @DisplayName("401, 403(키와 권한 설정), 408, 409 는 재시도 대상이다. 소진되면 DLQ 알림으로 운영자가 안다")
+        void configurationAndTransientStatusesAreRetryable(int status) {
+            server.expect(requestTo(API_URL))
+                    .andRespond(withStatus(HttpStatus.valueOf(status))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .body("{\"error\":{\"message\":\"Incorrect API key provided\",\"code\":\"invalid_api_key\"}}"));
 
             assertThatThrownBy(() -> openAIClient.analyzeImage(IMAGE_URL))
                     .isInstanceOf(RuntimeException.class)
@@ -652,14 +770,17 @@ class OpenAIClientTest {
         }
 
         @Test
-        @DisplayName("본문이 JSON 이 아닌 400 도 재시도 가능한 RuntimeException")
-        void wrapsBadRequestWithNonJsonBody() {
+        @DisplayName("오류 본문이 길면 예외 메시지에는 앞 200자만 남는다")
+        void truncatesLongErrorBody() {
+            String tail = "TAIL_MARKER_SHOULD_NOT_APPEAR";
+            String body = "{\"error\":{\"message\":\"" + "x".repeat(1000) + tail + "\"}}";
             server.expect(requestTo(API_URL))
-                    .andRespond(withStatus(HttpStatus.BAD_REQUEST).body("invalid_image"));
+                    .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON).body(body));
 
-            assertThatThrownBy(() -> openAIClient.analyzeImage(IMAGE_URL))
-                    .isInstanceOf(RuntimeException.class)
-                    .isNotInstanceOf(NonRetryableAnalysisException.class);
+            Throwable thrown = catchThrowable(() -> openAIClient.analyzeImage(IMAGE_URL));
+
+            assertThat(reasonOf(thrown)).isEqualTo(AnalysisFailureReason.REQUEST_REJECTED);
+            assertThat(thrown.getMessage()).doesNotContain(tail);
         }
 
         @Test

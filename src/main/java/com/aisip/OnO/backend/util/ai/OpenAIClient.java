@@ -38,6 +38,16 @@ public class OpenAIClient {
     private static final Set<String> IMAGE_FORMAT_ERROR_CODES = Set.of(
             "invalid_image", "invalid_image_format", "image_parse_error", "unsupported_image_media_type");
 
+    /**
+     * 같은 요청을 다시 보내도 같은 결과가 나오는 4xx. 400(요청 형식), 404(모델·경로 없음), 413(본문 과대), 422(처리 불가).
+     * 401/403(키·권한 설정 오류)은 넣지 않는다. 재시도를 다 쓰고 DLQ 로 가야 Discord 알림으로 운영자가 알 수 있다.
+     * 408/409/429 는 시간이 지나면 풀릴 수 있어 재시도한다.
+     */
+    private static final Set<Integer> REJECTED_REQUEST_STATUSES = Set.of(400, 404, 413, 422);
+
+    /** 모델 응답이나 오류 본문을 로그에 남길 때의 최대 길이 */
+    static final int LOG_PREVIEW_LENGTH = 200;
+
     private static final Map<String, Object> ANALYSIS_RESPONSE_FORMAT = createAnalysisResponseFormat();
 
     private final RestTemplate restTemplate;
@@ -118,15 +128,23 @@ public class OpenAIClient {
         } catch (HttpClientErrorException e) {
             recordExternalCall("openai", OPERATION_ANALYZE_IMAGES, "failure", sample);
             String responseBody = e.getResponseBodyAsString();
+            int status = e.getStatusCode().value();
+            String bodyPreview = preview(responseBody);
             if (isNonRetryableQuotaError(e, responseBody)) {
                 throw new NonRetryableAnalysisException(AnalysisFailureReason.QUOTA, "OpenAI 할당량이 초과되어 분석을 진행할 수 없습니다.", e);
             }
             if (isImageFormatError(e, responseBody)) {
                 throw new NonRetryableAnalysisException(AnalysisFailureReason.UNSUPPORTED_IMAGE,
-                        "OpenAI 가 이미지를 읽지 못했습니다: " + responseBody, e);
+                        "OpenAI 가 이미지를 읽지 못했습니다: " + bodyPreview, e);
             }
-            log.error("Error analyzing images: {}", e.getMessage(), e);
-            throw new RuntimeException("AI 이미지 분석 중 오류가 발생했습니다: " + e.getMessage(), e);
+            if (REJECTED_REQUEST_STATUSES.contains(status)) {
+                log.warn("OpenAI rejected analysis request - status: {}, body: {}", status, bodyPreview);
+                throw new NonRetryableAnalysisException(AnalysisFailureReason.REQUEST_REJECTED,
+                        "OpenAI 가 분석 요청을 거부했습니다. status=" + status + ", body=" + bodyPreview, e);
+            }
+            // 예외 메시지에는 응답 본문이 통째로 들어가므로 상태와 앞부분만 남긴다
+            log.error("Error analyzing images - status: {}, body: {}", status, bodyPreview);
+            throw new RuntimeException("AI 이미지 분석 중 오류가 발생했습니다. status=" + status + ", body=" + bodyPreview, e);
         } catch (NonRetryableAnalysisException e) {
             recordExternalCall("openai", OPERATION_ANALYZE_IMAGES, "failure", sample);
             log.warn("Non-retryable image analysis failure - reason: {}, message: {}", e.getReason(), e.getMessage());
@@ -366,16 +384,22 @@ public class OpenAIClient {
      * 앱이 그리는 필드 이름(ProblemAnalysisResult)은 그대로 두고 analyzable 만 더한다.
      */
     private static Map<String, Object> createAnalysisResponseFormat() {
-        Map<String, Object> stringType = Map.of("type", "string");
-
         Map<String, Object> properties = new LinkedHashMap<>();
-        properties.put("analyzable", Map.of("type", "boolean"));
-        properties.put("subject", stringType);
-        properties.put("problemType", stringType);
-        properties.put("keyPoints", Map.of("type", "array", "items", stringType));
-        properties.put("solution", stringType);
-        properties.put("commonMistakes", stringType);
-        properties.put("studyTips", stringType);
+        properties.put("analyzable", described("boolean",
+                "이미지에서 학습용 문제를 찾아 분석했으면 true, 문제를 찾을 수 없거나 알아볼 수 없으면 false"));
+        properties.put("subject", described("string", "과목명. 예: 수학, 영어, 물리, 행정법"));
+        properties.put("problemType", described("string",
+                "객관식·서술형 같은 문제 형식이 아니라 이 문제가 속한 단원이나 개념 영역. 예: 이차방정식의 판별식"));
+        Map<String, Object> keyPoints = new LinkedHashMap<>();
+        keyPoints.put("type", "array");
+        keyPoints.put("description", "이 문제를 푸는 데 필요한 핵심 개념이나 공식 2~4개");
+        keyPoints.put("items", Map.of("type", "string"));
+        properties.put("keyPoints", keyPoints);
+        properties.put("solution", described("string",
+                "최종 답이나 정답 선지를 밝히지 않고, 조건 정리, 필요한 개념, 접근 순서를 단계별로 설명한 풀이 방향"));
+        properties.put("commonMistakes", described("string",
+                "계산 실수보다 개념을 잘못 적용하거나 조건을 잘못 읽는 것처럼 이 문제에서 자주 하는 사고의 오류"));
+        properties.put("studyTips", described("string", "이 문제와 관련된 개념을 복습할 때 도움이 되는 구체적인 학습 방법"));
 
         Map<String, Object> schema = new LinkedHashMap<>();
         schema.put("type", "object");
@@ -392,6 +416,21 @@ public class OpenAIClient {
         responseFormat.put("type", "json_schema");
         responseFormat.put("json_schema", jsonSchema);
         return java.util.Collections.unmodifiableMap(responseFormat);
+    }
+
+    private static Map<String, Object> described(String type, String description) {
+        Map<String, Object> property = new LinkedHashMap<>();
+        property.put("type", type);
+        property.put("description", description);
+        return property;
+    }
+
+    /** 모델 응답이나 오류 본문을 로그에 남길 때 앞부분만 자른다. 이미지(base64)가 섞여 들어와도 통째로 남지 않게 한다 */
+    static String preview(String text) {
+        if (text == null) {
+            return null;
+        }
+        return text.length() <= LOG_PREVIEW_LENGTH ? text : text.substring(0, LOG_PREVIEW_LENGTH) + "...(" + text.length() + "자)";
     }
 
     private String createLearningReportSystemPrompt() {
@@ -444,11 +483,13 @@ public class OpenAIClient {
 
         } catch (Exception e) {
             if (e instanceof NonRetryableAnalysisException nonRetryableAnalysisException) {
-                log.warn("Non-retryable analysis response detected: {}", response);
+                log.warn("Non-retryable analysis response detected: {}", preview(response));
                 throw nonRetryableAnalysisException;
             }
-            log.error("Error parsing response: {}", response, e);
-            throw new RuntimeException("AI 분석 결과 응답 파싱 중 오류가 발생했습니다.", e);
+            // Jackson 예외 메시지에는 응답 원문 일부(최대 500자)가 들어가므로 앞부분만 남기고, 원인으로 잇지 않는다.
+            // 이어 두면 상위의 스택 트레이스 로그에 그대로 찍힌다.
+            log.error("Error parsing response: {}, error: {}", preview(response), preview(e.toString()));
+            throw new RuntimeException("AI 분석 결과 응답 파싱 중 오류가 발생했습니다: " + e.getClass().getSimpleName());
         }
     }
 
@@ -580,7 +621,7 @@ public class OpenAIClient {
         try {
             return objectMapper.readValue(jsonContent, Map.class);
         } catch (Exception strictParseException) {
-            log.warn("Strict JSON parse failed, retrying with lenient parser: {}", strictParseException.getMessage());
+            log.warn("Strict JSON parse failed, retrying with lenient parser: {}", preview(strictParseException.getMessage()));
             return LENIENT_OBJECT_MAPPER.readValue(jsonContent, Map.class);
         }
     }
