@@ -563,6 +563,26 @@ class ProblemControllerTest extends ProblemTestSupport {
             assertThat(problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow().getStatus())
                     .isEqualTo(com.aisip.OnO.backend.problem.entity.AnalysisStatus.NO_IMAGE);
         }
+
+        @Test
+        @DisplayName("PATCH /{id}/no-image - 완료된 분석은 그대로 둔다")
+        void keepsCompletedAnalysisOnNoImage() throws Exception {
+            Problem problem = saveProblem(owner.getId(), ownerRoot);
+            saveSkippedAnalysis(problem);
+            inTransaction(() -> {
+                var analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
+                analysis.updateWithSuccess("수학", "계산", "[\"판별식\"]", "풀이", "실수", "팁");
+                problemAnalysisRepository.save(analysis);
+            });
+
+            mockMvc.perform(patch("/api/problems/{id}/no-image", problem.getId()))
+                    .andExpect(status().isOk());
+
+            var analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
+            assertThat(analysis.getStatus())
+                    .isEqualTo(com.aisip.OnO.backend.problem.entity.AnalysisStatus.COMPLETED);
+            assertThat(analysis.getSubject()).isEqualTo("수학");
+        }
     }
 
     // ════════════════════════════ 수정/삭제 ════════════════════════════
