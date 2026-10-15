@@ -15,11 +15,14 @@ import java.util.regex.Pattern;
  *
  * 판단 규칙
  * - 문장 단위로 본다. 문장 일부만 잘라 내면 앞뒤가 어색한 글이 남기 때문이다.
- * - 단정 표현(정답, 답은, 따라서 답, 구하는 값은 등)과 답이 한 문장에 함께 있을 때만 지운다.
+ * - 단정 표현(정답은, 답은, 따라서 답, 구하는 값은, 옳은 것은 등)과 답이 한 문장에 함께 있을 때만 지운다.
+ *   "정답", "해답" 은 조사나 기호가 붙은 단정 형태(정답은, 정답:)이거나 바로 뒤에 답이 올 때(정답 ③)만 단정으로 본다.
+ *   "정답을 찾기 위해 3단계로" 처럼 낱말만 나오는 문장까지 지우면 풀이 안내가 사라진다.
  *   답만 나오는 문장은 지우지 않는다. 숫자 답 "3" 은 조건 정리("3개의 공")에도 흔히 나오고,
  *   개념을 묻는 문제(답이 "대동법", "광합성")는 그 개념을 짚는 힌트 문장이 곧 분석의 본문이라
  *   단독 일치로 지우면 분석 글이 거의 비게 된다. 그런 노출은 프롬프트로 막는다.
  * - 숫자 답은 앞뒤가 다른 숫자로 이어지면 같은 답으로 보지 않는다("3" 은 "13", "3.5" 와 일치하지 않는다).
+ * - 영문 한 글자 답(A~E 등)은 대소문자를 구분한다. 구분하지 않으면 관사 "a" 와 일치한다.
  * - 지운 뒤 필드가 비면 원문 대신 무난한 안내 문장을 둔다. 원문을 되살리면 걸러 낸 의미가 없다.
  */
 final class AnswerLeakFilter {
@@ -31,14 +34,25 @@ final class AnswerLeakFilter {
 
     /**
      * 답을 단정하는 표현. "대답은" 처럼 다른 낱말의 끝인 "답" 은 제외한다.
+     * "정답", "해답" 은 조사나 기호가 붙은 형태만 본다("정답을 찾기 위해" 는 단정이 아니다). 바로 뒤에 답이 오는
+     * "정답 3" 은 답에 따라 달라지므로 leaksAnswer 에서 따로 본다.
+     * 객관식 해설의 결론 표현(옳은 것은, 적절하지 않은 것은 등)도 단정으로 본다. "값은" 단독은 조건 설명에도 흔해 넣지 않는다.
      * 영어 문제 해설이 영어로 나오는 경우를 위해 answer is 도 둔다.
      */
     private static final Pattern ASSERTION = Pattern.compile(
-            "정답|해답|최종\\s*답|따라서\\s*답|(?<![가-힣])답\\s*(?:은|는|이|:|=)"
-                    + "|구하(?:는|려는)\\s*값\\s*(?:은|는|이)|answer\\s*(?:is|:)",
+            "(?:정답|해답)\\s*(?:은|는|이|인|:|=|으로|입니다)|(?:정답|해답)\\s*[.。!]?\\s*$"
+                    + "|최종\\s*답|따라서\\s*답|(?<![가-힣])답\\s*(?:은|는|이|:|=)"
+                    + "|구하(?:는|려는)\\s*값\\s*(?:은|는|이)"
+                    + "|(?:옳은|옳지\\s*않은|적절한|적절하지\\s*않은|알맞은|알맞지\\s*않은|바른|바르지\\s*않은|맞는|맞지\\s*않는)"
+                    + "\\s*것\\s*(?:은|는|이|으로|:|=)"
+                    + "|answer\\s*(?:is|:)",
             Pattern.CASE_INSENSITIVE);
 
-    private static final Pattern CHOICE = Pattern.compile("([1-9])\\s*번?|([①-⑨])");
+    /** "정답 ③", "해답: 3" 처럼 낱말 바로 뒤에 답이 오는 형태. 뒤에 답 표기를 붙여 쓴다 */
+    private static final String ANSWER_NOUN_PREFIX = "(?:정답|해답)\\s*[:=]?\\s*";
+
+    /** 선지 번호. 1~20 과 ①~⑳ 을 서로 바꿔 본다(유니코드 ①~⑳ 은 U+2460~U+2473 으로 이어져 있다) */
+    private static final Pattern CHOICE = Pattern.compile("(1[0-9]|20|[1-9])\\s*번?|([①-⑳])");
     private static final Pattern TRAILING_PUNCTUATION = Pattern.compile("[.。]+$");
     private static final Pattern LIST_NUMBER = Pattern.compile("[0-9]{1,2}\\.");
 
@@ -92,6 +106,7 @@ final class AnswerLeakFilter {
         tokens.add(answer);
         Matcher choice = CHOICE.matcher(answer);
         if (choice.matches()) {
+            // 정규식이 1~20, ①~⑳ 만 받으므로 number 는 1~20 이고 '①' + number - 1 은 ①~⑳ 안에 든다
             int number = choice.group(1) != null
                     ? Integer.parseInt(choice.group(1))
                     : choice.group(2).charAt(0) - '①' + 1;
@@ -163,11 +178,9 @@ final class AnswerLeakFilter {
     }
 
     static boolean leaksAnswer(String sentence, List<String> tokens) {
-        if (!ASSERTION.matcher(sentence).find()) {
-            return false;
-        }
+        boolean asserted = ASSERTION.matcher(sentence).find();
         for (String token : tokens) {
-            if (containsToken(sentence, token)) {
+            if (asserted ? containsToken(sentence, token) : matches(sentence, ANSWER_NOUN_PREFIX + tokenRegex(token), token)) {
                 return true;
             }
         }
@@ -177,8 +190,23 @@ final class AnswerLeakFilter {
     /**
      * 답 표기의 공백은 있어도 없어도 같게 본다("x = 2" 와 "x=2"). 숫자로 시작하거나 끝나는 답은 앞뒤가 숫자로 이어지면,
      * 영문자로 시작하거나 끝나는 답은 앞뒤가 영문자로 이어지면 다른 낱말로 본다.
+     * 영문 한 글자 답은 대소문자를 구분하고, 그 밖의 답은 구분하지 않는다.
      */
     static boolean containsToken(String sentence, String token) {
+        return matches(sentence, tokenRegex(token), token);
+    }
+
+    private static boolean matches(String sentence, String regex, String token) {
+        int flags = isSingleAsciiLetter(token) ? 0 : Pattern.CASE_INSENSITIVE;
+        return Pattern.compile(regex, flags).matcher(sentence).find();
+    }
+
+    private static boolean isSingleAsciiLetter(String token) {
+        String stripped = token.strip();
+        return stripped.length() == 1 && isAsciiLetter(stripped.charAt(0));
+    }
+
+    private static String tokenRegex(String token) {
         String[] parts = token.strip().split("\\s+");
         StringBuilder regex = new StringBuilder();
         char first = token.strip().charAt(0);
@@ -199,7 +227,7 @@ final class AnswerLeakFilter {
         } else if (isAsciiLetter(last)) {
             regex.append("(?![A-Za-z])");
         }
-        return Pattern.compile(regex.toString(), Pattern.CASE_INSENSITIVE).matcher(sentence).find();
+        return regex.toString();
     }
 
     /**

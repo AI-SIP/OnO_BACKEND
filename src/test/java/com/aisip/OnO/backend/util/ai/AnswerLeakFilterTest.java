@@ -234,6 +234,119 @@ class AnswerLeakFilterTest {
     }
 
     @Nested
+    @DisplayName("검증 지적 반영 - 단정 표현과 답 비교")
+    class ReviewFollowUps {
+
+        @ParameterizedTest(name = "\"{0}\"")
+        @ValueSource(strings = {
+                "정답을 찾기 위해 3단계로 나눠 생각하세요.",
+                "정답을 고르기 전에 선지 ③ 의 조건을 확인하세요.",
+                "해답을 보기 전에 3가지 조건을 먼저 정리하세요.",
+                "해답 풀이를 보며 3단계 전략을 비교하세요."
+        })
+        @DisplayName("C: 조사나 기호 없이 '정답', '해답' 낱말만 나오는 문장은 지우지 않는다")
+        void bareAnswerNounIsNotAssertion(String sentence) {
+            assertThat(solutionAfter(sentence, "3")).isEqualTo(sentence);
+        }
+
+        @ParameterizedTest(name = "\"{0}\"")
+        @ValueSource(strings = {
+                "정답이 3번이다.",
+                "③이 정답입니다.",
+                "따라서 ③이 정답.",
+                "정답 ③ 을 고르면 된다.",
+                "해답은 3이다.",
+                "해답: ③.",
+                "정답으로 3번을 고른다.",
+                "정답인 ③ 을 떠올리세요."
+        })
+        @DisplayName("C: 조사나 기호가 붙은 단정 형태, 낱말 바로 뒤의 답은 지운다")
+        void assertedAnswerNounIsRemoved(String sentence) {
+            assertThat(solutionAfter("조건을 정리하세요. " + sentence + " 부호를 확인하세요.", "3"))
+                    .isEqualTo("조건을 정리하세요. 부호를 확인하세요.");
+        }
+
+        @ParameterizedTest(name = "\"{0}\"")
+        @ValueSource(strings = {
+                "The answer is a noun phrase in the first sentence.",
+                "The answer is about a change in the main idea.",
+                "Answer: a key word appears in line 3."
+        })
+        @DisplayName("D: 영문 한 글자 답(A)은 대소문자를 구분해 관사 a 와 일치하지 않는다")
+        void singleLetterAnswerIsCaseSensitive(String sentence) {
+            assertThat(solutionAfter(sentence, "A")).isEqualTo(sentence);
+        }
+
+        @ParameterizedTest(name = "\"{0}\"")
+        @ValueSource(strings = {"The answer is A.", "정답은 (A) 이다.", "Answer: A."})
+        @DisplayName("D: 영문 한 글자 답도 같은 대소문자로 단정되면 지운다")
+        void singleLetterAnswerIsRemoved(String sentence) {
+            assertThat(solutionAfter("Read the passage. " + sentence + " Check the tone.", "A"))
+                    .isEqualTo("Read the passage. Check the tone.");
+        }
+
+        @Test
+        @DisplayName("D: 두 글자 이상 영문 답은 지금처럼 대소문자를 구분하지 않는다")
+        void multiLetterAnswerIsCaseInsensitive() {
+            assertThat(solutionAfter("Read it. The answer is BECAUSE.", "because")).isEqualTo("Read it.");
+        }
+
+        @ParameterizedTest(name = "\"{0}\"")
+        @ValueSource(strings = {
+                "따라서 옳은 것은 ③이다.",
+                "옳지 않은 것은 3번이다.",
+                "적절한 것은 ③.",
+                "적절하지 않은 것은 ③입니다.",
+                "알맞은 것은 3번이다.",
+                "바른 것은 ③이다.",
+                "올바른 것은 ③이다.",
+                "맞는 것이 ③번이다.",
+                "옳은 것: ③."
+        })
+        @DisplayName("E: 객관식 해설의 결론 표현과 답이 함께 있으면 지운다")
+        void choiceConclusionIsRemoved(String sentence) {
+            assertThat(solutionAfter("선지를 하나씩 보세요. " + sentence + " 근거를 확인하세요.", "3"))
+                    .isEqualTo("선지를 하나씩 보세요. 근거를 확인하세요.");
+        }
+
+        @ParameterizedTest(name = "\"{0}\"")
+        @ValueSource(strings = {
+                "옳은 것을 고르기 전에 선지 ③ 의 조건부터 확인하세요.",
+                "적절한 것을 찾으려면 3가지 기준을 세우세요.",
+                "값은 3 이상이어야 한다는 조건을 확인하세요.",
+                "x 의 값은 3 보다 큰지 따져 보세요."
+        })
+        @DisplayName("E: 결론 표현이 아닌 문장, '값은' 단독은 답이 있어도 지우지 않는다")
+        void nonConclusionIsKept(String sentence) {
+            assertThat(solutionAfter(sentence, "3")).isEqualTo(sentence);
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @CsvSource({"10,⑩", "12,⑫", "15번,⑮", "⑳,⑳", "⑪,⑪"})
+        @DisplayName("F: 10 이상 선지 번호도 숫자, 원 숫자, 번 표기를 서로 바꿔 본다")
+        void choiceNumbersUpToTwenty(String answer, String circled) {
+            int number = circled.charAt(0) - '①' + 1;
+            assertThat(AnswerLeakFilter.answerTokens(answer)).contains(circled, number + "번", String.valueOf(number));
+        }
+
+        @Test
+        @DisplayName("F: 21 이상은 선지 번호로 보지 않아 원 숫자를 만들지 않는다")
+        void choiceNumbersAboveTwenty() {
+            assertThat(AnswerLeakFilter.answerTokens("21")).containsExactly("21");
+            assertThat(AnswerLeakFilter.answerTokens("0")).containsExactly("0");
+        }
+
+        @Test
+        @DisplayName("F: 답이 12 이면 '정답은 ⑫' 는 지우고 '정답은 ②' 나 '112쪽' 은 남긴다")
+        void twoDigitChoiceRemoval() {
+            assertThat(solutionAfter("조건을 보세요. 정답은 ⑫이다.", "12")).isEqualTo("조건을 보세요.");
+            assertThat(solutionAfter("조건을 보세요. 정답은 12번이다.", "⑫")).isEqualTo("조건을 보세요.");
+            String kept = "정답은 ②와 비교해 보세요. 해답은 112쪽에 있습니다.";
+            assertThat(solutionAfter(kept, "12")).isEqualTo(kept);
+        }
+    }
+
+    @Nested
     @DisplayName("문장 나누기")
     class SentenceSplit {
 
