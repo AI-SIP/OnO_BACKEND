@@ -30,6 +30,7 @@ public class ProblemAnalysisDbService {
     private final ProblemImageDataRepository problemImageDataRepository;
     private final ProblemAnalysisRepository analysisRepository;
     private final ProblemAnalysisDispatchGuard dispatchGuard;
+    private final ProblemAnalysisQuotaRefunder quotaRefunder;
 
     @Transactional(readOnly = true)
     public AnalysisPreparation fetchAnalysisPreparation(Long problemId) {
@@ -68,6 +69,29 @@ public class ProblemAnalysisDbService {
         analysisRepository.save(analysis);
         // 분석이 끝났으니 처리 중 표시를 지운다. COMPLETED 는 다시 요청해도 건너뛰므로 순서는 중요하지 않다.
         dispatchGuard.releaseAfterCommit(problemId);
+    }
+
+    /**
+     * 메시지를 보낸 뒤 처리 전에 문제 이미지가 모두 지워진 경우. 분석할 것이 없으니 실패가 아니라 요청 때와 같은 NO_IMAGE 로 둔다.
+     * AI 를 쓰지 않았으므로 PROCESSING 에서 바뀔 때만 한도 1회를 돌려준다(겹친 메시지가 두 번 돌려주지 않게).
+     */
+    @Transactional
+    public void finishWithoutImage(Long problemId) {
+        ProblemAnalysis analysis = analysisRepository.findByProblemId(problemId)
+                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_ANALYSIS_NOT_FOUND));
+        if (analysis.getStatus().equals(AnalysisStatus.COMPLETED)) {
+            log.info("Analysis already COMPLETED, skipping NO_IMAGE. problemId: {}", problemId);
+            dispatchGuard.releaseAfterCommit(problemId);
+            return;
+        }
+        boolean wasProcessing = analysis.getStatus().equals(AnalysisStatus.PROCESSING);
+        analysis.updateToNoImage();
+        analysisRepository.save(analysis);
+        if (wasProcessing) {
+            quotaRefunder.refundAfterCommit(analysis.getProblem().getUserId());
+        }
+        dispatchGuard.releaseAfterCommit(problemId);
+        log.info("No problem image left at analysis time, marked NO_IMAGE. problemId: {}", problemId);
     }
 
     public record AnalysisPreparation(List<String> imageUrls, boolean alreadyCompleted) {}

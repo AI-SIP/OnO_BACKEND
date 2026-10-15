@@ -268,8 +268,8 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
         }
 
         @Test
-        @DisplayName("재시도 인터셉터 안에서는 시도마다 FAILED 로 바꾸지 않고, DLQ 에서 한 번만 FAILED 로 바꾼다")
-        void keepsProcessingUntilDeadLetter() {
+        @DisplayName("재시도 인터셉터 안에서는 1, 2회차에 PROCESSING 을 두고 3회차에 FAILED 로 바꾸며, 뒤이은 DLQ 는 다시 세지 않는다")
+        void marksFailedOnLastAttemptAndDeadLetterDoesNotDoubleCount() {
             Problem problem = analyzableProblem();
             inTransaction(() -> {
                 ProblemAnalysis analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
@@ -279,19 +279,26 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
             given(openAIClient.analyzeImages(anyList())).willThrow(imageDownloadTimeout());
             double maxRetriesBefore = failureCount(AnalysisFailureReason.MAX_RETRIES);
             double transientBefore = failureCount(AnalysisFailureReason.TRANSIENT);
+            List<AnalysisStatus> statusAfterAttempt = new ArrayList<>();
 
             // 리스너 컨테이너의 재시도 인터셉터와 같이 한 스레드에서 RetryContext 를 걸고 세 번 부른다.
             RetryTemplate retryTemplate = RetryTemplate.builder()
                     .maxAttempts(RabbitRetryAttempts.MAX_ATTEMPTS).noBackoff().build();
             assertThatThrownBy(() -> retryTemplate.execute(context -> {
-                consumer.handleAnalysisMessage(analysisMessage(problem.getId()));
-                return null;
+                try {
+                    consumer.handleAnalysisMessage(analysisMessage(problem.getId()));
+                    return null;
+                } finally {
+                    statusAfterAttempt.add(statusOf(problem));
+                }
             })).isInstanceOf(RuntimeException.class);
 
             verify(openAIClient, times(RabbitRetryAttempts.MAX_ATTEMPTS)).analyzeImages(anyList());
-            assertThat(statusOf(problem))
-                    .as("중간에 FAILED 가 보이면 앱이 폴링을 멈춰 뒤이은 재시도 성공을 놓친다")
-                    .isEqualTo(AnalysisStatus.PROCESSING);
+            assertThat(statusAfterAttempt)
+                    .as("중간에 FAILED 가 보이면 앱이 폴링을 멈춘다. 마지막 시도는 DLQ 를 기다리지 않고 FAILED 로 바꾼다")
+                    .containsExactly(AnalysisStatus.PROCESSING, AnalysisStatus.PROCESSING, AnalysisStatus.FAILED);
+            assertThat(errorMessageOf(problem)).isEqualTo(AnalysisFailureReason.MAX_RETRIES.userMessage());
+            assertThat(failureCount(AnalysisFailureReason.MAX_RETRIES)).isEqualTo(maxRetriesBefore + 1);
             assertThat(failureCount(AnalysisFailureReason.TRANSIENT))
                     .as("재시도 중간 실패는 메트릭에 세지 않는다")
                     .isEqualTo(transientBefore);
@@ -301,8 +308,10 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
             assertThat(statusOf(problem)).isEqualTo(AnalysisStatus.FAILED);
             assertThat(errorMessageOf(problem)).isEqualTo(AnalysisFailureReason.MAX_RETRIES.userMessage());
             assertThat(failureCount(AnalysisFailureReason.MAX_RETRIES))
-                    .as("메시지 하나의 최종 실패는 한 번만 센다")
+                    .as("마지막 시도에서 이미 센 실패를 DLQ 가 다시 세지 않는다")
                     .isEqualTo(maxRetriesBefore + 1);
+            verify(discordWebhookNotificationService).sendErrorNotification(
+                    eq("RabbitMQ DLQ - GPT Analysis"), anyString(), eq("ERROR"), anyString());
         }
 
         @Test

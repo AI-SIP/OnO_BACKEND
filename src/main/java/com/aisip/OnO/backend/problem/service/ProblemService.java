@@ -3,6 +3,7 @@ package com.aisip.OnO.backend.problem.service;
 import com.aisip.OnO.backend.common.response.CursorSort;
 import com.aisip.OnO.backend.admin.dto.AdminProblemResponseDto;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.common.ratelimit.RateLimitKeys;
 import com.aisip.OnO.backend.common.ratelimit.RateLimitService;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
@@ -70,7 +71,6 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 @RequiredArgsConstructor
 public class ProblemService {
-    private static final String AI_ANALYSIS_RATE_LIMIT_KEY = "ai_analysis";
     private static final int AI_ANALYSIS_LIMIT_PER_DAY = 20;
     private static final int MEMO_MAX_LENGTH = 1000;
 
@@ -578,7 +578,7 @@ public class ProblemService {
                 return;
             }
 
-            if (!rateLimitService.tryConsume(AI_ANALYSIS_RATE_LIMIT_KEY, userId, AI_ANALYSIS_LIMIT_PER_DAY)) {
+            if (!rateLimitService.tryConsume(RateLimitKeys.AI_ANALYSIS, userId, AI_ANALYSIS_LIMIT_PER_DAY)) {
                 analysisDispatchGuard.release(problemId);
                 analysisService.updateToRateLimitExceeded(problemId);
                 log.info("AI 분석 일일 요청 제한 초과 - userId: {}, problemId: {}", userId, problemId);
@@ -592,10 +592,10 @@ public class ProblemService {
             } catch (RuntimeException e) {
                 // 아직 전송을 등록하기 전이라 롤백 정리가 걸려 있지 않다. 여기서 직접 되돌린다.
                 analysisDispatchGuard.release(problemId);
-                rateLimitService.refund(AI_ANALYSIS_RATE_LIMIT_KEY, userId);
+                rateLimitService.refund(RateLimitKeys.AI_ANALYSIS, userId);
                 throw e;
             }
-            analysisDispatcher.dispatchAfterCommit(problemId, userId, AI_ANALYSIS_RATE_LIMIT_KEY);
+            analysisDispatcher.dispatchAfterCommit(problemId, userId, RateLimitKeys.AI_ANALYSIS);
             log.info("GPT 분석 요청 등록 - problemId: {}, 이미지 개수: {}", problemId, problemImageCount);
         }
     }

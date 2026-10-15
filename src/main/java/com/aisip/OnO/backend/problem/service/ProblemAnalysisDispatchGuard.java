@@ -17,8 +17,10 @@ import java.time.Duration;
  * 표시를 남기고, 표시가 있는 동안 들어온 요청은 한도도 쓰지 않고 메시지도 보내지 않는다.
  * 동시에 두 요청이 들어와도 SET NX 에 성공한 쪽만 보낸다.
  *
- * TTL 은 분석 큐의 메시지 TTL(30분, RabbitMQConfig)과 같다. 그보다 오래 남은 메시지는 DLQ 로 빠지므로
- * 30분이 지난 PROCESSING 은 처리 중이 아니라 멈춘 것으로 보고 다시 요청을 받는다.
+ * TTL 은 35분이다. 메시지는 큐에서 최대 30분(큐 TTL, RabbitMQConfig) 기다린 뒤 꺼내지면 처리에 최대 약 3.5분
+ * (OpenAI read 타임아웃 60초 x 3회 + 백오프 1초, 2초 + S3 읽기)이 걸린다. TTL 이 30분이면 큐에서 오래 기다린 메시지가
+ * 처리되는 동안 표시가 먼저 풀려 같은 문제의 메시지가 겹쳐 나갈 수 있으므로 그보다 길게 둔다.
+ * 35분이 지난 PROCESSING 은 처리 중이 아니라 멈춘 것으로 보고 다시 요청을 받는다.
  * 분석이 끝나면(성공, 최종 실패, 전송 실패) 표시를 지워 바로 다시 요청할 수 있게 한다.
  *
  * Redis 장애 시에는 RateLimitService 처럼 통과시킨다. 중복 메시지가 나갈 수 있지만 컨슈머가
@@ -30,7 +32,7 @@ import java.time.Duration;
 public class ProblemAnalysisDispatchGuard {
 
     static final String KEY_PREFIX = "ai_analysis_inflight:";
-    static final Duration TTL = Duration.ofMinutes(30);
+    static final Duration TTL = Duration.ofMinutes(35);
 
     private final RedisTemplate<String, Object> redisTemplate;
 
@@ -53,7 +55,7 @@ public class ProblemAnalysisDispatchGuard {
         try {
             redisTemplate.delete(key(problemId));
         } catch (Exception e) {
-            // 지우지 못해도 TTL(30분)이 지나면 풀린다.
+            // 지우지 못해도 TTL(35분)이 지나면 풀린다.
             log.warn("Analysis dispatch guard release failed - problemId: {}, reason: {}",
                     problemId, e.getMessage());
         }

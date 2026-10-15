@@ -116,7 +116,8 @@ public class ProblemAnalysisConsumer {
         );
 
         // DLQ 도달 = 모든 재시도 소진 또는 큐 TTL 만료. PROCESSING 고착 방지를 위해 FAILED로 전이
-        // 재시도 중간 실패는 PROCESSING 으로 두므로, 일시적 실패의 최종 상태는 여기서 한 번만 기록된다.
+        // 재시도를 소진한 메시지는 마지막 시도에서 이미 FAILED(MAX_RETRIES) 로 기록됐다. 그 기록이 실패했거나
+        // 큐 TTL 이 지나 처리 전에 빠진 메시지를 위해 여기서도 기록한다. 이미 FAILED 면 markFailed 가 건너뛴다.
         try {
             analysisFailureService.markFailed(message.getProblemId(), AnalysisFailureReason.MAX_RETRIES);
         } catch (Exception e) {
