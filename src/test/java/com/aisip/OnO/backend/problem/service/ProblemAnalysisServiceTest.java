@@ -17,6 +17,7 @@ import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.problem.support.ProblemTestSupport;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.util.ai.AnalysisFailureReason;
+import com.aisip.OnO.backend.util.ai.AnalysisInput;
 import com.aisip.OnO.backend.util.ai.NonRetryableAnalysisException;
 import com.aisip.OnO.backend.util.ai.ProblemAnalysisResult;
 import io.micrometer.core.instrument.Counter;
@@ -27,6 +28,17 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.http.MediaType;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestTemplate;
+import com.aisip.OnO.backend.util.ai.AnalysisImageLoader;
+import com.aisip.OnO.backend.util.ai.OpenAIClient;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.retry.support.RetryTemplate;
@@ -39,11 +51,13 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 /**
  * AI 분석 서비스 3종(트리거/DB 작업/실패 기록) 통합 테스트.
@@ -331,7 +345,7 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
         @DisplayName("OpenAI 결과가 COMPLETED 로 저장된다")
         void savesAnalysisResult() {
             Problem problem = problemWithImage();
-            given(openAIClient.analyzeImages(anyList())).willReturn(successResult());
+            given(openAIClient.analyze(any())).willReturn(successResult());
 
             analysisService.analyzeProblemSync(problem.getId());
 
@@ -348,7 +362,7 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
         void releasesDispatchGuardOnSuccess() {
             Problem problem = problemWithImage();
             redisTemplate.opsForValue().set(guardKey(problem.getId()), "1");
-            given(openAIClient.analyzeImages(anyList())).willReturn(successResult());
+            given(openAIClient.analyze(any())).willReturn(successResult());
 
             analysisService.analyzeProblemSync(problem.getId());
 
@@ -356,18 +370,59 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
         }
 
         @Test
-        @DisplayName("PROBLEM_IMAGE 만 분석 대상으로 넘긴다")
-        void sendsOnlyProblemImages() {
+        @DisplayName("문제 이미지와 해설 이미지를 나눠 넘기고, 학생 풀이 이미지(SOLVE_IMAGE)는 넘기지 않는다")
+        void sendsProblemAndAnswerImagesButNotSolveImages() {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
             saveImageData(problem, "https://s3/p.png", ProblemImageType.PROBLEM_IMAGE);
             saveImageData(problem, "https://s3/a.png", ProblemImageType.ANSWER_IMAGE);
             saveImageData(problem, "https://s3/s.png", ProblemImageType.SOLVE_IMAGE);
             saveSkippedAnalysis(problem);
-            given(openAIClient.analyzeImages(anyList())).willReturn(successResult());
+            given(openAIClient.analyze(any())).willReturn(successResult());
 
             analysisService.analyzeProblemSync(problem.getId());
 
-            verify(openAIClient).analyzeImages(List.of("https://s3/p.png"));
+            ArgumentCaptor<AnalysisInput> captor = ArgumentCaptor.forClass(AnalysisInput.class);
+            verify(openAIClient).analyze(captor.capture());
+            assertThat(captor.getValue().problemImageUrls()).containsExactly("https://s3/p.png");
+            assertThat(captor.getValue().answerImageUrls()).containsExactly("https://s3/a.png");
+            assertThat(captor.getValue().problemImageUrls()).doesNotContain("https://s3/s.png");
+            assertThat(captor.getValue().answerImageUrls()).doesNotContain("https://s3/s.png");
+        }
+
+        @Test
+        @DisplayName("제목(reference)과 메모를 분석 입력에 함께 넘기고, 이미지는 종류별로 등록 순서를 지킨다")
+        void sendsReferenceMemoAndImagesInOrder() {
+            Problem problem = saveProblem(owner.getId(), ownerRoot, "부호를 거꾸로 봐서 틀렸다", "2024 수능 21번");
+            saveImageData(problem, "https://s3/p1.png", ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(problem, "https://s3/a1.png", ProblemImageType.ANSWER_IMAGE);
+            saveImageData(problem, "https://s3/p2.png", ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(problem, "https://s3/a2.png", ProblemImageType.ANSWER_IMAGE);
+            saveSkippedAnalysis(problem);
+            given(openAIClient.analyze(any())).willReturn(successResult());
+
+            analysisService.analyzeProblemSync(problem.getId());
+
+            ArgumentCaptor<AnalysisInput> captor = ArgumentCaptor.forClass(AnalysisInput.class);
+            verify(openAIClient).analyze(captor.capture());
+            AnalysisInput input = captor.getValue();
+            assertThat(input.problemImageUrls()).containsExactly("https://s3/p1.png", "https://s3/p2.png");
+            assertThat(input.answerImageUrls()).containsExactly("https://s3/a1.png", "https://s3/a2.png");
+            assertThat(input.reference()).isEqualTo("2024 수능 21번");
+            assertThat(input.memo()).isEqualTo("부호를 거꾸로 봐서 틀렸다");
+        }
+
+        @Test
+        @DisplayName("해설 이미지만 있고 문제 이미지가 0장이면 OpenAI 를 부르지 않고 NO_IMAGE 로 끝낸다")
+        void answerImageOnlyIsNoImage() {
+            Problem problem = saveProblem(owner.getId(), ownerRoot);
+            saveImageData(problem, "https://s3/a.png", ProblemImageType.ANSWER_IMAGE);
+            saveSkippedAnalysis(problem);
+            markProcessing(problem);
+
+            analysisService.analyzeProblemSync(problem.getId());
+
+            verify(openAIClient, never()).analyze(any());
+            assertThat(statusOf(problem)).isEqualTo(AnalysisStatus.NO_IMAGE);
         }
 
         @Test
@@ -382,7 +437,7 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
 
             analysisService.analyzeProblemSync(problem.getId());
 
-            verify(openAIClient, never()).analyzeImages(anyList());
+            verify(openAIClient, never()).analyze(any());
             assertThat(problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow().getSubject())
                     .isEqualTo("기존");
         }
@@ -396,7 +451,7 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
         @DisplayName("모델이 판독을 거절하면(NonRetryableAnalysisException) FAILED 로 기록하고 예외를 다시 던진다")
         void marksFailedOnNonRetryableRejection() {
             Problem problem = problemWithImage();
-            given(openAIClient.analyzeImages(anyList()))
+            given(openAIClient.analyze(any()))
                     .willThrow(new NonRetryableAnalysisException(AnalysisFailureReason.UNREADABLE_IMAGE, "이미지에서 문제를 인식할 수 없습니다"));
 
             assertThatThrownBy(() -> analysisService.analyzeProblemSync(problem.getId()))
@@ -415,7 +470,7 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
         @DisplayName("OpenAI 가 400 을 내면 FAILED 로 기록하고 예외를 다시 던진다")
         void marksFailedOnBadRequest() {
             Problem problem = problemWithImage();
-            given(openAIClient.analyzeImages(anyList()))
+            given(openAIClient.analyze(any()))
                     .willThrow(new HttpClientErrorException(HttpStatus.BAD_REQUEST, "Bad Request"));
 
             assertThatThrownBy(() -> analysisService.analyzeProblemSync(problem.getId()))
@@ -434,7 +489,7 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
         void marksFailedOnLastAttemptOnly() {
             Problem problem = problemWithImage();
             markProcessing(problem);
-            given(openAIClient.analyzeImages(anyList()))
+            given(openAIClient.analyze(any()))
                     .willThrow(new HttpClientErrorException(HttpStatus.INTERNAL_SERVER_ERROR, "Server Error"));
             double maxRetriesBefore = failureCount(AnalysisFailureReason.MAX_RETRIES);
             double transientBefore = failureCount(AnalysisFailureReason.TRANSIENT);
@@ -452,7 +507,7 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
                 }
             })).isInstanceOf(HttpClientErrorException.class);
 
-            verify(openAIClient, times(3)).analyzeImages(anyList());
+            verify(openAIClient, times(3)).analyze(any());
             assertThat(statusAfterAttempt)
                     .as("중간에 FAILED 가 보이면 앱이 폴링을 멈춘다. 마지막 시도에서는 DLQ 를 기다리지 않고 바로 FAILED")
                     .containsExactly(AnalysisStatus.PROCESSING, AnalysisStatus.PROCESSING, AnalysisStatus.FAILED);
@@ -469,7 +524,7 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
             Problem problem = problemWithImage();
             markProcessing(problem);
             redisTemplate.opsForValue().set(guardKey(problem.getId()), "1");
-            given(openAIClient.analyzeImages(anyList()))
+            given(openAIClient.analyze(any()))
                     .willThrow(new HttpClientErrorException(HttpStatus.INTERNAL_SERVER_ERROR, "Server Error"));
 
             RetryTemplate retryTemplate = RetryTemplate.builder()
@@ -491,7 +546,7 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
         @DisplayName("재시도 인터셉터 안이라도 재시도하지 않는 실패는 바로 FAILED 로 기록한다")
         void marksNonRetryableFailedEvenInsideRetryContext() {
             Problem problem = problemWithImage();
-            given(openAIClient.analyzeImages(anyList()))
+            given(openAIClient.analyze(any()))
                     .willThrow(new NonRetryableAnalysisException(AnalysisFailureReason.REFUSAL, "I'm sorry"));
 
             RetryTemplate retryTemplate = RetryTemplate.builder().maxAttempts(1).noBackoff().build();
@@ -517,7 +572,7 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
                     .extracting(ProblemAnalysisServiceTest::errorCaseOf)
                     .isEqualTo(ProblemErrorCase.PROBLEM_NOT_FOUND);
 
-            verify(openAIClient, never()).analyzeImages(anyList());
+            verify(openAIClient, never()).analyze(any());
 
             // Problem 은 소프트 삭제(@SQLDelete)지만 ProblemAnalysis 는 cascade = ALL 이라
             // 실제로 행이 삭제된다. 따라서 "행이 남아 NOT_STARTED 다"로 단정할 수 없다.
@@ -540,6 +595,82 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
         }
     }
 
+    // ════════════════════════════ 2단계: 실제 클라이언트 응답의 저장 모양 ════════════════════════════
+
+    /**
+     * OpenAIClient 빈은 베이스에서 목이다. 여기서는 그 목이 실물 OpenAIClient(HTTP 는 MockRestServiceServer, S3 는 목 로더)에
+     * 위임하게 해서, 모델 응답의 내부 필드가 DB 와 조회 응답까지 가지 않는지 끝까지 확인한다. 실제 OpenAI 로는 나가지 않는다.
+     */
+    @Nested
+    @DisplayName("2단계 - 내부 필드와 정답 노출 문장은 DB 와 조회 응답에 남지 않는다")
+    class StoredAnalysisWithRealClient {
+
+        private static final String API_URL = "https://api.openai.com/v1/chat/completions";
+        private static final String MARKER = "INTERNAL_SOLUTION_MARKER";
+
+        private String modelResponse() throws Exception {
+            Map<String, Object> content = new LinkedHashMap<>();
+            content.put("analyzable", true);
+            content.put("internalSolution", MARKER + " 판별식이 0 이므로 중근이고 x = 2 이다");
+            content.put("finalAnswer", "x = 2");
+            content.put("explanationCheck", "matches");
+            content.put("subject", "수학");
+            content.put("problemType", "이차방정식의 판별식");
+            content.put("keyPoints", List.of("판별식", "중근의 뜻"));
+            content.put("solution", "먼저 판별식을 세워 보세요. 따라서 답은 x = 2 입니다. 근의 개수를 판별식의 부호로 판단하세요.");
+            content.put("commonMistakes", "메모처럼 부호를 거꾸로 보기 쉽습니다.");
+            content.put("studyTips", "판별식 단원을 다시 보세요.");
+            String message = "{\"role\":\"assistant\",\"content\":" + objectMapper.writeValueAsString(objectMapper.writeValueAsString(content)) + "}";
+            return "{\"choices\":[{\"index\":0,\"message\":" + message + ",\"finish_reason\":\"stop\"}]}";
+        }
+
+        @Test
+        @DisplayName("COMPLETED 로 저장되고, 학생용 필드에는 내부 풀이와 정답 문장이 없으며, 조회 응답 필드도 그대로다")
+        void storesOnlyVisibleFields() throws Exception {
+            Problem problem = saveProblem(owner.getId(), ownerRoot, "부호를 거꾸로 봄", "모의고사 3월");
+            String problemUrl = "https://s3/p.png";
+            String answerUrl = "https://s3/a.png";
+            saveImageData(problem, problemUrl, ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(problem, answerUrl, ProblemImageType.ANSWER_IMAGE);
+            saveSkippedAnalysis(problem);
+
+            RestTemplate restTemplate = new RestTemplate();
+            MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+            server.expect(requestTo(API_URL)).andRespond(withSuccess(modelResponse(), MediaType.APPLICATION_JSON));
+            AnalysisImageLoader loader = Mockito.mock(AnalysisImageLoader.class);
+            given(loader.loadForAnalysis(List.of(problemUrl), List.of(answerUrl))).willReturn(
+                    new AnalysisImageLoader.LoadedImages(List.of("data:image/png;base64,UFJPQg=="), List.of("data:image/png;base64,QU5T")));
+            OpenAIClient realClient = new OpenAIClient(restTemplate, objectMapper, new SimpleMeterRegistry(), loader);
+            ReflectionTestUtils.setField(realClient, "model", "gpt-4o");
+            ReflectionTestUtils.setField(realClient, "apiKey", "test-openai-api-key");
+            ReflectionTestUtils.setField(realClient, "apiUrl", API_URL);
+            given(openAIClient.analyze(any())).willAnswer(invocation -> realClient.analyze(invocation.getArgument(0)));
+
+            analysisService.analyzeProblemSync(problem.getId());
+
+            server.verify();
+            ProblemAnalysis saved = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
+            assertThat(saved.getStatus()).isEqualTo(AnalysisStatus.COMPLETED);
+            List<String> stored = java.util.Arrays.asList(saved.getSubject(), saved.getProblemType(), saved.getKeyPoints(),
+                    saved.getSolution(), saved.getCommonMistakes(), saved.getStudyTips());
+            assertThat(stored).noneMatch(value -> value != null && value.contains(MARKER));
+            assertThat(saved.getSolution())
+                    .isEqualTo("먼저 판별식을 세워 보세요. 근의 개수를 판별식의 부호로 판단하세요.")
+                    .doesNotContain("x = 2");
+            assertThat(saved.getCommonMistakes()).isEqualTo("메모처럼 부호를 거꾸로 보기 쉽습니다.");
+
+            ProblemAnalysisResponseDto response = analysisService.getAnalysis(problem.getId(), owner.getId());
+            String json = objectMapper.writeValueAsString(response);
+            assertThat(json).doesNotContain(MARKER).doesNotContain("internalSolution")
+                    .doesNotContain("finalAnswer").doesNotContain("explanationCheck");
+            List<String> fieldNames = new ArrayList<>();
+            objectMapper.readTree(json).fieldNames().forEachRemaining(fieldNames::add);
+            assertThat(fieldNames).containsExactlyInAnyOrder("id", "problemId", "subject", "problemType", "keyPoints",
+                    "solution", "commonMistakes", "studyTips", "status", "errorMessage");
+            assertThat(response.keyPoints()).containsExactly("판별식", "중근의 뜻");
+        }
+    }
+
     // ════════════════════════════ DB 서비스 ════════════════════════════
 
     @Nested
@@ -557,8 +688,26 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
             ProblemAnalysisDbService.AnalysisPreparation prep =
                     analysisDbService.fetchAnalysisPreparation(problem.getId());
 
-            assertThat(prep.imageUrls()).containsExactly("https://s3/p1.png");
+            assertThat(prep.input().problemImageUrls()).containsExactly("https://s3/p1.png");
+            assertThat(prep.input().answerImageUrls()).containsExactly("https://s3/a1.png");
+            assertThat(prep.input().reference()).isEqualTo("출처");
+            assertThat(prep.input().memo()).isEqualTo("메모");
             assertThat(prep.alreadyCompleted()).isFalse();
+        }
+
+        @Test
+        @DisplayName("제목과 메모가 없으면 null 로 준다")
+        void fetchesNullReferenceAndMemo() {
+            Problem problem = saveProblem(owner.getId(), ownerRoot, null, null);
+            saveImageData(problem, "https://s3/p1.png", ProblemImageType.PROBLEM_IMAGE);
+            saveSkippedAnalysis(problem);
+
+            ProblemAnalysisDbService.AnalysisPreparation prep =
+                    analysisDbService.fetchAnalysisPreparation(problem.getId());
+
+            assertThat(prep.input().reference()).isNull();
+            assertThat(prep.input().memo()).isNull();
+            assertThat(prep.input().answerImageUrls()).isEmpty();
         }
 
         @Test
@@ -567,7 +716,9 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
             saveSkippedAnalysis(problem);
 
-            assertThat(analysisDbService.fetchAnalysisPreparation(problem.getId()).imageUrls()).isEmpty();
+            ProblemAnalysisDbService.AnalysisPreparation prep = analysisDbService.fetchAnalysisPreparation(problem.getId());
+            assertThat(prep.input().problemImageUrls()).isEmpty();
+            assertThat(prep.input().answerImageUrls()).isEmpty();
         }
 
         @Test
@@ -747,7 +898,7 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
             Problem problem = problemWithImage();
             markProcessing(problem);
             consumeQuota(owner.getId(), 3);
-            given(openAIClient.analyzeImages(anyList()))
+            given(openAIClient.analyze(any()))
                     .willThrow(new NonRetryableAnalysisException(reason, "image side failure"));
 
             assertThatThrownBy(() -> analysisService.analyzeProblemSync(problem.getId()))
@@ -834,7 +985,7 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
 
             analysisService.analyzeProblemSync(problem.getId());
 
-            verify(openAIClient, never()).analyzeImages(anyList());
+            verify(openAIClient, never()).analyze(any());
             assertThat(statusOf(problem)).isEqualTo(AnalysisStatus.NO_IMAGE);
             assertThat(redisTemplate.hasKey(guardKey(problem.getId()))).isFalse();
             assertThat(quotaOf(owner.getId())).isEqualTo("2");
