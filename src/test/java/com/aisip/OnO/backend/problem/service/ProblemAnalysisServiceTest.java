@@ -12,6 +12,7 @@ import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.problem.support.ProblemTestSupport;
 import com.aisip.OnO.backend.user.entity.User;
+import com.aisip.OnO.backend.util.ai.AnalysisFailureReason;
 import com.aisip.OnO.backend.util.ai.NonRetryableAnalysisException;
 import com.aisip.OnO.backend.util.ai.ProblemAnalysisResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -333,7 +334,7 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
         void marksFailedOnNonRetryableRejection() {
             Problem problem = problemWithImage();
             given(openAIClient.analyzeImages(anyList()))
-                    .willThrow(new NonRetryableAnalysisException("이미지에서 문제를 인식할 수 없습니다"));
+                    .willThrow(new NonRetryableAnalysisException(AnalysisFailureReason.UNREADABLE_IMAGE, "이미지에서 문제를 인식할 수 없습니다"));
 
             assertThatThrownBy(() -> analysisService.analyzeProblemSync(problem.getId()))
                     .as("재시도해도 소용없는 실패는 상위에서 DLQ 처리해야 하므로 그대로 전파된다")

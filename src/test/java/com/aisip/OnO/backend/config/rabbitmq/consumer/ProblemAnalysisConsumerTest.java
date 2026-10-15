@@ -7,6 +7,7 @@ import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemAnalysis;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.user.entity.User;
+import com.aisip.OnO.backend.util.ai.AnalysisFailureReason;
 import com.aisip.OnO.backend.util.ai.NonRetryableAnalysisException;
 import com.aisip.OnO.backend.util.ai.ProblemAnalysisResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -183,7 +184,7 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
         void ackOnNonRetryableRejection() {
             Problem problem = analyzableProblem();
             given(openAIClient.analyzeImages(anyList()))
-                    .willThrow(new NonRetryableAnalysisException("분석이 불가능한 이미지입니다."));
+                    .willThrow(new NonRetryableAnalysisException(AnalysisFailureReason.UNREADABLE_IMAGE, "분석이 불가능한 이미지입니다."));
 
             assertThatCode(() -> consumer.handleAnalysisMessage(analysisMessage(problem.getId())))
                     .as("재시도해도 같은 결과라 큐에 되돌리지 않는다")

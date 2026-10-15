@@ -98,7 +98,7 @@ public class OpenAIClient {
             recordExternalCall("openai", "analyze_images", "failure", sample);
             String responseBody = e.getResponseBodyAsString();
             if (isNonRetryableQuotaError(e, responseBody)) {
-                throw new NonRetryableAnalysisException("OpenAI 할당량이 초과되어 분석을 진행할 수 없습니다.", e);
+                throw new NonRetryableAnalysisException(AnalysisFailureReason.QUOTA, "OpenAI 할당량이 초과되어 분석을 진행할 수 없습니다.", e);
             }
             log.error("Error analyzing images: {}", e.getMessage(), e);
             throw new RuntimeException("AI 이미지 분석 중 오류가 발생했습니다: " + e.getMessage(), e);
@@ -289,12 +289,12 @@ public class OpenAIClient {
 
             if (!looksLikeJsonObject(jsonContent)) {
                 if (isImageNotAnalyzableResponse(jsonContent)) {
-                    throw new NonRetryableAnalysisException("분석이 불가능한 이미지입니다.");
+                    throw new NonRetryableAnalysisException(AnalysisFailureReason.UNREADABLE_IMAGE, "분석이 불가능한 이미지입니다.");
                 }
                 if (isRefusalResponse(jsonContent)) {
-                    throw new NonRetryableAnalysisException("AI가 요청을 거절하여 분석을 진행할 수 없습니다.");
+                    throw new NonRetryableAnalysisException(AnalysisFailureReason.REFUSAL, "AI가 요청을 거절하여 분석을 진행할 수 없습니다.");
                 }
-                throw new NonRetryableAnalysisException("AI가 JSON 형식이 아닌 응답을 반환했습니다.");
+                throw new NonRetryableAnalysisException(AnalysisFailureReason.INVALID_RESPONSE, "AI가 JSON 형식이 아닌 응답을 반환했습니다.");
             }
 
             Map<String, Object> parsed = readJsonMap(jsonContent);
