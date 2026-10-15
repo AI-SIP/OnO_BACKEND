@@ -52,7 +52,7 @@ class AnalysisImageLoaderTest {
     @BeforeEach
     void setUp() {
         amazonS3Client = mock(AmazonS3Client.class);
-        loader = new AnalysisImageLoader(amazonS3Client, BUCKET, 5);
+        loader = new AnalysisImageLoader(amazonS3Client, BUCKET, 5, AnalysisImageLoader.DEFAULT_MAX_TOTAL_BYTES);
     }
 
     // ---- 테스트 데이터 ----
@@ -171,6 +171,26 @@ class AnalysisImageLoaderTest {
         System.arraycopy(app1, 0, result, insertAt, app1.length);
         System.arraycopy(jpeg, insertAt, result, insertAt + app1.length, jpeg.length - insertAt);
         return result;
+    }
+
+    private static int brightness(BufferedImage image, int x, int y) {
+        int rgb = image.getRGB(x, y);
+        return (((rgb >> 16) & 0xFF) + ((rgb >> 8) & 0xFF) + (rgb & 0xFF)) / 3;
+    }
+
+    /** JPEG 의 SOF0 헤더에 적힌 가로세로만 바꾼다. 본문은 작은 그대로라 헤더만 큰 크기를 주장하는 파일이 된다 */
+    private static byte[] withJpegDimensions(byte[] jpeg, int width, int height) {
+        byte[] patched = jpeg.clone();
+        for (int i = 2; i + 8 < patched.length; i++) {
+            if ((patched[i] & 0xFF) == 0xFF && (patched[i + 1] & 0xFF) == 0xC0) {
+                patched[i + 5] = (byte) (height >> 8);
+                patched[i + 6] = (byte) height;
+                patched[i + 7] = (byte) (width >> 8);
+                patched[i + 8] = (byte) width;
+                return patched;
+            }
+        }
+        throw new IllegalStateException("SOF0 를 찾지 못했다");
     }
 
     private static void assertReason(Throwable thrown, AnalysisFailureReason expected) {
@@ -351,13 +371,13 @@ class AnalysisImageLoaderTest {
         @Test
         @DisplayName("알 수 없는 형식(PDF, 빈 파일, RIFF 지만 WEBP 아님)은 UNSUPPORTED_IMAGE")
         void rejectsUnknownFormats() {
-            stubObject("doc.pdf", "%PDF-1.7 fake".getBytes(StandardCharsets.US_ASCII));
-            stubObject("empty.jpg", new byte[0]);
+            stubObject("image/doc.pdf", "%PDF-1.7 fake".getBytes(StandardCharsets.US_ASCII));
+            stubObject("image/empty.jpg", new byte[0]);
             byte[] wav = webpBytes();
             System.arraycopy("WAVE".getBytes(StandardCharsets.US_ASCII), 0, wav, 8, 4);
-            stubObject("sound.webp", wav);
+            stubObject("image/sound.webp", wav);
 
-            for (String key : List.of("doc.pdf", "empty.jpg", "sound.webp")) {
+            for (String key : List.of("image/doc.pdf", "image/empty.jpg", "image/sound.webp")) {
                 Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(
                         () -> loader.loadAsDataUrls(List.of(URL_PREFIX + key)));
                 assertReason(thrown, AnalysisFailureReason.UNSUPPORTED_IMAGE);
@@ -370,7 +390,7 @@ class AnalysisImageLoaderTest {
     class SizeAndS3Errors {
 
         @Test
-        @DisplayName("메타데이터가 20MB 를 넘으면 본문을 읽지 않고 UNSUPPORTED_IMAGE, 스트림은 닫는다")
+        @DisplayName("메타데이터가 20MB 를 넘으면 본문을 읽지 않고 IMAGE_TOO_LARGE, 스트림은 닫는다")
         void rejectsTooLargeByMetadata() {
             TrackingInputStream stream = stubObject("image/huge.jpg",
                     new ByteArrayInputStream(new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF}),
@@ -379,12 +399,12 @@ class AnalysisImageLoaderTest {
             Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(
                     () -> loader.loadAsDataUrls(List.of(URL_PREFIX + "image/huge.jpg")));
 
-            assertReason(thrown, AnalysisFailureReason.UNSUPPORTED_IMAGE);
+            assertReason(thrown, AnalysisFailureReason.IMAGE_TOO_LARGE);
             assertThat(stream.closed).isTrue();
         }
 
         @Test
-        @DisplayName("메타데이터에 크기가 없어도 실제로 20MB 를 넘게 읽히면 UNSUPPORTED_IMAGE")
+        @DisplayName("메타데이터에 크기가 없어도 실제로 20MB 를 넘게 읽히면 IMAGE_TOO_LARGE")
         void rejectsTooLargeByActualBytes() {
             byte[] big = new byte[(int) AnalysisImageLoader.MAX_OBJECT_BYTES + 1];
             big[0] = (byte) 0xFF;
@@ -395,7 +415,7 @@ class AnalysisImageLoaderTest {
             Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(
                     () -> loader.loadAsDataUrls(List.of(URL_PREFIX + "image/huge.jpg")));
 
-            assertReason(thrown, AnalysisFailureReason.UNSUPPORTED_IMAGE);
+            assertReason(thrown, AnalysisFailureReason.IMAGE_TOO_LARGE);
             assertThat(stream.closed).isTrue();
         }
 
@@ -434,6 +454,22 @@ class AnalysisImageLoaderTest {
                     () -> loader.loadAsDataUrls(List.of(URL_PREFIX + "image/gone.jpg")));
 
             assertReason(thrown, AnalysisFailureReason.INVALID_IMAGE_SOURCE);
+        }
+
+        @Test
+        @DisplayName("S3 403(AccessDenied)도 404 처럼 재시도하지 않는 INVALID_IMAGE_SOURCE")
+        void accessDeniedIsNonRetryable() {
+            // ListBucket 권한이 없으면 없는 key 도 404 가 아니라 403 으로 온다
+            AmazonS3Exception denied = new AmazonS3Exception("Access Denied");
+            denied.setStatusCode(403);
+            denied.setErrorCode("AccessDenied");
+            when(amazonS3Client.getObject(BUCKET, "image/gone.jpg")).thenThrow(denied);
+
+            Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(
+                    () -> loader.loadAsDataUrls(List.of(URL_PREFIX + "image/gone.jpg")));
+
+            assertReason(thrown, AnalysisFailureReason.INVALID_IMAGE_SOURCE);
+            assertThat(thrown).hasCause(denied);
         }
 
         @Test
@@ -614,13 +650,70 @@ class AnalysisImageLoaderTest {
         }
 
         @Test
-        @DisplayName("EXIF 회전 정보가 있는 큰 JPEG 는 다시 인코딩하면 회전이 사라지므로 원본을 보낸다")
-        void keepsOriginalWhenExifRotated() {
+        @DisplayName("EXIF Orientation 6 인 큰 JPEG 는 시계 방향으로 돌린 뒤 줄여 가로세로가 바뀐다")
+        void rotatesClockwiseThenShrinks() throws IOException {
             byte[] rotated = withExifOrientation(encode(drawImage(4000, 3000, BufferedImage.TYPE_INT_RGB), "jpg"), 6);
             stubObject("image/rotated.jpg", rotated);
 
-            assertThat(AnalysisImageLoader.hasNonDefaultExifOrientation(rotated)).isTrue();
-            assertThat(bytesOf(loader.loadAsDataUrls(List.of(URL_PREFIX + "image/rotated.jpg")).get(0))).isEqualTo(rotated);
+            String dataUrl = loader.loadAsDataUrls(List.of(URL_PREFIX + "image/rotated.jpg")).get(0);
+
+            assertThat(mimeOf(dataUrl)).isEqualTo("image/jpeg");
+            BufferedImage result = decode(bytesOf(dataUrl));
+            assertThat(result.getWidth()).as("4000x3000 을 세운 3000x4000 을 줄인 크기").isEqualTo(1536);
+            assertThat(result.getHeight()).isEqualTo(2048);
+            // 원본 왼쪽 위의 검은 사각형은 시계 방향 90도 회전 뒤 오른쪽 위로 간다
+            assertThat(brightness(result, result.getWidth() - 20, 20)).as("오른쪽 위").isLessThan(64);
+            assertThat(brightness(result, 20, 20)).as("왼쪽 위").isGreaterThan(192);
+            assertThat(brightness(result, 20, result.getHeight() - 20)).as("왼쪽 아래").isGreaterThan(192);
+        }
+
+        @Test
+        @DisplayName("EXIF Orientation 8 은 반시계 방향으로 돌린다")
+        void rotatesCounterClockwise() throws IOException {
+            byte[] rotated = withExifOrientation(encode(drawImage(4000, 3000, BufferedImage.TYPE_INT_RGB), "jpg"), 8);
+            stubObject("image/rotated.jpg", rotated);
+
+            BufferedImage result = decode(bytesOf(loader.loadAsDataUrls(List.of(URL_PREFIX + "image/rotated.jpg")).get(0)));
+
+            assertThat(result.getWidth()).isEqualTo(1536);
+            assertThat(result.getHeight()).isEqualTo(2048);
+            // 왼쪽 위는 반시계 방향 90도 회전 뒤 왼쪽 아래로 간다
+            assertThat(brightness(result, 20, result.getHeight() - 20)).as("왼쪽 아래").isLessThan(64);
+            assertThat(brightness(result, 20, 20)).as("왼쪽 위").isGreaterThan(192);
+        }
+
+        @Test
+        @DisplayName("EXIF Orientation 3 은 180도 돌리고 가로세로는 그대로다")
+        void rotatesHalfTurn() throws IOException {
+            byte[] rotated = withExifOrientation(encode(drawImage(4000, 3000, BufferedImage.TYPE_INT_RGB), "jpg"), 3);
+            stubObject("image/rotated.jpg", rotated);
+
+            BufferedImage result = decode(bytesOf(loader.loadAsDataUrls(List.of(URL_PREFIX + "image/rotated.jpg")).get(0)));
+
+            assertThat(result.getWidth()).isEqualTo(2048);
+            assertThat(result.getHeight()).isEqualTo(1536);
+            assertThat(brightness(result, result.getWidth() - 20, result.getHeight() - 20)).as("오른쪽 아래").isLessThan(64);
+            assertThat(brightness(result, 20, 20)).as("왼쪽 위").isGreaterThan(192);
+        }
+
+        @Test
+        @DisplayName("회전 정보가 있어도 긴 변이 2048 이하이면 다시 인코딩하지 않고 원본을 보낸다")
+        void keepsSmallRotatedOriginal() {
+            byte[] rotated = withExifOrientation(encode(drawImage(1600, 1200, BufferedImage.TYPE_INT_RGB), "jpg"), 6);
+            stubObject("image/small-rotated.jpg", rotated);
+
+            assertThat(bytesOf(loader.loadAsDataUrls(List.of(URL_PREFIX + "image/small-rotated.jpg")).get(0))).isEqualTo(rotated);
+        }
+
+        @ParameterizedTest(name = "Orientation {0}")
+        @ValueSource(ints = {2, 4, 5, 7})
+        @DisplayName("반전이 섞인 Orientation(2/4/5/7)은 큰 사진이어도 원본을 보낸다")
+        void keepsMirroredOriginal(int orientation) {
+            byte[] mirrored = withExifOrientation(encode(drawImage(3000, 2000, BufferedImage.TYPE_INT_RGB), "jpg"), orientation);
+            stubObject("image/mirrored.jpg", mirrored);
+
+            assertThat(AnalysisImageLoader.exifOrientation(mirrored)).isEqualTo(orientation);
+            assertThat(bytesOf(loader.loadAsDataUrls(List.of(URL_PREFIX + "image/mirrored.jpg")).get(0))).isEqualTo(mirrored);
         }
 
         @Test
@@ -632,6 +725,215 @@ class AnalysisImageLoaderTest {
             assertThat(AnalysisImageLoader.hasNonDefaultExifOrientation(upright)).isFalse();
             assertThat(decode(bytesOf(loader.loadAsDataUrls(List.of(URL_PREFIX + "image/upright.jpg")).get(0))).getWidth())
                     .isEqualTo(2048);
+        }
+    }
+
+    @Nested
+    @DisplayName("업로드 경로 key 제한")
+    class KeyRestriction {
+
+        @ParameterizedTest(name = "{0}")
+        @ValueSource(strings = {
+                "config/application-prod.yml",
+                "backup/db.sql",
+                "IMAGE/2026/10/15/a.jpg",
+                "images/2026/10/15/a.jpg",
+                "image/../config/application-prod.yml",
+                "image/2026/10/15/..jpg",
+                "image/2026/10/15/a b.jpg",
+                "image/2026/10/15/a.jpg?versionId=1",
+                "image/2026/10/15/%2e%2e/a.jpg",
+                "image/2026/10/15/한글.jpg",
+                "image/2026/10/15/a\\b.jpg",
+                "2024-08-01T12:34:56/memo_a.jpg",
+                "2024-08-01T12:34:56/problemImage_../../x.jpg",
+                "2024-08-01T12:34:56/problemImage_a/b.jpg"
+        })
+        @DisplayName("업로드 경로가 아니거나, .. 이 있거나, 허용하지 않는 문자가 있으면 S3 를 읽지 않고 INVALID_IMAGE_SOURCE")
+        void rejectsKeyOutsideUploadPath(String key) {
+            Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(
+                    () -> loader.loadAsDataUrls(List.of(URL_PREFIX + key)));
+
+            assertReason(thrown, AnalysisFailureReason.INVALID_IMAGE_SOURCE);
+            verifyNoInteractions(amazonS3Client);
+        }
+
+        @Test
+        @DisplayName("지금 업로드 형식(image/yyyy/MM/dd/UUID.확장자)은 허용한다")
+        void acceptsCurrentUploadKey() {
+            String key = "image/2026/10/15/3f2b8c1e-4d5a-4b6c-9e7f-0a1b2c3d4e5f.jpg";
+            stubObject(key, encode(drawImage(100, 80, BufferedImage.TYPE_INT_RGB), "jpg"));
+
+            assertThat(loader.loadAsDataUrls(List.of(URL_PREFIX + key))).hasSize(1);
+            verify(amazonS3Client).getObject(BUCKET, key);
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @ValueSource(strings = {
+                "2024-08-01T12:34:56.123456/problemImage_IMG_0001.jpg",
+                "2024-12-31T09:05/problemImage_사진 1.png",
+                "2025-02-28T23:59:59.1/answerImage_scan.jpeg"
+        })
+        @DisplayName("2025-03 이전 서버 업로드 형식(createdAt/종류_원본파일명)도 허용한다")
+        void acceptsLegacyUploadKey(String key) {
+            stubObject(key, encode(drawImage(100, 80, BufferedImage.TYPE_INT_RGB), "jpg"));
+
+            assertThat(loader.loadAsDataUrls(List.of(URL_PREFIX + key))).hasSize(1);
+            verify(amazonS3Client).getObject(BUCKET, key);
+        }
+
+        @Test
+        @DisplayName("목록 중 하나라도 허용하지 않는 key 면 앞의 이미지도 읽지 않는다")
+        void validatesAllKeysBeforeReading() {
+            Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(() -> loader.loadAsDataUrls(
+                    List.of(URL_PREFIX + "image/2026/10/15/a.jpg", URL_PREFIX + "config/secret.yml")));
+
+            assertReason(thrown, AnalysisFailureReason.INVALID_IMAGE_SOURCE);
+            verifyNoInteractions(amazonS3Client);
+        }
+    }
+
+    @Nested
+    @DisplayName("디코딩 메모리")
+    class DecodeMemory {
+
+        @Test
+        @DisplayName("서브샘플링 값은 디코딩한 긴 변이 목표의 2배 미만이 되게 올림으로 정한다")
+        void subsamplingKeepsDecodedLongSideBelowTwiceTarget() {
+            // 예전 식(longSide / (target * 2))은 4096~8191px 에서 1 이라 원본 해상도로 디코딩했다
+            assertThat(AnalysisImageLoader.subsamplingFor(5000, 2048)).isEqualTo(2);
+            assertThat(AnalysisImageLoader.subsamplingFor(8000, 2048)).isEqualTo(2);
+            assertThat(AnalysisImageLoader.subsamplingFor(8191, 2048)).isEqualTo(3);
+            assertThat(AnalysisImageLoader.subsamplingFor(4096, 2048)).isEqualTo(2);
+            assertThat(AnalysisImageLoader.subsamplingFor(4095, 2048)).isEqualTo(1);
+            assertThat(AnalysisImageLoader.subsamplingFor(2049, 2048)).isEqualTo(1);
+
+            for (int longSide = 2049; longSide <= 40_000; longSide++) {
+                int s = AnalysisImageLoader.subsamplingFor(longSide, 2048);
+                int decoded = (longSide + s - 1) / s;
+                assertThat(decoded).as("longSide=%d, s=%d", longSide, s).isLessThan(4096).isGreaterThanOrEqualTo(2048);
+            }
+        }
+
+        @Test
+        @DisplayName("긴 변 5000px 는 절반(2500px)으로 서브샘플링해 디코딩한다")
+        void decodesFiveThousandWithSubsampling() throws IOException {
+            byte[] jpeg = encode(drawImage(5000, 500, BufferedImage.TYPE_INT_RGB), "jpg");
+
+            BufferedImage decoded = AnalysisImageLoader.decodeForLongSide(jpeg, 2048);
+
+            assertThat(decoded.getWidth()).isEqualTo(2500);
+            assertThat(decoded.getHeight()).isEqualTo(250);
+        }
+
+        @Test
+        @DisplayName("긴 변 8000px 는 4000px 로 서브샘플링해 디코딩하고, 최종 결과는 2048 로 줄어든다")
+        void decodesEightThousandWithSubsampling() throws IOException {
+            byte[] jpeg = encode(drawImage(800, 8000, BufferedImage.TYPE_INT_RGB), "jpg");
+
+            BufferedImage decoded = AnalysisImageLoader.decodeForLongSide(jpeg, 2048);
+            assertThat(decoded.getHeight()).isEqualTo(4000);
+            assertThat(decoded.getWidth()).isEqualTo(400);
+
+            stubObject("image/tall8000.jpg", jpeg);
+            BufferedImage sent = decode(bytesOf(loader.loadAsDataUrls(List.of(URL_PREFIX + "image/tall8000.jpg")).get(0)));
+            assertThat(sent.getHeight()).isEqualTo(2048);
+            assertThat(sent.getWidth()).isEqualTo(205);
+        }
+
+        @Test
+        @DisplayName("헤더의 가로x세로가 4,000만 px 를 넘으면 디코딩하지 않고 IMAGE_TOO_LARGE")
+        void rejectsTooManyPixelsWithoutDecoding() {
+            byte[] bomb = withJpegDimensions(encode(drawImage(64, 64, BufferedImage.TYPE_INT_RGB), "jpg"), 8000, 6000);
+            stubObject("image/bomb.jpg", bomb);
+
+            Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(
+                    () -> loader.loadAsDataUrls(List.of(URL_PREFIX + "image/bomb.jpg")));
+
+            assertReason(thrown, AnalysisFailureReason.IMAGE_TOO_LARGE);
+            assertThatThrownBy(() -> AnalysisImageLoader.decodeForLongSide(bomb, 2048))
+                    .isInstanceOf(NonRetryableAnalysisException.class);
+        }
+
+        @Test
+        @DisplayName("PNG 도 헤더 픽셀 수로 거부한다")
+        void rejectsTooManyPixelsPng() {
+            byte[] png = encode(drawImage(64, 64, BufferedImage.TYPE_INT_RGB), "png");
+            // IHDR 은 8바이트 시그니처 + 길이(4) + "IHDR"(4) 뒤에 가로(4), 세로(4)
+            byte[] patched = png.clone();
+            java.nio.ByteBuffer.wrap(patched, 16, 8).putInt(10_000).putInt(5_000);
+            stubObject("image/bomb.png", patched);
+
+            Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(
+                    () -> loader.loadAsDataUrls(List.of(URL_PREFIX + "image/bomb.png")));
+
+            assertReason(thrown, AnalysisFailureReason.IMAGE_TOO_LARGE);
+        }
+
+        @Test
+        @DisplayName("정확히 4,000만 px 는 픽셀 상한으로 거부하지 않는다")
+        void acceptsExactlyPixelLimit() {
+            byte[] edge = withJpegDimensions(encode(drawImage(64, 64, BufferedImage.TYPE_INT_RGB), "jpg"), 8000, 5000);
+            stubObject("image/edge.jpg", edge);
+
+            Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(
+                    () -> loader.loadAsDataUrls(List.of(URL_PREFIX + "image/edge.jpg")));
+
+            assertThat(thrown).as("본문이 깨져 있어도 줄이기를 포기하고 원본을 보낼 뿐 IMAGE_TOO_LARGE 는 아니다").isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("요청 총용량")
+    class TotalSize {
+
+        @Test
+        @DisplayName("기본 총용량 상한은 30MB 다")
+        void defaultTotalLimitIsThirtyMegabytes() {
+            assertThat(AnalysisImageLoader.DEFAULT_MAX_TOTAL_BYTES).isEqualTo(30L * 1024 * 1024);
+        }
+
+        @Test
+        @DisplayName("줄이지 않고 보내는 WEBP 두 장(16MB+16MB)이 30MB 를 넘으면 IMAGE_TOO_LARGE")
+        void rejectsTotalOverDefaultLimit() {
+            byte[] big = new byte[16 * 1024 * 1024];
+            System.arraycopy(webpBytes(), 0, big, 0, 16);
+            stubObject("image/1.webp", big);
+            stubObject("image/2.webp", big);
+
+            Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(() -> loader.loadAsDataUrls(
+                    List.of(URL_PREFIX + "image/1.webp", URL_PREFIX + "image/2.webp")));
+
+            assertReason(thrown, AnalysisFailureReason.IMAGE_TOO_LARGE);
+        }
+
+        @Test
+        @DisplayName("합계는 보낼 바이트로 센다. 상한과 같으면 통과하고 넘으면 거부한다")
+        void countsSentBytesAgainstConfiguredLimit() {
+            byte[] webp = webpBytes();
+            AnalysisImageLoader exact = new AnalysisImageLoader(amazonS3Client, BUCKET, 5, webp.length * 2L);
+
+            stubObject("image/1.webp", webp);
+            stubObject("image/2.webp", webp);
+            assertThat(exact.loadAsDataUrls(List.of(URL_PREFIX + "image/1.webp", URL_PREFIX + "image/2.webp"))).hasSize(2);
+
+            // S3 스트림은 한 번 읽으면 끝나므로 다시 스텁한다
+            stubObject("image/1.webp", webp);
+            stubObject("image/2.webp", webp);
+            stubObject("image/3.webp", webp);
+            Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(() -> exact.loadAsDataUrls(List.of(
+                    URL_PREFIX + "image/1.webp", URL_PREFIX + "image/2.webp", URL_PREFIX + "image/3.webp")));
+            assertReason(thrown, AnalysisFailureReason.IMAGE_TOO_LARGE);
+        }
+
+        @Test
+        @DisplayName("크게 찍힌 JPEG 는 줄인 뒤의 크기로 세므로 원본이 상한을 넘어도 통과한다")
+        void resizedImagesCountAfterShrinking() {
+            byte[] jpeg = encode(drawImage(4000, 3000, BufferedImage.TYPE_INT_RGB), "jpg");
+            stubObject("image/big.jpg", jpeg);
+            AnalysisImageLoader tight = new AnalysisImageLoader(amazonS3Client, BUCKET, 5, jpeg.length - 1L);
+
+            assertThat(tight.loadAsDataUrls(List.of(URL_PREFIX + "image/big.jpg"))).hasSize(1);
         }
     }
 }

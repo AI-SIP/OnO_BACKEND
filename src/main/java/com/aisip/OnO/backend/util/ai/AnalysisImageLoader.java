@@ -16,8 +16,11 @@ import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.ImageOutputStream;
+import javax.imageio.stream.MemoryCacheImageInputStream;
+import javax.imageio.stream.MemoryCacheImageOutputStream;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -29,6 +32,7 @@ import java.util.Base64;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * AI 분석에 보낼 문제 이미지를 서버가 S3 에서 직접 읽어 data URL 로 바꾼다.
@@ -36,13 +40,35 @@ import java.util.Set;
  * 이전에는 S3 URL 을 그대로 넘겨 OpenAI 가 직접 내려받았는데, 그 다운로드가 타임아웃 나면 400 으로 실패했다.
  * 등록 경로 중 일부는 URL 을 검증하지 않으므로 우리 버킷 URL 만 받고, 읽기는 URL 이 아니라 bucket/key 로 한다.
  * 이미지 바이트와 base64 는 크기가 커서 로그에 남기지 않는다. 로그에는 key 만 남긴다.
+ *
+ * ImageIO 의 전역 캐시 설정(ImageIO.setUseCache)은 다른 곳의 이미지 처리에도 영향을 주므로 건드리지 않는다.
+ * 대신 이 클래스의 입출력 스트림을 MemoryCache 스트림으로 직접 만들어 /tmp 디스크 캐시 파일을 쓰지 않는다.
  */
 @Slf4j
 @Component
 public class AnalysisImageLoader {
 
     static final long MAX_OBJECT_BYTES = 20L * 1024 * 1024;
+    static final long DEFAULT_MAX_TOTAL_BYTES = 30L * 1024 * 1024;
     static final int MAX_LONG_SIDE = 2048;
+    /**
+     * 헤더의 가로x세로가 이보다 크면 디코딩하지 않는다. 서브샘플링으로 줄여도 디코딩 중 버퍼가 커지고,
+     * 문제 사진으로는 나올 일이 없는 크기(예: 8000x5000)다. 압축 폭탄처럼 작은 파일이 큰 크기를 주장하는 경우도 막는다.
+     */
+    static final long MAX_DECODE_PIXELS = 40_000_000L;
+
+    /**
+     * 분석에 쓰는 key 는 FileUploadService 가 만든 업로드 경로만 허용한다. 서버 권한으로 버킷의 다른 객체를 읽지 않게 하기 위해서다.
+     * 현재 형식: image/yyyy/MM/dd/{UUID}.{확장자}
+     */
+    private static final Pattern UPLOAD_KEY = Pattern.compile("image/[A-Za-z0-9/._-]+");
+    /**
+     * 2025-03 이전(커밋 b6d9bdc 전) 서버 업로드 형식: {문제 createdAt(LocalDateTime)}/{이미지 종류}_{원본 파일명}.
+     * 이 시기 문제를 "다시 분석하기"로 요청할 수 있어 남겨 둔다. 원본 파일명은 사용자가 정한 것이라 문자를 제한하지 않고
+     * 경로 구분자(/)와 제어 문자만 막는다.
+     */
+    private static final Pattern LEGACY_UPLOAD_KEY = Pattern.compile(
+            "\\d{4}-\\d{2}-\\d{2}T[0-9:.]+/(problemImage|answerImage|solveImage|processImage)_[^/\\p{Cntrl}]+");
     private static final float JPEG_QUALITY = 0.85f;
     private static final String S3_HOST_SUFFIX = ".amazonaws.com/";
     private static final Set<String> HEIF_BRANDS = Set.of("heic", "heix", "hevc", "heim", "heis", "mif1", "msf1");
@@ -50,15 +76,18 @@ public class AnalysisImageLoader {
     private final AmazonS3Client amazonS3Client;
     private final String bucket;
     private final int maxImages;
+    private final long maxTotalBytes;
 
     public AnalysisImageLoader(
             AmazonS3Client amazonS3Client,
             @Value("${cloud.aws.s3.bucket}") String bucket,
-            @Value("${openai.analysis.max-images:5}") int maxImages
+            @Value("${openai.analysis.max-images:5}") int maxImages,
+            @Value("${openai.analysis.max-total-bytes:" + DEFAULT_MAX_TOTAL_BYTES + "}") long maxTotalBytes
     ) {
         this.amazonS3Client = amazonS3Client;
         this.bucket = bucket;
         this.maxImages = maxImages;
+        this.maxTotalBytes = maxTotalBytes;
     }
 
     enum ImageFormat {
@@ -73,7 +102,7 @@ public class AnalysisImageLoader {
 
     /**
      * 이미지 URL 목록을 OpenAI image_url.url 에 넣을 data URL 목록으로 바꾼다.
-     * 재시도로 해결되지 않는 문제(외부 URL, 형식, 장수)는 NonRetryableAnalysisException,
+     * 재시도로 해결되지 않는 문제(외부 URL, 형식, 장수, 크기)는 NonRetryableAnalysisException,
      * 그 밖의 S3/IO 오류는 재시도 대상인 일반 RuntimeException 으로 던진다.
      */
     public List<String> loadAsDataUrls(List<String> imageUrls) {
@@ -88,8 +117,16 @@ public class AnalysisImageLoader {
 
         List<String> keys = imageUrls.stream().map(this::extractKey).toList();
         List<String> dataUrls = new ArrayList<>(keys.size());
+        long totalBytes = 0;
         for (String key : keys) {
-            dataUrls.add(toDataUrl(key, readObject(key)));
+            EncodedImage encoded = encode(key, readObject(key));
+            // GIF/WEBP, 회전 정보가 있는 작은 JPEG, 디코딩 실패 원본은 줄이지 않고 보내므로 요청 전체 크기를 따로 막는다
+            totalBytes += encoded.bytes().length;
+            if (totalBytes > maxTotalBytes) {
+                throw new NonRetryableAnalysisException(AnalysisFailureReason.IMAGE_TOO_LARGE,
+                        "분석 이미지 합계가 상한 " + maxTotalBytes + " 바이트를 넘습니다. total=" + totalBytes);
+            }
+            dataUrls.add("data:" + encoded.mimeType() + ";base64," + Base64.getEncoder().encodeToString(encoded.bytes()));
         }
         return dataUrls;
     }
@@ -111,7 +148,18 @@ public class AnalysisImageLoader {
             throw new NonRetryableAnalysisException(AnalysisFailureReason.INVALID_IMAGE_SOURCE,
                     "S3 이미지 URL 에 key 가 없습니다.");
         }
+        if (!isUploadKey(key)) {
+            throw new NonRetryableAnalysisException(AnalysisFailureReason.INVALID_IMAGE_SOURCE,
+                    "업로드 경로의 key 가 아닙니다.");
+        }
         return key;
+    }
+
+    static boolean isUploadKey(String key) {
+        if (key.contains("..")) {
+            return false;
+        }
+        return UPLOAD_KEY.matcher(key).matches() || LEGACY_UPLOAD_KEY.matcher(key).matches();
     }
 
     private byte[] readObject(String key) {
@@ -122,6 +170,13 @@ public class AnalysisImageLoader {
             if (e.getStatusCode() == 404 || "NoSuchKey".equals(e.getErrorCode())) {
                 throw new NonRetryableAnalysisException(AnalysisFailureReason.INVALID_IMAGE_SOURCE,
                         "S3 에 이미지가 없습니다. key=" + key, e);
+            }
+            // ListBucket 권한이 없으면 없는 key 도 404 가 아니라 403(AccessDenied)으로 온다.
+            // 서버 IAM 설정이 깨져도 403 이 오므로, 그 경우를 알아챌 수 있게 error 로 남긴다.
+            if (e.getStatusCode() == 403 || "AccessDenied".equals(e.getErrorCode())) {
+                log.error("S3 access denied while loading analysis image - key: {}, errorCode: {}", key, e.getErrorCode());
+                throw new NonRetryableAnalysisException(AnalysisFailureReason.INVALID_IMAGE_SOURCE,
+                        "S3 이미지에 접근할 수 없습니다(403). key=" + key, e);
             }
             throw new RuntimeException("S3 이미지 조회에 실패했습니다. key=" + key, e);
         } catch (RuntimeException e) {
@@ -149,7 +204,7 @@ public class AnalysisImageLoader {
     }
 
     private NonRetryableAnalysisException tooLarge(String key, long contentLength) {
-        return new NonRetryableAnalysisException(AnalysisFailureReason.UNSUPPORTED_IMAGE,
+        return new NonRetryableAnalysisException(AnalysisFailureReason.IMAGE_TOO_LARGE,
                 "이미지가 20MB 를 넘습니다. key=" + key + ", size=" + contentLength);
     }
 
@@ -169,7 +224,7 @@ public class AnalysisImageLoader {
         return out.toByteArray();
     }
 
-    private String toDataUrl(String key, byte[] bytes) {
+    private EncodedImage encode(String key, byte[] bytes) {
         ImageFormat format = detectFormat(bytes);
         if (format == null) {
             throw new NonRetryableAnalysisException(AnalysisFailureReason.UNSUPPORTED_IMAGE,
@@ -182,7 +237,7 @@ public class AnalysisImageLoader {
         }
         log.info("Loaded analysis image - key: {}, format: {}, originalBytes: {}, sentBytes: {}",
                 key, encoded.mimeType(), bytes.length, encoded.bytes().length);
-        return "data:" + encoded.mimeType() + ";base64," + Base64.getEncoder().encodeToString(encoded.bytes());
+        return encoded;
     }
 
     static ImageFormat detectFormat(byte[] bytes) {
@@ -230,11 +285,15 @@ public class AnalysisImageLoader {
     /**
      * 긴 변이 2048px 를 넘는 JPEG/PNG 만 줄인다. OpenAI 도 2048 로 줄여서 보므로 판독 품질은 같고 전송량만 준다.
      * 디코딩하지 못하면(CMYK JPEG 등) 원본을 그대로 보낸다. 줄이지 못했다고 분석을 실패시키지는 않는다.
+     * 다만 헤더가 MAX_DECODE_PIXELS 를 넘는 크기를 말하면 디코딩하지 않고 IMAGE_TOO_LARGE 로 끝낸다.
+     *
+     * 다시 인코딩하면 EXIF 가 사라진다. 회전(3/6/8)은 픽셀을 직접 돌려서 줄이고,
+     * 반전이 섞인 값(2/4/5/7)은 드물어 원본을 보낸다. 긴 변이 2048 이하이면 회전 사진도 원본을 그대로 보낸다.
      */
     private EncodedImage resizeIfNeeded(String key, byte[] bytes, ImageFormat format) {
         EncodedImage original = new EncodedImage(bytes, format.mimeType);
-        // 다시 인코딩하면 EXIF 가 사라진다. 회전 정보가 있는 사진은 줄이면 옆으로 누운 채로 가므로 원본을 보낸다
-        if (format == ImageFormat.JPEG && hasNonDefaultExifOrientation(bytes)) {
+        int orientation = format == ImageFormat.JPEG ? exifOrientation(bytes) : 1;
+        if (orientation != 1 && !isRotationOnly(orientation)) {
             return original;
         }
         try {
@@ -242,22 +301,29 @@ public class AnalysisImageLoader {
             if (decoded == null) {
                 return original;
             }
-            BufferedImage resized = scaleDown(decoded, MAX_LONG_SIDE);
+            BufferedImage resized = rotate(scaleDown(decoded, MAX_LONG_SIDE), orientation);
             boolean keepAlpha = format == ImageFormat.PNG && resized.getColorModel().hasAlpha();
             byte[] reencoded = keepAlpha ? encodePng(resized) : encodeJpeg(resized);
             return new EncodedImage(reencoded, keepAlpha ? ImageFormat.PNG.mimeType : ImageFormat.JPEG.mimeType);
+        } catch (NonRetryableAnalysisException e) {
+            throw e;
         } catch (Exception e) {
             log.warn("Analysis image resize failed, sending original - key: {}, error: {}", key, e.toString());
             return original;
         }
     }
 
+    private static boolean isRotationOnly(int orientation) {
+        return orientation == 3 || orientation == 6 || orientation == 8;
+    }
+
     /**
-     * 원본 크기를 먼저 읽고, 아주 큰 이미지는 서브샘플링으로 디코딩해 메모리를 아낀다(긴 변이 목표의 2배 미만이 되게).
-     * 원본이 이미 목표 이하이면 디코딩하지 않고 null 을 돌려준다. 서브샘플링 뒤에도 긴 변은 목표보다 크다.
+     * 원본 크기를 먼저 읽고, 큰 이미지는 서브샘플링으로 디코딩해 메모리를 아낀다.
+     * 원본이 이미 목표 이하이면 디코딩하지 않고 null 을 돌려준다.
      */
-    private BufferedImage decodeForLongSide(byte[] bytes, int targetLongSide) throws IOException {
-        try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
+    static BufferedImage decodeForLongSide(byte[] bytes, int targetLongSide) throws IOException {
+        // ImageIO.createImageInputStream 은 전역 설정에 따라 /tmp 에 캐시 파일을 만든다. 메모리 캐시 스트림을 직접 쓴다
+        try (ImageInputStream input = new MemoryCacheImageInputStream(new ByteArrayInputStream(bytes))) {
             Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
             if (!readers.hasNext()) {
                 return null;
@@ -267,11 +333,15 @@ public class AnalysisImageLoader {
                 reader.setInput(input, true, true);
                 int width = reader.getWidth(0);
                 int height = reader.getHeight(0);
+                if ((long) width * height > MAX_DECODE_PIXELS) {
+                    throw new NonRetryableAnalysisException(AnalysisFailureReason.IMAGE_TOO_LARGE,
+                            "이미지 픽셀 수가 상한을 넘습니다. size=" + width + "x" + height);
+                }
                 int longSide = Math.max(width, height);
                 if (longSide <= targetLongSide) {
                     return null;
                 }
-                int subsampling = Math.max(1, longSide / (targetLongSide * 2));
+                int subsampling = subsamplingFor(longSide, targetLongSide);
                 ImageReadParam param = reader.getDefaultReadParam();
                 if (subsampling > 1) {
                     param.setSourceSubsampling(subsampling, subsampling, 0, 0);
@@ -281,6 +351,51 @@ public class AnalysisImageLoader {
                 reader.dispose();
             }
         }
+    }
+
+    /**
+     * 디코딩한 긴 변(= ceil(longSide / s))이 목표의 2배 미만이 되는 가장 작은 서브샘플링 값.
+     * ceil(longSide / s) <= 2*target - 1 이려면 s >= longSide / (2*target - 1) 이므로 올림 나눗셈을 쓴다.
+     * 이 값이면 디코딩한 긴 변은 목표 이상, 목표의 2배 미만이라 마지막 축소에서 화질을 잃지 않는다.
+     */
+    static int subsamplingFor(int longSide, int targetLongSide) {
+        int maxDecodedLongSide = targetLongSide * 2 - 1;
+        return Math.max(1, (longSide + maxDecodedLongSide - 1) / maxDecodedLongSide);
+    }
+
+    /** EXIF Orientation 3(180도), 6(시계 방향 90도), 8(반시계 방향 90도)을 픽셀에 적용한다. 그 밖의 값은 그대로 둔다 */
+    static BufferedImage rotate(BufferedImage source, int orientation) {
+        if (!isRotationOnly(orientation)) {
+            return source;
+        }
+        int width = source.getWidth();
+        int height = source.getHeight();
+        boolean swap = orientation != 3;
+        int imageType = source.getColorModel().hasAlpha() ? BufferedImage.TYPE_INT_ARGB : BufferedImage.TYPE_INT_RGB;
+        BufferedImage rotated = new BufferedImage(swap ? height : width, swap ? width : height, imageType);
+
+        AffineTransform transform = new AffineTransform();
+        switch (orientation) {
+            case 3 -> {
+                transform.translate(width, height);
+                transform.rotate(Math.PI);
+            }
+            case 6 -> {
+                transform.translate(height, 0);
+                transform.rotate(Math.PI / 2);
+            }
+            default -> {
+                transform.translate(0, width);
+                transform.rotate(-Math.PI / 2);
+            }
+        }
+        Graphics2D g = rotated.createGraphics();
+        try {
+            g.drawImage(source, transform, null);
+        } finally {
+            g.dispose();
+        }
+        return rotated;
     }
 
     /** 한 번에 크게 줄이면 계단 현상이 생기므로 절반씩 줄이다가 마지막에 목표 크기로 맞춘다. */
@@ -316,7 +431,7 @@ public class AnalysisImageLoader {
     private static byte[] encodeJpeg(BufferedImage image) throws IOException {
         ImageWriter writer = ImageIO.getImageWritersByFormatName("jpeg").next();
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        try (ImageOutputStream output = ImageIO.createImageOutputStream(out)) {
+        try (ImageOutputStream output = new MemoryCacheImageOutputStream(out)) {
             writer.setOutput(output);
             ImageWriteParam param = writer.getDefaultWriteParam();
             param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
@@ -328,10 +443,19 @@ public class AnalysisImageLoader {
         return out.toByteArray();
     }
 
+    /** ImageIO.write(image, "png", out) 도 내부에서 캐시 스트림을 만들므로 메모리 캐시 스트림으로 직접 쓴다 */
     private static byte[] encodePng(BufferedImage image) throws IOException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        if (!ImageIO.write(image, "png", out)) {
+        Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("png");
+        if (!writers.hasNext()) {
             throw new IOException("PNG writer 가 없습니다.");
+        }
+        ImageWriter writer = writers.next();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (ImageOutputStream output = new MemoryCacheImageOutputStream(out)) {
+            writer.setOutput(output);
+            writer.write(image);
+        } finally {
+            writer.dispose();
         }
         return out.toByteArray();
     }
@@ -340,21 +464,28 @@ public class AnalysisImageLoader {
      * JPEG 의 APP1(Exif) 에서 Orientation(0x0112) 이 1 이 아닌지 본다. 해석하지 못하면 false.
      */
     static boolean hasNonDefaultExifOrientation(byte[] jpeg) {
+        return exifOrientation(jpeg) != 1;
+    }
+
+    /**
+     * JPEG 의 APP1(Exif) 에서 Orientation(0x0112) 값을 읽는다. 없거나 해석하지 못하면 1(기본).
+     */
+    static int exifOrientation(byte[] jpeg) {
         int offset = 2;
         while (offset + 4 <= jpeg.length && (jpeg[offset] & 0xFF) == 0xFF) {
             int marker = jpeg[offset + 1] & 0xFF;
             if (marker == 0xDA || marker == 0xD9) {
-                return false;
+                return 1;
             }
             int segmentLength = ((jpeg[offset + 2] & 0xFF) << 8) | (jpeg[offset + 3] & 0xFF);
             int dataStart = offset + 4;
             if (marker == 0xE1 && asciiAt(jpeg, dataStart, "Exif") && dataStart + 6 + 8 <= jpeg.length) {
                 Integer orientation = readOrientation(jpeg, dataStart + 6, Math.min(jpeg.length, offset + 2 + segmentLength));
-                return orientation != null && orientation != 1;
+                return orientation == null || orientation < 1 || orientation > 8 ? 1 : orientation;
             }
             offset += 2 + segmentLength;
         }
-        return false;
+        return 1;
     }
 
     private static Integer readOrientation(byte[] data, int tiffStart, int end) {
