@@ -1,10 +1,13 @@
 package com.aisip.OnO.backend.common.ratelimit;
 
 import java.time.Duration;
+import java.util.List;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -12,6 +15,14 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class RateLimitService {
     private static final String KEY_PREFIX = "rate_limit:";
+
+    // 값이 1 이상일 때만 줄인다. GET 과 DECR 을 따로 부르면 그 사이에 키가 만료돼
+    // DECR 이 TTL 없는 -1 키를 새로 만들 수 있어서 한 번에 실행한다. DECR 은 TTL 을 건드리지 않는다.
+    private static final RedisScript<Long> REFUND_SCRIPT = new DefaultRedisScript<>(
+            "local current = tonumber(redis.call('GET', KEYS[1]))\n"
+                    + "if current and current > 0 then return redis.call('DECR', KEYS[1]) end\n"
+                    + "return -1",
+            Long.class);
 
     private final RedisTemplate<String, Object> redisTemplate;
 
@@ -33,6 +44,22 @@ public class RateLimitService {
             // Redis 장애 시 서비스 중단 방지를 위해 통과
             log.warn("Rate limit check failed for key: {}, failing open - reason: {}", key, e.getMessage());
             return true;
+        }
+    }
+
+    /**
+     * tryConsume 으로 쓴 1회를 되돌린다. 요청을 실제로 처리하지 못했을 때(예: 큐 전송 실패) 부른다.
+     * 0 아래로는 내려가지 않고, 키가 이미 만료됐으면 아무것도 하지 않는다.
+     * Redis 장애 시에는 tryConsume 과 같은 이유로 예외를 던지지 않고 넘어간다.
+     */
+    public void refund(String keyName, Long userId) {
+        String key = KEY_PREFIX + keyName + ":" + userId;
+
+        try {
+            Long count = redisTemplate.execute(REFUND_SCRIPT, List.of(key));
+            log.info("Rate limit refunded - userId: {}, key: {}, count: {}", userId, keyName, count);
+        } catch (Exception e) {
+            log.warn("Rate limit refund failed for key: {}, ignoring - reason: {}", key, e.getMessage());
         }
     }
 }

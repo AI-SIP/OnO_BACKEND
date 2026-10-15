@@ -3,10 +3,10 @@ package com.aisip.OnO.backend.problem.service;
 import com.aisip.OnO.backend.common.response.CursorSort;
 import com.aisip.OnO.backend.admin.dto.AdminProblemResponseDto;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.common.ratelimit.RateLimitKeys;
 import com.aisip.OnO.backend.common.ratelimit.RateLimitService;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
-import com.aisip.OnO.backend.config.rabbitmq.producer.ProblemAnalysisProducer;
 import com.aisip.OnO.backend.mission.entity.MissionMetric;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.mission.service.MissionProgressUpdater;
@@ -71,7 +71,6 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 @RequiredArgsConstructor
 public class ProblemService {
-    private static final String AI_ANALYSIS_RATE_LIMIT_KEY = "ai_analysis";
     private static final int AI_ANALYSIS_LIMIT_PER_DAY = 20;
     private static final int MEMO_MAX_LENGTH = 1000;
 
@@ -96,7 +95,8 @@ public class ProblemService {
 
     private final S3DeleteProducer s3DeleteProducer;
 
-    private final ProblemAnalysisProducer analysisProducer;
+    private final ProblemAnalysisDispatcher analysisDispatcher;
+    private final ProblemAnalysisDispatchGuard analysisDispatchGuard;
     private final TagRepository tagRepository;
     private final ProblemTagMappingRepository problemTagMappingRepository;
     private final RateLimitService rateLimitService;
@@ -536,8 +536,9 @@ public class ProblemService {
     /**
      * GPT 문제 분석 요청 (RabbitMQ 방식)
      * - 이미지 유무 확인 후 상태 업데이트
-     * - 이미지 있음: NOT_STARTED → PROCESSING → RabbitMQ 전송
+     * - 이미지 있음: NOT_STARTED → PROCESSING → (커밋 후) RabbitMQ 전송
      * - 이미지 없음: NOT_STARTED → NO_IMAGE
+     * - 이미 보낸 메시지가 처리 중이면 한도를 쓰지 않고 아무것도 하지 않는다
      */
     @Transactional
     public void analysisProblem(Long problemId, Long userId) {
@@ -569,16 +570,33 @@ public class ProblemService {
             analysisService.updateToNoImage(problemId);
             log.info("분석 불가 (이미지 없음) - problemId: {}", problemId);
         } else {
-            if (!rateLimitService.tryConsume(AI_ANALYSIS_RATE_LIMIT_KEY, userId, AI_ANALYSIS_LIMIT_PER_DAY)) {
+            // 앱의 "다시 분석하기"와 이미지 수정 API 는 처리 중에도 다시 요청한다.
+            // 이미 보낸 메시지가 있으면 한도를 또 쓰거나 메시지를 겹쳐 보내지 않는다.
+            // 한도보다 먼저 확인해야 겹친 요청이 한도를 쓰지 않는다.
+            if (!analysisDispatchGuard.tryAcquire(problemId)) {
+                log.info("이미 분석 메시지가 처리 중이라 다시 보내지 않습니다 - problemId: {}", problemId);
+                return;
+            }
+
+            if (!rateLimitService.tryConsume(RateLimitKeys.AI_ANALYSIS, userId, AI_ANALYSIS_LIMIT_PER_DAY)) {
+                analysisDispatchGuard.release(problemId);
                 analysisService.updateToRateLimitExceeded(problemId);
                 log.info("AI 분석 일일 요청 제한 초과 - userId: {}, problemId: {}", userId, problemId);
                 return;
             }
 
-            // 이미지 있음 → PROCESSING 상태로 업데이트 후 RabbitMQ 전송
-            analysisService.updateToProcessing(problemId);
-            analysisProducer.sendAnalysisMessage(problemId);
-            log.info("GPT 분석 요청 전송 완료 - problemId: {}, 이미지 개수: {}", problemId, problemImageCount);
+            // 이미지 있음 → PROCESSING 상태로 업데이트하고, 커밋된 뒤에 RabbitMQ 로 전송한다.
+            // 커밋 전에 보내면 컨슈머가 커밋 전 상태를 읽을 수 있다(ProblemAnalysisDispatcher 참고).
+            try {
+                analysisService.updateToProcessing(problemId);
+            } catch (RuntimeException e) {
+                // 아직 전송을 등록하기 전이라 롤백 정리가 걸려 있지 않다. 여기서 직접 되돌린다.
+                analysisDispatchGuard.release(problemId);
+                rateLimitService.refund(RateLimitKeys.AI_ANALYSIS, userId);
+                throw e;
+            }
+            analysisDispatcher.dispatchAfterCommit(problemId, userId, RateLimitKeys.AI_ANALYSIS);
+            log.info("GPT 분석 요청 등록 - problemId: {}, 이미지 개수: {}", problemId, problemImageCount);
         }
     }
 

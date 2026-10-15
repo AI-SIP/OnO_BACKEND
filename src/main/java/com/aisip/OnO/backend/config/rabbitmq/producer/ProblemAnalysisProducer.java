@@ -21,6 +21,8 @@ public class ProblemAnalysisProducer {
     /**
      * GPT 문제 분석 메시지 전송
      * @param problemId 분석할 문제 ID
+     * @throws org.springframework.amqp.AmqpException 브로커에 메시지를 넘기지 못했을 때.
+     *         삼키면 한도는 이미 썼는데 상태가 PROCESSING 으로 영원히 남으므로, 호출한 쪽이 실패로 정리하게 던진다.
      */
     public void sendAnalysisMessage(Long problemId) {
         try {
@@ -39,7 +41,7 @@ public class ProblemAnalysisProducer {
             log.error("RabbitMQ message send failed - exchange: {}, routingKey: {}, operation: {}, problemId: {}, error: {}",
                     RabbitMQConfig.ANALYSIS_EXCHANGE, RabbitMQConfig.GPT_ANALYSIS_ROUTING_KEY,
                     "problem_analysis", problemId, e.getMessage(), e);
-            // 메시지 전송 실패해도 예외를 던지지 않음 (분석은 선택적 기능)
+            throw e;
         }
     }
 }

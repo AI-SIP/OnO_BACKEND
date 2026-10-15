@@ -7,6 +7,7 @@ import com.aisip.OnO.backend.config.rabbitmq.message.ProblemAnalysisMessage;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.problem.service.ProblemAnalysisFailureService;
 import com.aisip.OnO.backend.problem.service.ProblemAnalysisService;
+import com.aisip.OnO.backend.util.ai.AnalysisFailureReason;
 import com.aisip.OnO.backend.util.ai.NonRetryableAnalysisException;
 import com.aisip.OnO.backend.util.webhook.DiscordWebhookNotificationService;
 import lombok.RequiredArgsConstructor;
@@ -114,9 +115,11 @@ public class ProblemAnalysisConsumer {
                 attempts
         );
 
-        // DLQ 도달 = 모든 재시도 소진. PROCESSING 고착 방지를 위해 FAILED로 전이
+        // DLQ 도달 = 모든 재시도 소진 또는 큐 TTL 만료. PROCESSING 고착 방지를 위해 FAILED로 전이
+        // 재시도를 소진한 메시지는 마지막 시도에서 이미 FAILED(MAX_RETRIES) 로 기록됐다. 그 기록이 실패했거나
+        // 큐 TTL 이 지나 처리 전에 빠진 메시지를 위해 여기서도 기록한다. 이미 FAILED 면 markFailed 가 건너뛴다.
         try {
-            analysisFailureService.markFailed(message.getProblemId(), "최대 재시도 횟수 초과 또는 큐 만료");
+            analysisFailureService.markFailed(message.getProblemId(), AnalysisFailureReason.MAX_RETRIES);
         } catch (Exception e) {
             log.error("RabbitMQ DLQ markFailed failed - problemId: {}, error: {}",
                     message.getProblemId(), e.getMessage());

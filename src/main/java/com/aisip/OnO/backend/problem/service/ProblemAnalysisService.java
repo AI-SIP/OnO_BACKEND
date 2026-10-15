@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.problem.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.config.rabbitmq.RabbitRetryAttempts;
 import com.aisip.OnO.backend.problem.dto.ProblemAnalysisResponseDto;
 import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.Problem;
@@ -11,12 +12,14 @@ import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.problem.repository.ProblemAnalysisRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
+import com.aisip.OnO.backend.util.ai.AnalysisFailureReason;
 import com.aisip.OnO.backend.util.ai.NonRetryableAnalysisException;
 import com.aisip.OnO.backend.util.ai.OpenAIClient;
 import com.aisip.OnO.backend.util.ai.ProblemAnalysisResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.retry.support.RetrySynchronizationManager;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -141,6 +144,11 @@ public class ProblemAnalysisService {
             ProblemAnalysisDbService.AnalysisPreparation prep = problemAnalysisDbService.fetchAnalysisPreparation(problemId);
             if (prep.alreadyCompleted()) {
                 log.info("Analysis already completed for problemId: {}", problemId);
+                return;
+            }
+            // 요청 뒤 처리 전에 문제 이미지가 모두 지워졌으면 OpenAI 를 부르지 않고 NO_IMAGE 로 끝낸다
+            if (prep.imageUrls().isEmpty()) {
+                problemAnalysisDbService.finishWithoutImage(problemId);
                 return;
             }
 
@@ -312,10 +320,32 @@ public class ProblemAnalysisService {
 
     /**
      * 에러 처리
+     *
+     * 컨슈머의 재시도 인터셉터 안에서 난 일시적 실패는 재시도가 남아 있으면 PROCESSING 을 유지한다.
+     * 여기서 FAILED 로 바꾸면 앱이 폴링을 멈추고 실패 화면을 띄운다. 그 뒤 재시도가 성공해도
+     * 사용자는 모르고 "다시 분석하기"를 눌러 한도를 한 번 더 쓴다.
+     *
+     * 마지막 시도의 일시적 실패는 그 자리에서 FAILED(MAX_RETRIES) 로 바꾼다. DLQ 핸들러도 같은 기록을 하지만,
+     * 그쪽 기록이 실패하면 PROCESSING 으로 굳고 앱에는 PROCESSING 에서 다시 요청하는 버튼이 없다.
+     * DLQ 가 이어서 와도 markFailed 가 이미 FAILED 인 행은 건너뛰므로 메트릭이 두 번 오르지 않는다.
+     *
+     * 재시도하지 않는 실패와, 재시도 인터셉터 밖에서 불린 경우(다시 시도할 주체가 없음)는 바로 그 사유로 기록한다.
      */
     private void handleAnalysisError(Long problemId, Exception e) {
+        AnalysisFailureReason reason = AnalysisFailureReason.from(e);
+
+        if (!(e instanceof NonRetryableAnalysisException) && RetrySynchronizationManager.getContext() != null) {
+            int attempt = RabbitRetryAttempts.currentAttempt();
+            if (attempt < RabbitRetryAttempts.MAX_ATTEMPTS) {
+                log.info("Analysis attempt failed, leaving PROCESSING for retry - problemId: {}, attempt: {}/{}, reason: {}",
+                        problemId, attempt, RabbitRetryAttempts.MAX_ATTEMPTS, reason.tag());
+                return;
+            }
+            reason = AnalysisFailureReason.MAX_RETRIES;
+        }
+
         try {
-            problemAnalysisFailureService.markFailed(problemId, e.getMessage());
+            problemAnalysisFailureService.markFailed(problemId, reason);
         } catch (Exception ex) {
             log.error("Error handling analysis error for problemId: {}", problemId, ex);
         }

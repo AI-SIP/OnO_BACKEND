@@ -6,10 +6,11 @@ import com.fasterxml.jackson.core.json.JsonReadFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -20,18 +21,40 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class OpenAIClient {
+
+    static final String OPERATION_ANALYZE_IMAGES = "analyze_images";
+    static final String OPERATION_LEARNING_REPORT = "recommend_learning_report";
+
+    /** 이미지 자체를 OpenAI 가 읽지 못했다는 400 오류 코드. 같은 이미지로 재시도해도 같은 결과다 */
+    private static final Set<String> IMAGE_FORMAT_ERROR_CODES = Set.of(
+            "invalid_image", "invalid_image_format", "image_parse_error", "unsupported_image_media_type");
+
+    /**
+     * 요청 본문이 너무 크다는 413 은 이미지 탓이라 재시도하지 않는다.
+     * 그 밖의 4xx(이미지 코드가 아닌 400, 401, 403, 404, 422 등)는 재시도한다. 스키마나 모델명, 키 같은 우리 쪽 설정이
+     * 잘못돼도 같은 상태 코드가 오는데, 재시도하지 않으면 모든 분석이 DLQ 알림 없이 조용히 실패하기 때문이다.
+     * OpenAI 는 4xx 응답에 과금하지 않으므로 재시도 비용은 S3 를 다시 읽는 정도다.
+     */
+    private static final int PAYLOAD_TOO_LARGE = 413;
+
+    /** 모델 응답이나 오류 본문을 로그에 남길 때의 최대 길이 */
+    static final int LOG_PREVIEW_LENGTH = 200;
+
+    private static final Map<String, Object> ANALYSIS_RESPONSE_FORMAT = createAnalysisResponseFormat();
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
+    private final AnalysisImageLoader analysisImageLoader;
     private static final ObjectMapper LENIENT_OBJECT_MAPPER = JsonMapper.builder()
             .enable(JsonReadFeature.ALLOW_BACKSLASH_ESCAPING_ANY_CHARACTER)
             .build();
@@ -49,65 +72,85 @@ public class OpenAIClient {
     private boolean learningReportAiEnabled;
 
     /**
+     * lombok.config 가 없어 @RequiredArgsConstructor 로는 @Qualifier 가 생성자 파라미터로 복사되지 않는다.
+     * 그러면 타임아웃 없는 범용 restTemplate 이 주입되므로 생성자를 직접 쓴다.
+     */
+    public OpenAIClient(
+            @Qualifier(OpenAIHttpClientConfig.AI_REST_TEMPLATE) RestTemplate restTemplate,
+            ObjectMapper objectMapper,
+            MeterRegistry meterRegistry,
+            AnalysisImageLoader analysisImageLoader
+    ) {
+        this.restTemplate = restTemplate;
+        this.objectMapper = objectMapper;
+        this.meterRegistry = meterRegistry;
+        this.analysisImageLoader = analysisImageLoader;
+    }
+
+    /**
      * 여러 이미지 URL을 분석하여 문제에 대한 정보를 추출합니다.
+     * 이미지는 서버가 S3 에서 직접 읽어 data URL 로 보낸다. OpenAI 가 URL 을 내려받다 타임아웃 나는 일을 없애기 위해서다.
      */
     public ProblemAnalysisResult analyzeImages(List<String> imageUrls) {
+        log.info("Starting image analysis for {} images", imageUrls == null ? 0 : imageUrls.size());
+
+        // 1. 이미지 로드. 외부 URL·장수 초과·형식 오류는 여기서 NonRetryable 로 끝난다(OpenAI 호출 시간 계측에서 뺀다)
+        List<String> imageDataUrls = analysisImageLoader.loadAsDataUrls(imageUrls);
+
         Timer.Sample sample = Timer.start(meterRegistry);
         try {
-            log.info("Starting image analysis for {} images", imageUrls.size());
+            // 2. Vision API 요청 메시지 생성
+            List<Message> messages = createVisionMessages(imageDataUrls);
 
-            // 1. Vision API 요청 메시지 생성
-            List<Message> messages = createVisionMessages(imageUrls);
-
-            // 2. ChatGPT API 요청 생성
+            // 3. ChatGPT API 요청 생성. 응답은 Structured Outputs 스키마로 강제한다
             ChatCompletionRequest request = ChatCompletionRequest.builder()
                     .model(model)
                     .messages(messages)
-                    .maxTokens(2000)
-                    .temperature(0.7)
+                    .maxTokens(3000)
+                    .temperature(0.2)
+                    .responseFormat(ANALYSIS_RESPONSE_FORMAT)
                     .build();
-
-            // 3. HTTP 헤더 설정
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(apiKey);
-
-            HttpEntity<ChatCompletionRequest> entity = new HttpEntity<>(request, headers);
 
             // 4. API 호출
             ResponseEntity<ChatCompletionResponse> response = restTemplate.postForEntity(
                     apiUrl,
-                    entity,
+                    new HttpEntity<>(request, jsonHeaders()),
                     ChatCompletionResponse.class
             );
 
-            // 5. 응답 추출
-            String content = response.getBody()
-                    .getChoices()
-                    .get(0)
-                    .getMessage()
-                    .getContent();
+            ChatCompletionResponse body = response.getBody();
+            recordTokenUsage(OPERATION_ANALYZE_IMAGES, body);
 
-            log.debug("Received response from OpenAI - contentLength: {}", content == null ? 0 : content.length());
-
-            // 6. JSON 응답 파싱
-            recordExternalCall("openai", "analyze_images", "success", sample);
-            return parseResponse(content);
+            // 5. 응답 판정과 파싱
+            ProblemAnalysisResult result = interpretAnalysisResponse(body);
+            recordExternalCall("openai", OPERATION_ANALYZE_IMAGES, "success", sample);
+            return result;
 
         } catch (HttpClientErrorException e) {
-            recordExternalCall("openai", "analyze_images", "failure", sample);
+            recordExternalCall("openai", OPERATION_ANALYZE_IMAGES, "failure", sample);
             String responseBody = e.getResponseBodyAsString();
+            int status = e.getStatusCode().value();
+            String bodyPreview = preview(responseBody);
             if (isNonRetryableQuotaError(e, responseBody)) {
-                throw new NonRetryableAnalysisException("OpenAI 할당량이 초과되어 분석을 진행할 수 없습니다.", e);
+                throw new NonRetryableAnalysisException(AnalysisFailureReason.QUOTA, "OpenAI 할당량이 초과되어 분석을 진행할 수 없습니다.", e);
             }
-            log.error("Error analyzing images: {}", e.getMessage(), e);
-            throw new RuntimeException("AI 이미지 분석 중 오류가 발생했습니다: " + e.getMessage(), e);
+            if (isImageFormatError(e, responseBody)) {
+                throw new NonRetryableAnalysisException(AnalysisFailureReason.UNSUPPORTED_IMAGE,
+                        "OpenAI 가 이미지를 읽지 못했습니다: " + bodyPreview, e);
+            }
+            if (status == PAYLOAD_TOO_LARGE) {
+                throw new NonRetryableAnalysisException(AnalysisFailureReason.IMAGE_TOO_LARGE,
+                        "OpenAI 요청 본문이 너무 큽니다. body=" + bodyPreview, e);
+            }
+            // 예외 메시지에는 응답 본문이 통째로 들어가므로 상태와 앞부분만 남긴다
+            log.error("Error analyzing images - status: {}, body: {}", status, bodyPreview);
+            throw new RuntimeException("AI 이미지 분석 중 오류가 발생했습니다. status=" + status + ", body=" + bodyPreview, e);
         } catch (NonRetryableAnalysisException e) {
-            recordExternalCall("openai", "analyze_images", "failure", sample);
-            log.warn("Non-retryable image analysis failure: {}", e.getMessage());
+            recordExternalCall("openai", OPERATION_ANALYZE_IMAGES, "failure", sample);
+            log.warn("Non-retryable image analysis failure - reason: {}, message: {}", e.getReason(), e.getMessage());
             throw e;
         } catch (Exception e) {
-            recordExternalCall("openai", "analyze_images", "failure", sample);
+            recordExternalCall("openai", OPERATION_ANALYZE_IMAGES, "failure", sample);
             log.error("Error analyzing images: {}", e.getMessage(), e);
             throw new RuntimeException("AI 이미지 분석 중 오류가 발생했습니다: " + e.getMessage(), e);
         }
@@ -146,29 +189,35 @@ public class OpenAIClient {
                     .temperature(0.3)
                     .build();
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(apiKey);
-
             ResponseEntity<ChatCompletionResponse> response = restTemplate.postForEntity(
                     apiUrl,
-                    new HttpEntity<>(request, headers),
+                    new HttpEntity<>(request, jsonHeaders()),
                     ChatCompletionResponse.class
             );
 
-            String content = response.getBody()
+            ChatCompletionResponse body = response.getBody();
+            recordTokenUsage(OPERATION_LEARNING_REPORT, body);
+
+            String content = body
                     .getChoices()
                     .get(0)
                     .getMessage()
                     .getContent();
 
-            recordExternalCall("openai", "recommend_learning_report", "success", sample);
+            recordExternalCall("openai", OPERATION_LEARNING_REPORT, "success", sample);
             return parseLearningRecommendation(content);
         } catch (Exception e) {
-            recordExternalCall("openai", "recommend_learning_report", "failure", sample);
+            recordExternalCall("openai", OPERATION_LEARNING_REPORT, "failure", sample);
             log.warn("AI learning recommendation failed, fallback to rule-based: {}", e.getMessage());
             return Optional.empty();
         }
+    }
+
+    private HttpHeaders jsonHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+        return headers;
     }
 
     private void recordExternalCall(String dependency, String operation, String outcome, Timer.Sample sample) {
@@ -184,9 +233,68 @@ public class OpenAIClient {
     }
 
     /**
+     * 응답의 usage 로 입력/출력 토큰 수를 센다. usage 가 없으면 건너뛴다.
+     */
+    private void recordTokenUsage(String operation, ChatCompletionResponse body) {
+        if (body == null || body.getUsage() == null) {
+            return;
+        }
+        incrementTokens(operation, "input", body.getUsage().getPromptTokens());
+        incrementTokens(operation, "output", body.getUsage().getCompletionTokens());
+    }
+
+    private void incrementTokens(String operation, String type, Integer tokens) {
+        if (tokens == null || tokens <= 0) {
+            return;
+        }
+        Counter.builder("ono.ai.tokens")
+                .description("OpenAI token usage")
+                .tag("operation", operation)
+                .tag("model", model == null ? "unknown" : model)
+                .tag("type", type)
+                .register(meterRegistry)
+                .increment(tokens);
+    }
+
+    /**
+     * 판정 순서: 거절 → 길이 초과 → 빈 응답 → JSON(analyzable) → JSON 이 아닌 응답 휴리스틱.
+     */
+    private ProblemAnalysisResult interpretAnalysisResponse(ChatCompletionResponse body) {
+        ChatCompletionResponse.Choice choice = (body == null || body.getChoices() == null || body.getChoices().isEmpty())
+                ? null
+                : body.getChoices().get(0);
+        ChatCompletionResponse.MessageResponse message = choice == null ? null : choice.getMessage();
+
+        if (choice != null) {
+            String refusal = message == null ? null : message.getRefusal();
+            if (refusal != null && !refusal.isBlank()) {
+                throw new NonRetryableAnalysisException(AnalysisFailureReason.REFUSAL,
+                        "AI가 요청을 거절하여 분석을 진행할 수 없습니다: " + refusal);
+            }
+            if ("content_filter".equals(choice.getFinishReason())) {
+                throw new NonRetryableAnalysisException(AnalysisFailureReason.REFUSAL,
+                        "AI가 요청을 거절하여 분석을 진행할 수 없습니다: finish_reason=content_filter");
+            }
+            // 같은 요청을 다시 보내도 같은 지점에서 잘린다
+            if ("length".equals(choice.getFinishReason())) {
+                throw new NonRetryableAnalysisException(AnalysisFailureReason.INVALID_RESPONSE,
+                        "AI 응답이 최대 토큰 수에서 잘렸습니다.");
+            }
+        }
+
+        String content = message == null ? null : message.getContent();
+        if (content == null) {
+            // 응답 자체가 비어 온 것은 모델의 거절이 아니므로 재시도할 수 있게 둔다
+            throw new IllegalStateException("AI 응답에 content 가 없습니다.");
+        }
+        log.debug("Received response from OpenAI - contentLength: {}", content.length());
+        return parseResponse(content);
+    }
+
+    /**
      * Vision API용 메시지 생성
      */
-    private List<Message> createVisionMessages(List<String> imageUrls) {
+    private List<Message> createVisionMessages(List<String> imageDataUrls) {
         List<Message> messages = new ArrayList<>();
 
         // System 메시지
@@ -199,17 +307,17 @@ public class OpenAIClient {
         List<ContentPart> contentParts = new ArrayList<>();
 
         // 텍스트 파트
-        String textPrompt = createTextPrompt(imageUrls.size());
+        String textPrompt = createTextPrompt(imageDataUrls.size());
         contentParts.add(ContentPart.builder()
                 .type("text")
                 .text(textPrompt)
                 .build());
 
         // 이미지 파트들
-        for (String imageUrl : imageUrls) {
+        for (String imageDataUrl : imageDataUrls) {
             contentParts.add(ContentPart.builder()
                     .type("image_url")
-                    .imageUrl(ImageUrl.builder().url(imageUrl).build())
+                    .imageUrl(ImageUrl.builder().url(imageDataUrl).build())
                     .build());
         }
 
@@ -221,48 +329,108 @@ public class OpenAIClient {
         return messages;
     }
 
-    private String createSystemPrompt() {
+    /**
+     * 시험지 사진을 "시험 부정행위"로 오해해 거절하는 일이 많아(운영 실패 표본 9건 중 6건),
+     * 자료의 출처와 목적(본인이 이미 푼 문제의 복습)을 먼저 밝힌다.
+     */
+    String createSystemPrompt() {
         return """
-            당신은 학생이 스스로 문제를 해결할 수 있도록 사고의 물꼬를 터주는 '학습 길잡이'입니다.
-            직접적인 최종 정답이나 복잡한 수치 계산을 수행하는 대신, 문제를 해결하기 위한 '논리적 접근법'과 '단계별 가이드'를 제공하는 데 집중하세요.
+            당신은 학습자가 스스로 문제를 다시 풀 수 있도록 사고의 물꼬를 터주는 '복습 길잡이'입니다.
+
+            [자료의 맥락]
+            - 이 이미지는 학습자가 이미 풀어 보고 틀렸거나 헷갈렸던 문제를, 복습하려고 자신의 오답노트 앱에 직접 올린 것입니다.
+            - 학습자는 지금 시험을 보고 있는 것이 아니며, 이 분석은 시험이 끝난 뒤 개념을 다시 익히기 위한 복습용 해설입니다.
+            - 대상은 모든 학습용 문제입니다. 초중고 교과, 수능, 대학 전공, 공무원·자격증·NCS 시험, 토익·SAT 같은 어학 시험 등 어떤 과목이든 분석하세요.
+            - 용어는 해당 시험과 과목에서 실제로 쓰는 표준 용어를 사용하세요.
+
+            [분석 대상 고르기]
+            - 한 이미지에 문제가 여러 개 있으면, 가장 크게 보이거나 화면 중심에 있는 문제 하나를 골라 그 문제만 분석하세요.
+            - 이미지가 여러 장이면 하나의 문제를 나눠 찍은 것으로 보고 종합해서 하나의 문제로 분석하세요.
+            - 이미지에서 학습용 문제를 찾을 수 없으면(일반 사진, 빈 화면, 글자를 알아볼 수 없는 경우 등) 거절하지 말고
+              analyzable 을 false 로 하고 나머지 문자열은 빈 문자열, keyPoints 는 빈 배열로 응답하세요.
 
             [분석 및 작성 원칙]
-            1. Solve No-More: 수치를 대입해 최종 답을 계산하지 마세요. 대신 "A 공식을 사용해 B를 구한다"와 같은 '방법론'을 제시하세요.
-            2. Thinking Step (solution): 
+            1. Solve No-More: 수치를 대입해 최종 답을 계산하거나 정답 선지를 알려주지 마세요. 대신 "A 공식을 사용해 B를 구한다"와 같은 '방법론'을 제시하세요.
+            2. Thinking Step (solution):
                - 1단계: 문제에서 주어진 조건(Knowns)과 구해야 하는 것(Unknowns)을 명확히 정의하세요.
-               - 2단계: 이 문제를 풀기 위해 머릿속에서 꺼내야 할 핵심 공식이나 정의를 언급하세요.
-               - 3단계: 어떤 순서로 식을 세우고 접근해야 하는지 '전략'을 설명하세요.
+               - 2단계: 이 문제를 풀기 위해 머릿속에서 꺼내야 할 핵심 공식, 정의, 법리, 문법 규칙 등을 언급하세요.
+               - 3단계: 어떤 순서로 접근해야 하는지 '전략'을 설명하세요.
             3. Error Analysis (commonMistakes): 계산 실수보다는 '개념의 오용'이나 '조건을 잘못 읽는 경우' 등 사고의 오류를 짚어주세요.
-            4. Vocabulary: 중/고등 교육과정 표준 용어를 사용하여 학생이 교과서에서 본 내용을 떠올릴 수 있게 하세요.
+            4. keyPoints 에는 이 문제에 필요한 핵심 개념이나 공식을 2~4개 적으세요.
 
-            [응답 형식]
-            반드시 아래의 JSON 구조를 지키며, JSON 외에 다른 설명은 포함하지 마세요.
-            문자열 값에는 LaTeX/마크다운 수식 표기나 이스케이프 문자를 사용하지 마세요.
-            수식은 일반 한국어 문장으로 풀어서 작성하세요.
-            {
-              "subject": "과목명",
-              "problemType": "문제 유형",
-              "keyPoints": ["필요한 공식1", "핵심 개념2"],
-              "solution": "이 문제는 [개념]을 활용하는 문제입니다. 먼저 조건을 정리하면... 그 다음 ... 방향으로 식을 세워보세요.",
-              "commonMistakes": "이 조건(단서)을 놓치면 전혀 다른 방향으로 풀릴 수 있으니 주의하세요.",
-              "studyTips": "이 문제를 풀기 위해 교과서의 [단원명] 파트를 다시 읽어보는 것을 추천합니다."
-            }
-
-            모든 내용은 한국어로 작성하며, 학생이 스스로 답을 찾을 수 있게 격려하는 톤을 유지하세요.
+            [작성 형식]
+            - 모든 값은 순수한 텍스트로 작성하세요. LaTeX, 마크다운, 이스케이프 문자를 쓰지 마세요.
+            - 수식은 한국어 문장으로 풀어 쓰고, 필요하면 ², ³, √, π, ≤, ≥ 같은 유니코드 기호까지만 쓰세요.
+            - 모든 내용은 한국어로 작성하며, 학습자가 스스로 답을 찾을 수 있게 격려하는 톤을 유지하세요.
+            - 응답은 지정된 JSON 스키마(analyzable, subject, problemType, keyPoints, solution, commonMistakes, studyTips)를 따르세요.
             """;
     }
 
     private String createTextPrompt(int imageCount) {
         if (imageCount == 1) {
-            return "이미지에 있는 문제를 분석하여 위에서 요청한 JSON 형식으로 분석 결과를 제공해주세요.";
+            return "이미지에 있는 문제를 분석하여 지정된 JSON 형식으로 복습용 분석 결과를 제공해주세요.";
         } else {
             return String.format(
                     "다음 %d장의 이미지는 하나의 문제를 여러 장으로 나눈 것입니다. " +
                     "모든 이미지를 종합하여 하나의 문제로 분석하고, " +
-                    "위에서 요청한 JSON 형식으로 분석 결과를 제공해주세요.",
+                    "지정된 JSON 형식으로 복습용 분석 결과를 제공해주세요.",
                     imageCount
             );
         }
+    }
+
+    /**
+     * Structured Outputs(strict) 스키마. strict 모드는 모든 필드가 required 이고 additionalProperties 가 false 여야 한다.
+     * 앱이 그리는 필드 이름(ProblemAnalysisResult)은 그대로 두고 analyzable 만 더한다.
+     */
+    private static Map<String, Object> createAnalysisResponseFormat() {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("analyzable", described("boolean",
+                "이미지에서 학습용 문제를 찾아 분석했으면 true, 문제를 찾을 수 없거나 알아볼 수 없으면 false"));
+        properties.put("subject", described("string", "과목명. 예: 수학, 영어, 물리, 행정법"));
+        properties.put("problemType", described("string",
+                "객관식·서술형 같은 문제 형식이 아니라 이 문제가 속한 단원이나 개념 영역. 예: 이차방정식의 판별식"));
+        Map<String, Object> keyPoints = new LinkedHashMap<>();
+        keyPoints.put("type", "array");
+        keyPoints.put("description", "이 문제를 푸는 데 필요한 핵심 개념이나 공식 2~4개");
+        keyPoints.put("items", Map.of("type", "string"));
+        properties.put("keyPoints", keyPoints);
+        properties.put("solution", described("string",
+                "최종 답이나 정답 선지를 밝히지 않고, 조건 정리, 필요한 개념, 접근 순서를 단계별로 설명한 풀이 방향"));
+        properties.put("commonMistakes", described("string",
+                "계산 실수보다 개념을 잘못 적용하거나 조건을 잘못 읽는 것처럼 이 문제에서 자주 하는 사고의 오류"));
+        properties.put("studyTips", described("string", "이 문제와 관련된 개념을 복습할 때 도움이 되는 구체적인 학습 방법"));
+
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "object");
+        schema.put("properties", properties);
+        schema.put("required", List.copyOf(properties.keySet()));
+        schema.put("additionalProperties", false);
+
+        Map<String, Object> jsonSchema = new LinkedHashMap<>();
+        jsonSchema.put("name", "problem_analysis");
+        jsonSchema.put("strict", true);
+        jsonSchema.put("schema", schema);
+
+        Map<String, Object> responseFormat = new LinkedHashMap<>();
+        responseFormat.put("type", "json_schema");
+        responseFormat.put("json_schema", jsonSchema);
+        return java.util.Collections.unmodifiableMap(responseFormat);
+    }
+
+    private static Map<String, Object> described(String type, String description) {
+        Map<String, Object> property = new LinkedHashMap<>();
+        property.put("type", type);
+        property.put("description", description);
+        return property;
+    }
+
+    /** 모델 응답이나 오류 본문을 로그에 남길 때 앞부분만 자른다. 이미지(base64)가 섞여 들어와도 통째로 남지 않게 한다 */
+    static String preview(String text) {
+        if (text == null) {
+            return null;
+        }
+        return text.length() <= LOG_PREVIEW_LENGTH ? text : text.substring(0, LOG_PREVIEW_LENGTH) + "...(" + text.length() + "자)";
     }
 
     private String createLearningReportSystemPrompt() {
@@ -289,15 +457,20 @@ public class OpenAIClient {
 
             if (!looksLikeJsonObject(jsonContent)) {
                 if (isImageNotAnalyzableResponse(jsonContent)) {
-                    throw new NonRetryableAnalysisException("분석이 불가능한 이미지입니다.");
+                    throw new NonRetryableAnalysisException(AnalysisFailureReason.UNREADABLE_IMAGE, "분석이 불가능한 이미지입니다.");
                 }
                 if (isRefusalResponse(jsonContent)) {
-                    throw new NonRetryableAnalysisException("AI가 요청을 거절하여 분석을 진행할 수 없습니다.");
+                    throw new NonRetryableAnalysisException(AnalysisFailureReason.REFUSAL, "AI가 요청을 거절하여 분석을 진행할 수 없습니다.");
                 }
-                throw new NonRetryableAnalysisException("AI가 JSON 형식이 아닌 응답을 반환했습니다.");
+                throw new NonRetryableAnalysisException(AnalysisFailureReason.INVALID_RESPONSE, "AI가 JSON 형식이 아닌 응답을 반환했습니다.");
             }
 
             Map<String, Object> parsed = readJsonMap(jsonContent);
+
+            // 스키마가 analyzable=false 로 답하면 문제를 찾지 못한 이미지다. 필드가 없으면(구 형식) 분석된 것으로 본다
+            if (Boolean.FALSE.equals(parsed.get("analyzable"))) {
+                throw new NonRetryableAnalysisException(AnalysisFailureReason.UNREADABLE_IMAGE, "분석이 불가능한 이미지입니다.");
+            }
 
             return ProblemAnalysisResult.builder()
                     .subject((String) parsed.get("subject"))
@@ -310,11 +483,13 @@ public class OpenAIClient {
 
         } catch (Exception e) {
             if (e instanceof NonRetryableAnalysisException nonRetryableAnalysisException) {
-                log.warn("Non-retryable analysis response detected: {}", response);
+                log.warn("Non-retryable analysis response detected: {}", preview(response));
                 throw nonRetryableAnalysisException;
             }
-            log.error("Error parsing response: {}", response, e);
-            throw new RuntimeException("AI 분석 결과 응답 파싱 중 오류가 발생했습니다.", e);
+            // Jackson 예외 메시지에는 응답 원문 일부(최대 500자)가 들어가므로 앞부분만 남기고, 원인으로 잇지 않는다.
+            // 이어 두면 상위의 스택 트레이스 로그에 그대로 찍힌다.
+            log.error("Error parsing response: {}, error: {}", preview(response), preview(e.toString()));
+            throw new RuntimeException("AI 분석 결과 응답 파싱 중 오류가 발생했습니다: " + e.getClass().getSimpleName());
         }
     }
 
@@ -377,19 +552,39 @@ public class OpenAIClient {
         return content.startsWith("{") && content.endsWith("}");
     }
 
+    /**
+     * JSON 이 아닌 응답 중 "이미지를 읽지 못했다"는 뜻의 문구.
+     * 예전에는 "이미지가", "죄송하지만" 처럼 넓은 조건이 있어, 이미지를 언급하는 거절문까지 판독 불가로 분류됐다.
+     * 판독 실패를 직접 말하는 표현만 남긴다.
+     */
     private boolean isImageNotAnalyzableResponse(String content) {
+        String lower = content.toLowerCase();
         return content.contains("분석할 수 없")
                 || content.contains("인식할 수 없")
+                || content.contains("읽을 수 없")
+                || content.contains("알아볼 수 없")
+                || content.contains("판독")
                 || content.contains("명확하지 않")
-                || content.contains("이미지가")
-                || content.contains("이미지에 있는 문제")
-                || content.contains("죄송하지만")
-                || content.contains("다른 이미지를 제공");
+                || content.contains("흐려")
+                || content.contains("흐릿")
+                || content.contains("잘려")
+                || content.contains("다른 이미지를 제공")
+                || lower.contains("unable to read")
+                || lower.contains("can't read")
+                || lower.contains("cannot read")
+                || lower.contains("too blurry")
+                || lower.contains("not legible")
+                || lower.contains("illegible");
     }
 
     private boolean isRefusalResponse(String content) {
         String lower = content.toLowerCase();
-        return lower.contains("i'm sorry")
+        return content.contains("도와드릴 수 없")
+                || content.contains("도와 드릴 수 없")
+                || content.contains("도움을 드릴 수 없")
+                || content.contains("제공할 수 없")
+                || content.contains("답변할 수 없")
+                || lower.contains("i'm sorry")
                 || lower.contains("i am sorry")
                 || lower.contains("can't assist")
                 || lower.contains("cannot assist")
@@ -406,12 +601,27 @@ public class OpenAIClient {
         return e.getStatusCode().value() == 429 && responseBody != null && responseBody.contains("insufficient_quota");
     }
 
+    /**
+     * 400 중 이미지 형식 자체를 거부한 경우. error.code 로 판정하고, 본문이 JSON 이 아니면 재시도 대상으로 둔다.
+     */
+    private boolean isImageFormatError(HttpClientErrorException e, String responseBody) {
+        if (e.getStatusCode().value() != 400 || responseBody == null || responseBody.isBlank()) {
+            return false;
+        }
+        try {
+            JsonNode code = objectMapper.readTree(responseBody).path("error").path("code");
+            return code.isTextual() && IMAGE_FORMAT_ERROR_CODES.contains(code.asText());
+        } catch (Exception parseException) {
+            return false;
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> readJsonMap(String jsonContent) throws Exception {
         try {
             return objectMapper.readValue(jsonContent, Map.class);
         } catch (Exception strictParseException) {
-            log.warn("Strict JSON parse failed, retrying with lenient parser: {}", strictParseException.getMessage());
+            log.warn("Strict JSON parse failed, retrying with lenient parser: {}", preview(strictParseException.getMessage()));
             return LENIENT_OBJECT_MAPPER.readValue(jsonContent, Map.class);
         }
     }
