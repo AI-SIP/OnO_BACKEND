@@ -112,6 +112,78 @@ class RateLimitServiceTest extends IntegrationTestSupport {
     }
 
     @Nested
+    @DisplayName("환불")
+    class Refund {
+
+        @Test
+        @DisplayName("환불하면 쓴 1회가 돌아와 한도에 걸렸던 요청이 다시 통과한다")
+        void refundsOneConsumption() {
+            String key = uniqueKey();
+            rateLimitService.tryConsume(key, 1L, 1);
+
+            rateLimitService.refund(key, 1L);
+
+            assertThat(redisTemplate.opsForValue().get(redisKey(key, 1L))).isEqualTo("0");
+            assertThat(rateLimitService.tryConsume(key, 1L, 1))
+                    .as("전송하지 못한 요청은 한도에서 빠져야 한다")
+                    .isTrue();
+        }
+
+        @Test
+        @DisplayName("0 아래로는 내려가지 않는다")
+        void neverGoesBelowZero() {
+            String key = uniqueKey();
+            rateLimitService.tryConsume(key, 1L, 5);
+
+            rateLimitService.refund(key, 1L);
+            rateLimitService.refund(key, 1L);
+            rateLimitService.refund(key, 1L);
+
+            assertThat(redisTemplate.opsForValue().get(redisKey(key, 1L)))
+                    .as("음수가 되면 그날 한도가 20회보다 늘어난다")
+                    .isEqualTo("0");
+        }
+
+        @Test
+        @DisplayName("키가 없으면(만료) 새로 만들지 않는다")
+        void doesNotCreateMissingKey() {
+            String key = uniqueKey();
+
+            rateLimitService.refund(key, 1L);
+
+            assertThat(redisTemplate.hasKey(redisKey(key, 1L)))
+                    .as("TTL 없는 키가 생기면 카운터가 영원히 남는다")
+                    .isFalse();
+        }
+
+        @Test
+        @DisplayName("환불해도 하루 창(TTL)은 그대로 둔다")
+        void keepsExpiry() {
+            String key = uniqueKey();
+            rateLimitService.tryConsume(key, 1L, 5);
+            rateLimitService.tryConsume(key, 1L, 5);
+
+            rateLimitService.refund(key, 1L);
+
+            assertThat(redisTemplate.opsForValue().get(redisKey(key, 1L))).isEqualTo("1");
+            assertThat(redisTemplate.getExpire(redisKey(key, 1L)))
+                    .isGreaterThan(Duration.ofHours(23).toSeconds());
+        }
+
+        @Test
+        @DisplayName("다른 사용자의 카운터는 건드리지 않는다")
+        void refundsOnlyThatUser() {
+            String key = uniqueKey();
+            rateLimitService.tryConsume(key, 1L, 5);
+            rateLimitService.tryConsume(key, 2L, 5);
+
+            rateLimitService.refund(key, 1L);
+
+            assertThat(redisTemplate.opsForValue().get(redisKey(key, 2L))).isEqualTo("1");
+        }
+    }
+
+    @Nested
     @DisplayName("윈도우")
     class Window {
 
