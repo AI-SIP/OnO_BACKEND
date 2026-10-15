@@ -4,4 +4,4 @@ interface:
   default_prompt: "Use $commit to create git commits."
 
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

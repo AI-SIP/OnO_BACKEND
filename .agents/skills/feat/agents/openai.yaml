@@ -4,4 +4,4 @@ interface:
   default_prompt: "Use $feat to implement this OnO feature."
 
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

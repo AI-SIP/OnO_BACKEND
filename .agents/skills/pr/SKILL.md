@@ -2,7 +2,6 @@
 name: pr
 description: 현재 작업 브랜치를 push 하고 AI-SIP/OnO_BACKEND 의 develop 대상 GitHub PR 을 레포 템플릿 형식으로 생성한다. 사용자가 PR 생성을 명시적으로 요청할 때만 사용한다.
 argument-hint: "[추가 설명 — 선택]"
-disable-model-invocation: true
 ---
 
 # pr — GitHub PR 생성 (→ develop)

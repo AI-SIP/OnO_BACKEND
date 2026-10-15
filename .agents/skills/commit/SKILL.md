@@ -2,7 +2,6 @@
 name: commit
 description: 현재 변경분을 논리 단위로 나누고 OnO 커밋 메시지 형식으로 실제 git commit 까지 수행한다. 사용자가 커밋을 명시적으로 요청할 때만 사용한다.
 argument-hint: "[추가 맥락 — 선택]"
-disable-model-invocation: true
 ---
 
 # commit — 커밋 생성
