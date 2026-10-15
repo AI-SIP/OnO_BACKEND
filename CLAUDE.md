@@ -79,6 +79,7 @@
 일반 기능:  analysis → plan → feat → test → check → commit → pr (→ report)
 성능 작업:  perf(진단) → plan → feat → test → check → commit → pr (→ report)
 ```
+- 각 단계는 `/analysis` 같은 슬래시 명령(스킬)이다. 본문은 `.agents/skills/<이름>/SKILL.md` 한 곳에 있고 `.claude/skills/<이름>` 은 그 링크다. Codex 도 같은 파일을 쓰니 절차는 SKILL.md 만 고친다.
 - 단계 경계에서 사람이 검토 후 다음으로 진행 (자동 연쇄 X).
 - `analysis`는 요구 명확하면 생략 가능. `explain`은 아무 때나.
 - `/feat` 은 구현만 하고 커밋하지 않는다. 테스트는 `/test` 에서 작성·실행하고, 커밋은 `/commit` 이 실제로 수행한다.
