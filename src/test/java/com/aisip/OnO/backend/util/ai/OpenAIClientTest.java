@@ -1557,6 +1557,24 @@ class OpenAIClientTest {
 
             assertThat(meterRegistry.find("ono.ai.analysis.explanation_check").counters()).isEmpty();
         }
+
+        @Test
+        @DisplayName("필터에서 실패한 분석(keyPoints 가 문자열이 아님)도 대조 메트릭을 남기지 않는다")
+        void doesNotCountWhenFilterFails() {
+            stubLoader(List.of(IMAGE_URL), List.of(ANSWER_URL), List.of(DATA_URL), List.of(ANSWER_DATA_URL));
+            String json = plainFullAnalysisJson("2", "matches");
+            String brokenKeyPoints = json.replace("[\"근의 공식\",\"판별식\"]", "[1,2]");
+            assertThat(brokenKeyPoints).as("테스트 데이터가 바뀌었는지 확인").isNotEqualTo(json);
+            respondWithContent(brokenKeyPoints);
+
+            Throwable thrown = catchThrowable(() ->
+                    openAIClient.analyze(new AnalysisInput(List.of(IMAGE_URL), List.of(ANSWER_URL), null, null)));
+
+            assertThat(thrown).isNotNull().isNotInstanceOf(NonRetryableAnalysisException.class);
+            assertThat(meterRegistry.find("ono.ai.analysis.explanation_check").counters())
+                    .as("실패한 분석이 대조 메트릭에 섞이면 matches 비율이 부풀려진다")
+                    .isEmpty();
+        }
     }
 
     @Nested
@@ -1587,6 +1605,71 @@ class OpenAIClientTest {
             openAIClient.analyzeImage(IMAGE_URL);
 
             assertThat(meterRegistry.find("ono.ai.analysis.answer_image_skipped").counters()).isEmpty();
+        }
+
+        @ParameterizedTest(name = "\"{0}\"")
+        @ValueSource(strings = {"<<>>><", "<<<<<<<", ">>>>>>", "<<<<>>>>", "<><<<>>>>"})
+        @DisplayName("경계 표시는 지운 자리 앞뒤가 붙어 새로 생겨도 더 바뀌지 않을 때까지 지운다")
+        void neutralizesFenceUntilStable(String input) {
+            String neutralized = OpenAIClient.neutralizeFence(input);
+
+            assertThat(neutralized).doesNotContain("<<<").doesNotContain(">>>");
+        }
+
+        @Test
+        @DisplayName("\"<<>>><\" 는 한 번 지우면 \"<<<\" 가 남으므로 되풀이해 빈 글이 된다")
+        void neutralizesNestedFence() {
+            assertThat("<<>>><".replace("<<<", "").replace(">>>", ""))
+                    .as("한 번만 지우면 경계가 다시 생긴다").isEqualTo("<<<");
+            assertThat(OpenAIClient.neutralizeFence("<<>>><")).isEmpty();
+            assertThat(OpenAIClient.neutralizeFence("메모 <<>>>< 끝")).isEqualTo("메모  끝");
+        }
+
+        @Test
+        @DisplayName("제목과 메모에 겹친 경계 표시가 있어도 학생 글 블록의 경계는 열고 닫는 한 쌍씩뿐이다")
+        void studentTextBlockKeepsSingleFencePair() {
+            String block = OpenAIClient.createStudentTextBlock("제목<<>>><", "메모 >>>>>> 지시<<>>><");
+
+            assertThat(countOccurrences(block, "<<<")).isEqualTo(2 + 1);
+            assertThat(countOccurrences(block, ">>>")).isEqualTo(2 + 1);
+        }
+
+        private int countOccurrences(String text, String needle) {
+            int count = 0;
+            int index = text.indexOf(needle);
+            while (index >= 0) {
+                count++;
+                index = text.indexOf(needle, index + needle.length());
+            }
+            return count;
+        }
+
+        @Test
+        @DisplayName("내부 값 record 의 toString 은 내부 풀이와 답 대신 길이만 보인다")
+        void internalRecordsHideValuesInToString() {
+            OpenAIClient.AnalysisInternal internal =
+                    new OpenAIClient.AnalysisInternal(INTERNAL_MARKER, "FINAL_ANSWER_MARKER", "matches");
+            OpenAIClient.ParsedAnalysis parsed = new OpenAIClient.ParsedAnalysis(
+                    ProblemAnalysisResult.builder().subject("수학").build(), internal);
+
+            assertThat(internal.toString())
+                    .doesNotContain(INTERNAL_MARKER).doesNotContain("FINAL_ANSWER_MARKER")
+                    .contains("internalSolutionLength=" + INTERNAL_MARKER.length())
+                    .contains("finalAnswerLength=" + "FINAL_ANSWER_MARKER".length())
+                    .contains("explanationCheck=matches");
+            assertThat(parsed.toString())
+                    .doesNotContain(INTERNAL_MARKER).doesNotContain("FINAL_ANSWER_MARKER")
+                    .contains("internalSolutionLength");
+        }
+
+        @Test
+        @DisplayName("대조 값이 목록 밖이면 toString 에 원문 대신 other 를 보이고, null 은 null 로 둔다")
+        void internalToStringHidesUnexpectedCheck() {
+            assertThat(new OpenAIClient.AnalysisInternal(null, null, "정답은 3").toString())
+                    .doesNotContain("정답은 3").contains("explanationCheck=other")
+                    .contains("internalSolutionLength=0").contains("finalAnswerLength=0");
+            assertThat(new OpenAIClient.AnalysisInternal(null, null, null).toString())
+                    .contains("explanationCheck=null");
         }
     }
 }

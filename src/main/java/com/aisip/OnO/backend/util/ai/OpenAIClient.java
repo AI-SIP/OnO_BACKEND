@@ -153,9 +153,12 @@ public class OpenAIClient {
             // 5. 응답 판정과 파싱
             ParsedAnalysis parsed = interpretAnalysisResponse(body);
 
-            // 6. 내부 필드로 해설 대조 결과를 남기고, 학생에게 보이는 글에서 정답을 밝히는 문장을 지운다
-            recordExplanationCheck(parsed.internal(), !images.answerImages().isEmpty());
+            // 6. 학생에게 보이는 글에서 정답을 밝히는 문장을 지운다
             ProblemAnalysisResult result = removeAnswerLeak(parsed);
+
+            // 7. 해설 대조 결과는 필터와 결과 생성까지 끝난 성공 분석에만 남긴다.
+            //    먼저 남기면 keyPoints 형식 오류처럼 필터에서 실패한 분석도 대조 메트릭에 섞인다
+            recordExplanationCheck(parsed.internal(), !images.answerImages().isEmpty());
             recordExternalCall("openai", OPERATION_ANALYZE_IMAGES, "success", sample);
             return result;
 
@@ -464,9 +467,20 @@ public class OpenAIClient {
         return block.toString();
     }
 
-    /** 학생 글 안의 경계 표시를 지워, 글이 경계를 닫고 지시문처럼 보이는 일을 막는다 */
-    private static String neutralizeFence(String text) {
-        return text.replace(STUDENT_TEXT_OPEN, "").replace(STUDENT_TEXT_CLOSE, "");
+    /**
+     * 학생 글 안의 경계 표시를 지워, 글이 경계를 닫고 지시문처럼 보이는 일을 막는다.
+     * 한 번만 지우면 "<<<<<<" 나 "<<>>><" 처럼 지운 자리 앞뒤가 붙어 새 경계가 생기므로, 더 바뀌지 않을 때까지 되풀이한다.
+     * 지울 때마다 글이 줄어들어 반드시 끝난다.
+     */
+    static String neutralizeFence(String text) {
+        String current = text;
+        while (true) {
+            String next = current.replace(STUDENT_TEXT_OPEN, "").replace(STUDENT_TEXT_CLOSE, "");
+            if (next.equals(current)) {
+                return next;
+            }
+            current = next;
+        }
     }
 
     /**
@@ -645,6 +659,12 @@ public class OpenAIClient {
 
     /** 모델 응답을 학생에게 보이는 결과와 내부 필드로 나눈 것. 내부 필드는 OpenAIClient 밖으로 나가지 않는다 */
     record ParsedAnalysis(ProblemAnalysisResult result, AnalysisInternal internal) {
+        /** 기본 toString 은 내부 풀이와 답을 그대로 찍는다. 디버그 로그나 예외 메시지로 새지 않게 내부 값은 길이만 보인다 */
+        @Override
+        public String toString() {
+            return "ParsedAnalysis[result=" + (result == null ? "null" : "present")
+                    + ", internal=" + internal + "]";
+        }
     }
 
     /**
@@ -652,6 +672,14 @@ public class OpenAIClient {
      * 예전 형식 응답처럼 필드가 없으면 null 이다.
      */
     record AnalysisInternal(String internalSolution, String finalAnswer, String explanationCheck) {
+        /** 기본 toString 은 내부 풀이와 답을 그대로 찍는다. 길이와 대조 결과만 보인다 */
+        @Override
+        public String toString() {
+            return "AnalysisInternal[internalSolutionLength=" + lengthOf(internalSolution)
+                    + ", finalAnswerLength=" + lengthOf(finalAnswer)
+                    + ", explanationCheck=" + (explanationCheck == null || EXPLANATION_CHECKS.contains(explanationCheck)
+                    ? explanationCheck : "other") + "]";
+        }
     }
 
     @SuppressWarnings("unchecked")
