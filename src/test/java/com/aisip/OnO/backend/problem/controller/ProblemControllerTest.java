@@ -13,7 +13,9 @@ import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.support.ProblemTestSupport;
 import com.aisip.OnO.backend.tag.entity.Tag;
 import com.aisip.OnO.backend.user.entity.User;
+import com.aisip.OnO.backend.util.ai.AnalysisFailureReason;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.amqp.AmqpConnectException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -25,6 +27,10 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -95,6 +101,19 @@ class ProblemControllerTest extends ProblemTestSupport {
         void rejectsDelete() throws Exception {
             mockMvc.perform(delete("/api/problems/all"))
                     .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("분석 요청은 401 로 막히고 메시지도 나가지 않는다")
+        void rejectsAnalysisRequest() throws Exception {
+            Problem problem = saveProblem(owner.getId(), ownerRoot);
+            saveImageData(problem, "https://s3/p.png", ProblemImageType.PROBLEM_IMAGE);
+            saveSkippedAnalysis(problem);
+
+            mockMvc.perform(post("/api/problems/{id}/analysis", problem.getId()))
+                    .andExpect(status().isUnauthorized());
+
+            verify(problemAnalysisProducer, never()).sendAnalysisMessage(any());
         }
 
         @Test
@@ -506,6 +525,30 @@ class ProblemControllerTest extends ProblemTestSupport {
 
             mockMvc.perform(post("/api/problems/{id}/analysis", othersProblem.getId()))
                     .andExpect(status().isForbidden());
+
+            verify(problemAnalysisProducer, never()).sendAnalysisMessage(any());
+        }
+
+        @Test
+        @DisplayName("POST /{id}/analysis - 큐 전송이 실패해도 200 이고, 분석은 FAILED 로 바뀐다")
+        void requestAnalysisSucceedsEvenWhenDispatchFails() throws Exception {
+            Problem problem = saveProblem(owner.getId(), ownerRoot);
+            saveImageData(problem, "https://s3/p.png", ProblemImageType.PROBLEM_IMAGE);
+            saveSkippedAnalysis(problem);
+            willThrow(new AmqpConnectException(new java.net.ConnectException("Connection refused")))
+                    .given(problemAnalysisProducer).sendAnalysisMessage(problem.getId());
+            try {
+                mockMvc.perform(post("/api/problems/{id}/analysis", problem.getId()))
+                        .andExpect(status().isOk());
+
+                var analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
+                assertThat(analysis.getStatus())
+                        .isEqualTo(com.aisip.OnO.backend.problem.entity.AnalysisStatus.FAILED);
+                assertThat(analysis.getErrorMessage()).isEqualTo(AnalysisFailureReason.DISPATCH.userMessage());
+            } finally {
+                redisTemplate.delete("rate_limit:ai_analysis:" + owner.getId());
+                redisTemplate.delete("ai_analysis_inflight:" + problem.getId());
+            }
         }
 
         @Test

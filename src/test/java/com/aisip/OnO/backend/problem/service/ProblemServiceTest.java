@@ -24,7 +24,11 @@ import com.aisip.OnO.backend.problem.support.ProblemTestSupport;
 import com.aisip.OnO.backend.tag.entity.Tag;
 import com.aisip.OnO.backend.tag.exception.TagErrorCase;
 import com.aisip.OnO.backend.user.entity.User;
+import com.aisip.OnO.backend.util.ai.AnalysisFailureReason;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.amqp.AmqpConnectException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -38,13 +42,21 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -66,6 +78,9 @@ class ProblemServiceTest extends ProblemTestSupport {
 
     @Autowired
     private RateLimitService rateLimitService;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     private User owner;
     private User intruder;
@@ -1382,6 +1397,273 @@ class ProblemServiceTest extends ProblemTestSupport {
                     .isEqualTo(ProblemErrorCase.PROBLEM_USER_UNMATCHED);
 
             verify(problemAnalysisProducer, never()).sendAnalysisMessage(any());
+            assertThat(redisTemplate.hasKey("ai_analysis_inflight:" + othersProblemId))
+                    .as("소유권 검증이 먼저라 남의 문제에 처리 중 표시를 남기지 않는다")
+                    .isFalse();
+        }
+
+        // ── 커밋 후 전송 ──
+
+        private String guardKey(Long problemId) {
+            return "ai_analysis_inflight:" + problemId;
+        }
+
+        private Object consumedCount(Long userId) {
+            return redisTemplate.opsForValue().get(rateLimitKey(userId));
+        }
+
+        private Long problemWithImage() {
+            Long problemId = problemService.registerProblem(
+                    new ProblemRegisterDto(null, "메모", null, ownerRoot.getId(), null), owner.getId());
+            saveImageData(problemRepository.findById(problemId).orElseThrow(),
+                    "https://s3/p.png", ProblemImageType.PROBLEM_IMAGE);
+            redisTemplate.delete(rateLimitKey(owner.getId()));
+            return problemId;
+        }
+
+        private void setStatus(Long problemId, AnalysisStatus status) {
+            inTransaction(() -> {
+                ProblemAnalysis analysis = problemAnalysisRepository.findByProblemId(problemId).orElseThrow();
+                switch (status) {
+                    case PROCESSING -> analysis.updateToProcessing();
+                    case FAILED -> analysis.updateWithFailure(AnalysisFailureReason.TRANSIENT.userMessage());
+                    default -> throw new IllegalArgumentException(status.name());
+                }
+                problemAnalysisRepository.save(analysis);
+            });
+        }
+
+        private double failureCount(AnalysisFailureReason reason) {
+            Counter counter = meterRegistry.find("ono.ai.analysis.failures").tag("reason", reason.tag()).counter();
+            return counter == null ? 0 : counter.count();
+        }
+
+        @Test
+        @DisplayName("메시지는 트랜잭션이 커밋된 뒤에 한 번 나간다 - 커밋 전에는 나가지 않는다")
+        void sendsOnlyAfterCommit() {
+            Long problemId = problemWithImage();
+            try {
+                transactionTemplate.executeWithoutResult(status -> {
+                    problemService.analysisProblem(problemId, owner.getId());
+                    verify(problemAnalysisProducer, never()).sendAnalysisMessage(any());
+                });
+
+                verify(problemAnalysisProducer, times(1)).sendAnalysisMessage(problemId);
+                assertThat(problemAnalysisRepository.findByProblemId(problemId).orElseThrow().getStatus())
+                        .isEqualTo(AnalysisStatus.PROCESSING);
+                assertThat(redisTemplate.hasKey(guardKey(problemId)))
+                        .as("보낸 메시지가 처리되는 동안 처리 중 표시가 남는다")
+                        .isTrue();
+            } finally {
+                redisTemplate.delete(rateLimitKey(owner.getId()));
+                redisTemplate.delete(guardKey(problemId));
+            }
+        }
+
+        @Test
+        @DisplayName("요청 트랜잭션이 롤백되면 메시지를 보내지 않고, 처리 중 표시와 한도를 되돌린다")
+        void doesNotSendWhenRolledBack() {
+            Long problemId = problemWithImage();
+            try {
+                transactionTemplate.executeWithoutResult(status -> {
+                    problemService.analysisProblem(problemId, owner.getId());
+                    status.setRollbackOnly();
+                });
+
+                verify(problemAnalysisProducer, never()).sendAnalysisMessage(any());
+                assertThat(problemAnalysisRepository.findByProblemId(problemId).orElseThrow().getStatus())
+                        .as("PROCESSING 도 롤백됐다")
+                        .isEqualTo(AnalysisStatus.NOT_STARTED);
+                assertThat(redisTemplate.hasKey(guardKey(problemId)))
+                        .as("남겨 두면 30분 동안 다시 요청할 수 없다")
+                        .isFalse();
+                assertThat(consumedCount(owner.getId())).isEqualTo("0");
+            } finally {
+                redisTemplate.delete(rateLimitKey(owner.getId()));
+                redisTemplate.delete(guardKey(problemId));
+            }
+        }
+
+        // ── 전송 실패 ──
+
+        @Test
+        @DisplayName("큐 전송이 실패하면 요청은 정상으로 끝나고, FAILED(DISPATCH)·한도 환불·표시 해제가 일어난다")
+        void handlesDispatchFailure() {
+            Long problemId = problemWithImage();
+            willThrow(new AmqpConnectException(new java.net.ConnectException("Connection refused")))
+                    .given(problemAnalysisProducer).sendAnalysisMessage(problemId);
+            double before = failureCount(AnalysisFailureReason.DISPATCH);
+            try {
+                assertThatCode(() -> problemService.analysisProblem(problemId, owner.getId()))
+                        .as("요청 트랜잭션은 이미 커밋됐다. afterCommit 의 예외가 500 으로 새면 안 된다")
+                        .doesNotThrowAnyException();
+
+                verify(problemAnalysisProducer, times(1)).sendAnalysisMessage(problemId);
+                ProblemAnalysis analysis = problemAnalysisRepository.findByProblemId(problemId).orElseThrow();
+                assertThat(analysis.getStatus())
+                        .as("예전에는 예외를 삼켜 PROCESSING 으로 영원히 남았다")
+                        .isEqualTo(AnalysisStatus.FAILED);
+                assertThat(analysis.getErrorMessage()).isEqualTo(AnalysisFailureReason.DISPATCH.userMessage());
+                assertThat(consumedCount(owner.getId()))
+                        .as("보내지도 못한 요청이 하루 한도를 쓰면 안 된다")
+                        .isEqualTo("0");
+                assertThat(redisTemplate.hasKey(guardKey(problemId)))
+                        .as("바로 다시 요청할 수 있어야 한다")
+                        .isFalse();
+                assertThat(failureCount(AnalysisFailureReason.DISPATCH)).isEqualTo(before + 1);
+            } finally {
+                redisTemplate.delete(rateLimitKey(owner.getId()));
+                redisTemplate.delete(guardKey(problemId));
+            }
+        }
+
+        @Test
+        @DisplayName("전송 실패 뒤 다시 요청하면 정상으로 보낸다")
+        void retriesAfterDispatchFailure() {
+            Long problemId = problemWithImage();
+            willThrow(new AmqpConnectException(new java.net.ConnectException("Connection refused")))
+                    .willDoNothing()
+                    .given(problemAnalysisProducer).sendAnalysisMessage(problemId);
+            try {
+                problemService.analysisProblem(problemId, owner.getId());
+                problemService.analysisProblem(problemId, owner.getId());
+
+                verify(problemAnalysisProducer, times(2)).sendAnalysisMessage(problemId);
+                assertThat(problemAnalysisRepository.findByProblemId(problemId).orElseThrow().getStatus())
+                        .isEqualTo(AnalysisStatus.PROCESSING);
+                assertThat(consumedCount(owner.getId()))
+                        .as("실패한 1회는 돌려받고 성공한 1회만 남는다")
+                        .isEqualTo("1");
+            } finally {
+                redisTemplate.delete(rateLimitKey(owner.getId()));
+                redisTemplate.delete(guardKey(problemId));
+            }
+        }
+
+        // ── 중복 요청 가드 ──
+
+        @Test
+        @DisplayName("PROCESSING 이고 처리 중 표시가 있으면 한도를 쓰지 않고 다시 보내지 않는다")
+        void skipsWhileInFlight() {
+            Long problemId = problemWithImage();
+            try {
+                problemService.analysisProblem(problemId, owner.getId());
+                verify(problemAnalysisProducer, times(1)).sendAnalysisMessage(problemId);
+                assertThat(consumedCount(owner.getId())).isEqualTo("1");
+
+                problemService.analysisProblem(problemId, owner.getId());
+                problemService.analysisProblem(problemId, owner.getId());
+
+                verify(problemAnalysisProducer, times(1)).sendAnalysisMessage(problemId);
+                assertThat(consumedCount(owner.getId()))
+                        .as("앱의 다시 분석하기·이미지 수정이 처리 중 한도를 또 쓰면 안 된다")
+                        .isEqualTo("1");
+                assertThat(problemAnalysisRepository.findByProblemId(problemId).orElseThrow().getStatus())
+                        .isEqualTo(AnalysisStatus.PROCESSING);
+            } finally {
+                redisTemplate.delete(rateLimitKey(owner.getId()));
+                redisTemplate.delete(guardKey(problemId));
+            }
+        }
+
+        @Test
+        @DisplayName("PROCESSING 이지만 처리 중 표시가 없으면(30분 경과·굳은 행) 다시 보내고 한도를 1 쓴다")
+        void resendsStuckProcessing() {
+            Long problemId = problemWithImage();
+            setStatus(problemId, AnalysisStatus.PROCESSING);
+            redisTemplate.delete(guardKey(problemId));
+            try {
+                problemService.analysisProblem(problemId, owner.getId());
+
+                verify(problemAnalysisProducer, times(1)).sendAnalysisMessage(problemId);
+                assertThat(consumedCount(owner.getId())).isEqualTo("1");
+            } finally {
+                redisTemplate.delete(rateLimitKey(owner.getId()));
+                redisTemplate.delete(guardKey(problemId));
+            }
+        }
+
+        @Test
+        @DisplayName("FAILED 에서 다시 요청하면 정상으로 보내고 한도를 쓴다")
+        void resendsFailed() {
+            Long problemId = problemWithImage();
+            setStatus(problemId, AnalysisStatus.FAILED);
+            try {
+                problemService.analysisProblem(problemId, owner.getId());
+
+                verify(problemAnalysisProducer, times(1)).sendAnalysisMessage(problemId);
+                assertThat(consumedCount(owner.getId())).isEqualTo("1");
+                ProblemAnalysis analysis = problemAnalysisRepository.findByProblemId(problemId).orElseThrow();
+                assertThat(analysis.getStatus()).isEqualTo(AnalysisStatus.PROCESSING);
+                assertThat(analysis.getErrorMessage()).isNull();
+            } finally {
+                redisTemplate.delete(rateLimitKey(owner.getId()));
+                redisTemplate.delete(guardKey(problemId));
+            }
+        }
+
+        @Test
+        @DisplayName("한도를 넘겨 막히면 처리 중 표시를 남기지 않는다")
+        void releasesGuardWhenRateLimited() {
+            Long problemId = problemWithImage();
+            try {
+                for (int i = 0; i < 20; i++) {
+                    rateLimitService.tryConsume("ai_analysis", owner.getId(), 20);
+                }
+
+                problemService.analysisProblem(problemId, owner.getId());
+
+                assertThat(problemAnalysisRepository.findByProblemId(problemId).orElseThrow().getStatus())
+                        .isEqualTo(AnalysisStatus.RATE_LIMIT_EXCEEDED);
+                assertThat(redisTemplate.hasKey(guardKey(problemId)))
+                        .as("남기면 다음 날 한도가 풀려도 30분 동안 요청이 무시된다")
+                        .isFalse();
+            } finally {
+                redisTemplate.delete(rateLimitKey(owner.getId()));
+                redisTemplate.delete(guardKey(problemId));
+            }
+        }
+
+        @Test
+        @DisplayName("같은 문제로 두 요청이 동시에 들어와도 메시지는 한 번만 나가고 한도도 한 번만 쓴다")
+        void sendsOnceUnderConcurrentRequests() throws Exception {
+            Long problemId = problemWithImage();
+            setStatus(problemId, AnalysisStatus.FAILED);
+            ExecutorService executor = Executors.newFixedThreadPool(2);
+            try {
+                for (int round = 0; round < 5; round++) {
+                    redisTemplate.delete(guardKey(problemId));
+                    redisTemplate.delete(rateLimitKey(owner.getId()));
+                    setStatus(problemId, AnalysisStatus.FAILED);
+                    clearInvocations(problemAnalysisProducer);
+
+                    CountDownLatch ready = new CountDownLatch(2);
+                    CountDownLatch start = new CountDownLatch(1);
+                    List<Future<?>> futures = new ArrayList<>();
+                    for (int i = 0; i < 2; i++) {
+                        futures.add(executor.submit(() -> {
+                            ready.countDown();
+                            start.await();
+                            problemService.analysisProblem(problemId, owner.getId());
+                            return null;
+                        }));
+                    }
+                    ready.await();
+                    start.countDown();
+                    for (Future<?> future : futures) {
+                        future.get(10, TimeUnit.SECONDS);
+                    }
+
+                    verify(problemAnalysisProducer, times(1)).sendAnalysisMessage(problemId);
+                    assertThat(consumedCount(owner.getId()))
+                            .as("%d번째 시도: 겹친 요청이 한도를 쓰면 안 된다", round + 1)
+                            .isEqualTo("1");
+                }
+            } finally {
+                executor.shutdownNow();
+                redisTemplate.delete(rateLimitKey(owner.getId()));
+                redisTemplate.delete(guardKey(problemId));
+            }
         }
 
         @Test
