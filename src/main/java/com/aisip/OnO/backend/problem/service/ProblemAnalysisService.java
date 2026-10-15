@@ -11,12 +11,14 @@ import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.problem.repository.ProblemAnalysisRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemImageDataRepository;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
+import com.aisip.OnO.backend.util.ai.AnalysisFailureReason;
 import com.aisip.OnO.backend.util.ai.NonRetryableAnalysisException;
 import com.aisip.OnO.backend.util.ai.OpenAIClient;
 import com.aisip.OnO.backend.util.ai.ProblemAnalysisResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.retry.support.RetrySynchronizationManager;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -314,8 +316,20 @@ public class ProblemAnalysisService {
      * 에러 처리
      */
     private void handleAnalysisError(Long problemId, Exception e) {
+        AnalysisFailureReason reason = AnalysisFailureReason.from(e);
+
+        // 컨슈머의 재시도 인터셉터 안이면 재시도가 남았거나, 소진되면 DLQ 핸들러가 MAX_RETRIES 로 정리한다.
+        // 여기서 FAILED 로 바꾸면 앱이 폴링을 멈추고 실패 화면을 띄운다. 그 뒤 재시도가 성공해도
+        // 사용자는 모르고 "다시 분석하기"를 눌러 한도를 한 번 더 쓴다. 그래서 PROCESSING 을 유지한다.
+        // 재시도하지 않는 실패와, 재시도 인터셉터 밖에서 불린 경우(다시 시도할 주체가 없음)만 바로 기록한다.
+        if (!(e instanceof NonRetryableAnalysisException) && RetrySynchronizationManager.getContext() != null) {
+            log.info("Analysis attempt failed, leaving PROCESSING for retry or DLQ - problemId: {}, reason: {}",
+                    problemId, reason.tag());
+            return;
+        }
+
         try {
-            problemAnalysisFailureService.markFailed(problemId, e.getMessage());
+            problemAnalysisFailureService.markFailed(problemId, reason);
         } catch (Exception ex) {
             log.error("Error handling analysis error for problemId: {}", problemId, ex);
         }

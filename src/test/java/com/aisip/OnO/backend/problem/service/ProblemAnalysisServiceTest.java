@@ -15,12 +15,15 @@ import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.util.ai.AnalysisFailureReason;
 import com.aisip.OnO.backend.util.ai.NonRetryableAnalysisException;
 import com.aisip.OnO.backend.util.ai.ProblemAnalysisResult;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.web.client.HttpClientErrorException;
 
 import java.util.List;
@@ -31,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -50,6 +54,9 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
 
     @Autowired
     private ProblemAnalysisFailureService analysisFailureService;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     private User owner;
     private User intruder;
@@ -77,6 +84,15 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
                 .commonMistakes("부호 실수")
                 .studyTips("공식을 유도해 보기")
                 .build();
+    }
+
+    private static String guardKey(Long problemId) {
+        return "ai_analysis_inflight:" + problemId;
+    }
+
+    private double failureCount(AnalysisFailureReason reason) {
+        Counter counter = meterRegistry.find("ono.ai.analysis.failures").tag("reason", reason.tag()).counter();
+        return counter == null ? 0 : counter.count();
     }
 
     private Problem problemWithImage() {
@@ -213,7 +229,7 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
         void processingClearsErrorMessage() {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
             saveSkippedAnalysis(problem);
-            analysisFailureService.markFailed(problem.getId(), "이전 실패");
+            analysisFailureService.markFailed(problem.getId(), AnalysisFailureReason.TRANSIENT);
 
             analysisService.updateToProcessing(problem.getId());
 
@@ -293,6 +309,18 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
         }
 
         @Test
+        @DisplayName("분석이 끝나면 처리 중 표시를 지운다")
+        void releasesDispatchGuardOnSuccess() {
+            Problem problem = problemWithImage();
+            redisTemplate.opsForValue().set(guardKey(problem.getId()), "1");
+            given(openAIClient.analyzeImages(anyList())).willReturn(successResult());
+
+            analysisService.analyzeProblemSync(problem.getId());
+
+            assertThat(redisTemplate.hasKey(guardKey(problem.getId()))).isFalse();
+        }
+
+        @Test
         @DisplayName("PROBLEM_IMAGE 만 분석 대상으로 넘긴다")
         void sendsOnlyProblemImages() {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
@@ -342,7 +370,10 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
 
             ProblemAnalysis analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
             assertThat(analysis.getStatus()).isEqualTo(AnalysisStatus.FAILED);
-            assertThat(analysis.getErrorMessage()).isEqualTo("이미지에서 문제를 인식할 수 없습니다");
+            assertThat(analysis.getErrorMessage())
+                    .as("앱이 error_message 를 그대로 보여 주므로 예외 원문이 아니라 사유별 사용자 문구를 저장한다")
+                    .isEqualTo(AnalysisFailureReason.UNREADABLE_IMAGE.userMessage())
+                    .doesNotContain("인식할 수 없습니다");
         }
 
         @Test
@@ -355,8 +386,51 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
             assertThatThrownBy(() -> analysisService.analyzeProblemSync(problem.getId()))
                     .isInstanceOf(HttpClientErrorException.class);
 
+            ProblemAnalysis analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
+            assertThat(analysis.getStatus()).isEqualTo(AnalysisStatus.FAILED);
+            assertThat(analysis.getErrorMessage())
+                    .as("재시도 대상 예외는 일시적 실패 문구로 기록한다. HTTP 응답 원문을 사용자에게 보여 주지 않는다")
+                    .isEqualTo(AnalysisFailureReason.TRANSIENT.userMessage())
+                    .doesNotContain("Bad Request");
+        }
+
+        @Test
+        @DisplayName("재시도 인터셉터 안에서 난 일시적 실패는 FAILED 로 바꾸지 않고 PROCESSING 으로 둔다")
+        void keepsProcessingWhileRetriesRemain() {
+            Problem problem = problemWithImage();
+            analysisService.updateToProcessing(problem.getId());
+            given(openAIClient.analyzeImages(anyList()))
+                    .willThrow(new HttpClientErrorException(HttpStatus.INTERNAL_SERVER_ERROR, "Server Error"));
+
+            // 리스너 컨테이너의 재시도 인터셉터처럼 같은 스레드에 RetryContext 를 걸고 세 번 시도한다.
+            RetryTemplate retryTemplate = RetryTemplate.builder().maxAttempts(3).noBackoff().build();
+            assertThatThrownBy(() -> retryTemplate.execute(context -> {
+                analysisService.analyzeProblemSync(problem.getId());
+                return null;
+            })).isInstanceOf(HttpClientErrorException.class);
+
+            verify(openAIClient, times(3)).analyzeImages(anyList());
             assertThat(problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow().getStatus())
-                    .isEqualTo(AnalysisStatus.FAILED);
+                    .as("FAILED 를 받은 앱은 폴링을 멈춘다. 최종 상태는 DLQ 핸들러가 기록한다")
+                    .isEqualTo(AnalysisStatus.PROCESSING);
+        }
+
+        @Test
+        @DisplayName("재시도 인터셉터 안이라도 재시도하지 않는 실패는 바로 FAILED 로 기록한다")
+        void marksNonRetryableFailedEvenInsideRetryContext() {
+            Problem problem = problemWithImage();
+            given(openAIClient.analyzeImages(anyList()))
+                    .willThrow(new NonRetryableAnalysisException(AnalysisFailureReason.REFUSAL, "I'm sorry"));
+
+            RetryTemplate retryTemplate = RetryTemplate.builder().maxAttempts(1).noBackoff().build();
+            assertThatThrownBy(() -> retryTemplate.execute(context -> {
+                analysisService.analyzeProblemSync(problem.getId());
+                return null;
+            })).isInstanceOf(NonRetryableAnalysisException.class);
+
+            ProblemAnalysis analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
+            assertThat(analysis.getStatus()).isEqualTo(AnalysisStatus.FAILED);
+            assertThat(analysis.getErrorMessage()).isEqualTo(AnalysisFailureReason.REFUSAL.userMessage());
         }
 
         @Test
@@ -474,30 +548,83 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
             saveSkippedAnalysis(problem);
 
-            analysisFailureService.markFailed(problem.getId(), "OpenAI 400");
+            analysisFailureService.markFailed(problem.getId(), AnalysisFailureReason.QUOTA);
 
             ProblemAnalysis analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
             assertThat(analysis.getStatus()).isEqualTo(AnalysisStatus.FAILED);
-            assertThat(analysis.getErrorMessage()).isEqualTo("OpenAI 400");
+            assertThat(analysis.getErrorMessage()).isEqualTo(AnalysisFailureReason.QUOTA.userMessage());
         }
 
         @Test
         @DisplayName("분석 레코드가 없으면 아무 일도 하지 않는다")
         void ignoresMissingAnalysisRow() {
-            assertThatCode(() -> analysisFailureService.markFailed(999_999L, "사라진 문제"))
+            assertThatCode(() -> analysisFailureService.markFailed(999_999L, AnalysisFailureReason.TRANSIENT))
                     .doesNotThrowAnyException();
         }
 
         @Test
-        @DisplayName("에러 메시지가 null 이어도 상태는 FAILED 로 남는다")
-        void acceptsNullErrorMessage() {
+        @DisplayName("사유가 null 이어도 상태는 FAILED 로 남고 일시적 실패 문구를 쓴다")
+        void acceptsNullReason() {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
             saveSkippedAnalysis(problem);
 
             analysisFailureService.markFailed(problem.getId(), null);
 
-            assertThat(problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow().getStatus())
-                    .isEqualTo(AnalysisStatus.FAILED);
+            ProblemAnalysis analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
+            assertThat(analysis.getStatus()).isEqualTo(AnalysisStatus.FAILED);
+            assertThat(analysis.getErrorMessage()).isEqualTo(AnalysisFailureReason.TRANSIENT.userMessage());
+        }
+
+        @Test
+        @DisplayName("이미 COMPLETED 인 분석은 FAILED 로 덮지 않는다")
+        void doesNotOverwriteCompleted() {
+            Problem problem = saveProblem(owner.getId(), ownerRoot);
+            saveSkippedAnalysis(problem);
+            inTransaction(() -> {
+                ProblemAnalysis analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
+                analysis.updateWithSuccess("수학", "계산", "[]", "풀이", "실수", "팁");
+                problemAnalysisRepository.save(analysis);
+            });
+            double before = failureCount(AnalysisFailureReason.MAX_RETRIES);
+
+            analysisFailureService.markFailed(problem.getId(), AnalysisFailureReason.MAX_RETRIES);
+
+            ProblemAnalysis analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
+            assertThat(analysis.getStatus())
+                    .as("겹쳐 나간 다른 메시지의 실패가 이미 나온 결과를 가리면 안 된다")
+                    .isEqualTo(AnalysisStatus.COMPLETED);
+            assertThat(failureCount(AnalysisFailureReason.MAX_RETRIES))
+                    .as("사용자에게 실패로 보이지 않았으니 세지 않는다")
+                    .isEqualTo(before);
+        }
+
+        @Test
+        @DisplayName("실패 메트릭을 reason 태그로 한 번 올린다")
+        void countsFailureByReasonTag() {
+            Problem problem = saveProblem(owner.getId(), ownerRoot);
+            saveSkippedAnalysis(problem);
+            double before = failureCount(AnalysisFailureReason.UNSUPPORTED_IMAGE);
+            double otherBefore = failureCount(AnalysisFailureReason.TRANSIENT);
+
+            analysisFailureService.markFailed(problem.getId(), AnalysisFailureReason.UNSUPPORTED_IMAGE);
+
+            assertThat(failureCount(AnalysisFailureReason.UNSUPPORTED_IMAGE)).isEqualTo(before + 1);
+            assertThat(failureCount(AnalysisFailureReason.TRANSIENT)).isEqualTo(otherBefore);
+            assertThat(meterRegistry.find("ono.ai.analysis.failures").tag("reason", "unsupported_image").counter())
+                    .as("태그 값은 AnalysisFailureReason.tag() 다")
+                    .isNotNull();
+        }
+
+        @Test
+        @DisplayName("FAILED 로 기록하면 처리 중 표시를 지워 바로 다시 요청할 수 있게 한다")
+        void releasesDispatchGuard() {
+            Problem problem = saveProblem(owner.getId(), ownerRoot);
+            saveSkippedAnalysis(problem);
+            redisTemplate.opsForValue().set(guardKey(problem.getId()), "1");
+
+            analysisFailureService.markFailed(problem.getId(), AnalysisFailureReason.MAX_RETRIES);
+
+            assertThat(redisTemplate.hasKey(guardKey(problem.getId()))).isFalse();
         }
     }
 }

@@ -29,6 +29,7 @@ public class ProblemAnalysisDbService {
     private final ProblemRepository problemRepository;
     private final ProblemImageDataRepository problemImageDataRepository;
     private final ProblemAnalysisRepository analysisRepository;
+    private final ProblemAnalysisDispatchGuard dispatchGuard;
 
     @Transactional(readOnly = true)
     public AnalysisPreparation fetchAnalysisPreparation(Long problemId) {
@@ -65,6 +66,8 @@ public class ProblemAnalysisDbService {
                 result.getStudyTips()
         );
         analysisRepository.save(analysis);
+        // 분석이 끝났으니 처리 중 표시를 지운다. COMPLETED 는 다시 요청해도 건너뛰므로 순서는 중요하지 않다.
+        dispatchGuard.releaseAfterCommit(problemId);
     }
 
     public record AnalysisPreparation(List<String> imageUrls, boolean alreadyCompleted) {}
