@@ -37,6 +37,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 import com.aisip.OnO.backend.util.ai.AnalysisImageLoader;
 import com.aisip.OnO.backend.util.ai.OpenAIClient;
+import com.aisip.OnO.backend.util.ai.OpenAIHttpClientConfig;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -1043,12 +1044,18 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
         }
 
         @Test
-        @DisplayName("처리 중 표시 TTL 은 35분으로, 큐 TTL 30분과 처리 최대 시간을 더한 것보다 길다")
+        @DisplayName("처리 중 표시 TTL 은 40분으로, 큐 TTL 30분과 처리 최대 시간을 더한 것보다 길다")
         void guardOutlivesQueueTtlPlusProcessing() {
-            assertThat(ProblemAnalysisDispatchGuard.TTL).isEqualTo(Duration.ofMinutes(35));
+            assertThat(ProblemAnalysisDispatchGuard.TTL).isEqualTo(Duration.ofMinutes(40));
             Duration queueTtl = Duration.ofMillis(RabbitMQConfig.GPT_ANALYSIS_QUEUE_TTL_MS);
-            Duration maxProcessing = Duration.ofSeconds(60 * RabbitRetryAttempts.MAX_ATTEMPTS + 1 + 2);
-            assertThat(ProblemAnalysisDispatchGuard.TTL).isGreaterThan(queueTtl.plus(maxProcessing));
+            // OpenAI 타임아웃 기본값을 직접 참조해, 타임아웃만 올리고 TTL 을 따라 올리지 않으면 이 테스트가 깨지게 한다
+            Duration perAttempt = Duration.ofMillis(OpenAIHttpClientConfig.DEFAULT_CONNECT_TIMEOUT_MS
+                    + OpenAIHttpClientConfig.DEFAULT_READ_TIMEOUT_MS);
+            Duration backoff = Duration.ofSeconds(1 + 2);
+            Duration maxProcessing = perAttempt.multipliedBy(RabbitRetryAttempts.MAX_ATTEMPTS).plus(backoff);
+            assertThat(ProblemAnalysisDispatchGuard.TTL)
+                    .as("S3 읽기 시간까지 버틸 여유가 있어야 한다")
+                    .isGreaterThan(queueTtl.plus(maxProcessing).plusMinutes(3));
         }
     }
 }
