@@ -14,8 +14,8 @@ description: Use for OnO feature implementation. Trigger when the user requests 
 5. 구현 범위를 명세서 또는 현재 변경사항의 의도에 맞춰 제한한다. 임의 확장, 과한 추상화, 무관한 리팩터링을 하지 않는다.
 6. 백엔드 구현 시 API 계약, DTO, validation, 예외 처리, transaction, 권한, 성능, 로그, 데이터 정합성을 확인한다.
 7. DB schema 변경은 migration/명시 SQL을 우선한다. H2 인메모리가 아닌 환경에 `ddl-auto=create` 또는 `create-drop`을 추가하지 않는다.
-8. 기능 위험도에 맞춰 단위 테스트 또는 API 통합 테스트를 추가/갱신한다.
-9. 가능한 범위에서 포맷팅, 정적 검사, 관련 테스트, 빌드를 실행한다.
+8. 구현만 하고 커밋하지 않는다. 테스트 작성과 실행은 `$test`, 실제 커밋은 `$commit` 에서 한다.
+9. 가능한 범위에서 포맷팅, 정적 검사(최소 `./gradlew compileJava`)를 실행한다.
 10. 완료 직전에 아래 자가 반증 질문에 답하고, 필요한 경우 추가 수정 또는 리스크 보고를 한다.
     - 내가 놓쳤을 가능성이 큰 것은?
     - 이 변경이 실제 사용자에게 깨질 수 있는 경로는?

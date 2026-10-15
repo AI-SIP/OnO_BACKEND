@@ -20,6 +20,7 @@ primary_commands=(
   commit
   explain
   feat
+  issue
   migrate
   perf
   plan

@@ -50,11 +50,11 @@ argument-hint: "<추가 설명 (선택)>"
 | 버그 수정 | `bug` |
 | 리팩터링 | `refactor` |
 | 설정·의존성·chore | `chore` |
-| 성능 개선 | `performance` |
-| 문서·주석 | `documentation` |
+| 성능 개선 | (없음, 성능 전용 label 이 없다) |
+| 문서·주석 | `docs` |
 | 테스트 | `test` |
 
-결정한 label은 적용 전에 `mcp__github__.get_label`로 존재 여부를 확인하고, 존재하는 label만 적용한다.
+결정한 label은 적용 전에 `gh label list --repo AI-SIP/OnO_BACKEND`(또는 `mcp__github__.get_label`)로 존재 여부를 확인하고, 존재하는 label만 적용한다. label 을 새로 만들지 않는다.
 
 ### 4. PR 제목 결정
 브랜치명과 커밋 내역을 종합해 PR 제목을 결정한다.
@@ -101,15 +101,9 @@ argument-hint: "<추가 설명 (선택)>"
 ### 스크린샷 (선택)
 ```
 
-### 6. 생성 전 미리보기 확인
-PR을 생성하기 전에 다음 항목을 사용자에게 보여주고 확인을 받는다:
-- **Base → Head**: `develop` ← 현재 브랜치명
-- **제목**: 결정된 제목
-- **Labels**: 결정된 레이블
-- **연관 이슈**: `close #이슈번호` 또는 없음
-- **본문 미리보기**: 작성된 본문 전체
-
-사용자가 수정을 요청하면 반영한 뒤 재확인한다. 승인하면 다음 단계로 진행한다.
+### 6. 미리보기 없이 바로 진행
+사용자 확인을 받지 않고 바로 7단계(push)와 8단계(PR 생성)로 진행한다. 제목, label, 연관 이슈, 본문은 9단계 결과 보고에서 함께 보여 준다.
+단, 1단계에서 미커밋 변경이 있거나 연관 이슈 판단이 애매하면 PR 을 만들기 전에 그 점만 짧게 알린다.
 
 ### 7. 원격 브랜치 push
 원격 브랜치가 없거나 미push 커밋이 있으면 직접 push한 뒤 PR 생성을 진행한다.
@@ -142,4 +136,4 @@ PR 생성 후 생성된 PR 번호에 `mcp__github__.issue_write` 도구를 `meth
 milestone, project, issue fields, type 등 나머지 항목은 지정하지 않는다.
 
 ### 9. 결과 보고
-생성된 PR URL, base/head branch, assignee, 적용 label, 연결한 issue, `main`을 target으로 사용하지 않았다는 점을 사용자에게 알린다.
+생성된 PR URL, 제목, base/head branch, assignee, 적용 label, 연결한 issue, `main`을 target으로 사용하지 않았다는 점을 사용자에게 알린다. merge 는 하지 않는다(사용자가 명시적으로 요청할 때만).

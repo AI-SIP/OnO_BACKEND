@@ -23,10 +23,12 @@ argument-hint: "<이슈 설명 또는 파일 경로>"
 | 기능 추가·신규 개발 | Common Issue Template | `feature` | `[feat]` |
 | 리팩터·코드 정리 | Common Issue Template | `refactor` | `[refactor]` |
 | 설정·환경·의존성·chore | Common Issue Template | `chore` | `[chore]` |
-| 성능 개선 | Common Issue Template | `performance` | `[perf]` |
-| 문서·주석 | Common Issue Template | `documentation` | `[docs]` |
+| 성능 개선 | Common Issue Template | (없음) | `[perf]` |
+| 문서·주석 | Common Issue Template | `docs` | `[docs]` |
 | 테스트 | Common Issue Template | `test` | `[test]` |
 | 기타·불명확 | Common Issue Template | (없음) | `[chore]` |
+
+결정한 label 은 적용 전에 `gh label list --repo AI-SIP/OnO_BACKEND` 로 실제 존재하는지 확인하고, 없는 label 은 빼고 진행한다(label 을 새로 만들지 않는다).
 
 ### 3. 템플릿 채우기
 
@@ -77,7 +79,7 @@ argument-hint: "<이슈 설명 또는 파일 경로>"
 - `title`: 3단계에서 결정한 제목
 - `body`: 3단계에서 작성한 본문
 - `assignees`: `["KiSeungMin"]` (항상 고정)
-- `labels`: 2단계에서 결정한 레이블 배열
+- `labels`: 2단계에서 결정하고 존재를 확인한 레이블 배열
 
 ### 6. 결과 보고
 생성된 이슈 URL을 사용자에게 알린다.

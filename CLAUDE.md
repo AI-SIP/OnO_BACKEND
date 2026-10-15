@@ -30,8 +30,18 @@
 ```bash
 ./gradlew compileJava                          # 엔티티 변경 후 컴파일 확인
 ./gradlew test --tests "패키지.클래스.메서드"  # 특정 테스트 실행
-./gradlew build                                # 전체 빌드
+./gradlew build                                # 전체 빌드 (테스트 포함)
+./gradlew test jacocoTestReport jacocoTestCoverageVerification  # CI(test.yml)와 같은 커버리지 검증 (라인 85%, 분기 70%)
 ```
+- 테스트는 H2 가 아니라 **Testcontainers MySQL**(+ Redis, RabbitMQ) 위에서 돈다(`src/test/java/.../support/TestContainers.java`). **Docker 가 켜져 있어야** 하고, 꺼져 있으면 컨텍스트 로딩 단계에서 전부 실패한다.
+- test 프로필(`src/test/resources/application-test.yml`)은 Flyway 를 끄고 버려지는 컨테이너 DB 에만 `ddl-auto: update` 를 쓴다.
+
+### 핵심 규칙 요약 (상세는 `AGENTS.md` 0.1.1, 0.2)
+- **`ddl-auto` 를 `create` / `create-drop` 으로 바꾸거나 실행 인자로 넘기지 않는다.** 이 레포에는 H2 환경이 없다. 스키마 변경은 Flyway 마이그레이션(`/migrate`)으로 한다.
+- DB 설정을 바꾸면 어떤 profile 에 적용되는지, 운영으로 번질 수 있는지 확인한다.
+- 기능 구현과 버그 수정에는 테스트를 같이 둔다. 버그는 가능하면 실패하는 테스트부터 만든다. 작성과 실행은 `/test` 단계에서 한다.
+- API 동작 변경은 성공 케이스와 함께 validation 실패, 권한 실패(타인 데이터 차단, 인증 없음), 예외 케이스를 확인한다.
+- 테스트에서 실제 FCM 발송이나 운영 DB 접근은 하지 않는다. 외부 연동은 mock 한다.
 
 ## 프로젝트 구조
 
@@ -46,11 +56,17 @@
 | `practicenote` | 복습 기록 |
 | `folder` | 폴더 (문제 분류) |
 | `tag` | 태그 |
-| `mission` | 미션·보상 |
 | `problemsolve` | 문제 풀이 기록 |
 | `learningcalendar` | 학습 캘린더 |
 | `learningreport` | 학습 리포트 |
+| `mission` | 미션·보상 |
+| `achievement` | 업적 |
+| `cosmetic` | 꾸미기 아이템 (보유·장착) |
+| `studyroom` | 스터디룸 (멤버, 챌린지, 피드, 공유 문제와 댓글, 주간 리포트) |
+| `notice` | 서비스 공지 |
+| `feedback` | 사용자 피드백 |
 | `admin` | 관리자 기능 |
+| `mcp` | 관리자용 MCP 서버 도구 (통계, 사용자, 문제, 피드백, 스터디룸 조회) |
 | `common` | 공통 유틸·예외·응답 |
 | `config` | 설정 (Security, JPA 등) |
 | `util` | 유틸리티 |
@@ -60,9 +76,12 @@
 ## 작업 파이프라인
 
 ```
-일반 기능:  analysis → plan → feat → test → check → commit → report
-성능 작업:  perf(진단) → plan → feat → test → check → commit → report
+일반 기능:  analysis → plan → feat → test → check → commit → pr (→ report)
+성능 작업:  perf(진단) → plan → feat → test → check → commit → pr (→ report)
 ```
 - 단계 경계에서 사람이 검토 후 다음으로 진행 (자동 연쇄 X).
 - `analysis`는 요구 명확하면 생략 가능. `explain`은 아무 때나.
+- `/feat` 은 구현만 하고 커밋하지 않는다. 테스트는 `/test` 에서 작성·실행하고, 커밋은 `/commit` 이 실제로 수행한다.
+- `/pr` 은 필요하면 원격 브랜치를 push 한 뒤 develop 대상 PR 을 미리보기 확인 없이 바로 만든다. merge 는 사용자가 명시적으로 요청할 때만.
 - 검토 강도: plan 후 🔴최고 / feat 후 🟠 / check 결과 🟡 / report 🟢.
+- 팀 공유 가드레일(DB 차단 훅, merge·force push 차단, 비밀값 파일 읽기 차단)은 `.claude/settings.json` 에 있다. 사용법은 `.claude/claude-guide.md`.

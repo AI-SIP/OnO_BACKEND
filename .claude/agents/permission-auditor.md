@@ -1,6 +1,6 @@
 ---
 name: permission-auditor
-description: 권한·사용자 데이터 격리 검증. 사용자별 오답노트 데이터 접근 차단, 인증·인가 누락, 필터 조건 누락을 검사한다. /check 명령 시 자동 위임.
+description: 읽기 전용(코드 수정·커밋 금지). 권한·사용자 데이터 격리 검증. 사용자별 오답노트 데이터 접근 차단, 인증·인가 누락, 필터 조건 누락을 검사한다. /check 에서 항상, /analysis, /plan 에서 필요 시 위임.
 tools: Read, Grep, Glob, Bash
 ---
 

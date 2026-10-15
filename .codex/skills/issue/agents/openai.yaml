@@ -1,0 +1,7 @@
+interface:
+  display_name: "OnO Issue"
+  short_description: "OnO GitHub 이슈 생성"
+  default_prompt: "Use $issue to create an OnO GitHub issue from this description."
+
+policy:
+  allow_implicit_invocation: true

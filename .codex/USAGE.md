@@ -14,6 +14,7 @@
     ├── check/
     ├── commit/
     ├── feat/
+    ├── issue/
     ├── migrate/
     ├── plan/
     ├── pr/
@@ -34,6 +35,7 @@
 ~/.codex/skills/check
 ~/.codex/skills/commit
 ~/.codex/skills/feat
+~/.codex/skills/issue
 ~/.codex/skills/migrate
 ~/.codex/skills/plan
 ~/.codex/skills/pr
@@ -119,7 +121,7 @@ feat docs/...의 구현 명세서를 기준으로 기능 구현해줘
 현재 `.claude/commands`와 맞춰 제공하는 주요 명령어 이름:
 
 ```text
-analysis check commit explain feat migrate perf plan pr report test
+analysis check commit explain feat issue migrate perf plan pr report test
 ```
 
 보조 스킬:
@@ -226,7 +228,8 @@ $feat
 - 기준 구현 명세서를 먼저 확인한다.
 - 명세서가 불명확하면 어떤 문서를 기준으로 할지 묻는다.
 - API 계약, DTO, validation, 예외 처리, transaction, 권한, 성능, 데이터 정합성을 확인하며 구현한다.
-- 가능한 범위에서 테스트, 빌드, 정적 검사를 실행한다.
+- 구현만 하고 커밋하지 않는다. 테스트 작성과 실행은 `$test`, 실제 커밋은 `$commit` 에서 한다.
+- 가능한 범위에서 정적 검사(최소 `./gradlew compileJava`)를 실행한다.
 - 완료 직전에 자가 반증 3문항에 답하고 추가 수정 또는 리스크 보고가 필요한지 확인한다.
 - 완료 후 사용자 영향, 검증 결과, 남은 리스크, 추천 커밋 메시지를 보고한다.
 
@@ -279,6 +282,21 @@ $pr abc1234
 - 원격 브랜치가 없거나 미push 커밋이 있으면 `git push -u origin 현재브랜치`로 직접 push한다.
 - `.github/PULL_REQUEST_TEMPLATE.md`를 읽고 같은 구조로 작성한다.
 - 사용자 영향, API 호환성, DB migration, 인증/권한, 검증 결과, 배포 리스크, 롤백 방법을 포함한다.
+- 미리보기 확인 없이 바로 PR 을 만든다. merge 는 하지 않는다(사용자가 명시적으로 요청할 때만).
+
+### issue
+
+설명이나 파일 내용을 바탕으로 `AI-SIP/OnO_BACKEND` 에 GitHub 이슈를 만들 때 사용한다.
+
+```text
+$issue 문제 목록 조회가 느리다
+```
+
+수행 방식:
+
+- 버그는 `bug-report-template.md`, 그 외는 `common-issue-template.md` 형식으로 본문을 쓴다.
+- label 은 `gh label list` 로 실제 존재를 확인한 것만 붙인다.
+- 생성 전에 제목, label, 본문을 보여 주고 확인을 받는다.
 
 ### test-writer
 
@@ -445,6 +463,9 @@ cp -R .codex/skills/analysis ~/.codex/skills/
 cp -R .codex/skills/check ~/.codex/skills/
 cp -R .codex/skills/commit ~/.codex/skills/
 cp -R .codex/skills/feat ~/.codex/skills/
+cp -R .codex/skills/issue ~/.codex/skills/
+cp -R .codex/skills/migrate ~/.codex/skills/
+cp -R .codex/skills/pr ~/.codex/skills/
 cp -R .codex/skills/plan ~/.codex/skills/
 cp -R .codex/skills/report ~/.codex/skills/
 cp -R .codex/skills/test ~/.codex/skills/
