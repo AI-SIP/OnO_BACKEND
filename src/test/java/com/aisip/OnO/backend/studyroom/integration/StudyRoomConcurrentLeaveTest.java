@@ -47,9 +47,17 @@ class StudyRoomConcurrentLeaveTest extends StudyRoomTestSupport {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    /**
+     * 두 요청이 모두 앞 요청의 커밋 전에 멤버를 읽으면 뒤 요청은 잠금 재조회에서 빈 결과를 받아 200 이다(#368 이 노린 경로).
+     * 뒤 요청이 앞 요청 커밋 뒤에 시작하면 권한 확인(getMemberOrThrow)에서 멤버가 없어 403 이다.
+     * 이는 이미 나간 멤버의 재요청과 같은 정상 응답이라(StudyRoomMembershipApiTest.leftMemberCannotLeaveAgain)
+     * 200 과 403 을 모두 허용하고 500 만 막는다. 배리어는 두 요청의 출발만 맞출 뿐 트랜잭션 시작 순서는 보장하지 못해,
+     * 둘 다 200 을 기대하면 부하가 있을 때 간헐적으로 실패했다(#391).
+     * 이미 읽어 둔 멤버를 지우는 순서는 아래 두 테스트가 결정적으로 재현한다.
+     */
     @Test
-    @DisplayName("같은 멤버의 나가기 요청이 동시에 두 번 와도 둘 다 200 이고 방은 남는다")
-    void concurrentLeaveRequestsBothSucceed() throws Exception {
+    @DisplayName("같은 멤버의 나가기 요청이 동시에 두 번 와도 500 없이 하나 이상 200 이고 방은 남는다")
+    void concurrentLeaveRequestsDoNotFail() throws Exception {
         for (int round = 0; round < 10; round++) {
             User host = fixtures.createUser("host" + round);
             User member = fixtures.createUser("member" + round);
@@ -75,7 +83,9 @@ class StudyRoomConcurrentLeaveTest extends StudyRoomTestSupport {
             }
             executor.shutdown();
 
-            assertThat(statuses).as("round %d 응답", round).containsOnly(200);
+            assertThat(statuses).as("round %d 응답", round)
+                    .containsAnyOf(200)
+                    .allSatisfy(status -> assertThat(status).isIn(200, 403));
             assertThat(memberRepository.existsByRoomIdAndUserId(room.getId(), member.getId()))
                     .as("round %d 나간 멤버의 멤버십", round).isFalse();
             assertThat(memberRepository.countByRoomId(room.getId())).as("round %d 남은 멤버", round).isEqualTo(1);
