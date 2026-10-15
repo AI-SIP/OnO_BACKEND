@@ -1130,6 +1130,89 @@ class AnalysisImageLoaderTest {
         }
 
         @Test
+        @DisplayName("해설 이미지의 S3 403(AccessDenied)은 재시도하지 않고 그 장만 빼며, 다른 해설은 보낸다")
+        void skipsAccessDeniedAnswerImage() {
+            stubObject("image/p1.webp", webpBytes());
+            stubObject("image/a2.webp", webpOfSize(50));
+            AmazonS3Exception denied = new AmazonS3Exception("Access Denied");
+            denied.setStatusCode(403);
+            denied.setErrorCode("AccessDenied");
+            when(amazonS3Client.getObject(BUCKET, "image/a1.webp")).thenThrow(denied);
+
+            AnalysisImageLoader.LoadedImages loaded = loader.loadForAnalysis(List.of(url("image/p1.webp")),
+                    List.of(url("image/a1.webp"), url("image/a2.webp")));
+
+            assertThat(loaded.problemImages()).hasSize(1);
+            assertThat(loaded.answerImages()).hasSize(1);
+            assertThat(bytesOf(loaded.answerImages().get(0))).hasSize(50);
+            assertThat(loaded.skippedAnswerReasons()).containsExactly(AnalysisImageLoader.SKIP_ACCESS_DENIED);
+        }
+
+        @Test
+        @DisplayName("상태 코드 없이 AccessDenied 코드만 와도 해설 이미지는 그 장만 뺀다")
+        void skipsAccessDeniedCodeAnswerImage() {
+            stubObject("image/p1.webp", webpBytes());
+            AmazonS3Exception denied = new AmazonS3Exception("Access Denied");
+            denied.setErrorCode("AccessDenied");
+            when(amazonS3Client.getObject(BUCKET, "image/a1.webp")).thenThrow(denied);
+
+            AnalysisImageLoader.LoadedImages loaded =
+                    loader.loadForAnalysis(List.of(url("image/p1.webp")), List.of(url("image/a1.webp")));
+
+            assertThat(loaded.answerImages()).isEmpty();
+            assertThat(loaded.skippedAnswerReasons()).containsExactly("access_denied");
+        }
+
+        @Test
+        @DisplayName("해설 이미지가 함께 있어도 문제 이미지의 S3 403 은 지금처럼 재시도 대상이고 해설은 읽지 않는다")
+        void problemImageAccessDeniedStaysRetryable() {
+            AmazonS3Exception denied = new AmazonS3Exception("Access Denied");
+            denied.setStatusCode(403);
+            denied.setErrorCode("AccessDenied");
+            when(amazonS3Client.getObject(BUCKET, "image/p1.webp")).thenThrow(denied);
+
+            assertThatThrownBy(() -> loader.loadForAnalysis(List.of(url("image/p1.webp")), List.of(url("image/a1.webp"))))
+                    .isInstanceOf(RuntimeException.class)
+                    .isNotInstanceOf(NonRetryableAnalysisException.class)
+                    .hasCause(denied);
+            verify(amazonS3Client, never()).getObject(BUCKET, "image/a1.webp");
+        }
+
+        @Test
+        @DisplayName("해설 이미지의 IO 오류(본문 읽기 실패)는 재시도 대상으로 올린다")
+        void answerImageIoErrorIsRetryable() {
+            stubObject("image/p1.webp", webpBytes());
+            stubObject("image/a1.webp", new InputStream() {
+                @Override
+                public int read() throws IOException {
+                    throw new IOException("connection reset");
+                }
+            }, 100L);
+
+            assertThatThrownBy(() -> loader.loadForAnalysis(List.of(url("image/p1.webp")), List.of(url("image/a1.webp"))))
+                    .isInstanceOf(RuntimeException.class)
+                    .isNotInstanceOf(NonRetryableAnalysisException.class);
+        }
+
+        @Test
+        @DisplayName("뺀 해설 이미지마다 이유를 남긴다(형식, 총용량, 장수 상한)")
+        void recordsSkipReasons() {
+            AnalysisImageLoader limited = new AnalysisImageLoader(amazonS3Client, BUCKET, 5, 100L, 2);
+            stubObject("image/p1.webp", webpOfSize(40));
+            stubObject("image/a1.heic", heifBytes("heic"));
+            stubObject("image/a2.webp", webpOfSize(70));
+
+            AnalysisImageLoader.LoadedImages loaded = limited.loadForAnalysis(List.of(url("image/p1.webp")),
+                    List.of(url("image/a1.heic"), url("image/a2.webp"), url("image/a3.webp")));
+
+            assertThat(loaded.answerImages()).isEmpty();
+            assertThat(loaded.skippedAnswerReasons()).containsExactlyInAnyOrder(
+                    AnalysisImageLoader.SKIP_OVER_COUNT,
+                    AnalysisFailureReason.UNSUPPORTED_IMAGE.tag(),
+                    AnalysisImageLoader.SKIP_TOTAL_SIZE);
+        }
+
+        @Test
         @DisplayName("총용량 상한은 해설 이미지까지 합쳐 센다. 넘게 만드는 해설은 빼고, 남은 용량에 맞는 다음 해설은 넣는다")
         void totalLimitIncludesAnswerImages() {
             // 상한 110바이트: 문제 40 + 해설 50 = 90 은 통과, 여기에 해설 30 을 더하면 120 이라 뺀다, 해설 16 은 106 이라 넣는다

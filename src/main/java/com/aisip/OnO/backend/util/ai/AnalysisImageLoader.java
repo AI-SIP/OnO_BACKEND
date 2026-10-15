@@ -77,6 +77,11 @@ public class AnalysisImageLoader {
 
     static final int DEFAULT_MAX_ANSWER_IMAGES = 3;
 
+    /** 해설 이미지를 뺀 이유. 메트릭 ono.ai.analysis.answer_image_skipped 의 reason 태그로 쓴다 */
+    static final String SKIP_ACCESS_DENIED = "access_denied";
+    static final String SKIP_TOTAL_SIZE = "total_size_limit";
+    static final String SKIP_OVER_COUNT = "over_count";
+
     private final AmazonS3Client amazonS3Client;
     private final String bucket;
     private final int maxImages;
@@ -124,7 +129,11 @@ public class AnalysisImageLoader {
      * - 상한(기본 3장)을 넘으면 앞에서부터 상한만큼만 쓴다
      * - key 제한, 형식, 크기 검증은 문제 이미지와 똑같이 하고, 걸리면 그 해설 이미지만 빼고 보낸다
      * - 문제 이미지를 먼저 담고, 해설 이미지를 더해 총용량을 넘으면 그 해설 이미지를 뺀다
-     * - S3 일시 오류는 문제 이미지와 같이 재시도 대상으로 올린다. 재시도하면 해설까지 넣어 분석할 수 있다
+     * - S3 403(AccessDenied)은 그 해설 이미지만 뺀다. 문제 이미지의 403 은 IAM 설정 오류를 DLQ 알림으로 드러내려고
+     *   재시도 대상으로 두지만, 같은 IAM 오류라면 문제 이미지에서 이미 실패하므로 해설에서까지 재시도할 이유가 없다.
+     *   없는 key 에도 403 이 올 수 있어(ListBucket 권한이 없을 때) 해설 한 장 때문에 분석 전체를 재시도시키지 않는다
+     * - 그 밖의 S3 일시 오류(5xx, IO 오류)는 문제 이미지와 같이 재시도 대상으로 올린다. 재시도하면 해설까지 넣어 분석할 수 있다
+     * - 뺀 이유는 LoadedImages.skippedAnswerReasons 에 담아 호출하는 쪽이 메트릭으로 남긴다
      */
     public LoadedImages loadForAnalysis(List<String> problemImageUrls, List<String> answerImageUrls) {
         if (problemImageUrls == null || problemImageUrls.isEmpty()) {
@@ -136,8 +145,12 @@ public class AnalysisImageLoader {
                     "문제 이미지가 " + problemImageUrls.size() + "장으로 상한 " + maxImages + "장을 넘습니다.");
         }
         List<String> answers = answerImageUrls == null ? List.of() : answerImageUrls;
+        List<String> skippedAnswerReasons = new ArrayList<>();
         if (answers.size() > maxAnswerImages) {
             log.info("Answer images over limit, using first {} of {}", maxAnswerImages, answers.size());
+            for (int i = maxAnswerImages; i < answers.size(); i++) {
+                skippedAnswerReasons.add(SKIP_OVER_COUNT);
+            }
             answers = answers.subList(0, maxAnswerImages);
         }
 
@@ -145,7 +158,17 @@ public class AnalysisImageLoader {
         List<String> problemDataUrls = new ArrayList<>(keys.size());
         long totalBytes = 0;
         for (String key : keys) {
-            EncodedImage encoded = encode(key, readObject(key));
+            byte[] bytes;
+            try {
+                bytes = readObject(key);
+            } catch (S3AccessDeniedException e) {
+                // 403 은 재시도 대상으로 둔다. 없는 key 에도 403 이 올 수 있지만(ListBucket 권한이 없을 때),
+                // 서버 IAM 설정이 깨진 경우에도 403 이 온다. 재시도하지 않으면 모든 분석이 DLQ 알림 없이
+                // 조용히 실패하므로, 드문 없는 key 의 재시도 비용보다 운영자가 알아채는 쪽을 택한다.
+                log.error("S3 access denied while loading analysis image - key: {}, errorCode: {}", key, e.errorCode());
+                throw e;
+            }
+            EncodedImage encoded = encode(key, bytes);
             // GIF/WEBP, 회전 정보가 있는 작은 JPEG, 디코딩 실패 원본은 줄이지 않고 보내므로 요청 전체 크기를 따로 막는다
             totalBytes += encoded.bytes().length;
             if (totalBytes > maxTotalBytes) {
@@ -163,24 +186,55 @@ public class AnalysisImageLoader {
                 encoded = encode(key, readObject(key));
             } catch (NonRetryableAnalysisException e) {
                 log.warn("Skipping answer image - reason: {}, message: {}", e.getReason().tag(), e.getMessage());
+                skippedAnswerReasons.add(e.getReason().tag());
+                continue;
+            } catch (S3AccessDeniedException e) {
+                log.warn("Skipping answer image - reason: {}, message: {}", SKIP_ACCESS_DENIED, e.getMessage());
+                skippedAnswerReasons.add(SKIP_ACCESS_DENIED);
                 continue;
             }
             if (totalBytes + encoded.bytes().length > maxTotalBytes) {
                 log.warn("Skipping answer image over total limit - total: {}, image: {}, limit: {}",
                         totalBytes, encoded.bytes().length, maxTotalBytes);
+                skippedAnswerReasons.add(SKIP_TOTAL_SIZE);
                 continue;
             }
             totalBytes += encoded.bytes().length;
             answerDataUrls.add(toDataUrl(encoded));
         }
-        return new LoadedImages(problemDataUrls, answerDataUrls);
+        return new LoadedImages(problemDataUrls, answerDataUrls, skippedAnswerReasons);
     }
 
-    /** 분석에 보낼 data URL. 문제 이미지와 해설 이미지를 나눠 담아 프롬프트에서 라벨을 따로 붙인다 */
-    public record LoadedImages(List<String> problemImages, List<String> answerImages) {
+    /**
+     * 분석에 보낼 data URL. 문제 이미지와 해설 이미지를 나눠 담아 프롬프트에서 라벨을 따로 붙인다.
+     * skippedAnswerReasons 는 빼고 보낸 해설 이미지마다 그 이유(SKIP_* 또는 AnalysisFailureReason 태그)다.
+     */
+    public record LoadedImages(List<String> problemImages, List<String> answerImages, List<String> skippedAnswerReasons) {
         public LoadedImages {
             problemImages = List.copyOf(problemImages);
             answerImages = List.copyOf(answerImages);
+            skippedAnswerReasons = skippedAnswerReasons == null ? List.of() : List.copyOf(skippedAnswerReasons);
+        }
+
+        public LoadedImages(List<String> problemImages, List<String> answerImages) {
+            this(problemImages, answerImages, List.of());
+        }
+    }
+
+    /**
+     * S3 403(AccessDenied). 재시도 대상 실패라 일반 RuntimeException 을 잇는다.
+     * 문제 이미지에서는 그대로 올려 재시도시키고, 해설 이미지에서는 그 장만 빼는 데 쓰려고 따로 구분한다.
+     */
+    static final class S3AccessDeniedException extends RuntimeException {
+        private final String errorCode;
+
+        S3AccessDeniedException(String message, AmazonServiceException cause) {
+            super(message, cause);
+            this.errorCode = cause.getErrorCode();
+        }
+
+        String errorCode() {
+            return errorCode;
         }
     }
 
@@ -228,11 +282,9 @@ public class AnalysisImageLoader {
                 throw new NonRetryableAnalysisException(AnalysisFailureReason.INVALID_IMAGE_SOURCE,
                         "S3 에 이미지가 없습니다. key=" + key, e);
             }
-            // 403 은 재시도 대상으로 둔다. 없는 key 에도 403 이 올 수 있지만(ListBucket 권한이 없을 때),
-            // 서버 IAM 설정이 깨진 경우에도 403 이 온다. 재시도하지 않으면 모든 분석이 DLQ 알림 없이
-            // 조용히 실패하므로, 드문 없는 key 의 재시도 비용보다 운영자가 알아채는 쪽을 택한다.
+            // 403 을 재시도할지, 그 장만 뺄지는 문제 이미지인지 해설 이미지인지에 따라 loadForAnalysis 가 정한다
             if (e.getStatusCode() == 403 || "AccessDenied".equals(e.getErrorCode())) {
-                log.error("S3 access denied while loading analysis image - key: {}, errorCode: {}", key, e.getErrorCode());
+                throw new S3AccessDeniedException("S3 이미지 조회 권한이 없습니다. key=" + key, e);
             }
             throw new RuntimeException("S3 이미지 조회에 실패했습니다. key=" + key, e);
         } catch (RuntimeException e) {

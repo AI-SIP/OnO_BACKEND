@@ -124,6 +124,7 @@ public class OpenAIClient {
         // 1. 이미지 로드. 외부 URL·장수 초과·형식 오류는 여기서 NonRetryable 로 끝난다(OpenAI 호출 시간 계측에서 뺀다)
         AnalysisImageLoader.LoadedImages images =
                 analysisImageLoader.loadForAnalysis(input.problemImageUrls(), input.answerImageUrls());
+        recordSkippedAnswerImages(images);
 
         Timer.Sample sample = Timer.start(meterRegistry);
         try {
@@ -200,6 +201,20 @@ public class OpenAIClient {
      */
     public ProblemAnalysisResult analyzeImage(String imageUrl) {
         return analyzeImages(List.of(imageUrl));
+    }
+
+    /** 빼고 보낸 해설 이미지를 이유별로 센다. 403 이 늘면 버킷 권한이나 key 정리를 의심할 수 있다 */
+    private void recordSkippedAnswerImages(AnalysisImageLoader.LoadedImages images) {
+        if (images == null || images.skippedAnswerReasons() == null) {
+            return;
+        }
+        for (String reason : images.skippedAnswerReasons()) {
+            Counter.builder("ono.ai.analysis.answer_image_skipped")
+                    .description("AI 분석에서 빼고 보낸 해설 이미지 수")
+                    .tag("reason", reason)
+                    .register(meterRegistry)
+                    .increment();
+        }
     }
 
     private static int lengthOf(String text) {

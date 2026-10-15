@@ -1558,4 +1558,35 @@ class OpenAIClientTest {
             assertThat(meterRegistry.find("ono.ai.analysis.explanation_check").counters()).isEmpty();
         }
     }
+
+    @Nested
+    @DisplayName("2단계 - 검증 지적 반영")
+    class ReviewFollowUps {
+
+        @Test
+        @DisplayName("빼고 보낸 해설 이미지는 이유별로 answer_image_skipped 메트릭에 센다")
+        void countsSkippedAnswerImages() {
+            when(imageLoader.loadForAnalysis(List.of(IMAGE_URL), List.of(ANSWER_URL)))
+                    .thenReturn(new AnalysisImageLoader.LoadedImages(List.of(DATA_URL), List.of(),
+                            List.of("access_denied", "access_denied", "unsupported_image")));
+            respondWithContent(plainFullAnalysisJson("2", "no_explanation"));
+
+            openAIClient.analyze(new AnalysisInput(List.of(IMAGE_URL), List.of(ANSWER_URL), null, null));
+
+            assertThat(meterRegistry.find("ono.ai.analysis.answer_image_skipped").tag("reason", "access_denied")
+                    .counter().count()).isEqualTo(2.0);
+            assertThat(meterRegistry.find("ono.ai.analysis.answer_image_skipped").tag("reason", "unsupported_image")
+                    .counter().count()).isEqualTo(1.0);
+        }
+
+        @Test
+        @DisplayName("빼고 보낸 해설 이미지가 없으면 answer_image_skipped 를 남기지 않는다")
+        void noSkippedMetricWhenNothingSkipped() {
+            respondWithContent(plainFullAnalysisJson("2", "no_explanation"));
+
+            openAIClient.analyzeImage(IMAGE_URL);
+
+            assertThat(meterRegistry.find("ono.ai.analysis.answer_image_skipped").counters()).isEmpty();
+        }
+    }
 }
