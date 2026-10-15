@@ -108,6 +108,8 @@ OnO 작업 에이전트 지침
 | `perf` | 성능 병목 진단 (읽기 전용) | 허용 |
 | `migrate` | Flyway 마이그레이션 작성과 안전성 검토 | 차단 |
 | `explain` | 코드 흐름과 설계 이유 설명 (읽기 전용) | 허용 |
+| `release-check` | main 머지 전 배포 범위의 API 계약 변경을 프론트 출시 버전과 대조해 배포 가능/주의/불가 판정 (읽기 전용) | 차단 |
+| `deploy-verify` | dev/prod 배포 직후 workflow, 스모크, 공개 GET, Flyway 버전, Sentry 를 조회만 해서 표로 보고 | 차단 |
 
 - "차단" 은 사용자가 명시적으로 부를 때만 실행한다는 뜻이다(Claude `disable-model-invocation: true`, Codex `agents/openai.yaml` 의 `allow_implicit_invocation: false`).
 - 작업 흐름은 `plan → feat → test → check → commit → pr` 순서다. 단계 경계에서 사용자가 검토한 뒤 넘어간다.
