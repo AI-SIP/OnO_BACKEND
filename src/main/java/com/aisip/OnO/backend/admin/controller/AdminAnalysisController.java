@@ -1,6 +1,5 @@
 package com.aisip.OnO.backend.admin.controller;
 
-import com.aisip.OnO.backend.admin.repository.AdminStatsQueryRepository;
 import com.aisip.OnO.backend.admin.service.AdminStatsService;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.user.dto.UserResponseDto;
@@ -33,7 +32,6 @@ public class AdminAnalysisController {
     private final UserService userService;
     private final MissionLogService missionLogService;
     private final AdminStatsService adminStatsService;
-    private final AdminStatsQueryRepository adminStatsQueryRepository;
 
     /** 한 번에 볼 수 있는 최대 기간. 날짜별 표와 차트가 한 화면에 들어가는 선이다. */
     private static final int MAX_RANGE_DAYS = 366;
@@ -59,8 +57,10 @@ public class AdminAnalysisController {
             selectedStartDate = selectedEndDate.minusDays(MAX_RANGE_DAYS - 1);
         }
 
-        AdminStatsService.Period period = adminStatsService.period(selectedStartDate, selectedEndDate);
-        AdminStatsService.Daily daily = adminStatsService.daily(selectedStartDate, selectedEndDate);
+        // 지표를 따로따로 부르면 요청 하나가 커넥션을 두 개 쓴다. 한 트랜잭션에서 모두 센다. (#405)
+        AdminStatsService.AnalysisPage page = adminStatsService.analysisPage(selectedStartDate, selectedEndDate, today);
+        AdminStatsService.Period period = page.period();
+        AdminStatsService.Daily daily = page.daily();
 
         model.addAttribute("startDate", selectedStartDate);
         model.addAttribute("endDate", selectedEndDate);
@@ -81,13 +81,13 @@ public class AdminAnalysisController {
         model.addAttribute("dailyRows", daily.rowsNewestFirst());
         model.addAttribute("dailyTotals", daily.totals());
 
-        model.addAttribute("userStats", adminStatsService.userStats(period, daily, today));
-        model.addAttribute("learningStats", adminStatsService.learningStats(period, daily));
-        model.addAttribute("analysisStats", adminStatsService.analysisStats(period));
-        model.addAttribute("growthStats", adminStatsService.growthStats(period, daily));
-        model.addAttribute("roomStats", adminStatsService.roomStats(period));
-        model.addAttribute("topProblemWriters", adminStatsQueryRepository.topProblemWriters(selectedStartDate, selectedEndDate, 10));
-        model.addAttribute("topSolvers", adminStatsQueryRepository.topSolvers(selectedStartDate, selectedEndDate, 10));
+        model.addAttribute("userStats", page.userStats());
+        model.addAttribute("learningStats", page.learningStats());
+        model.addAttribute("analysisStats", page.analysisStats());
+        model.addAttribute("growthStats", page.growthStats());
+        model.addAttribute("roomStats", page.roomStats());
+        model.addAttribute("topProblemWriters", page.topProblemWriters());
+        model.addAttribute("topSolvers", page.topSolvers());
 
         return "analysis";
     }
