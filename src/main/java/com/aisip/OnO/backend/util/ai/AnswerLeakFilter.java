@@ -23,6 +23,8 @@ import java.util.regex.Pattern;
  *   단독 일치로 지우면 분석 글이 거의 비게 된다. 그런 노출은 프롬프트로 막는다.
  * - 숫자 답은 앞뒤가 다른 숫자로 이어지면 같은 답으로 보지 않는다("3" 은 "13", "3.5" 와 일치하지 않는다).
  * - 영문 한 글자 답(A~E 등)은 대소문자를 구분한다. 구분하지 않으면 관사 "a" 와 일치한다.
+ * - 한글 한 글자 답(가~하, ㄱ~ㅎ 선지)은 앞에 한글이 붙어 있으면 다른 낱말의 글자로 본다("봅니다" 의 "다").
+ *   뒤에는 조사나 서술격 조사(이, 가, 은, 는, 입니다, 번 등)만 붙을 수 있다("다음" 의 "다" 는 답이 아니다).
  * - 지운 뒤 필드가 비면 원문 대신 무난한 안내 문장을 둔다. 원문을 되살리면 걸러 낸 의미가 없다.
  */
 final class AnswerLeakFilter {
@@ -37,14 +39,20 @@ final class AnswerLeakFilter {
      * "정답", "해답" 은 조사나 기호가 붙은 형태만 본다("정답을 찾기 위해" 는 단정이 아니다). 바로 뒤에 답이 오는
      * "정답 3" 은 답에 따라 달라지므로 leaksAnswer 에서 따로 본다.
      * 객관식 해설의 결론 표현(옳은 것은, 적절하지 않은 것은 등)도 단정으로 본다. "값은" 단독은 조건 설명에도 흔해 넣지 않는다.
+     * 다만 "옳은 것은 무엇인지" 처럼 바로 뒤에 의문사가 오면 결론이 아니라 질문이라 단정으로 보지 않는다.
+     * "③이 옳다" 처럼 문장을 끝맺는 판단도 단정으로 본다. 문장 끝일 때만 보는 것은 "조건이 맞다면" 같은 가정을 빼기 위해서다.
+     * "최종적으로", "결론적으로" 는 같은 문장이 "이다", "가 된다" 같은 결론으로 끝날 때만 단정으로 본다(#406).
+     * "최종적으로 경우의 수는 10이다" 는 지우고, "최종적으로 3가지 조건을 확인해 보세요" 같은 안내는 남긴다.
      * 영어 문제 해설이 영어로 나오는 경우를 위해 answer is 도 둔다.
      */
     private static final Pattern ASSERTION = Pattern.compile(
             "(?:정답|해답)\\s*(?:은|는|이|인|:|=|으로|입니다)|(?:정답|해답)\\s*[.。!]?\\s*$"
                     + "|최종\\s*답|따라서\\s*답|(?<![가-힣])답\\s*(?:은|는|이|:|=)"
+                    + "|(?:최종적으로|결론적으로)(?=[^.。!?\\n]*(?:이다|입니다|이에요|예요|[이가]\\s*(?:된다|됩니다)))"
+                    + "|[이가]\\s*(?:옳다|옳습니다|맞다|맞습니다|적절하다|적절합니다)\\s*[.。!]?\\s*$"
                     + "|구하(?:는|려는)\\s*값\\s*(?:은|는|이)"
                     + "|(?:옳은|옳지\\s*않은|적절한|적절하지\\s*않은|알맞은|알맞지\\s*않은|바른|바르지\\s*않은|맞는|맞지\\s*않는)"
-                    + "\\s*것\\s*(?:은|는|이|으로|:|=)"
+                    + "\\s*것\\s*(?:은|는|이|으로|:|=)(?!\\s*(?:무엇인|무엇일|무엇이|어느|어떤|몇))"
                     + "|answer\\s*(?:is|:)",
             Pattern.CASE_INSENSITIVE);
 
@@ -55,6 +63,11 @@ final class AnswerLeakFilter {
     private static final Pattern CHOICE = Pattern.compile("(1[0-9]|20|[1-9])\\s*번?|([①-⑳])");
     private static final Pattern TRAILING_PUNCTUATION = Pattern.compile("[.。]+$");
     private static final Pattern LIST_NUMBER = Pattern.compile("[0-9]{1,2}\\.");
+
+    /** 한글 한 글자 답 뒤에 붙을 수 있는 조사와 서술격 조사의 첫 글자. "다이다", "다입니다", "다인", "다에", "다라고", "다뿐" */
+    private static final String KOREAN_PARTICLE_START = "[이입인임가은는을를와과로번예야의에라도뿐]";
+    /** 자음 선지(ㄱ~ㅎ)는 "ㄱ만" 도 받는다. 음절 답에 넣으면 "다만" 이 걸려 자음에만 둔다 */
+    private static final String JAMO_PARTICLE_START = "[이입인임가은는을를와과로번예야의에라도뿐만]";
 
     private AnswerLeakFilter() {
     }
@@ -226,6 +239,11 @@ final class AnswerLeakFilter {
             regex.append("(?![0-9]|\\.[0-9])");
         } else if (isAsciiLetter(last)) {
             regex.append("(?![A-Za-z])");
+        } else if (isSingleKorean(token)) {
+            regex.insert(0, "(?<![가-힣ㄱ-ㅎ])");
+            char answer = token.strip().charAt(0);
+            String particles = answer >= 'ㄱ' && answer <= 'ㅎ' ? JAMO_PARTICLE_START : KOREAN_PARTICLE_START;
+            regex.append("(?:(?![가-힣ㄱ-ㅎ])|(?=").append(particles).append("))");
         }
         return regex.toString();
     }
@@ -258,6 +276,15 @@ final class AnswerLeakFilter {
             sentences.add(text.substring(start));
         }
         return sentences;
+    }
+
+    private static boolean isSingleKorean(String token) {
+        String stripped = token.strip();
+        if (stripped.length() != 1) {
+            return false;
+        }
+        char c = stripped.charAt(0);
+        return (c >= '가' && c <= '힣') || (c >= 'ㄱ' && c <= 'ㅎ');
     }
 
     private static boolean isAsciiDigit(char c) {
