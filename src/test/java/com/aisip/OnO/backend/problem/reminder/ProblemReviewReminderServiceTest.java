@@ -13,11 +13,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -32,6 +35,7 @@ import static com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderStatus
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -94,6 +98,37 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
 
     private void giveFcmToken(Long ownerId, String token) {
         fcmTokenRepository.save(FcmToken.From(new FcmTokenRequestDto(token), ownerId));
+    }
+
+    private ProblemReviewReminderStatus statusOf(ProblemReviewReminder reminder) {
+        return reminderRepository.findById(reminder.getId()).orElseThrow().getStatus();
+    }
+
+    /**
+     * 오늘 이미 나간 푸시 한 건을 만든다. 실제 발송 경로처럼 선점 시각과 발송 시각을 같은 폴링 시각으로 둔다.
+     * {@code rows} 가 2 이상이면 같은 폴링에 묶여 나간 묶음 푸시다.
+     */
+    private void pushedAt(Long ownerId, long firstProblemId, int rows, LocalDateTime pollAt) {
+        for (int i = 0; i < rows; i++) {
+            ProblemReviewReminder reminder = saveDueReminder(ownerId, firstProblemId + i, pollAt.minusHours(1));
+            inTransaction(() -> {
+                reminderRepository.tryUpdateStatus(reminder.getId(), SCHEDULED, SENDING, pollAt);
+                reminderRepository.markSent(reminder.getId(), pollAt, SENT);
+            });
+        }
+    }
+
+    /** 사용자별 FCM 호출 요청을 모은다. */
+    private Map<Long, List<NotificationRequestDto>> capturedRequestsByUser() {
+        ArgumentCaptor<Long> userIdCaptor = ArgumentCaptor.forClass(Long.class);
+        ArgumentCaptor<NotificationRequestDto> requestCaptor = ArgumentCaptor.forClass(NotificationRequestDto.class);
+        verify(fcmService, atLeast(0)).sendNotificationToAllUserDevice(userIdCaptor.capture(), requestCaptor.capture());
+        Map<Long, List<NotificationRequestDto>> byUser = new HashMap<>();
+        for (int i = 0; i < userIdCaptor.getAllValues().size(); i++) {
+            byUser.computeIfAbsent(userIdCaptor.getAllValues().get(i), id -> new ArrayList<>())
+                    .add(requestCaptor.getAllValues().get(i));
+        }
+        return byUser;
     }
 
     // ════════════════════════════ 예약 ════════════════════════════
@@ -444,39 +479,38 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         }
 
         @Test
-        @DisplayName("오늘 이미 보낸 사용자에게는 하루 두 번 보내지 않는다")
-        void sendsAtMostOncePerDay() {
+        @DisplayName("같은 날 이전 폴링에서 이미 보냈어도 다음 폴링의 due 는 따로 나간다")
+        void sendsAgainOnLaterPollSameDay() {
             giveFcmToken(userId, "token-1");
-            ProblemReviewReminder alreadySent =
-                    saveDueReminder(userId, 11001L, nowInSendWindow().minusDays(1));
-            LocalDateTime sentAt = nowInSendWindow();
-            inTransaction(() -> reminderRepository.markSent(alreadySent.getId(), sentAt, SENT));
+            LocalDateTime now = nowInSendWindow();
+            pushedAt(userId, 11001L, 1, now.minusHours(1));
+            ProblemReviewReminder due = saveDueReminder(userId, 11002L, now.minusMinutes(1));
 
-            ProblemReviewReminder due = saveDueReminder(userId, 11002L, nowInSendWindow().minusMinutes(1));
+            service.sendDueReminders(now);
 
-            service.sendDueReminders(nowInSendWindow());
-
-            verify(fcmService, never()).sendNotificationToAllUserDevice(any(), any());
-            assertThat(reminderRepository.findById(due.getId()).orElseThrow().getStatus()).isEqualTo(SCHEDULED);
+            verify(fcmService, times(1)).sendNotificationToAllUserDevice(eq(userId), any());
+            assertThat(statusOf(due))
+                    .as("하루 한 건 제한은 없어졌다. 문제마다 예약 시각에 나간다")
+                    .isEqualTo(SENT);
         }
 
         @Test
-        @DisplayName("같은 사용자의 다른 예약이 SENDING 이면 오늘의 두 번째 알림을 보내지 않는다")
-        void doesNotSendWhileAnotherReminderIsSending() {
+        @DisplayName("같은 사용자의 다른 예약이 SENDING 이어도 새 due 는 나간다")
+        void sendsWhileAnotherReminderIsSending() {
             giveFcmToken(userId, "token-1");
-            ProblemReviewReminder claimed =
-                    saveDueReminder(userId, 15001L, nowInSendWindow().minusMinutes(10));
+            LocalDateTime now = nowInSendWindow();
+            ProblemReviewReminder claimed = saveDueReminder(userId, 15001L, now.minusMinutes(10));
             inTransaction(() ->
-                    reminderRepository.tryUpdateStatus(claimed.getId(), SCHEDULED, SENDING, nowInSendWindow()));
-            ProblemReviewReminder second =
-                    saveDueReminder(userId, 15002L, nowInSendWindow().minusMinutes(5));
+                    reminderRepository.tryUpdateStatus(claimed.getId(), SCHEDULED, SENDING, now.minusMinutes(5)));
+            ProblemReviewReminder second = saveDueReminder(userId, 15002L, now.minusMinutes(5));
 
-            service.sendDueReminders(nowInSendWindow());
+            service.sendDueReminders(now);
 
-            verify(fcmService, never()).sendNotificationToAllUserDevice(any(), any());
-            assertThat(reminderRepository.findById(second.getId()).orElseThrow().getStatus())
-                    .as("다른 인스턴스가 선점해 SENDING 으로 커밋한 직후 폴링이 돌면 같은 날 두 번째 푸시가 나간다")
-                    .isEqualTo(SCHEDULED);
+            verify(fcmService, times(1)).sendNotificationToAllUserDevice(eq(userId), any());
+            assertThat(statusOf(second)).isEqualTo(SENT);
+            assertThat(statusOf(claimed))
+                    .as("다른 인스턴스가 선점한 행은 이번 폴링이 건드리지 않는다")
+                    .isEqualTo(SENDING);
         }
 
         @Test
@@ -526,41 +560,174 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         }
 
         @Test
-        @DisplayName("due 가 여러 건이면 가장 오래된 것 하나만 보낸다")
-        void sendsOnlyEarliestPerUser() {
+        @DisplayName("같은 폴링에 due 가 1건이면 FCM 을 한 번, 그 문제의 단건 알림으로 부른다")
+        void sendsSingleNotificationForOneDue() {
             giveFcmToken(userId, "token-1");
-            ProblemReviewReminder earlier =
-                    saveDueReminder(userId, 12001L, nowInSendWindow().minusMinutes(10));
-            ProblemReviewReminder later =
-                    saveDueReminder(userId, 12002L, nowInSendWindow().minusMinutes(5));
+            ProblemReviewReminder due = saveDueReminder(userId, 12101L, nowInSendWindow().minusMinutes(1));
 
             service.sendDueReminders(nowInSendWindow());
 
-            verify(fcmService, times(1)).sendNotificationToAllUserDevice(eq(userId), any());
-            assertThat(reminderRepository.findById(earlier.getId()).orElseThrow().getStatus()).isEqualTo(SENT);
-            assertThat(reminderRepository.findById(later.getId()).orElseThrow().getStatus()).isEqualTo(SCHEDULED);
+            List<NotificationRequestDto> requests = capturedRequestsByUser().get(userId);
+            assertThat(requests).hasSize(1);
+            assertThat(requests.get(0).body()).isEqualTo("그때 남긴 오답, 다시 풀어볼 시간이에요");
+            assertThat(requests.get(0).data())
+                    .containsEntry("type", "problem_review_reminder")
+                    .containsEntry("problemId", "12101")
+                    .doesNotContainKey("count");
+            assertThat(statusOf(due)).isEqualTo(SENT);
         }
 
         @Test
-        @DisplayName("사용자별로 독립 판단한다 - 한 명이 이미 받았어도 다른 사람은 받는다")
+        @DisplayName("같은 폴링에 due 가 3건이면 FCM 을 한 번만 부르고 세 행 모두 같은 sentAt 으로 SENT 가 된다")
+        void bundlesDueRowsOfSamePoll() {
+            giveFcmToken(userId, "token-1");
+            LocalDateTime now = nowInSendWindow();
+            ProblemReviewReminder later = saveDueReminder(userId, 12001L, now.minusMinutes(5));
+            ProblemReviewReminder earliest = saveDueReminder(userId, 12002L, now.minusMinutes(30));
+            ProblemReviewReminder middle = saveDueReminder(userId, 12003L, now.minusMinutes(10));
+
+            service.sendDueReminders(now);
+
+            List<NotificationRequestDto> requests = capturedRequestsByUser().get(userId);
+            assertThat(requests).hasSize(1);
+            assertThat(requests.get(0).body()).isEqualTo("다시 풀어볼 오답이 3개 있어요");
+            assertThat(requests.get(0).data())
+                    .containsEntry("count", "3")
+                    .as("누르면 가장 먼저 예약된 문제가 열린다")
+                    .containsEntry("problemId", String.valueOf(earliest.getProblemId()));
+
+            List<ProblemReviewReminder> rows = List.of(later, earliest, middle).stream()
+                    .map(r -> reminderRepository.findById(r.getId()).orElseThrow())
+                    .toList();
+            assertThat(rows).extracting(ProblemReviewReminder::getStatus).containsOnly(SENT);
+            assertThat(rows).extracting(ProblemReviewReminder::getSentAt)
+                    .doesNotContainNull()
+                    .containsOnly(rows.get(0).getSentAt());
+        }
+
+        @Test
+        @DisplayName("오늘 푸시 5건(묶음 포함)을 채운 사용자에게는 6번째를 보내지 않고 SCHEDULED 로 둔다")
+        void stopsAtDailyPushLimit() {
+            giveFcmToken(userId, "token-1");
+            LocalDateTime now = nowInSendWindow();
+            pushedAt(userId, 16001L, 3, now.minusHours(5));
+            pushedAt(userId, 16011L, 1, now.minusHours(4));
+            pushedAt(userId, 16021L, 2, now.minusHours(3));
+            pushedAt(userId, 16031L, 1, now.minusHours(2));
+            pushedAt(userId, 16041L, 1, now.minusHours(1));
+            ProblemReviewReminder sixth = saveDueReminder(userId, 16051L, now.minusMinutes(1));
+
+            service.sendDueReminders(now);
+
+            verify(fcmService, never()).sendNotificationToAllUserDevice(any(), any());
+            assertThat(statusOf(sixth))
+                    .as("행은 8개지만 푸시는 5건이라 상한에 걸린다. 상한에 걸린 예약은 다음 날로 넘어간다")
+                    .isEqualTo(SCHEDULED);
+        }
+
+        @Test
+        @DisplayName("오늘 푸시가 4건(행은 더 많아도)이면 아직 상한 전이라 보낸다")
+        void sendsBelowDailyPushLimit() {
+            giveFcmToken(userId, "token-1");
+            LocalDateTime now = nowInSendWindow();
+            pushedAt(userId, 16101L, 3, now.minusHours(4));
+            pushedAt(userId, 16111L, 2, now.minusHours(3));
+            pushedAt(userId, 16121L, 1, now.minusHours(2));
+            pushedAt(userId, 16131L, 1, now.minusHours(1));
+            ProblemReviewReminder fifth = saveDueReminder(userId, 16141L, now.minusMinutes(1));
+
+            service.sendDueReminders(now);
+
+            verify(fcmService, times(1)).sendNotificationToAllUserDevice(eq(userId), any());
+            assertThat(statusOf(fifth)).isEqualTo(SENT);
+        }
+
+        @Test
+        @DisplayName("선점 중인 SENDING 행도 오늘 푸시로 세어 상한에 포함한다")
+        void countsSendingRowTowardLimit() {
+            giveFcmToken(userId, "token-1");
+            LocalDateTime now = nowInSendWindow();
+            pushedAt(userId, 16201L, 1, now.minusHours(4));
+            pushedAt(userId, 16211L, 1, now.minusHours(3));
+            pushedAt(userId, 16221L, 1, now.minusHours(2));
+            pushedAt(userId, 16231L, 1, now.minusHours(1));
+            ProblemReviewReminder claimed = saveDueReminder(userId, 16241L, now.minusMinutes(30));
+            inTransaction(() ->
+                    reminderRepository.tryUpdateStatus(claimed.getId(), SCHEDULED, SENDING, now.minusMinutes(5)));
+            ProblemReviewReminder due = saveDueReminder(userId, 16251L, now.minusMinutes(1));
+
+            service.sendDueReminders(now);
+
+            verify(fcmService, never()).sendNotificationToAllUserDevice(any(), any());
+            assertThat(statusOf(due))
+                    .as("SENT 4건 + 다른 인스턴스가 보내는 중인 1건 = 5건")
+                    .isEqualTo(SCHEDULED);
+        }
+
+        @Test
+        @DisplayName("어제 푸시는 오늘 상한에 들어가지 않는다")
+        void yesterdayPushesDoNotCount() {
+            giveFcmToken(userId, "token-1");
+            LocalDateTime now = nowInSendWindow();
+            LocalDateTime yesterday = now.minusDays(1);
+            for (int i = 0; i < 5; i++) {
+                pushedAt(userId, 16301L + i * 10, 1, yesterday.minusHours(i));
+            }
+            ProblemReviewReminder due = saveDueReminder(userId, 16401L, now.minusMinutes(1));
+
+            service.sendDueReminders(now);
+
+            assertThat(statusOf(due)).isEqualTo(SENT);
+        }
+
+        @Test
+        @DisplayName("사용자 A, B 가 동시에 due 면 사용자별로 FCM 을 한 번씩 부르고 묶음에는 자기 문제만 담긴다")
+        void bundlesPerUser() {
+            User other = fixtures.createOtherUser();
+            giveFcmToken(userId, "token-u1");
+            giveFcmToken(other.getId(), "token-u2");
+            LocalDateTime now = nowInSendWindow();
+            ProblemReviewReminder mineEarly = saveDueReminder(userId, 13101L, now.minusMinutes(20));
+            ProblemReviewReminder mineLate = saveDueReminder(userId, 13102L, now.minusMinutes(2));
+            ProblemReviewReminder theirsEarliest = saveDueReminder(other.getId(), 13201L, now.minusMinutes(40));
+            ProblemReviewReminder theirs2 = saveDueReminder(other.getId(), 13202L, now.minusMinutes(15));
+            ProblemReviewReminder theirs3 = saveDueReminder(other.getId(), 13203L, now.minusMinutes(1));
+
+            service.sendDueReminders(now);
+
+            Map<Long, List<NotificationRequestDto>> byUser = capturedRequestsByUser();
+            assertThat(byUser).containsOnlyKeys(userId, other.getId());
+            assertThat(byUser.get(userId)).singleElement().satisfies(request -> assertThat(request.data())
+                    .containsEntry("problemId", "13101")
+                    .containsEntry("count", "2"));
+            assertThat(byUser.get(other.getId())).singleElement().satisfies(request -> assertThat(request.data())
+                    .as("다른 사용자의 더 이른 예약이 내 묶음에 섞이면 안 된다")
+                    .containsEntry("problemId", "13201")
+                    .containsEntry("count", "3"));
+            assertThat(List.of(mineEarly, mineLate, theirsEarliest, theirs2, theirs3))
+                    .extracting(reminder -> statusOf(reminder))
+                    .containsOnly(SENT);
+        }
+
+        @Test
+        @DisplayName("상한은 사용자별로 판단한다 - 한 명이 상한에 걸려도 다른 사람은 받는다")
         void isolatesUsers() {
             User other = fixtures.createOtherUser();
             giveFcmToken(userId, "token-u1");
             giveFcmToken(other.getId(), "token-u2");
+            LocalDateTime now = nowInSendWindow();
+            for (int i = 0; i < 5; i++) {
+                pushedAt(userId, 13001L + i * 10, 1, now.minusHours(i + 1));
+            }
+            ProblemReviewReminder mineDue = saveDueReminder(userId, 13091L, now.minusMinutes(1));
+            ProblemReviewReminder othersDue = saveDueReminder(other.getId(), 13092L, now.minusMinutes(1));
 
-            ProblemReviewReminder alreadySent =
-                    saveDueReminder(userId, 13001L, nowInSendWindow().minusDays(1));
-            LocalDateTime sentAt = nowInSendWindow();
-            inTransaction(() -> reminderRepository.markSent(alreadySent.getId(), sentAt, SENT));
-
-            ProblemReviewReminder othersDue =
-                    saveDueReminder(other.getId(), 13002L, nowInSendWindow().minusMinutes(1));
-
-            service.sendDueReminders(nowInSendWindow());
+            service.sendDueReminders(now);
 
             verify(fcmService, times(1)).sendNotificationToAllUserDevice(eq(other.getId()), any());
             verify(fcmService, never()).sendNotificationToAllUserDevice(eq(userId), any());
-            assertThat(reminderRepository.findById(othersDue.getId()).orElseThrow().getStatus()).isEqualTo(SENT);
+            assertThat(statusOf(othersDue)).isEqualTo(SENT);
+            assertThat(statusOf(mineDue)).isEqualTo(SCHEDULED);
         }
 
         @Test

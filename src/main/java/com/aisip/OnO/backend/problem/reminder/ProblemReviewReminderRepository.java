@@ -16,33 +16,16 @@ public interface ProblemReviewReminderRepository extends JpaRepository<ProblemRe
     boolean existsByProblemIdAndSequence(Long problemId, int sequence);
 
     /**
-     * "오늘 이 사용자를 아직 건드리지 않았는가" 로 후보를 고른다.
+     * 지금 보낼 예약을 고른다.
      *
-     * <p>SENT 만 보면 선점(SENDING)과 SENT 기록 사이에 창이 생긴다. 선점은 별도 트랜잭션으로 바로
-     * 커밋되므로, 인스턴스 A 가 예약 X 를 SENDING 으로 커밋한 직후 인스턴스 B 가 폴링하면 X 는
-     * SCHEDULED 가 아니라 후보에서 빠지고 그 사용자의 SENT 행도 아직 없어서, 같은 사용자의 다른
-     * 예약 Y 가 하루 두 번째 푸시로 나갔다. 그래서 오늘 선점된 SENDING 행도 "이미 처리함" 으로 센다.
-     *
-     * <p>선점 시각은 {@code tryUpdateStatus} 가 넣는 {@code updatedAt} 이다. SENDING 이 영영 막지는
-     * 않는다 — 10분 넘게 멈춘 행은 stuck 복구가 FAILED 로 넘긴다.
+     * <p>예전에는 "오늘 이미 처리한 사용자" 를 빼서 사용자당 하루 한 건만 나갔다. 지금은 문제마다
+     * 예약 시각에 보내고, 하루 상한은 {@link #countTodayPushesByUser} 로 푸시 수를 세어 서비스에서 건다.
      */
     @Query("""
             SELECT r FROM ProblemReviewReminder r
             WHERE r.status = :status
               AND r.scheduledAt <= :now
               AND r.deletedAt IS NULL
-              AND NOT EXISTS (
-                  SELECT 1 FROM ProblemReviewReminder handled
-                  WHERE handled.userId = r.userId
-                    AND handled.deletedAt IS NULL
-                    AND (
-                        (handled.status = :sent
-                            AND handled.sentAt >= :startOfDay AND handled.sentAt < :endOfDay)
-                        OR
-                        (handled.status = :sending
-                            AND handled.updatedAt >= :startOfDay AND handled.updatedAt < :endOfDay)
-                    )
-              )
               AND EXISTS (
                   SELECT 1 FROM User u
                   WHERE u.id = r.userId
@@ -57,11 +40,35 @@ public interface ProblemReviewReminderRepository extends JpaRepository<ProblemRe
     List<ProblemReviewReminder> findDueReminders(
             @Param("status") ProblemReviewReminderStatus status,
             @Param("now") LocalDateTime now,
+            Pageable pageable
+    );
+
+    /**
+     * 사용자별로 오늘 나간 푸시 수를 센다. 행 수가 아니다.
+     *
+     * <p>한 번에 묶어 보낸 행들은 같은 폴링 시각을 공유한다. 선점 때 {@code updatedAt} 에,
+     * 발송 기록 때 {@code sentAt} 에 같은 {@code now} 가 들어가므로 그 시각의 가짓수가 곧 푸시 수다.
+     * 선점만 되고 아직 SENT 가 아닌 SENDING 행도 이미 나가는 중인 푸시라 함께 센다.
+     */
+    @Query("""
+            SELECT r.userId AS userId,
+                   COUNT(DISTINCT CASE WHEN r.status = :sent THEN r.sentAt ELSE r.updatedAt END) AS pushCount
+            FROM ProblemReviewReminder r
+            WHERE r.userId IN :userIds
+              AND r.deletedAt IS NULL
+              AND (
+                  (r.status = :sent AND r.sentAt >= :startOfDay AND r.sentAt < :endOfDay)
+                  OR
+                  (r.status = :sending AND r.updatedAt >= :startOfDay AND r.updatedAt < :endOfDay)
+              )
+            GROUP BY r.userId
+            """)
+    List<ReminderPushCount> countTodayPushesByUser(
+            @Param("userIds") Collection<Long> userIds,
             @Param("sent") ProblemReviewReminderStatus sent,
             @Param("sending") ProblemReviewReminderStatus sending,
             @Param("startOfDay") LocalDateTime startOfDay,
-            @Param("endOfDay") LocalDateTime endOfDay,
-            Pageable pageable
+            @Param("endOfDay") LocalDateTime endOfDay
     );
 
     @Modifying(clearAutomatically = true)

@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -18,9 +19,16 @@ public class ProblemReviewReminderPolicy {
     private static final String NOTIFICATION_TITLE = "오답노트 복습";
     private static final String NOTIFICATION_BODY_DEFAULT = "그때 남긴 오답, 다시 풀어볼 시간이에요";
     private static final String NOTIFICATION_BODY_FALLBACK = "이전에 남긴 오답노트를 다시 풀어보세요";
+    private static final String NOTIFICATION_BODY_BUNDLE = "다시 풀어볼 오답이 %d개 있어요";
+    /** 사용자당 하루에 보내는 복습 푸시 수의 상한. 묶음 푸시도 한 건으로 센다. */
+    private static final int DAILY_PUSH_LIMIT = 5;
 
     public List<Integer> getIntervals() {
         return INTERVALS;
+    }
+
+    public int getDailyPushLimit() {
+        return DAILY_PUSH_LIMIT;
     }
 
     /**
@@ -68,6 +76,32 @@ public class ProblemReviewReminderPolicy {
         );
 
         return new NotificationRequestDto("", NOTIFICATION_TITLE, body, data);
+    }
+
+    /**
+     * 같은 폴링에 걸린 한 사용자의 예약 여러 건을 푸시 하나로 묶는다.
+     *
+     * <p>type 은 단건과 같은 {@code problem_review_reminder} 로 두고 {@code problemId} 에 가장 이른 예약의
+     * 문제를 넣는다. 지금 출시된 앱도 누르면 그 문제 상세가 열린다. 복습 목록 화면({@code review_due})은
+     * {@code Problem.nextReviewAt} 기준이라 리마인더 간격과 맞지 않아 쓰지 않는다.
+     */
+    public NotificationRequestDto buildBundleNotification(List<ProblemReviewReminder> reminders) {
+        if (reminders.size() == 1) {
+            return buildNotification(reminders.get(0));
+        }
+        ProblemReviewReminder first = reminders.stream()
+                .min(Comparator.comparing(ProblemReviewReminder::getScheduledAt)
+                        .thenComparing(ProblemReviewReminder::getId))
+                .orElseThrow();
+
+        Map<String, String> data = Map.of(
+                "type", NotificationType.PROBLEM_REVIEW_REMINDER,
+                "problemId", String.valueOf(first.getProblemId()),
+                "count", String.valueOf(reminders.size())
+        );
+
+        return new NotificationRequestDto("", NOTIFICATION_TITLE,
+                String.format(NOTIFICATION_BODY_BUNDLE, reminders.size()), data);
     }
 
     private boolean hasContent(String value) {
