@@ -21,6 +21,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
@@ -90,7 +91,9 @@ public class GlobalExceptionHandler {
             MissingServletRequestParameterException.class,
             MissingRequestHeaderException.class,
             BindException.class,
-            ConstraintViolationException.class
+            ConstraintViolationException.class,
+            // @RequestParam 에 붙인 @Min, @Max 같은 제약이 깨지면 이 예외가 난다. (#400)
+            HandlerMethodValidationException.class
     })
     public ResponseEntity<CommonResponse> handleBadRequestException(Exception ex, WebRequest request) {
         return handleSpringStatusException(ex, request, HttpStatus.BAD_REQUEST, "잘못된 요청입니다.");
