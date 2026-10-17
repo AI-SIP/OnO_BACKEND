@@ -310,25 +310,7 @@ class ProblemRepositoryTest extends ProblemTestSupport {
         }
 
         @Test
-        @DisplayName("복습 대상 요약은 사용자별 due 개수를 집계한다")
-        void summarizesDueCountPerUser() {
-            LocalDate today = LocalDate.now();
-            saveProblemWithReviewSchedule(owner.getId(), ownerRoot, today, 1, 0);
-            saveProblemWithReviewSchedule(owner.getId(), ownerRoot, today.minusDays(1), 1, 0);
-            saveProblemWithReviewSchedule(intruder.getId(), intruderRoot, today, 1, 0);
-
-            List<ReviewDueSummary> summaries = problemRepository.findReviewDueSummaryByDate(today, MASTERY_THRESHOLD);
-
-            assertThat(summaries)
-                    .extracting(ReviewDueSummary::getUserId, ReviewDueSummary::getDueCount)
-                    .containsExactlyInAnyOrder(
-                            tuple(owner.getId(), 2L),
-                            tuple(intruder.getId(), 1L)
-                    );
-        }
-
-        @Test
-        @DisplayName("마지막으로 틀린 뒤에 정답 날이 3일이면 복습 대상과 알림 집계에서 빠진다")
+        @DisplayName("마지막으로 틀린 뒤에 정답 날이 3일이면 복습 대상에서 빠진다")
         void excludesProblemsWithEnoughCorrectSolves() {
             LocalDate today = LocalDate.now();
             Problem mastered = saveProblemWithReviewSchedule(owner.getId(), ownerRoot, today, 1, 0);
@@ -344,9 +326,6 @@ class ProblemRepositoryTest extends ProblemTestSupport {
                     .extracting(ReviewDueProblemProjection::problemId, ReviewDueProblemProjection::correctCount)
                     .as("마지막으로 틀린 뒤의 정답 날만 센다")
                     .containsExactly(tuple(stillDue.getId(), 2L));
-            assertThat(problemRepository.findReviewDueSummaryByDate(today, MASTERY_THRESHOLD))
-                    .extracting(ReviewDueSummary::getUserId, ReviewDueSummary::getDueCount)
-                    .containsExactly(tuple(owner.getId(), 1L));
         }
 
         @Test
@@ -360,9 +339,6 @@ class ProblemRepositoryTest extends ProblemTestSupport {
             assertThat(problemRepository.findReviewDueProblems(owner.getId(), today, MASTERY_THRESHOLD))
                     .extracting(ReviewDueProblemProjection::problemId, ReviewDueProblemProjection::correctCount)
                     .containsExactly(tuple(relearning.getId(), 0L));
-            assertThat(problemRepository.findReviewDueSummaryByDate(today, MASTERY_THRESHOLD))
-                    .extracting(ReviewDueSummary::getUserId, ReviewDueSummary::getDueCount)
-                    .containsExactly(tuple(owner.getId(), 1L));
         }
 
         @Test
@@ -381,9 +357,6 @@ class ProblemRepositoryTest extends ProblemTestSupport {
                     .extracting(ReviewDueProblemProjection::problemId, ReviewDueProblemProjection::correctCount)
                     .as("하루에 세 번 맞혀도 정답을 남긴 날은 하루라 추천에 남는다")
                     .containsExactly(tuple(crammed.getId(), 1L));
-            assertThat(problemRepository.findReviewDueSummaryByDate(today, MASTERY_THRESHOLD))
-                    .extracting(ReviewDueSummary::getUserId, ReviewDueSummary::getDueCount)
-                    .containsExactly(tuple(owner.getId(), 1L));
         }
 
         private void saveSolves(Problem problem, AnswerStatus... statuses) {

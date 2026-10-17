@@ -11,7 +11,10 @@ package com.aisip.OnO.backend.util.fcm;
  */
 public final class NotificationType {
 
-    /** 오늘 복습할 문제가 있는 사용자에게 보내는 일일 알림. */
+    /**
+     * 복습 목록 화면을 여는 값. 서버는 더 이상 이 type 으로 푸시를 보내지 않지만
+     * 앱의 홈 위젯 라우팅이 같은 값을 쓰는 계약이라 남겨 둔다.
+     */
     public static final String REVIEW_DUE = "review_due";
 
     /** 며칠 접속하지 않은 사용자에게 보내는 재참여 알림. */

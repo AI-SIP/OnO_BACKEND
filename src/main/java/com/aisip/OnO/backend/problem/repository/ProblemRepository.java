@@ -50,22 +50,4 @@ public interface ProblemRepository extends JpaRepository<Problem, Long>, Problem
     List<ReviewDueProblemProjection> findReviewDueProblems(@Param("userId") Long userId,
                                                            @Param("today") LocalDate today,
                                                            @Param("masteryThreshold") long masteryThreshold);
-
-    @Query("""
-            SELECT p.userId as userId, COUNT(p) as dueCount
-            FROM Problem p
-            WHERE p.nextReviewAt <= :today
-              AND (SELECT COUNT(DISTINCT cast(ps.practicedAt as LocalDate)) FROM ProblemSolve ps
-                   WHERE ps.problem = p
-                     AND ps.answerStatus = com.aisip.OnO.backend.problemsolve.entity.AnswerStatus.CORRECT
-                     AND NOT EXISTS (SELECT 1 FROM ProblemSolve wps
-                                     WHERE wps.problem = p
-                                       AND wps.answerStatus IN (com.aisip.OnO.backend.problemsolve.entity.AnswerStatus.WRONG,
-                                                             com.aisip.OnO.backend.problemsolve.entity.AnswerStatus.PARTIAL)
-                                       AND (wps.practicedAt > ps.practicedAt
-                                            OR (wps.practicedAt = ps.practicedAt AND wps.id > ps.id)))) < :masteryThreshold
-            GROUP BY p.userId
-            """)
-    List<ReviewDueSummary> findReviewDueSummaryByDate(@Param("today") LocalDate today,
-                                                      @Param("masteryThreshold") long masteryThreshold);
 }
