@@ -489,6 +489,9 @@ public class OpenAIClient {
      *
      * 2단계(#397): 모델이 내부 필드에서 끝까지 풀고 해설과 맞춰 본 뒤, 학생에게 보이는 필드에는 힌트만 쓰게 한다.
      * 과목은 스키마 enum 으로 고정하고, problemType 은 문제 형식이 아니라 단원이나 개념 영역으로 쓰게 한다.
+     *
+     * #406: dev 실호출에서 번호는 숨겼지만 정답 선지의 문장을 keyPoints 와 solution 에 그대로 옮기거나, 마지막 계산 값을 쓰는 일이 있어
+     * 그 두 가지를 따로 금지한다. 앱이 수식을 렌더링하지 않는다는 점과 일반 기호 예시도 밝힌다.
      */
     String createSystemPrompt() {
         return """
@@ -522,13 +525,16 @@ public class OpenAIClient {
             [분석 및 작성 원칙]
             1. Solve No-More: 학습자에게 보이는 필드에서는 수치를 대입해 최종 답을 계산하거나 정답 선지를 알려주지 마세요.
                최종 답, 정답 선지 번호, 최종 수치를 쓰지 말고, "A 공식을 사용해 B를 구한다"와 같은 '방법론'을 제시하세요.
+               - 정답 선지의 문장이나 빈칸에 들어갈 표현을 그대로 옮기거나 우리말로 바꿔 사실처럼 적지 마세요. keyPoints 도 마찬가지입니다.
+                 대신 선지를 판단할 기준(예: "제도가 처음 시행된 시기와 지역을 확인한다")이나 단서가 있는 위치를 짚어 주세요.
+               - 계산 문제는 식을 세우는 방법까지만 쓰고, 마지막 계산 결과나 "따라서 ~는 ~이다", "최종적으로 ~이다" 같은 결론 값을 쓰지 마세요.
             2. Thinking Step (solution):
                - 1단계: 문제에서 주어진 조건(Knowns)과 구해야 하는 것(Unknowns)을 명확히 정의하세요.
                - 2단계: 이 문제를 풀기 위해 머릿속에서 꺼내야 할 핵심 공식, 정의, 법리, 문법 규칙 등을 언급하세요.
                - 3단계: 어떤 순서로 접근해야 하는지 '전략'을 설명하세요. 직접 풀어 본 과정에서 막히기 쉬운 지점을 짚어 주세요.
             3. Error Analysis (commonMistakes): 일반론이 아니라 이 문제에서 실제로 걸리기 쉬운 지점을 짚으세요. 계산 실수보다는 '개념의 오용'이나 '조건을 잘못 읽는 경우' 등 사고의 오류를 짚어주세요.
                학습자의 메모에 틀린 이유나 헷갈린 점이 적혀 있으면 그것을 가장 먼저 다루세요.
-            4. keyPoints 에는 이 문제에 필요한 핵심 개념이나 공식을 2~4개 적으세요.
+            4. keyPoints 에는 이 문제에 필요한 핵심 개념이나 공식을 2~4개 적으세요. 정답 선지의 내용을 핵심 개념처럼 적지 마세요.
 
             [분류 규칙]
             - subject 는 스키마의 목록에서만 고르세요. 학년이나 시험 종류가 아니라 문제 내용의 영역으로 고릅니다.
@@ -541,8 +547,11 @@ public class OpenAIClient {
             - 같은 단원은 늘 같은 이름으로 쓰고, 교과서 단원명처럼 짧게(15자 이내) 쓰세요.
 
             [작성 형식]
-            - 모든 값은 순수한 텍스트로 작성하세요. LaTeX, 마크다운, 이스케이프 문자를 쓰지 마세요.
-            - 수식은 한국어 문장으로 풀어 쓰고, 필요하면 ², ³, √, π, ≤, ≥ 같은 유니코드 기호까지만 쓰세요.
+            - 모든 값은 순수한 텍스트로 작성하세요. LaTeX(\\frac, \\binom, \\( \\) 등), 마크다운, 역슬래시를 쓰지 마세요.
+              학습자 앱은 수식을 렌더링하지 않고 글자를 그대로 보여 줍니다.
+            - 줄을 나눌 때는 역슬래시와 n 두 글자가 아니라 실제 줄바꿈을 쓰세요.
+            - 수식은 일반 기호로 쓰세요. 예: 조합 5C2, 순열 5P2, 거듭제곱 3⁵, 분수 3/4, 곱셈 ×, 루트 √2.
+              ², ³, √, π, ≤, ≥ 같은 유니코드 기호까지 쓸 수 있습니다.
             - 모든 내용은 한국어로 작성하며, 학습자가 스스로 답을 찾을 수 있게 격려하는 톤을 유지하세요.
             - 응답은 지정된 JSON 스키마(analyzable, internalSolution, finalAnswer, explanationCheck, subject, problemType, keyPoints, solution, commonMistakes, studyTips)를 따르세요.
             """;
@@ -592,11 +601,11 @@ public class OpenAIClient {
                 "객관식·서술형 같은 문제 형식이 아니라 이 문제가 속한 단원이나 개념 영역. 예: 이차함수, 확률과 통계, 화학 반응식과 양적 관계"));
         Map<String, Object> keyPoints = new LinkedHashMap<>();
         keyPoints.put("type", "array");
-        keyPoints.put("description", "이 문제를 푸는 데 필요한 핵심 개념이나 공식 2~4개. 최종 답은 쓰지 않는다");
+        keyPoints.put("description", "이 문제를 푸는 데 필요한 핵심 개념이나 공식 2~4개. 최종 답과 정답 선지의 내용은 쓰지 않는다");
         keyPoints.put("items", Map.of("type", "string"));
         properties.put("keyPoints", keyPoints);
         properties.put("solution", described("string",
-                "최종 답이나 정답 선지를 밝히지 않고, 조건 정리, 필요한 개념, 접근 순서를 단계별로 설명한 풀이 방향"));
+                "최종 답, 정답 선지와 그 내용, 마지막 계산 결과를 밝히지 않고, 조건 정리, 필요한 개념, 접근 순서를 단계별로 설명한 풀이 방향"));
         properties.put("commonMistakes", described("string",
                 "이 문제에서 실제로 걸리기 쉬운 사고의 오류. 학습자 메모에 틀린 이유가 있으면 그것을 먼저 다룬다. 최종 답은 쓰지 않는다"));
         properties.put("studyTips", described("string",
@@ -705,17 +714,20 @@ public class OpenAIClient {
                 throw new NonRetryableAnalysisException(AnalysisFailureReason.UNREADABLE_IMAGE, "분석이 불가능한 이미지입니다.");
             }
 
-            ProblemAnalysisResult result = ProblemAnalysisResult.builder()
+            // 앱은 분석 글을 일반 텍스트로 그리므로 역슬래시와 n 두 글자, LaTeX 를 정답 검사 전에 글자로 바꾼다.
+            // 줄바꿈이 살아야 정답 검사의 문장 나누기도 맞게 된다
+            ProblemAnalysisResult result = AnalysisTextNormalizer.normalize(ProblemAnalysisResult.builder()
                     .subject(normalizeSubject((String) parsed.get("subject")))
                     .problemType((String) parsed.get("problemType"))
                     .keyPoints((List<String>) parsed.get("keyPoints"))
                     .solution((String) parsed.get("solution"))
                     .commonMistakes((String) parsed.get("commonMistakes"))
                     .studyTips((String) parsed.get("studyTips"))
-                    .build();
+                    .build());
+            // 답도 글과 같은 규칙으로 바꿔야 답 \frac{3}{4} 가 글의 3/4 와 맞아 정답 검사에 걸린다
             AnalysisInternal internal = new AnalysisInternal(
                     (String) parsed.get("internalSolution"),
-                    (String) parsed.get("finalAnswer"),
+                    AnalysisTextNormalizer.normalizeAnswer(result.getSubject(), (String) parsed.get("finalAnswer")),
                     (String) parsed.get("explanationCheck"));
             return new ParsedAnalysis(result, internal);
 
