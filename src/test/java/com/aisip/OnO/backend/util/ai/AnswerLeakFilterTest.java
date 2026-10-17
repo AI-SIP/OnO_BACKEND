@@ -347,6 +347,123 @@ class AnswerLeakFilterTest {
     }
 
     @Nested
+    @DisplayName("#406 dev 실호출 반영 - 한글 한 글자 답, 결론 부사, 질문형 결론 표현")
+    class DevCallFollowUps {
+
+        @ParameterizedTest(name = "\"{0}\"")
+        @ValueSource(strings = {
+                "가, 나 중에서 옳은 것은 무엇인지 조건과 비교해 봅니다.",
+                "다음 중 옳은 것은 무엇인지 하나씩 따져 봅니다.",
+                "따라서 다른 선지와 비교해 옳은 것을 고릅니다.",
+                "옳은 것은 어느 선지인지 근거를 먼저 세웁니다."
+        })
+        @DisplayName("한글 한 글자 답(다)은 다른 낱말 안의 글자(봅니다, 다음, 다른)와 일치하지 않는다")
+        void singleKoreanAnswerIsNotPartOfWord(String sentence) {
+            assertThat(solutionAfter(sentence, "다")).isEqualTo(sentence);
+        }
+
+        @ParameterizedTest(name = "\"{0}\"")
+        @ValueSource(strings = {
+                "따라서 옳은 것은 다이다.",
+                "옳은 것은 다입니다.",
+                "정답은 다.",
+                "정답 다 를 고르면 된다.",
+                "옳은 것은 (다) 이다."
+        })
+        @DisplayName("한글 한 글자 답도 단정 표현과 함께 단독으로 나오거나 조사가 붙으면 지운다")
+        void singleKoreanAnswerWithAssertionIsRemoved(String sentence) {
+            assertThat(solutionAfter("보기를 하나씩 보세요. " + sentence + " 근거를 확인하세요.", "다"))
+                    .isEqualTo("보기를 하나씩 보세요. 근거를 확인하세요.");
+        }
+
+        @Test
+        @DisplayName("자음 선지(ㄷ)도 같은 경계 규칙을 쓴다")
+        void consonantChoice() {
+            assertThat(solutionAfter("보기를 보세요. 옳은 것은 ㄷ이다.", "ㄷ")).isEqualTo("보기를 보세요.");
+            String kept = "ㄱ, ㄴ 의 조건을 먼저 비교해 봅니다.";
+            assertThat(solutionAfter(kept, "ㄷ")).isEqualTo(kept);
+        }
+
+        @ParameterizedTest(name = "\"{0}\"")
+        @ValueSource(strings = {
+                "최종적으로 경우의 수는 150이다.",
+                "결론적으로 150가지가 된다."
+        })
+        @DisplayName("'최종적으로', '결론적으로' 와 답이 함께 있으면 지운다")
+        void concludingAdverbIsAssertion(String sentence) {
+            assertThat(solutionAfter("식을 세우세요. " + sentence + " 검산하세요.", "150"))
+                    .isEqualTo("식을 세우세요. 검산하세요.");
+        }
+
+        @ParameterizedTest(name = "\"{0}\" / {1}")
+        @CsvSource(delimiter = '|', value = {
+                "최종적으로 3가지 조건을 모두 만족하는지 확인해 보세요.|3",
+                "결론적으로 2단계에서 세운 식을 정리해 보세요.|2",
+                "결론적으로 가로 길이와 세로 길이를 비교해 보세요.|가",
+                "최종적으로 두 값 사이의 관계를 확인하세요.|사",
+                "최종적으로 조건에 따라 다를 수 있음을 확인하세요.|다"
+        })
+        @DisplayName("검증 지적: '최종적으로', '결론적으로' 뒤가 결론이 아닌 안내 문장이면 지우지 않는다")
+        void concludingAdverbGuidanceIsKept(String sentence, String answer) {
+            assertThat(solutionAfter(sentence, answer)).isEqualTo(sentence);
+        }
+
+        @ParameterizedTest(name = "\"{0}\" / {1}")
+        @CsvSource(delimiter = '|', value = {
+                "정답이 다인 이유를 생각해 보세요.|다",
+                "옳은 것은 다에 해당한다.|다",
+                "따라서 정답은 다라고 할 수 있다.|다",
+                "옳은 것은 ㄱ만 해당한다.|ㄱ",
+                "옳은 것은 ㄱ뿐이다.|ㄱ"
+        })
+        @DisplayName("검증 지적: 한글 한 글자 답 뒤의 인, 에, 라, 만(자음), 뿐도 조사로 본다")
+        void moreKoreanParticles(String sentence, String answer) {
+            assertThat(solutionAfter("보기를 보세요. " + sentence, answer)).isEqualTo("보기를 보세요.");
+        }
+
+        @Test
+        @DisplayName("검증 지적: 음절 답 '다' 는 '다만' 과 일치하지 않는다")
+        void daManIsKept() {
+            String sentence = "옳은 것은 다만 조건을 다시 읽어야 보입니다.";
+            assertThat(solutionAfter(sentence, "다")).isEqualTo(sentence);
+        }
+
+        @ParameterizedTest(name = "\"{0}\"")
+        @ValueSource(strings = {"따져 보면 ③이 옳다.", "그러므로 ③이 맞습니다.", "결국 3번이 적절하다."})
+        @DisplayName("검증 지적: 문장을 끝맺는 '이 옳다', '이 맞습니다' 도 단정으로 본다")
+        void sentenceFinalJudgement(String sentence) {
+            assertThat(solutionAfter("선지를 보세요. " + sentence, "3")).isEqualTo("선지를 보세요.");
+        }
+
+        @Test
+        @DisplayName("검증 지적: '조건이 맞다면' 같은 가정은 단정이 아니다")
+        void conditionalIsKept() {
+            String sentence = "조건이 맞다면 3 을 대입해 보세요.";
+            assertThat(solutionAfter(sentence, "3")).isEqualTo(sentence);
+        }
+
+        @Test
+        @DisplayName("검증 지적: '무엇보다' 는 의문사가 아니라 단정을 막지 않는다")
+        void mueotbodaIsNotQuestion() {
+            assertThat(solutionAfter("선지를 보세요. 옳은 것은 무엇보다 ③이다.", "3")).isEqualTo("선지를 보세요.");
+        }
+
+        @Test
+        @DisplayName("'최종적으로' 가 있어도 답이 없으면 지우지 않는다")
+        void concludingAdverbWithoutAnswer() {
+            String sentence = "최종적으로 무엇을 구하는지 3단계에서 확인하세요.";
+            assertThat(solutionAfter(sentence, "150")).isEqualTo(sentence);
+        }
+
+        @Test
+        @DisplayName("'옳은 것은 무엇' 처럼 질문형이면 단정이 아니라 선지 번호가 있어도 남긴다")
+        void questionFormIsKept() {
+            String sentence = "선지 ③ 을 포함해 옳은 것은 무엇인지 기준을 세우세요.";
+            assertThat(solutionAfter(sentence, "3")).isEqualTo(sentence);
+        }
+    }
+
+    @Nested
     @DisplayName("문장 나누기")
     class SentenceSplit {
 
