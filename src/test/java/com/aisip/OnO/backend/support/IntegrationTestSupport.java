@@ -1,11 +1,13 @@
 package com.aisip.OnO.backend.support;
 
 import com.aisip.OnO.backend.config.rabbitmq.producer.ProblemAnalysisProducer;
+import com.aisip.OnO.backend.studyroom.service.StudyRoomActivityListener;
 import com.aisip.OnO.backend.util.ai.OpenAIClient;
 import com.aisip.OnO.backend.util.fcm.service.FcmService;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
 import com.aisip.OnO.backend.util.webhook.DiscordWebhookNotificationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -18,6 +20,7 @@ import org.springframework.security.test.context.TestSecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -53,6 +56,9 @@ public abstract class IntegrationTestSupport {
     @Autowired
     private DatabaseCleaner databaseCleaner;
 
+    @Autowired
+    private StudyRoomActivityListener studyRoomActivityListener;
+
     /** FCM은 실사용자 푸시 발송 경로다. 테스트에서 절대 실제 호출되면 안 된다. */
     @MockBean
     protected FcmService fcmService;
@@ -68,6 +74,17 @@ public abstract class IntegrationTestSupport {
 
     @MockBean
     protected ProblemAnalysisProducer problemAnalysisProducer;
+
+    /**
+     * 테스트가 넘긴 활동 뒤처리(피드, 챌린지 판정)를 테스트 안에서 끝낸다.
+     *
+     * <p>{@code @AfterEach} 는 목 초기화보다 먼저 돈다. 여기서 기다리지 않으면 늦게 끝난 뒤처리의 알림 호출이
+     * 초기화된 FCM 목에 남아 다음 테스트의 {@code verify} 를 흔들고, 다음 테스트의 DB 정리 뒤에 행을 남긴다.
+     */
+    @AfterEach
+    void awaitStudyRoomActivity() {
+        studyRoomActivityListener.awaitIdle(Duration.ofSeconds(10));
+    }
 
     @BeforeEach
     void resetDatabaseAndSecurityContext() {
