@@ -7,6 +7,7 @@ import com.aisip.OnO.backend.admin.dto.AdminStatsDto.GrowthStats;
 import com.aisip.OnO.backend.admin.dto.AdminStatsDto.LabelCount;
 import com.aisip.OnO.backend.admin.dto.AdminStatsDto.LearningStats;
 import com.aisip.OnO.backend.admin.dto.AdminStatsDto.Metric;
+import com.aisip.OnO.backend.admin.dto.AdminStatsDto.RankRow;
 import com.aisip.OnO.backend.admin.dto.AdminStatsDto.RecentFeedback;
 import com.aisip.OnO.backend.admin.dto.AdminStatsDto.RecentProblem;
 import com.aisip.OnO.backend.admin.dto.AdminStatsDto.RecentSolve;
@@ -39,6 +40,31 @@ public class AdminStatsService {
 
     public Period period(LocalDate start, LocalDate end) {
         return new Period(start, end);
+    }
+
+    /**
+     * 통계 화면 한 장에 필요한 지표를 읽기 전용 트랜잭션 하나에서 모두 센다.
+     *
+     * <p>예전에는 컨트롤러가 이 클래스의 메서드를 하나씩(각자 트랜잭션) 부른 뒤, 순위 두 개를 트랜잭션 밖에서
+     * 리포지토리로 바로 불렀다. open-in-view 가 켜져 있으면 첫 트랜잭션의 커넥션을 요청 끝까지 쥔 채로,
+     * 트랜잭션 밖의 {@code JdbcTemplate} 호출이 풀에서 커넥션을 하나 더 받는다. 요청 하나가 커넥션 두 개를 쓰니
+     * 풀 크기만큼 통계 요청이 겹치면 모두 두 번째 커넥션을 기다리며 30초 뒤에 함께 실패했다. (#405)
+     * 한 트랜잭션 안에서는 {@code JdbcTemplate} 도 트랜잭션에 묶인 커넥션을 그대로 쓰므로 요청 하나가 하나만 쓴다.
+     */
+    public AnalysisPage analysisPage(LocalDate start, LocalDate end, LocalDate today) {
+        Period period = period(start, end);
+        Daily daily = daily(start, end);
+        return new AnalysisPage(
+                period,
+                daily,
+                userStats(period, daily, today),
+                learningStats(period, daily),
+                analysisStats(period),
+                growthStats(period, daily),
+                roomStats(period),
+                statsQueryRepository.topProblemWriters(start, end, 10),
+                statsQueryRepository.topSolvers(start, end, 10)
+        );
     }
 
     public Daily daily(LocalDate start, LocalDate end) {
@@ -197,6 +223,19 @@ public class AdminStatsService {
         public double barHeight(long value) {
             return recentDauMax == 0 ? 0.0 : value * 100.0 / recentDauMax;
         }
+    }
+
+    public record AnalysisPage(
+            Period period,
+            Daily daily,
+            UserStats userStats,
+            LearningStats learningStats,
+            AnalysisStats analysisStats,
+            GrowthStats growthStats,
+            RoomStats roomStats,
+            List<RankRow> topProblemWriters,
+            List<RankRow> topSolvers
+    ) {
     }
 
     public record Period(LocalDate start, LocalDate end) {
