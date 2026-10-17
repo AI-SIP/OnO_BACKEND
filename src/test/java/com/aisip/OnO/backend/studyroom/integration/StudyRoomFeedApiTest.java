@@ -125,6 +125,23 @@ class StudyRoomFeedApiTest extends StudyRoomTestSupport {
                     .andExpect(jsonPath("$.data.size").value(50));
         }
 
+        @ParameterizedTest
+        @ValueSource(strings = {"0", "-1", "-5"})
+        @DisplayName("size 가 0 이하면 500 이 아니라 1 로 맞춰 준다 (#400)")
+        void nonPositiveSizeIsRaisedToOne(String size) throws Exception {
+            RoomFixture fixture = createRoomWithMemberAndOutsider();
+            saveFeed(fixture.room(), fixture.host());
+            saveFeed(fixture.room(), fixture.host());
+            authenticateAs(fixture.host().getId());
+
+            mockMvc.perform(get("/api/study-room/{roomId}/feed", fixture.roomId())
+                            .param("size", size))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.content.length()").value(1))
+                    .andExpect(jsonPath("$.data.hasNext").value(true))
+                    .andExpect(jsonPath("$.data.size").value(1));
+        }
+
         @Test
         @DisplayName("다른 방의 피드는 섞이지 않는다")
         void feedIsScopedToRoom() throws Exception {

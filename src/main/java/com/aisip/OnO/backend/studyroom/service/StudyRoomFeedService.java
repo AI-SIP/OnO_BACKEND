@@ -53,7 +53,8 @@ public class StudyRoomFeedService {
     @Transactional(readOnly = true)
     public CursorPageResponse<FeedItemResponse> getFeed(Long roomId, Long userId, Long cursor, int size) {
         accessService.validateMember(roomId, userId);
-        int safeSize = Math.min(size, 50);
+        // size 가 음수면 PageRequest.of 가 IllegalArgumentException 을 던져 500 이 났다(#400). 댓글 목록처럼 1 이상으로 맞춘다.
+        int safeSize = Math.min(Math.max(size, 1), 50);
         List<StudyRoomFeed> feeds = feedRepository.findWithUserByRoomIdAndCursor(roomId, cursor, PageRequest.of(0, safeSize + 1));
         boolean hasNext = feeds.size() > safeSize;
         List<StudyRoomFeed> contentFeeds = hasNext ? feeds.subList(0, safeSize) : feeds;

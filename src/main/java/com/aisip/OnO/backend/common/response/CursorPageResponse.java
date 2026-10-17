@@ -13,6 +13,14 @@ public record CursorPageResponse<T>(
         int size                // 요청한 페이지 크기
 ) {
     /**
+     * 커서 목록 API 가 한 번에 받는 size 의 최솟값과 최댓값.
+     * size 가 0 이하면 QueryDSL limit(size + 1) 이 깨져 500 이 났다(#400).
+     * 앱은 20, 많아야 50 을 보내므로 100 이면 지금 요청을 막지 않는다.
+     */
+    public static final int MIN_SIZE = 1;
+    public static final int MAX_SIZE = 100;
+
+    /**
      * 커서 페이지 응답 생성
      * @param content 조회된 데이터
      * @param nextCursor 다음 커서
