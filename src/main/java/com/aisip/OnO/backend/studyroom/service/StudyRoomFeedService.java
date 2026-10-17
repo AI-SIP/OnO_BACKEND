@@ -5,7 +5,6 @@ import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.studyroom.dto.StudyRoomDtos.*;
 import com.aisip.OnO.backend.studyroom.entity.*;
-import com.aisip.OnO.backend.studyroom.event.StudyRoomActivityEvent;
 import com.aisip.OnO.backend.studyroom.exception.StudyRoomErrorCase;
 import com.aisip.OnO.backend.studyroom.repository.*;
 import com.aisip.OnO.backend.user.entity.User;
@@ -19,7 +18,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -27,9 +25,6 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import static org.springframework.transaction.annotation.Propagation.REQUIRES_NEW;
-import static org.springframework.transaction.event.TransactionPhase.AFTER_COMMIT;
 
 @Slf4j
 @Service
@@ -48,7 +43,6 @@ public class StudyRoomFeedService {
     private final ObjectMapper objectMapper;
     private final StudyRoomReactionService reactionService;
     private final CustomEmojiValidator customEmojiValidator;
-    private final StudyRoomChallengeService challengeService;
 
     @Transactional(readOnly = true)
     public CursorPageResponse<FeedItemResponse> getFeed(Long roomId, Long userId, Long cursor, int size) {
@@ -97,21 +91,12 @@ public class StudyRoomFeedService {
         return new FeedReactionToggleResponse(feedId, reactions);
     }
 
-    @TransactionalEventListener(phase = AFTER_COMMIT)
-    @Transactional(propagation = REQUIRES_NEW)
-    public void handleActivity(StudyRoomActivityEvent event) {
-        try {
-            createFeedsForUserRooms(event.userId(), event.eventType(), event.metadata());
-        } catch (Exception e) {
-            log.error("Failed to create study room feed. userId: {}, eventType: {}", event.userId(), event.eventType(), e);
-        }
-        try {
-            challengeService.checkAndNotifyChallengeCompletionForUser(event.userId());
-        } catch (Exception e) {
-            log.error("Failed to check challenge completion. userId: {}, eventType: {}", event.userId(), event.eventType(), e);
-        }
-    }
-
+    /**
+     * 사용자가 속한 모든 방에 활동 피드를 남긴다.
+     *
+     * <p>학습 활동이 커밋된 뒤 {@link StudyRoomActivityListener} 가 요청 스레드 밖에서 부른다.
+     * 호출자에게 트랜잭션이 없으니 여기서 새 트랜잭션 하나를 연다.
+     */
     @Transactional
     public void createFeedsForUserRooms(Long userId, StudyRoomFeedEventType eventType, Map<String, Object> metadata) {
         User user = userRepository.findById(userId)
