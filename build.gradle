@@ -104,6 +104,11 @@ tasks.named('test') {
 	useJUnitPlatform()
 	systemProperty 'spring.profiles.active', 'test'
 
+	// 로컬 셸에 SENTRY_DSN 이 있으면 테스트가 의도한 예외까지 운영 Sentry 로 올라갔다(#399).
+	// 테스트 JVM 에는 DSN 을 넘기지 않아 Sentry 자동 설정과 SentryAppender 가 아예 켜지지 않게 한다.
+	environment.remove('SENTRY_DSN')
+	environment.remove('SENTRY_DSN_DEV')
+
 	// 런타임은 Dockerfile 의 ENTRYPOINT 에서 -Duser.timezone=Asia/Seoul 로 시간대를 못박는데
 	// 테스트만 빠져 있었다. GitHub Actions 는 UTC 로 돌기 때문에, 운영과 다른 시간대에서 검증하고 있었다.
 	//
