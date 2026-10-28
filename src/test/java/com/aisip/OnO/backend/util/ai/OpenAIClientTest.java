@@ -1672,4 +1672,71 @@ class OpenAIClientTest {
                     .contains("explanationCheck=null");
         }
     }
+
+    @Nested
+    @DisplayName("#406 - 분석 글 표기 정리와 정답 선지 내용 금지")
+    class TextNormalizationAndChoiceContent {
+
+        @Test
+        @DisplayName("응답의 역슬래시 n 과 LaTeX 를 일반 글자로 바꿔 돌려준다")
+        void normalizesVisibleFields() {
+            respondWithContent(fullAnalysisJson("2", "no_explanation", List.of("\\binom{5}{2} 의 뜻"),
+                    "1단계: 조건을 정리한다.\\n2단계: \\( 3^{5} \\) 에서 빈 상자 경우를 뺀다.",
+                    "빈 상자 두 개인 경우를 놓친다.", "포함배제를 복습하세요."));
+
+            ProblemAnalysisResult result = openAIClient.analyzeImage(IMAGE_URL);
+
+            assertThat(result.getSolution()).isEqualTo("1단계: 조건을 정리한다.\n2단계: 3⁵ 에서 빈 상자 경우를 뺀다.");
+            assertThat(result.getKeyPoints()).containsExactly("5C2 의 뜻");
+        }
+
+        @Test
+        @DisplayName("줄바꿈을 먼저 살려서, 정답을 밝힌 줄만 지우고 다른 줄은 남긴다")
+        void normalizesBeforeAnswerFilter() {
+            respondWithContent(fullAnalysisJson("3", "no_explanation", List.of("판별식"),
+                    "1단계: 조건을 정리한다\\n2단계: 따라서 정답은 ③\\n3단계: 검산한다",
+                    "부호를 놓친다.", "복습하세요."));
+
+            assertThat(openAIClient.analyzeImage(IMAGE_URL).getSolution())
+                    .isEqualTo("1단계: 조건을 정리한다\n3단계: 검산한다");
+        }
+
+        @Test
+        @DisplayName("답이 LaTeX 여도 글과 같은 규칙으로 바꿔 정답 문장을 지운다")
+        void normalizesFinalAnswerForFilter() {
+            respondWithContent(fullAnalysisJson("\\frac{3}{4}", "no_explanation", List.of("분수의 나눗셈"),
+                    "조건을 정리한다. 따라서 정답은 \\( \\frac{3}{4} \\) 이다. 검산한다.",
+                    "부호를 놓친다.", "복습하세요."));
+
+            assertThat(openAIClient.analyzeImage(IMAGE_URL).getSolution()).isEqualTo("조건을 정리한다. 검산한다.");
+        }
+
+        @Test
+        @DisplayName("시스템 프롬프트에 정답 선지 내용 재진술 금지, 결론 값 금지, 일반 기호 예시가 들어 있다")
+        void systemPromptForbidsChoiceContent() {
+            AtomicReference<JsonNode> body = captureRequestAndRespond(
+                    chatCompletionJson(plainFullAnalysisJson("2", "no_explanation"), "stop", null));
+
+            openAIClient.analyzeImage(IMAGE_URL);
+
+            String prompt = body.get().get("messages").get(0).get("content").asText();
+            assertThat(prompt)
+                    .contains("정답 선지의 문장이나 빈칸에 들어갈 표현을 그대로 옮기거나 우리말로 바꿔 사실처럼 적지 마세요",
+                            "선지를 판단할 기준", "최종적으로 ~이다", "정답 선지의 내용을 핵심 개념처럼 적지 마세요",
+                            "수식을 렌더링하지 않고", "실제 줄바꿈", "5C2", "3⁵");
+        }
+
+        @Test
+        @DisplayName("스키마의 keyPoints, solution 설명에 정답 선지 내용 금지를 적는다")
+        void schemaDescribesChoiceContent() {
+            AtomicReference<JsonNode> body = captureRequestAndRespond(
+                    chatCompletionJson(plainFullAnalysisJson("2", "no_explanation"), "stop", null));
+
+            openAIClient.analyzeImage(IMAGE_URL);
+
+            JsonNode properties = body.get().at("/response_format/json_schema/schema/properties");
+            assertThat(properties.at("/keyPoints/description").asText()).contains("정답 선지의 내용은 쓰지 않는다");
+            assertThat(properties.at("/solution/description").asText()).contains("정답 선지와 그 내용", "마지막 계산 결과");
+        }
+    }
 }
