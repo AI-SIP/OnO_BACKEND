@@ -1,8 +1,5 @@
 package com.aisip.OnO.backend.problem.quartz;
 
-import com.aisip.OnO.backend.problem.repository.ProblemRepository;
-import com.aisip.OnO.backend.problem.repository.ReviewDueSummary;
-import com.aisip.OnO.backend.problem.service.ReviewIntervalCalculator;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.util.fcm.NotificationType;
@@ -19,8 +16,6 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Slf4j
 public class ReviewDueNotificationJob extends QuartzJobBean {
@@ -29,9 +24,6 @@ public class ReviewDueNotificationJob extends QuartzJobBean {
     private static final int REENGAGEMENT_INTERVAL_DAYS = 5;
     private static final int LONG_INACTIVE_THRESHOLD_DAYS = 30;
     private static final int LONG_INACTIVE_INTERVAL_DAYS = 30;
-
-    @Autowired
-    private ProblemRepository problemRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -47,49 +39,9 @@ public class ReviewDueNotificationJob extends QuartzJobBean {
         LocalDateTime reengagementCutoff = today.minusDays(REENGAGEMENT_THRESHOLD_DAYS).atStartOfDay(seoul).toLocalDateTime();
         LocalDateTime longInactiveCutoff = today.minusDays(LONG_INACTIVE_THRESHOLD_DAYS).atStartOfDay(seoul).toLocalDateTime();
 
-        sendReviewNotifications(today, reengagementCutoff);
+        // 복습 예정 문제 수를 알리던 9시 요약 푸시(흐름 1)는 문제별 복습 리마인더로 대신해 보내지 않는다.
         sendReengagementNotifications(today, reengagementCutoff, longInactiveCutoff);
         sendLongInactiveReengagementNotifications(today, longInactiveCutoff);
-    }
-
-    // 흐름 1: 복습 예정일이 된 문제가 있는 활성 유저에게 복습 알림
-    private void sendReviewNotifications(LocalDate today, LocalDateTime reengagementCutoff) {
-        List<ReviewDueSummary> summaries = problemRepository.findReviewDueSummaryByDate(
-                today, ReviewIntervalCalculator.MASTERY_THRESHOLD);
-        if (summaries.isEmpty()) return;
-
-        Map<Long, Long> dueCountByUserId = summaries.stream()
-                .collect(Collectors.toMap(ReviewDueSummary::getUserId, ReviewDueSummary::getDueCount));
-
-        List<User> users = userRepository.findAllById(new ArrayList<>(dueCountByUserId.keySet()));
-        List<Long> notifiedUserIds = new ArrayList<>();
-
-        for (User user : users) {
-            // 알림 수신 거부한 유저 스킵
-            if (!user.isNotificationEnabled()) continue;
-
-            // 7일 이상 미접속 유저는 재참여 흐름으로 처리
-            if (user.getLastActiveAt() == null || user.getLastActiveAt().isBefore(reengagementCutoff)) {
-                continue;
-            }
-            // 오늘 이미 알림 받은 경우 스킵
-            if (today.equals(user.getLastNotifiedAt())) {
-                continue;
-            }
-
-            long dueCount = dueCountByUserId.get(user.getId());
-            if (sendSafely(user.getId(),
-                    new NotificationRequestDto("", "오늘의 복습 알림",
-                            "오늘 복습할 문제가 " + dueCount + "개 있어요!",
-                            Map.of("type", NotificationType.REVIEW_DUE)))) {
-                notifiedUserIds.add(user.getId());
-            }
-        }
-
-        if (!notifiedUserIds.isEmpty()) {
-            userRepository.bulkUpdateLastNotifiedAt(notifiedUserIds, today);
-        }
-        log.info("[ReviewDue] 복습 알림 발송: {}명", notifiedUserIds.size());
     }
 
     // 흐름 2: 일정 기간 미접속 유저에게 재참여 알림 (due 문제 여부 무관)

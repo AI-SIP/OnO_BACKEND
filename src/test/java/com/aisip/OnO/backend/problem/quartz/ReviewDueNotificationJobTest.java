@@ -77,7 +77,7 @@ class ReviewDueNotificationJobTest extends IntegrationTestSupport {
 
     // ─────────────────────────── 픽스처 ───────────────────────────
 
-    /** 오늘 접속했고 알림을 켠 사용자. 복습 알림(흐름 1)의 기본 대상. */
+    /** 오늘 접속했고 알림을 켠 사용자. 재참여 흐름 대상이 아니다. */
     private User activeUser(String name) {
         return userWithActivity(name, today.atTime(9, 0), null, true);
     }
@@ -130,12 +130,12 @@ class ReviewDueNotificationJobTest extends IntegrationTestSupport {
     }
 
     @Nested
-    @DisplayName("복습 알림")
-    class ReviewDueNotification {
+    @DisplayName("복습 요약 푸시 제거")
+    class ReviewDueSummaryRemoved {
 
         @Test
-        @DisplayName("복습 예정일이 오늘이거나 지난 문제가 있으면 알림 대상이다")
-        void notifiesWhenReviewIsDueTodayOrEarlier() {
+        @DisplayName("due 문제가 있는 활성 사용자에게 요약 푸시가 나가지 않는다")
+        void doesNotSendReviewDueSummaryToActiveUser() {
             User dueToday = activeUser("due-today");
             User overdue = activeUser("overdue");
             dueProblem(dueToday.getId(), today);
@@ -143,102 +143,39 @@ class ReviewDueNotificationJobTest extends IntegrationTestSupport {
 
             runJob();
 
-            assertThat(sentNotificationTypes())
-                    .containsEntry(dueToday.getId(), "review_due")
-                    .containsEntry(overdue.getId(), "review_due");
-        }
-
-        @Test
-        @DisplayName("복습 예정일이 아직 오지 않은 문제만 있으면 보내지 않는다")
-        void skipsFutureReviewSchedule() {
-            User user = activeUser("future-due");
-            dueProblem(user.getId(), today.plusDays(1));
-
-            runJob();
-
-            then(fcmService).should(never()).sendNotificationToAllUserDevice(eq(user.getId()), any());
-            assertThat(lastNotifiedAtOf(user.getId())).isNull();
-        }
-
-        @Test
-        @DisplayName("복습 예정일이 없는 문제는 대상이 되지 않는다")
-        void skipsProblemWithoutSchedule() {
-            User user = activeUser("no-schedule");
-            problemRepository.save(Problem.from(
-                    new ProblemRegisterDto(null, "메모", "출처", null, LocalDateTime.now()), user.getId()));
-
-            runJob();
-
             then(fcmService).should(never()).sendNotificationToAllUserDevice(anyLong(), any());
-        }
-
-        @Test
-        @DisplayName("알림을 끈 사용자에게는 보내지 않는다")
-        void skipsUserWithNotificationDisabled() {
-            User enabled = activeUser("notify-on");
-            User disabled = userWithActivity("notify-off", today.atTime(9, 0), null, false);
-            dueProblem(enabled.getId(), today);
-            dueProblem(disabled.getId(), today);
-
-            runJob();
-
-            then(fcmService).should().sendNotificationToAllUserDevice(eq(enabled.getId()), any());
-            then(fcmService).should(never()).sendNotificationToAllUserDevice(eq(disabled.getId()), any());
-            assertThat(lastNotifiedAtOf(disabled.getId()))
-                    .as("보내지 않았으므로 발송 이력도 남기지 않는다")
+            assertThat(lastNotifiedAtOf(dueToday.getId()))
+                    .as("보내지 않았으므로 발송 이력도 남기지 않는다. 남기면 재참여 간격 계산이 어긋난다")
                     .isNull();
+            assertThat(lastNotifiedAtOf(overdue.getId())).isNull();
         }
 
         @Test
-        @DisplayName("오늘 이미 알림을 받은 사용자에게는 다시 보내지 않는다")
-        void skipsUserAlreadyNotifiedToday() {
-            User user = userWithActivity("already-notified", today.atTime(9, 0), today, true);
-            dueProblem(user.getId(), today);
-
-            runJob();
-
-            then(fcmService).should(never()).sendNotificationToAllUserDevice(eq(user.getId()), any());
-        }
-
-        @Test
-        @DisplayName("어제 알림을 받았다면 오늘 다시 보낸다")
-        void notifiesUserNotifiedYesterday() {
+        @DisplayName("어제 알림을 받았고 due 가 있는 활성 사용자도 아무 푸시를 받지 않는다")
+        void doesNotSendToActiveUserNotifiedYesterday() {
             User user = userWithActivity("notified-yesterday", today.atTime(9, 0), today.minusDays(1), true);
             dueProblem(user.getId(), today);
 
             runJob();
 
-            assertThat(sentNotificationTypes()).containsEntry(user.getId(), "review_due");
-            assertThat(lastNotifiedAtOf(user.getId())).isEqualTo(today);
+            then(fcmService).should(never()).sendNotificationToAllUserDevice(eq(user.getId()), any());
+            assertThat(lastNotifiedAtOf(user.getId())).isEqualTo(today.minusDays(1));
         }
 
         @Test
-        @DisplayName("한 번도 접속한 적이 없는 사용자는 대상이 아니다")
-        void skipsUserWithoutLastActiveAt() {
-            User user = userWithActivity("never-active", null, null, true);
-            dueProblem(user.getId(), today);
-
-            runJob();
-
-            then(fcmService).should(never()).sendNotificationToAllUserDevice(anyLong(), any());
-        }
-
-        @Test
-        @DisplayName("미접속 7일 경계에서 그날 자정 접속자는 복습 알림 대상이다")
-        void sevenDayBoundaryStaysInReviewFlow() {
+        @DisplayName("미접속 7일 경계에서 그날 자정 접속자는 활성 사용자라 due 가 있어도 아무 푸시를 받지 않는다")
+        void sevenDayBoundaryUserGetsNothing() {
             User onBoundary = userWithActivity(
                     "boundary-active", today.minusDays(7).atStartOfDay(), null, true);
             dueProblem(onBoundary.getId(), today);
 
             runJob();
 
-            assertThat(sentNotificationTypes())
-                    .as("7일 전 자정 접속은 아직 활성 사용자로 본다")
-                    .containsEntry(onBoundary.getId(), "review_due");
+            then(fcmService).should(never()).sendNotificationToAllUserDevice(eq(onBoundary.getId()), any());
         }
 
         @Test
-        @DisplayName("7일 경계를 1초 넘긴 사용자는 복습 알림이 아니라 재참여 알림을 받는다")
+        @DisplayName("7일 경계를 1초 넘긴 사용자는 due 와 무관하게 재참여 알림을 받는다")
         void justPastSevenDayBoundaryFallsToReengagement() {
             User justPast = userWithActivity(
                     "boundary-inactive", today.minusDays(7).atStartOfDay().minusSeconds(1), null, true);
@@ -246,41 +183,7 @@ class ReviewDueNotificationJobTest extends IntegrationTestSupport {
 
             runJob();
 
-            assertThat(sentNotificationTypes()).containsEntry(justPast.getId(), "reengagement");
-        }
-
-        @Test
-        @DisplayName("알림 본문에 복습할 문제 개수를 담는다")
-        void includesDueCountInMessage() {
-            User user = activeUser("due-count");
-            dueProblem(user.getId(), today);
-            dueProblem(user.getId(), today.minusDays(1));
-            dueProblem(user.getId(), today.minusDays(2));
-            dueProblem(user.getId(), today.plusDays(5));
-
-            runJob();
-
-            NotificationRequestDto request = capturedNotificationFor(user.getId());
-            assertThat(request.title()).isEqualTo("오늘의 복습 알림");
-            assertThat(request.body()).as("예정일이 지난 3건만 센다").isEqualTo("오늘 복습할 문제가 3개 있어요!");
-            assertThat(request.data()).containsEntry("type", "review_due");
-        }
-
-        @Test
-        @DisplayName("다른 사용자의 복습 예정 문제는 내 알림 개수에 포함되지 않는다")
-        void dueCountIsScopedPerUser() {
-            User mine = activeUser("due-mine");
-            User theirs = activeUser("due-theirs");
-            dueProblem(mine.getId(), today);
-            dueProblem(theirs.getId(), today);
-            dueProblem(theirs.getId(), today.minusDays(1));
-
-            runJob();
-
-            assertThat(capturedNotificationFor(mine.getId()).body())
-                    .isEqualTo("오늘 복습할 문제가 1개 있어요!");
-            assertThat(capturedNotificationFor(theirs.getId()).body())
-                    .isEqualTo("오늘 복습할 문제가 2개 있어요!");
+            assertThat(sentNotificationTypes()).containsOnly(entry(justPast.getId(), "reengagement"));
         }
 
         @Test
@@ -399,10 +302,8 @@ class ReviewDueNotificationJobTest extends IntegrationTestSupport {
         @Test
         @DisplayName("한 사용자 발송이 실패해도 나머지 사용자에게는 계속 보낸다")
         void continuesAfterSingleFailure() {
-            User failing = activeUser("fcm-failing");
-            User succeeding = activeUser("fcm-ok");
-            dueProblem(failing.getId(), today);
-            dueProblem(succeeding.getId(), today);
+            User failing = userWithActivity("fcm-failing", today.minusDays(10).atTime(9, 0), null, true);
+            User succeeding = userWithActivity("fcm-ok", today.minusDays(10).atTime(9, 0), null, true);
 
             willThrow(new IllegalStateException("fcm queue down"))
                     .given(fcmService).sendNotificationToAllUserDevice(eq(failing.getId()), any());
@@ -440,7 +341,7 @@ class ReviewDueNotificationJobTest extends IntegrationTestSupport {
     class OverlappingFlows {
 
         @Test
-        @DisplayName("한 번 실행에서 사용자당 알림은 한 통만 보낸다")
+        @DisplayName("한 번 실행에서 미접속 사용자는 한 통만 받고 due 가 있는 활성 사용자는 받지 않는다")
         void sendsAtMostOneNotificationPerUser() {
             User active = activeUser("multi-active");
             User inactive = userWithActivity("multi-inactive", today.minusDays(10).atTime(9, 0), null, true);
@@ -457,8 +358,10 @@ class ReviewDueNotificationJobTest extends IntegrationTestSupport {
             userIdCaptor.getAllValues()
                     .forEach(id -> callCounts.merge(id, 1, Integer::sum));
 
+            assertThat(callCounts)
+                    .as("활성 사용자는 복습 요약 푸시가 없어져 0통이다")
+                    .doesNotContainKey(active.getId());
             assertThat(callCounts).containsOnly(
-                    entry(active.getId(), 1),
                     entry(inactive.getId(), 1),
                     entry(longInactive.getId(), 1));
         }

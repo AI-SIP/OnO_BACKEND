@@ -14,7 +14,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -121,40 +121,44 @@ public class ProblemReviewReminderService {
         expireOverdueRows(now);
 
         // 예약 시각을 창 안으로 맞춰 두어도 밀린 예약은 창 밖에서 due 가 된다.
-        // 특히 자정에 "오늘 보낸 것" 판정이 리셋되는 순간 가장 오래된 밀린 예약이
-        // 바로 조건을 만족해, 밀린 것이 있는 사용자는 매일 새벽에 푸시를 받게 된다.
+        // 상한에 걸려 넘어온 예약이나 실패 뒤 남은 예약이 새벽에 나가지 않도록 보낼 때도 시각을 본다.
         if (!policy.isWithinSendWindow(now)) {
             return;
         }
 
-        LocalDate today = now.toLocalDate();
-        LocalDateTime startOfDay = today.atStartOfDay();
-        LocalDateTime endOfDay = today.plusDays(1).atStartOfDay();
-
-        // 오늘 SENT 뿐 아니라 오늘 선점된 SENDING 행이 있는 사용자도 후보에서 뺀다.
-        // 선점이 바로 커밋되므로, 다른 인스턴스가 선점한 직후 폴링이 돌면 SENT 만으로는 중복을 못 막는다.
         List<ProblemReviewReminder> dueRows = repository.findDueReminders(
-                SCHEDULED, now, SENT, SENDING, startOfDay, endOfDay, PageRequest.of(0, DUE_REMINDER_BATCH_SIZE)
+                SCHEDULED, now, PageRequest.of(0, DUE_REMINDER_BATCH_SIZE)
         );
         if (dueRows.isEmpty()) return;
 
+        // 같은 폴링에 걸린 한 사용자의 예약은 푸시 하나로 묶는다. 몰아서 등록한 문제가 같은 시각에
+        // 한꺼번에 due 가 되면 푸시가 연달아 쏟아지기 때문이다.
         Map<Long, List<ProblemReviewReminder>> byUser = dueRows.stream()
                 .collect(Collectors.groupingBy(ProblemReviewReminder::getUserId));
+        Map<Long, Long> todayPushes = countTodayPushes(byUser.keySet(), now.toLocalDate());
 
         for (Map.Entry<Long, List<ProblemReviewReminder>> entry : byUser.entrySet()) {
-            ProblemReviewReminder candidate = entry.getValue().stream()
-                    .min(Comparator.comparing(ProblemReviewReminder::getScheduledAt))
-                    .orElseThrow();
-            sender.send(candidate, now);
+            Long userId = entry.getKey();
+            // 상한에 걸린 예약은 SCHEDULED 로 남아 다음 날 첫 폴링에 묶여 나가거나 기한이 지나 만료된다.
+            if (todayPushes.getOrDefault(userId, 0L) >= policy.getDailyPushLimit()) {
+                continue;
+            }
+            sender.send(userId, entry.getValue(), now);
         }
+    }
+
+    private Map<Long, Long> countTodayPushes(Collection<Long> userIds, LocalDate today) {
+        return repository.countTodayPushesByUser(
+                        userIds, SENT, SENDING, today.atStartOfDay(), today.plusDays(1).atStartOfDay())
+                .stream()
+                .collect(Collectors.toMap(ReminderPushCount::getUserId, ReminderPushCount::getPushCount));
     }
 
     /**
      * 기한이 한참 지난 예약을 접는다.
      *
-     * <p>하루에 한 건만 나가므로 같은 날 due 가 겹치면 나머지는 {@code SCHEDULED} 로 남는다.
-     * 이걸 정리하지 않으면 영원히 밀린 채로 남아 매일 한 건씩 나가게 된다.
-     * 사흘이 지난 복습 알림은 지금 보내도 의미가 없으니 보내지 않는다.
+     * <p>하루 푸시 상한에 걸렸거나, 알림을 껐거나, 토큰이 없는 사용자의 예약은 {@code SCHEDULED} 로 남는다.
+     * 이걸 정리하지 않으면 영원히 밀린 채로 남는다. 사흘이 지난 복습 알림은 지금 보내도 의미가 없으니 보내지 않는다.
      */
     private void expireOverdueRows(LocalDateTime now) {
         LocalDateTime expireBefore = now.minusDays(OVERDUE_EXPIRE_DAYS);

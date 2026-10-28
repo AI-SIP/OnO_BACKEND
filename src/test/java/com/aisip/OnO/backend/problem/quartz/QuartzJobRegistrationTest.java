@@ -201,7 +201,7 @@ class QuartzJobRegistrationTest extends IntegrationTestSupport {
             Job reviewDue = newJobLikeFiring(jobDetailOf(ReviewDueNotificationJob.class));
             assertThat(reviewDue).isInstanceOf(ReviewDueNotificationJob.class);
             assertThat(AopTestUtils.<Object>getUltimateTargetObject(reviewDue))
-                    .extracting("problemRepository", "userRepository", "fcmService")
+                    .extracting("userRepository", "fcmService")
                     .doesNotContainNull();
 
             Job reminder = newJobLikeFiring(jobDetailOf(ProblemReviewReminderJob.class));
