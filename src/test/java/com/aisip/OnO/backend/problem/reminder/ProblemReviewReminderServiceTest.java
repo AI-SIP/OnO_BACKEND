@@ -113,7 +113,7 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
             ProblemReviewReminder reminder = saveDueReminder(ownerId, firstProblemId + i, pollAt.minusHours(1));
             inTransaction(() -> {
                 reminderRepository.tryUpdateStatus(reminder.getId(), SCHEDULED, SENDING, pollAt);
-                reminderRepository.markSent(reminder.getId(), pollAt, SENT);
+                reminderRepository.markSent(reminder.getId(), pollAt, SENDING, SENT);
             });
         }
     }

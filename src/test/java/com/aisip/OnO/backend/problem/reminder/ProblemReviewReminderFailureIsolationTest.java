@@ -206,11 +206,11 @@ class ProblemReviewReminderFailureIsolationTest {
             assertThatCode(() -> service.sendDueReminders(now)).doesNotThrowAnyException();
 
             then(fcmService).should().sendNotificationToAllUserDevice(eq(20L), any(NotificationRequestDto.class));
-            then(repository).should().markFailed(1L, "enqueue failed", ProblemReviewReminderStatus.FAILED);
-            then(repository).should().markFailed(2L, "enqueue failed", ProblemReviewReminderStatus.FAILED);
-            then(repository).should().markSent(3L, now, ProblemReviewReminderStatus.SENT);
-            then(repository).should(never()).markSent(eq(1L), any(), any());
-            then(repository).should(never()).markFailed(eq(3L), any(), any());
+            then(repository).should().markFailed(1L, "enqueue failed", ProblemReviewReminderStatus.SENDING, ProblemReviewReminderStatus.FAILED);
+            then(repository).should().markFailed(2L, "enqueue failed", ProblemReviewReminderStatus.SENDING, ProblemReviewReminderStatus.FAILED);
+            then(repository).should().markSent(3L, now, ProblemReviewReminderStatus.SENDING, ProblemReviewReminderStatus.SENT);
+            then(repository).should(never()).markSent(eq(1L), any(), any(), any());
+            then(repository).should(never()).markFailed(eq(3L), any(), any(), any());
         }
 
         @Test

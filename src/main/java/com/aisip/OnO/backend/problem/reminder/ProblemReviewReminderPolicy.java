@@ -84,24 +84,31 @@ public class ProblemReviewReminderPolicy {
      * <p>type 은 단건과 같은 {@code problem_review_reminder} 로 두고 {@code problemId} 에 가장 이른 예약의
      * 문제를 넣는다. 지금 출시된 앱도 누르면 그 문제 상세가 열린다. 복습 목록 화면({@code review_due})은
      * {@code Problem.nextReviewAt} 기준이라 리마인더 간격과 맞지 않아 쓰지 않는다.
+     *
+     * <p>개수는 예약 행이 아니라 문제 수로 센다. 밀린 예약에는 같은 문제의 여러 차수가 함께 걸릴 수 있다.
+     * 문제가 하나뿐이면 가장 이른 예약으로 단건 알림을 보낸다.
      */
     public NotificationRequestDto buildBundleNotification(List<ProblemReviewReminder> reminders) {
-        if (reminders.size() == 1) {
-            return buildNotification(reminders.get(0));
-        }
         ProblemReviewReminder first = reminders.stream()
                 .min(Comparator.comparing(ProblemReviewReminder::getScheduledAt)
                         .thenComparing(ProblemReviewReminder::getId))
                 .orElseThrow();
+        long problemCount = reminders.stream()
+                .map(ProblemReviewReminder::getProblemId)
+                .distinct()
+                .count();
+        if (problemCount == 1) {
+            return buildNotification(first);
+        }
 
         Map<String, String> data = Map.of(
                 "type", NotificationType.PROBLEM_REVIEW_REMINDER,
                 "problemId", String.valueOf(first.getProblemId()),
-                "count", String.valueOf(reminders.size())
+                "count", String.valueOf(problemCount)
         );
 
         return new NotificationRequestDto("", NOTIFICATION_TITLE,
-                String.format(NOTIFICATION_BODY_BUNDLE, reminders.size()), data);
+                String.format(NOTIFICATION_BODY_BUNDLE, problemCount), data);
     }
 
     private boolean hasContent(String value) {

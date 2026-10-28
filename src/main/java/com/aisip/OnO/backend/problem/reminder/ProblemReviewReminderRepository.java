@@ -80,19 +80,26 @@ public interface ProblemReviewReminderRepository extends JpaRepository<ProblemRe
             @Param("updatedAt") LocalDateTime updatedAt
     );
 
+    /**
+     * 선점(SENDING)된 행만 SENT 로 바꾼다. 선점과 기록 사이에 문제 삭제나 탈퇴로 CANCELED 가 된 행,
+     * stuck 복구로 FAILED 가 된 행은 덮지 않는다.
+     */
     @Modifying(clearAutomatically = true)
-    @Query("UPDATE ProblemReviewReminder r SET r.status = :sent, r.sentAt = :sentAt WHERE r.id = :id")
-    void markSent(
+    @Query("UPDATE ProblemReviewReminder r SET r.status = :sent, r.sentAt = :sentAt WHERE r.id = :id AND r.status = :sending")
+    int markSent(
             @Param("id") Long id,
             @Param("sentAt") LocalDateTime sentAt,
+            @Param("sending") ProblemReviewReminderStatus sending,
             @Param("sent") ProblemReviewReminderStatus sent
     );
 
+    /** 선점(SENDING)된 행만 FAILED 로 바꾼다. 그사이 CANCELED 가 된 행은 덮지 않는다. */
     @Modifying(clearAutomatically = true)
-    @Query("UPDATE ProblemReviewReminder r SET r.status = :failed, r.retryCount = r.retryCount + 1, r.lastErrorMessage = :errorMessage WHERE r.id = :id")
-    void markFailed(
+    @Query("UPDATE ProblemReviewReminder r SET r.status = :failed, r.retryCount = r.retryCount + 1, r.lastErrorMessage = :errorMessage WHERE r.id = :id AND r.status = :sending")
+    int markFailed(
             @Param("id") Long id,
             @Param("errorMessage") String errorMessage,
+            @Param("sending") ProblemReviewReminderStatus sending,
             @Param("failed") ProblemReviewReminderStatus failed
     );
 

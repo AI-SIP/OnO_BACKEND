@@ -267,6 +267,34 @@ class ProblemReviewReminderPolicyTest {
     }
 
     @Test
+    @DisplayName("같은 문제의 여러 차수가 섞이면 개수를 예약 행이 아니라 문제 수로 센다")
+    void buildBundleNotification_sameProblemSequences_countsDistinctProblems() {
+        LocalDateTime base = LocalDateTime.of(2026, 7, 18, 12, 0);
+        List<ProblemReviewReminder> reminders = List.of(
+                reminderWithId(1L, 401L, base.minusDays(2)),
+                reminderWithId(2L, 401L, base),
+                reminderWithId(3L, 402L, base.minusDays(1)));
+
+        NotificationRequestDto dto = policy.buildBundleNotification(reminders);
+
+        assertThat(dto.body()).isEqualTo("다시 풀어볼 오답이 2개 있어요");
+        assertThat(dto.data()).containsEntry("problemId", "401").containsEntry("count", "2");
+    }
+
+    @Test
+    @DisplayName("묶음이 한 문제의 여러 차수뿐이면 가장 이른 예약으로 단건 알림을 보낸다")
+    void buildBundleNotification_singleProblem_sameAsEarliestSingle() {
+        LocalDateTime base = LocalDateTime.of(2026, 7, 18, 12, 0);
+        ProblemReviewReminder earliest = reminderWithId(5L, 501L, base.minusDays(2));
+        ProblemReviewReminder later = reminderWithId(6L, 501L, base);
+
+        NotificationRequestDto dto = policy.buildBundleNotification(List.of(later, earliest));
+
+        assertThat(dto).isEqualTo(policy.buildNotification(earliest));
+        assertThat(dto.data()).doesNotContainKey("count");
+    }
+
+    @Test
     @DisplayName("묶음이 2건이어도 묶음 문구를 쓴다")
     void buildBundleNotification_two_usesBundleBody() {
         LocalDateTime base = LocalDateTime.of(2026, 7, 18, 12, 0);

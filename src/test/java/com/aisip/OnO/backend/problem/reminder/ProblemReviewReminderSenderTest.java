@@ -19,6 +19,7 @@ import java.util.List;
 import static com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderStatus.CANCELED;
 import static com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderStatus.FAILED;
 import static com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderStatus.SCHEDULED;
+import static com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderStatus.SENDING;
 import static com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderStatus.SENT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -74,6 +75,14 @@ class ProblemReviewReminderSenderTest extends ProblemTestSupport {
         return captor.getValue();
     }
 
+    /** 다른 인스턴스가 실제 발송 경로대로 선점한 뒤 SENT 로 기록한 상태를 만든다. */
+    private void sentByOtherInstance(ProblemReviewReminder reminder, LocalDateTime at) {
+        inTransaction(() -> {
+            reminderRepository.tryUpdateStatus(reminder.getId(), SCHEDULED, SENDING, at);
+            reminderRepository.markSent(reminder.getId(), at, SENDING, SENT);
+        });
+    }
+
     /** 테스트 본문은 트랜잭션 밖이라 조회마다 영속성 컨텍스트가 새로 열린다. 벌크 UPDATE 결과가 그대로 보인다. */
     private ProblemReviewReminder reload(Long id) {
         return reminderRepository.findById(id).orElseThrow();
@@ -87,7 +96,7 @@ class ProblemReviewReminderSenderTest extends ProblemTestSupport {
         @DisplayName("다른 인스턴스가 이미 보낸 행은 선점에 실패해 FCM 을 부르지 않는다")
         void doesNotSendWhenClaimFails() {
             ProblemReviewReminder reminder = saveReminder(LocalDateTime.now().minusHours(1));
-            inTransaction(() -> reminderRepository.markSent(reminder.getId(), LocalDateTime.now(), SENT));
+            sentByOtherInstance(reminder, LocalDateTime.now());
 
             sender.send(user.getId(), List.of(reminder), LocalDateTime.now());
 
@@ -138,7 +147,7 @@ class ProblemReviewReminderSenderTest extends ProblemTestSupport {
             ProblemReviewReminder second = saveReminder(204L, now.minusMinutes(10));
             inTransaction(() -> reminderRepository.cancelByIdIn(List.of(canceled.getId()), CANCELED));
             LocalDateTime otherSentAt = now.minusMinutes(1);
-            inTransaction(() -> reminderRepository.markSent(alreadySent.getId(), otherSentAt, SENT));
+            sentByOtherInstance(alreadySent, otherSentAt);
 
             sender.send(user.getId(), List.of(second, alreadySent, first, canceled), now);
 
@@ -180,7 +189,7 @@ class ProblemReviewReminderSenderTest extends ProblemTestSupport {
             ProblemReviewReminder canceled = saveReminder(221L, now.minusMinutes(20));
             ProblemReviewReminder alreadySent = saveReminder(222L, now.minusMinutes(10));
             inTransaction(() -> reminderRepository.cancelByIdIn(List.of(canceled.getId()), CANCELED));
-            inTransaction(() -> reminderRepository.markSent(alreadySent.getId(), now.minusMinutes(1), SENT));
+            sentByOtherInstance(alreadySent, now.minusMinutes(1));
 
             sender.send(user.getId(), List.of(canceled, alreadySent), now);
 

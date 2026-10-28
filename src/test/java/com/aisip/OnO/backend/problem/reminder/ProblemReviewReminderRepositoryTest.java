@@ -76,7 +76,7 @@ class ProblemReviewReminderRepositoryTest extends ProblemTestSupport {
         ProblemReviewReminder reminder = scheduled(ownerId, at.minusHours(1));
         inTransaction(() -> {
             reminderRepository.tryUpdateStatus(reminder.getId(), SCHEDULED, SENDING, at);
-            reminderRepository.markSent(reminder.getId(), at, SENT);
+            reminderRepository.markSent(reminder.getId(), at, SENDING, SENT);
         });
         return reminder;
     }
@@ -89,7 +89,7 @@ class ProblemReviewReminderRepositoryTest extends ProblemTestSupport {
 
     private ProblemReviewReminder failed(Long ownerId, LocalDateTime at) {
         ProblemReviewReminder reminder = sending(ownerId, at);
-        inTransaction(() -> reminderRepository.markFailed(reminder.getId(), "enqueue failed", FAILED));
+        inTransaction(() -> reminderRepository.markFailed(reminder.getId(), "enqueue failed", SENDING, FAILED));
         return reminder;
     }
 
@@ -248,6 +248,63 @@ class ProblemReviewReminderRepositoryTest extends ProblemTestSupport {
             sent(otherUserId, DAY.atTime(10, 0));
 
             assertThat(countToday(List.of(userId, otherUserId))).containsOnly(entry(otherUserId, 1L));
+        }
+    }
+
+    // ─────────────────────────── 발송 결과 기록 ───────────────────────────
+
+    @Nested
+    @DisplayName("markSent / markFailed")
+    class MarkResult {
+
+        private final LocalDateTime at = DAY.atTime(12, 0);
+
+        private ProblemReviewReminder reload(Long id) {
+            return reminderRepository.findById(id).orElseThrow();
+        }
+
+        @Test
+        @DisplayName("선점 뒤 CANCELED 가 된 행은 markSent 가 SENT 로 덮지 않는다")
+        void markSent_doesNotOverwriteCanceled() {
+            ProblemReviewReminder reminder = sending(userId, at);
+            inTransaction(() -> reminderRepository.cancelByIdIn(List.of(reminder.getId()), CANCELED));
+
+            int[] updated = new int[1];
+            inTransaction(() -> updated[0] = reminderRepository.markSent(reminder.getId(), at, SENDING, SENT));
+
+            assertThat(updated[0]).isZero();
+            ProblemReviewReminder reloaded = reload(reminder.getId());
+            assertThat(reloaded.getStatus()).isEqualTo(CANCELED);
+            assertThat(reloaded.getSentAt()).isNull();
+        }
+
+        @Test
+        @DisplayName("선점 뒤 CANCELED 가 된 행은 markFailed 가 FAILED 로 덮지 않는다")
+        void markFailed_doesNotOverwriteCanceled() {
+            ProblemReviewReminder reminder = sending(userId, at);
+            inTransaction(() -> reminderRepository.cancelByIdIn(List.of(reminder.getId()), CANCELED));
+
+            int[] updated = new int[1];
+            inTransaction(() -> updated[0] = reminderRepository.markFailed(reminder.getId(), "enqueue failed", SENDING, FAILED));
+
+            assertThat(updated[0]).isZero();
+            ProblemReviewReminder reloaded = reload(reminder.getId());
+            assertThat(reloaded.getStatus()).isEqualTo(CANCELED);
+            assertThat(reloaded.getRetryCount()).isZero();
+        }
+
+        @Test
+        @DisplayName("SENDING 행은 markSent 가 SENT 와 발송 시각으로 바꾼다")
+        void markSent_updatesSending() {
+            ProblemReviewReminder reminder = sending(userId, at);
+
+            int[] updated = new int[1];
+            inTransaction(() -> updated[0] = reminderRepository.markSent(reminder.getId(), at, SENDING, SENT));
+
+            assertThat(updated[0]).isEqualTo(1);
+            ProblemReviewReminder reloaded = reload(reminder.getId());
+            assertThat(reloaded.getStatus()).isEqualTo(SENT);
+            assertThat(reloaded.getSentAt()).isEqualTo(at);
         }
     }
 

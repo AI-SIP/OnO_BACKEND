@@ -78,7 +78,7 @@ public class ProblemReviewReminderSender {
 
         try {
             newTransaction.executeWithoutResult(status ->
-                    claimedIds.forEach(id -> repository.markSent(id, now, SENT)));
+                    claimedIds.forEach(id -> repository.markSent(id, now, SENDING, SENT)));
             log.info("[ReviewReminder] 발송 완료 - userId: {}, reminderIds: {}", userId, claimedIds);
         } catch (Exception e) {
             // 이미 큐에 들어갔으므로 FAILED 로 덮지 않는다. SENDING 으로 남은 행은 stuck 복구가 정리하고,
@@ -93,7 +93,7 @@ public class ProblemReviewReminderSender {
         String truncated = errorMsg;
         try {
             newTransaction.executeWithoutResult(status ->
-                    reminderIds.forEach(id -> repository.markFailed(id, truncated, FAILED)));
+                    reminderIds.forEach(id -> repository.markFailed(id, truncated, SENDING, FAILED)));
         } catch (Exception e) {
             // SENDING 으로 남은 행은 stuck 복구가 FAILED 로 넘긴다.
             log.error("[ReviewReminder] FAILED 기록 실패 - userId: {}, reminderIds: {}", userId, reminderIds, e);
