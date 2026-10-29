@@ -125,12 +125,33 @@ class AnalysisTextNormalizerTest {
         @ParameterizedTest(name = "{0}")
         @CsvSource(delimiter = '|', value = {
                 "1단계 정리\\n2단계\\ne 는 자연상수|1단계 정리\\n2단계\\ne 는 자연상수",
-                "예를 들면\\n3단계\\neq. 처럼|예를 들면\\n3단계\\neq. 처럼",
                 "For example:\\n1. first\\ne.g., the subject|For example:\\n1. first\\ne.g., the subject"
         })
-        @DisplayName("글이 줄바꿈 이스케이프를 쓰면 \\ne, \\neq 처럼 기호와 겹치는 낱말도 줄바꿈으로 본다")
+        @DisplayName("글이 줄바꿈 이스케이프를 쓰면 \\ne 처럼 영어 낱말과 겹치는 짧은 명령은 줄바꿈으로 본다")
         void newlineBeforeSymbolName(String input, String expected) {
             assertThat(normalize(input)).isEqualTo(expected.replace("\\n", "\n"));
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @CsvSource(delimiter = '|', value = {
+                "1단계: 조건 정리\\n2단계: x \\neq 0 이므로|1단계: 조건 정리\\n2단계: x ≠ 0 이므로",
+                "1단계\\n2단계: a \\notin B 이고 \\nabla f|1단계\\n2단계: a ∉ B 이고 ∇ f",
+                "1단계\\n2단계: \\neg p|1단계\\n2단계: ¬ p"
+        })
+        @DisplayName("줄바꿈 이스케이프를 쓰는 글이어도 \\neq, \\notin, \\nabla 처럼 세 글자 이상인 명령은 기호로 바꾼다")
+        void longSymbolNameWithNewlineEscape(String input, String expected) {
+            assertThat(normalize(input)).isEqualTo(expected.replace("\\n", "\n"));
+        }
+
+        @ParameterizedTest(name = "{0} -> {1}")
+        @CsvSource(delimiter = '|', value = {
+                "\\tilde{x}|x",
+                "\\overrightarrow{AB} 의 크기|AB 의 크기",
+                "\\widehat{ABC}|ABC"
+        })
+        @DisplayName("벡터 표기와 \\tilde 는 내용만 남긴다")
+        void vectorAndTilde(String input, String expected) {
+            assertThat(normalize(input)).isEqualTo(expected);
         }
 
         @Test
