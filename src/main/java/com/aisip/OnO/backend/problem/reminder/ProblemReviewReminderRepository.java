@@ -44,6 +44,35 @@ public interface ProblemReviewReminderRepository extends JpaRepository<ProblemRe
     );
 
     /**
+     * {@link #findDueReminders} 와 같고, 이번 폴링에서 이미 본 사용자를 뺀다.
+     * 하루 상한에 걸린 사용자의 예약이 한 페이지를 채워 다른 사용자의 예약이 밀리지 않게 할 때 쓴다.
+     * 빈 목록은 넘기지 않는다(NOT IN () 은 DB 마다 다르게 해석된다).
+     */
+    @Query("""
+            SELECT r FROM ProblemReviewReminder r
+            WHERE r.status = :status
+              AND r.scheduledAt <= :now
+              AND r.deletedAt IS NULL
+              AND r.userId NOT IN :excludedUserIds
+              AND EXISTS (
+                  SELECT 1 FROM User u
+                  WHERE u.id = r.userId
+                    AND u.notificationEnabled = true
+              )
+              AND EXISTS (
+                  SELECT 1 FROM FcmToken t
+                  WHERE t.userId = r.userId
+              )
+            ORDER BY r.scheduledAt ASC, r.userId ASC
+            """)
+    List<ProblemReviewReminder> findDueRemindersExcludingUsers(
+            @Param("status") ProblemReviewReminderStatus status,
+            @Param("now") LocalDateTime now,
+            @Param("excludedUserIds") Collection<Long> excludedUserIds,
+            Pageable pageable
+    );
+
+    /**
      * 사용자별로 오늘 나간 푸시 수를 센다. 행 수가 아니다.
      *
      * <p>한 번에 묶어 보낸 행들은 같은 폴링 시각을 공유한다. 선점 때 {@code updatedAt} 에,

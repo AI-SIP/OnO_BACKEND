@@ -15,8 +15,10 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderStatus.*;
@@ -28,7 +30,9 @@ import static org.springframework.transaction.annotation.Propagation.REQUIRES_NE
 public class ProblemReviewReminderService {
 
     private static final int STUCK_TIMEOUT_MINUTES = 10;
-    private static final int DUE_REMINDER_BATCH_SIZE = 500;
+    static final int DUE_REMINDER_BATCH_SIZE = 500;
+    /** 상한에 걸린 사용자를 빼고 다시 고르는 횟수 상한. 한 폴링이 끝없이 길어지지 않게 둔다 */
+    private static final int MAX_DUE_PAGES_PER_POLL = 5;
     private static final int OVERDUE_EXPIRE_DAYS = 3;
     private static final List<ProblemReviewReminderStatus> PENDING_STATUSES = List.of(SCHEDULED, SENDING);
 
@@ -126,25 +130,51 @@ public class ProblemReviewReminderService {
             return;
         }
 
-        List<ProblemReviewReminder> dueRows = repository.findDueReminders(
-                SCHEDULED, now, PageRequest.of(0, DUE_REMINDER_BATCH_SIZE)
-        );
-        if (dueRows.isEmpty()) return;
+        // 상한에 걸린 사용자의 예약은 SCHEDULED 로 남고 예약 시각이 가장 이르므로, 매 폴링 조회의 앞자리를 다시 차지한다.
+        // 그런 행이 한 페이지를 채우면 그날 다른 사용자의 예약이 한 건도 나가지 않는다. 그래서 이번 폴링에서 이미 본
+        // 사용자를 빼고 다음 페이지를 다시 고른다. 상한에 걸린 사용자가 없거나 페이지가 차지 않았으면 더 볼 것이 없다.
+        Set<Long> seenUsers = new HashSet<>();
+        for (int page = 0; page < MAX_DUE_PAGES_PER_POLL; page++) {
+            List<ProblemReviewReminder> dueRows = seenUsers.isEmpty()
+                    ? repository.findDueReminders(SCHEDULED, now, PageRequest.of(0, DUE_REMINDER_BATCH_SIZE))
+                    : repository.findDueRemindersExcludingUsers(
+                            SCHEDULED, now, seenUsers, PageRequest.of(0, DUE_REMINDER_BATCH_SIZE));
+            if (dueRows.isEmpty()) {
+                return;
+            }
+            int cappedUsers = sendPage(dueRows, now);
+            dueRows.forEach(row -> seenUsers.add(row.getUserId()));
+            if (cappedUsers == 0 || dueRows.size() < DUE_REMINDER_BATCH_SIZE) {
+                return;
+            }
+        }
+    }
 
-        // 같은 폴링에 걸린 한 사용자의 예약은 푸시 하나로 묶는다. 몰아서 등록한 문제가 같은 시각에
-        // 한꺼번에 due 가 되면 푸시가 연달아 쏟아지기 때문이다.
+    /**
+     * 같은 폴링에 걸린 한 사용자의 예약은 푸시 하나로 묶는다. 몰아서 등록한 문제가 같은 시각에
+     * 한꺼번에 due 가 되면 푸시가 연달아 쏟아지기 때문이다.
+     *
+     * @return 하루 상한에 걸려 건너뛴 사용자 수
+     */
+    private int sendPage(List<ProblemReviewReminder> dueRows, LocalDateTime now) {
         Map<Long, List<ProblemReviewReminder>> byUser = dueRows.stream()
                 .collect(Collectors.groupingBy(ProblemReviewReminder::getUserId));
         Map<Long, Long> todayPushes = countTodayPushes(byUser.keySet(), now.toLocalDate());
 
+        int cappedUsers = 0;
         for (Map.Entry<Long, List<ProblemReviewReminder>> entry : byUser.entrySet()) {
             Long userId = entry.getKey();
             // 상한에 걸린 예약은 SCHEDULED 로 남아 다음 날 첫 폴링에 묶여 나가거나 기한이 지나 만료된다.
             if (todayPushes.getOrDefault(userId, 0L) >= policy.getDailyPushLimit()) {
+                cappedUsers++;
                 continue;
             }
             sender.send(userId, entry.getValue(), now);
         }
+        if (cappedUsers > 0) {
+            log.info("[ReviewReminder] 하루 푸시 상한으로 건너뛴 사용자: {}명", cappedUsers);
+        }
+        return cappedUsers;
     }
 
     private Map<Long, Long> countTodayPushes(Collection<Long> userIds, LocalDate today) {

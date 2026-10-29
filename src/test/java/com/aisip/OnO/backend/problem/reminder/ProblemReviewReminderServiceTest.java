@@ -731,6 +731,33 @@ class ProblemReviewReminderServiceTest extends ProblemTestSupport {
         }
 
         @Test
+        @DisplayName("상한에 걸린 사용자의 예약이 한 페이지를 채워도 그 뒤 다른 사용자의 예약은 같은 폴링에 나간다")
+        void cappedRowsDoNotStarveOtherUsers() {
+            User other = fixtures.createOtherUser();
+            giveFcmToken(userId, "token-u1");
+            giveFcmToken(other.getId(), "token-u2");
+            LocalDateTime now = nowInSendWindow();
+            for (int i = 0; i < 5; i++) {
+                pushedAt(userId, 17001L + i * 10, 1, now.minusHours(i + 1));
+            }
+            List<ProblemReviewReminder> capped = new ArrayList<>();
+            for (int i = 0; i < ProblemReviewReminderService.DUE_REMINDER_BATCH_SIZE; i++) {
+                capped.add(ProblemReviewReminder.create(
+                        userId, 18000L + i, "메모", "출처", 1, 1, now.minusMinutes(30)));
+            }
+            reminderRepository.saveAll(capped);
+            ProblemReviewReminder othersDue = saveDueReminder(other.getId(), 19001L, now.minusMinutes(1));
+
+            service.sendDueReminders(now);
+
+            verify(fcmService, never()).sendNotificationToAllUserDevice(eq(userId), any());
+            verify(fcmService, times(1)).sendNotificationToAllUserDevice(eq(other.getId()), any());
+            assertThat(statusOf(othersDue))
+                    .as("예전에는 상한에 걸린 500행이 조회 창을 다 차지해 이 예약이 그날 나가지 않았다")
+                    .isEqualTo(SENT);
+        }
+
+        @Test
         @DisplayName("FCM 발송이 실패하면 FAILED 로 기록하고 재시도 횟수를 올린다")
         void marksFailedOnFcmError() {
             giveFcmToken(userId, "token-1");
