@@ -83,11 +83,12 @@ class AnswerLeakFilterTest {
         }
 
         @Test
-        @DisplayName("개념을 묻는 글자 답도 단정 표현 없이 개념을 짚는 힌트 문장은 지우지 않는다")
-        void conceptAnswerHintIsKept() {
-            // 답이 개념이면 그 개념을 짚는 문장이 곧 힌트라, 단독 일치로 지우면 분석 글이 비게 된다
+        @DisplayName("개념을 묻는 글자 답은 단정 표현이 없어도 그 개념을 짚는 문장을 지운다 (2026-10-29 정책 변경)")
+        void conceptAnswerHintIsRemoved() {
+            // 예전에는 개념을 짚는 문장을 힌트로 남겼지만, dev 실호출에서 "대동법은 광해군 때 처음 시행되었다" 처럼
+            // 답을 그대로 보여 주는 문장이 남아 정답을 보여 주지 않는다는 원칙이 깨졌다. 글이 짧아지는 것보다 노출이 더 문제다
             String hint = "빛을 받는 곳을 보세요. 이 과정이 광합성과 어떻게 이어지는지 떠올려 보세요. 그래프를 해석하세요.";
-            assertThat(solutionAfter(hint, "광합성")).isEqualTo(hint);
+            assertThat(solutionAfter(hint, "광합성")).isEqualTo("빛을 받는 곳을 보세요. 그래프를 해석하세요.");
         }
 
         @Test
@@ -180,9 +181,9 @@ class AnswerLeakFilterTest {
         }
 
         @Test
-        @DisplayName("두 글자 이하 글자 답(예: 산소)은 단정 표현이 있을 때만 지운다")
+        @DisplayName("두 글자 글자 답(예: 산소)도 나오면 지운다. 한 글자 답만 선지 표기로 보고 남긴다")
         void shortTextAnswer() {
-            assertThat(solutionAfter("산소가 어디서 나오는지 보세요.", "산소")).isEqualTo("산소가 어디서 나오는지 보세요.");
+            assertThat(solutionAfter("조건을 보세요. 산소가 어디서 나오는지 보세요.", "산소")).isEqualTo("조건을 보세요.");
             assertThat(solutionAfter("조건을 보세요. 정답은 산소입니다.", "산소")).isEqualTo("조건을 보세요.");
         }
 
@@ -505,6 +506,127 @@ class AnswerLeakFilterTest {
         void answerBesideStepNumberIsRemoved() {
             assertThat(solutionAfter("1단계: 조건 정리\n2단계: 따라서 답은 2이다.", "2"))
                     .isEqualTo("1단계: 조건 정리");
+        }
+    }
+
+    @Nested
+    @DisplayName("2026-10-29 dev 실호출 반영 - 단정 표현 없이 결론 자리에 놓인 답의 값")
+    class AnswerValue {
+
+        private String solutionAfter(String solution, String finalAnswer, String answerValue) {
+            return AnswerLeakFilter.sanitize(result(solution), finalAnswer, answerValue).result().getSolution();
+        }
+
+        @ParameterizedTest(name = "\"{0}\"")
+        @ValueSource(strings = {
+                "4단계: α² + β² = 25 - 12 = 13입니다.",
+                "α² + β² = 13",
+                "따라서 두 근의 제곱의 합은 13입니다.",
+                "식을 계산하면 13이 나옵니다.",
+                "정리하면 값은 13이 됩니다.",
+                "5² - 2 × 6 = 13."
+        })
+        @DisplayName("객관식이라 선지 번호가 3 이어도, 값 13 이 등식이나 문장의 끝에 오면 지운다")
+        void valueAtConclusionIsRemoved(String sentence) {
+            assertThat(solutionAfter("3단계: 곱셈 공식을 떠올려 보세요.\n" + sentence, "3", "13"))
+                    .isEqualTo("3단계: 곱셈 공식을 떠올려 보세요.");
+        }
+
+        @ParameterizedTest(name = "\"{0}\"")
+        @ValueSource(strings = {
+                "α + β = 5, αβ = 6임을 알 수 있습니다.",
+                "α² + β² = (α + β)² - 2αβ 로 바꿔 보세요.",
+                "13개의 공 중에서 두 개를 고르는 경우를 생각합니다.",
+                "x = 13 - 2k 로 놓고 범위를 확인하세요.",
+                "αβ = 3입니다."
+        })
+        @DisplayName("값을 결론으로 쓰지 않은 문장과, 숫자뿐인 선지 번호(3)와 같은 중간 값은 남긴다")
+        void nonConclusionIsKept(String sentence) {
+            assertThat(solutionAfter(sentence, "3", "13")).isEqualTo(sentence);
+        }
+
+        @Test
+        @DisplayName("값 13 을 ⑬, 13번 같은 선지 표기로 바꿔 찾지 않는다")
+        void valueIsNotTreatedAsChoice() {
+            String sentence = "정답을 고르기 전에 13번 문제와 비교해 보세요.";
+            assertThat(solutionAfter(sentence, "3", "13")).isEqualTo(sentence);
+        }
+
+        @ParameterizedTest(name = "\"{0}\"")
+        @ValueSource(strings = {"그러므로 ③입니다.", "고를 것은 ③번이다."})
+        @DisplayName("선지 기호(③, 3번)로 문장을 끝맺으면 단정 표현이 없어도 지운다")
+        void choiceSymbolAtSentenceEndIsRemoved(String sentence) {
+            assertThat(solutionAfter("선지를 비교하세요. " + sentence, "3", null)).isEqualTo("선지를 비교하세요.");
+        }
+
+        @Test
+        @DisplayName("주관식은 answerValue 가 없어도(예전 형식) finalAnswer 를 값으로 본다")
+        void subjectiveAnswerWithoutValue() {
+            assertThat(solutionAfter("식을 세우세요.\n5C2 × 15 = 150", "150", null)).isEqualTo("식을 세우세요.");
+        }
+
+        @ParameterizedTest(name = "\"{0}\" / {1}")
+        @CsvSource(delimiter = '|', value = {
+                "대동법은 광해군 때 처음 시행되었다.|4|광해군",
+                "3단계: 선지에서 광해군을 찾아 선택한다.|4|광해군",
+                "3단계: 선택지 중 'careful'이 'cautious'와 가장 유사한 의미를 가집니다.|2|careful",
+                "'Cautious' means being careful to avoid danger.|2|careful",
+                "2단계: 양변을 2로 나누어 x > 4를 구한다.|3|x > 4",
+                "3단계: 확률은 3/6이므로, 이를 약분하여 1/2로 표현한다.|3|1/2",
+                "3단계: 18 g ÷ 18 g/mol = 1 mol이므로, 물의 몰수는 1 mol이다.|2|1 mol",
+                "2단계: 훈민정음은 조선의 세종대왕이 창제한 것이다.|1|세종"
+        })
+        @DisplayName("dev 실호출: 값이 낱말이나 식이면 문장 어디에 나오든 지운다")
+        void wordOrExpressionValueIsRemovedAnywhere(String sentence, String finalAnswer, String answerValue) {
+            assertThat(solutionAfter("조건을 정리하세요.\n" + sentence, finalAnswer, answerValue))
+                    .isEqualTo("조건을 정리하세요.");
+        }
+
+        @ParameterizedTest(name = "\"{0}\" / {1}")
+        @CsvSource(delimiter = '|', value = {
+                "4단계: 최종적으로 -1 + 1을 계산하여 0으로 간단화한다.|0",
+                "4단계: Δ = 0을 만족하도록 16 - 4k = 0을 풀면 k = 4가 된다.|4",
+                "f(1) = 1² - 2×1 + 3 = 2입니다.|2",
+                "4단계: x가 두 수 중 큰 수이므로, 큰 수는 7입니다.|7"
+        })
+        @DisplayName("dev 실호출: 숫자 값이 결론 서술(간단화한다, 가 된다, 입니다)로 끝나면 지운다")
+        void plainNumberAtConclusionIsRemoved(String sentence, String answerValue) {
+            assertThat(solutionAfter("조건을 정리하세요.\n" + sentence, answerValue, answerValue))
+                    .isEqualTo("조건을 정리하세요.");
+        }
+
+        @ParameterizedTest(name = "\"{0}\" / {1}")
+        @CsvSource(delimiter = '|', value = {
+                "어떤 수를 x라고 하면, x + 12 = 24라는 방정식을 세울 수 있습니다.|12",
+                "2단계: 이 방정식을 풀기 위해 양변에서 12를 뺍니다.|12",
+                "3단계: x = 24 - 12라는 식을 통해 x의 값을 구할 수 있습니다.|12",
+                "1단계: 주어진 이차방정식은 x² - 4x + k = 0이다.|4",
+                "여기서 a = 1, b = -4, c = k이다.|4",
+                "1단계: 주어진 이차함수 f(x) = x² - 2x + 3에서 a = 1, b = -2, c = 3임을 확인합니다.|2",
+                "2단계: 양변을 2로 나누어 범위를 정리합니다.|2"
+        })
+        @DisplayName("dev 실호출: 숫자 값이 문제 조건이나 중간 식에 나오는 문장은 남긴다")
+        void plainNumberInConditionIsKept(String sentence, String answerValue) {
+            assertThat(solutionAfter(sentence, answerValue, answerValue)).isEqualTo(sentence);
+        }
+
+        @Test
+        @DisplayName("한 글자 값(가, A)은 선지 표기라 문장 안에 나온 것만으로 지우지 않는다")
+        void singleCharacterValueIsNotWord() {
+            String sentence = "A 와 B 의 조건을 비교해 보세요.";
+            assertThat(solutionAfter(sentence, "A", "A")).isEqualTo(sentence);
+        }
+
+        @Test
+        @DisplayName("keyPoints 에 값이 결론으로 적혀 있어도 지운다")
+        void keyPointWithValue() {
+            ProblemAnalysisResult original = result("식을 세우세요.", "c", "t",
+                    List.of("근과 계수의 관계", "α² + β² = 13"));
+
+            AnswerLeakFilter.Outcome outcome = AnswerLeakFilter.sanitize(original, "3", "13");
+
+            assertThat(outcome.result().getKeyPoints()).containsExactly("근과 계수의 관계");
+            assertThat(outcome.leakedFields()).containsExactly("keyPoints");
         }
     }
 }
