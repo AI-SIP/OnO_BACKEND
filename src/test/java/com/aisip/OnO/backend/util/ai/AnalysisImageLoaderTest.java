@@ -247,38 +247,86 @@ class AnalysisImageLoaderTest {
     @DisplayName("장수")
     class ImageCount {
 
-        @Test
-        @DisplayName("상한(5장)을 넘으면 S3 를 한 번도 읽지 않고 TOO_MANY_IMAGES")
-        void rejectsTooManyImages() {
-            List<String> urls = Collections.nCopies(6, URL_PREFIX + "image/a.jpg");
+        /** 크기로 몇 번째 이미지인지 구분하는 WEBP. 줄이지 않고 그대로 보내므로 data URL 에서 다시 꺼내 볼 수 있다 */
+        private byte[] numberedWebp(int index) {
+            byte[] bytes = new byte[32 + index];
+            System.arraycopy(webpBytes(), 0, bytes, 0, 32);
+            return bytes;
+        }
 
-            Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(() -> loader.loadAsDataUrls(urls));
-
-            assertReason(thrown, AnalysisFailureReason.TOO_MANY_IMAGES);
-            verifyNoInteractions(amazonS3Client);
+        private List<String> stubNumberedProblems(int count) {
+            List<String> urls = new java.util.ArrayList<>();
+            for (int i = 0; i < count; i++) {
+                stubObject("image/p" + i + ".webp", numberedWebp(i));
+                urls.add(URL_PREFIX + "image/p" + i + ".webp");
+            }
+            return urls;
         }
 
         @Test
-        @DisplayName("상한과 같은 5장은 통과한다")
+        @DisplayName("기본 상한은 10장이다")
+        void defaultMaxImagesIsTen() {
+            assertThat(AnalysisImageLoader.DEFAULT_MAX_IMAGES).isEqualTo(10);
+        }
+
+        @Test
+        @DisplayName("상한과 같은 5장은 모두 쓰고 뺀 장수는 0이다")
         void acceptsExactlyMaxImages() {
-            byte[] jpeg = encode(drawImage(50, 50, BufferedImage.TYPE_INT_RGB), "jpg");
+            List<String> urls = stubNumberedProblems(5);
+
+            AnalysisImageLoader.LoadedImages loaded = loader.loadForAnalysis(urls, List.of());
+
+            assertThat(loaded.problemImages()).hasSize(5);
+            assertThat(loaded.skippedProblemImageCount()).isZero();
+        }
+
+        @Test
+        @DisplayName("상한(5장)을 넘으면 실패하지 않고 앞의 5장만 순서대로 쓰며, 뒤쪽은 S3 에서 읽지 않는다")
+        void usesFirstMaxImagesWhenOverLimit() {
+            List<String> urls = stubNumberedProblems(6);
+
+            AnalysisImageLoader.LoadedImages loaded = loader.loadForAnalysis(urls, List.of());
+
+            assertThat(loaded.problemImages()).hasSize(5);
             for (int i = 0; i < 5; i++) {
-                stubObject("image/" + i + ".jpg", jpeg);
+                assertThat(bytesOf(loaded.problemImages().get(i))).as("앞에서 %d번째", i).hasSize(32 + i);
             }
-            List<String> urls = List.of(0, 1, 2, 3, 4).stream().map(i -> URL_PREFIX + "image/" + i + ".jpg").toList();
+            assertThat(loaded.skippedProblemImageCount()).isEqualTo(1);
+            verify(amazonS3Client, never()).getObject(BUCKET, "image/p5.webp");
+        }
+
+        @Test
+        @DisplayName("16장짜리 요청(운영 재시도 초과 사례)도 앞의 5장만 읽고 11장을 뺀 것으로 센다")
+        void usesFirstMaxImagesForProductionSixteenImages() {
+            List<String> urls = stubNumberedProblems(16);
+
+            AnalysisImageLoader.LoadedImages loaded = loader.loadForAnalysis(urls, List.of());
+
+            assertThat(loaded.problemImages()).hasSize(5);
+            assertThat(loaded.skippedProblemImageCount()).isEqualTo(11);
+            for (int i = 5; i < 16; i++) {
+                verify(amazonS3Client, never()).getObject(BUCKET, "image/p" + i + ".webp");
+            }
+        }
+
+        @Test
+        @DisplayName("빼는 뒤쪽 이미지는 URL 검증도 하지 않는다. 외부 URL 이 섞여 있어도 앞의 상한만큼으로 분석한다")
+        void doesNotValidateDroppedImages() {
+            List<String> urls = new java.util.ArrayList<>(stubNumberedProblems(5));
+            urls.add("https://cdn.test/b.jpg");
+
+            AnalysisImageLoader.LoadedImages loaded = loader.loadForAnalysis(urls, List.of());
+
+            assertThat(loaded.problemImages()).hasSize(5);
+            assertThat(loaded.skippedProblemImageCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("loadAsDataUrls 도 상한을 넘으면 앞의 상한만큼만 돌려준다")
+        void loadAsDataUrlsAlsoCaps() {
+            List<String> urls = stubNumberedProblems(7);
 
             assertThat(loader.loadAsDataUrls(urls)).hasSize(5);
-        }
-
-        @Test
-        @DisplayName("16장짜리 요청(운영 재시도 초과 사례)도 S3 를 읽기 전에 거부한다")
-        void rejectsProductionSixteenImages() {
-            List<String> urls = Collections.nCopies(16, URL_PREFIX + "image/a.jpg");
-
-            Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(() -> loader.loadAsDataUrls(urls));
-
-            assertReason(thrown, AnalysisFailureReason.TOO_MANY_IMAGES);
-            verifyNoInteractions(amazonS3Client);
         }
 
         @Test
@@ -1039,13 +1087,21 @@ class AnalysisImageLoaderTest {
         }
 
         @Test
-        @DisplayName("문제 이미지가 상한을 넘으면 해설 이미지가 있어도 S3 를 읽기 전에 TOO_MANY_IMAGES")
-        void problemLimitStillApplies() {
-            Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(() -> loader.loadForAnalysis(
-                    Collections.nCopies(6, url("image/p.webp")), List.of(url("image/a.webp"))));
+        @DisplayName("문제 이미지가 상한을 넘어도 해설 이미지는 따로 세어 함께 쓴다. 문제 6장 + 해설 1장이면 문제 5장 + 해설 1장")
+        void problemLimitAppliesSeparatelyFromAnswers() {
+            List<String> problems = new java.util.ArrayList<>();
+            for (int i = 0; i < 6; i++) {
+                stubObject("image/p" + i + ".webp", webpBytes());
+                problems.add(url("image/p" + i + ".webp"));
+            }
+            stubObject("image/a.webp", webpBytes());
 
-            assertReason(thrown, AnalysisFailureReason.TOO_MANY_IMAGES);
-            verifyNoInteractions(amazonS3Client);
+            AnalysisImageLoader.LoadedImages loaded = loader.loadForAnalysis(problems, List.of(url("image/a.webp")));
+
+            assertThat(loaded.problemImages()).hasSize(5);
+            assertThat(loaded.answerImages()).hasSize(1);
+            assertThat(loaded.skippedProblemImageCount()).isEqualTo(1);
+            assertThat(loaded.skippedAnswerReasons()).isEmpty();
         }
 
         @Test
