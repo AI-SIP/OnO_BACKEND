@@ -236,7 +236,13 @@ final class AnswerLeakFilter {
             regex.append(Pattern.quote(parts[i]));
         }
         if (isAsciiDigit(last)) {
-            regex.append("(?![0-9]|\\.[0-9])");
+            // 프롬프트가 풀이를 "1단계, 2단계" 로 쓰게 해서, 답이 1~3 이면 "1단계: 답이 될 수 있는 경우를 나눠 보세요" 같은
+            // 정상 힌트 줄이 지워졌다. 단계와 순서를 세는 말이 붙은 숫자는 답으로 보지 않는다.
+            // "가지", "개" 는 개수를 묻는 문제의 답("정답은 2가지")일 수 있어 넣지 않는다.
+            regex.append("(?![0-9]|\\.[0-9]|\\s*(?:단계|번째))");
+        } else if (last == '번') {
+            // 선지 표기 "3번" 이 "3번째" 안에서 일치하지 않게 한다
+            regex.append("(?!째)");
         } else if (isAsciiLetter(last)) {
             regex.append("(?![A-Za-z])");
         } else if (isSingleKorean(token)) {
