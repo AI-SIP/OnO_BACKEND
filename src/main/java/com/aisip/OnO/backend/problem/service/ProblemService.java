@@ -6,7 +6,8 @@ import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.ratelimit.RateLimitKeys;
 import com.aisip.OnO.backend.common.ratelimit.RateLimitService;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
-import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
+import com.aisip.OnO.backend.config.rabbitmq.message.S3DeleteMessage;
+import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteAfterCommitSender;
 import com.aisip.OnO.backend.mission.entity.MissionMetric;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.mission.service.MissionProgressUpdater;
@@ -93,7 +94,7 @@ public class ProblemService {
 
     private final ProblemSolveRepository problemSolveRepository;
 
-    private final S3DeleteProducer s3DeleteProducer;
+    private final S3DeleteAfterCommitSender s3DeleteAfterCommitSender;
 
     private final ProblemAnalysisDispatcher analysisDispatcher;
     private final ProblemAnalysisDispatchGuard analysisDispatchGuard;
@@ -736,11 +737,11 @@ public class ProblemService {
     /**
      * 문제 삭제 (비동기 S3 파일 삭제 적용)
      * - DB 삭제: 동기 (즉시 완료)
-     * - S3 파일 삭제: 비동기 (RabbitMQ Producer로 전송)
+     * - S3 파일 삭제: 지울 이미지 목록만 돌려준다. 호출자가 모아서 커밋 뒤에 한 번에 보낸다
      * - PracticeNote 매핑 삭제: 동기 (데이터 정합성)
      */
-    // 호출자(deleteProblem / deleteFolderProblems / deleteAllUserProblems)의 트랜잭션 안에서 실행된다.
-    private void deleteProblemWithoutOwnerCheck(Long problemId) {
+    // 호출자(deleteProblem / deleteProblemList / deleteFolderProblems / deleteAllUserProblems)의 트랜잭션 안에서 실행된다.
+    private List<S3DeleteMessage> deleteProblemWithoutOwnerCheck(Long problemId) {
         // 1. 이미지 데이터 조회
         List<ProblemImageData> imageDataList = problemImageDataRepository.findAllByProblemId(problemId);
         // 1-1. 태그 매핑 조회
@@ -765,24 +766,22 @@ public class ProblemService {
 
         log.info("problemId: {} DB 삭제 완료", problemId);
 
-        // 7. S3 파일 삭제는 비동기로 처리 (RabbitMQ Producer)
-        imageDataList.forEach(imageData -> {
-            try {
-                s3DeleteProducer.sendDeleteMessage(imageData.getImageUrl(), problemId);
-            } catch (Exception e) {
-                log.error("S3 삭제 메시지 전송 실패 - problemId: {}, error: {}",
-                        problemId, e.getMessage());
-            }
-        });
-
-        log.info("problemId: {} S3 삭제 메시지 전송 완료 ({}개)", problemId, imageDataList.size());
+        // 7. S3 파일은 여기서 지우지 않는다. 같은 트랜잭션의 뒤쪽 작업이 실패해 롤백되면 파일도 남아야 한다.
+        return imageDataList.stream()
+                .map(imageData -> new S3DeleteMessage(imageData.getImageUrl(), problemId))
+                .toList();
     }
 
     @Transactional
     public void deleteProblem(Long problemId, Long userId) {
+        s3DeleteAfterCommitSender.sendAfterCommit(deleteOwnedProblem(problemId, userId));
+    }
+
+    private List<S3DeleteMessage> deleteOwnedProblem(Long problemId, Long userId) {
         findProblemEntity(problemId, userId);
-        deleteProblemWithoutOwnerCheck(problemId);
+        List<S3DeleteMessage> s3DeleteMessages = deleteProblemWithoutOwnerCheck(problemId);
         streakCacheService.evict(userId);
+        return s3DeleteMessages;
     }
 
     @Transactional
@@ -799,33 +798,38 @@ public class ProblemService {
 
     @Transactional
     public void deleteProblemList(Long userId, List<Long> problemIdList) {
-        problemIdList.forEach(problemId -> deleteProblem(problemId, userId));
+        // 중간에 하나라도 실패하면 전체가 롤백되므로, S3 삭제는 모두 지운 뒤 커밋되면 한 번에 보낸다.
+        List<S3DeleteMessage> s3DeleteMessages = new ArrayList<>();
+        problemIdList.forEach(problemId -> s3DeleteMessages.addAll(deleteOwnedProblem(problemId, userId)));
+        s3DeleteAfterCommitSender.sendAfterCommit(s3DeleteMessages);
     }
 
     // 호출자(deleteAllByFolderIds)의 트랜잭션 안에서 실행된다.
-    private void deleteFolderProblems(Long folderId) {
+    private List<S3DeleteMessage> deleteFolderProblems(Long folderId) {
+        List<S3DeleteMessage> s3DeleteMessages = new ArrayList<>();
         problemRepository.findAllByFolderId(folderId)
-                .forEach(problem -> {
-                    deleteProblemWithoutOwnerCheck(problem.getId());
-                });
+                .forEach(problem -> s3DeleteMessages.addAll(deleteProblemWithoutOwnerCheck(problem.getId())));
 
         log.info("problem in folderId: {} has deleted", folderId);
+        return s3DeleteMessages;
     }
 
     @Transactional
     public void deleteAllByFolderIds(Long userId, Collection<Long> folderIds) {
+        List<S3DeleteMessage> s3DeleteMessages = new ArrayList<>();
         folderIds.forEach(folderId -> {
             validateFolderOwner(folderId, userId);
-            deleteFolderProblems(folderId);
+            s3DeleteMessages.addAll(deleteFolderProblems(folderId));
         });
+        s3DeleteAfterCommitSender.sendAfterCommit(s3DeleteMessages);
     }
 
     @Transactional
     public void deleteAllUserProblems(Long userId) {
+        List<S3DeleteMessage> s3DeleteMessages = new ArrayList<>();
         problemRepository.findAllByUserId(userId)
-                .forEach(problem -> {
-                    deleteProblemWithoutOwnerCheck(problem.getId());
-                });
+                .forEach(problem -> s3DeleteMessages.addAll(deleteProblemWithoutOwnerCheck(problem.getId())));
+        s3DeleteAfterCommitSender.sendAfterCommit(s3DeleteMessages);
 
         streakCacheService.evict(userId);
         log.info("userId: {} delete all user problems", userId);
