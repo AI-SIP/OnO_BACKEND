@@ -1139,6 +1139,145 @@ class ProblemServiceTest extends ProblemTestSupport {
     }
 
     @Nested
+    @DisplayName("문제 삭제 후 S3 삭제 메시지")
+    class S3DeleteMessageAfterCommit {
+
+        @Test
+        @DisplayName("일괄 삭제 중 뒤쪽 id 가 실패하면 앞서 지운 문제의 S3 삭제 메시지도 나가지 않는다")
+        void sendsNothingWhenListDeleteRollsBack() {
+            Problem mine = saveProblem(owner.getId(), ownerRoot);
+            saveImageData(mine, "https://s3/mine-1.png", ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(mine, "https://s3/mine-2.png", ProblemImageType.ANSWER_IMAGE);
+            Problem theirs = saveProblem(intruder.getId(), intruderRoot);
+
+            assertThatThrownBy(() -> problemService.deleteProblemList(
+                    owner.getId(), List.of(mine.getId(), theirs.getId(), 999_999L)))
+                    .isInstanceOf(ApplicationException.class);
+
+            assertThat(problemImageDataRepository.findAllByProblemId(mine.getId()))
+                    .as("롤백으로 이미지 행이 되살아난다")
+                    .hasSize(2);
+            verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
+        }
+
+        @Test
+        @DisplayName("일괄 삭제 중 없는 id 가 섞여도 S3 삭제 메시지는 나가지 않는다")
+        void sendsNothingWhenListDeleteHitsUnknownProblem() {
+            Problem mine = saveProblem(owner.getId(), ownerRoot);
+            saveImageData(mine, "https://s3/mine.png", ProblemImageType.PROBLEM_IMAGE);
+
+            assertThatThrownBy(() -> problemService.deleteProblemList(
+                    owner.getId(), List.of(mine.getId(), 999_999L)))
+                    .isInstanceOf(ApplicationException.class);
+
+            assertThat(problemRepository.findById(mine.getId())).isPresent();
+            verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
+        }
+
+        @Test
+        @DisplayName("단건 삭제는 커밋된 뒤에 S3 삭제 메시지를 보낸다")
+        void sendsAfterCommitOnSingleDelete() {
+            Problem problem = saveProblem(owner.getId(), ownerRoot);
+            saveImageData(problem, "https://s3/one.png", ProblemImageType.PROBLEM_IMAGE);
+
+            inTransaction(() -> {
+                problemService.deleteProblem(problem.getId(), owner.getId());
+                verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
+            });
+
+            verify(s3DeleteProducer).sendDeleteMessage("https://s3/one.png", problem.getId());
+        }
+
+        @Test
+        @DisplayName("일괄 삭제가 성공하면 커밋 뒤에 모든 이미지의 메시지를 보낸다")
+        void sendsAllAfterCommitOnListDelete() {
+            Problem first = saveProblem(owner.getId(), ownerRoot);
+            saveImageData(first, "https://s3/first.png", ProblemImageType.PROBLEM_IMAGE);
+            Problem second = saveProblem(owner.getId(), ownerRoot);
+            saveImageData(second, "https://s3/second-1.png", ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(second, "https://s3/second-2.png", ProblemImageType.ANSWER_IMAGE);
+
+            inTransaction(() -> {
+                problemService.deleteProblemList(owner.getId(), List.of(first.getId(), second.getId()));
+                verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
+            });
+
+            verify(s3DeleteProducer).sendDeleteMessage("https://s3/first.png", first.getId());
+            verify(s3DeleteProducer).sendDeleteMessage("https://s3/second-1.png", second.getId());
+            verify(s3DeleteProducer).sendDeleteMessage("https://s3/second-2.png", second.getId());
+            verify(s3DeleteProducer, times(3)).sendDeleteMessage(any(), any());
+        }
+
+        @Test
+        @DisplayName("폴더 단위 삭제는 커밋된 뒤에 S3 삭제 메시지를 보낸다")
+        void sendsAfterCommitOnFolderDelete() {
+            Folder subFolder = fixtures.createFolder(owner.getId(), "정리 대상", ownerRoot);
+            Problem inFolder = saveProblem(owner.getId(), subFolder);
+            saveImageData(inFolder, "https://s3/folder.png", ProblemImageType.PROBLEM_IMAGE);
+            Problem keep = saveProblem(owner.getId(), ownerRoot);
+            saveImageData(keep, "https://s3/keep.png", ProblemImageType.PROBLEM_IMAGE);
+
+            inTransaction(() -> {
+                problemService.deleteAllByFolderIds(owner.getId(), List.of(subFolder.getId()));
+                verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
+            });
+
+            verify(s3DeleteProducer).sendDeleteMessage("https://s3/folder.png", inFolder.getId());
+            verify(s3DeleteProducer, times(1)).sendDeleteMessage(any(), any());
+        }
+
+        @Test
+        @DisplayName("전체 삭제는 커밋된 뒤에 S3 삭제 메시지를 보낸다")
+        void sendsAfterCommitOnDeleteAll() {
+            Problem first = saveProblem(owner.getId(), ownerRoot);
+            saveImageData(first, "https://s3/all-1.png", ProblemImageType.PROBLEM_IMAGE);
+            Problem second = saveProblem(owner.getId(), ownerRoot);
+            saveImageData(second, "https://s3/all-2.png", ProblemImageType.PROBLEM_IMAGE);
+            Problem theirs = saveProblem(intruder.getId(), intruderRoot);
+            saveImageData(theirs, "https://s3/theirs.png", ProblemImageType.PROBLEM_IMAGE);
+
+            inTransaction(() -> {
+                problemService.deleteAllUserProblems(owner.getId());
+                verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
+            });
+
+            verify(s3DeleteProducer).sendDeleteMessage("https://s3/all-1.png", first.getId());
+            verify(s3DeleteProducer).sendDeleteMessage("https://s3/all-2.png", second.getId());
+            verify(s3DeleteProducer, never()).sendDeleteMessage("https://s3/theirs.png", theirs.getId());
+        }
+
+        @Test
+        @DisplayName("전체 삭제를 부른 바깥 트랜잭션이 롤백되면 S3 삭제 메시지를 보내지 않는다")
+        void sendsNothingWhenOuterTransactionRollsBack() {
+            Problem problem = saveProblem(owner.getId(), ownerRoot);
+            saveImageData(problem, "https://s3/outer.png", ProblemImageType.PROBLEM_IMAGE);
+
+            transactionTemplate.executeWithoutResult(status -> {
+                problemService.deleteAllUserProblems(owner.getId());
+                status.setRollbackOnly();
+            });
+
+            assertThat(problemRepository.findById(problem.getId())).isPresent();
+            verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
+        }
+
+        @Test
+        @DisplayName("커밋 뒤 메시지 전송이 실패해도 삭제 요청은 성공한다")
+        void succeedsEvenIfSendFails() {
+            Problem problem = saveProblem(owner.getId(), ownerRoot);
+            saveImageData(problem, "https://s3/fail.png", ProblemImageType.PROBLEM_IMAGE);
+            willThrow(new AmqpConnectException(new RuntimeException("broker down")))
+                    .given(s3DeleteProducer).sendDeleteMessage(any(), any());
+
+            assertThatCode(() -> problemService.deleteProblem(problem.getId(), owner.getId()))
+                    .doesNotThrowAnyException();
+
+            assertThat(problemRepository.findById(problem.getId())).isEmpty();
+            verify(s3DeleteProducer).sendDeleteMessage("https://s3/fail.png", problem.getId());
+        }
+    }
+
+    @Nested
     @DisplayName("이미지 데이터 삭제")
     class DeleteImageData {
 
