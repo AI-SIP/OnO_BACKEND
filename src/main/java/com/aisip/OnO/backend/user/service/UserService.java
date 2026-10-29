@@ -211,6 +211,16 @@ public class UserService {
         findUserEntity(userId).updateNotificationEnabled(notificationEnabled);
     }
 
+    /** 앱에서 사용자가 자기 정보를 고칠 때 쓴다. 이름과 이메일만 바뀐다. */
+    @Transactional
+    public void updateUserProfile(Long userId, UserRegisterDto userRegisterDto) {
+        User user = findUserEntity(userId);
+        user.updateProfile(userRegisterDto);
+
+        log.info("userId: {} has updated profile", userId);
+    }
+
+    /** 관리자 화면에서 사용자 정보를 고칠 때 쓴다. */
     @Transactional
     public void updateUser(Long userId, UserRegisterDto userRegisterDto) {
 
