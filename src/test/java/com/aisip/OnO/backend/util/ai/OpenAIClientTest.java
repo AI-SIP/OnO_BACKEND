@@ -834,13 +834,13 @@ class OpenAIClientTest {
         @Test
         @DisplayName("로더가 재시도 불가로 거부하면 OpenAI 를 호출하지 않고 그 이유 그대로 던진다")
         void propagatesNonRetryableWithoutCallingOpenAI() {
-            List<String> sixteen = java.util.Collections.nCopies(16, IMAGE_URL);
-            when(imageLoader.loadForAnalysis(sixteen, List.of())).thenThrow(
-                    new NonRetryableAnalysisException(AnalysisFailureReason.TOO_MANY_IMAGES, "too many"));
+            List<String> urls = List.of("https://cdn.test/a.jpg");
+            when(imageLoader.loadForAnalysis(urls, List.of())).thenThrow(
+                    new NonRetryableAnalysisException(AnalysisFailureReason.INVALID_IMAGE_SOURCE, "foreign url"));
 
-            Throwable thrown = catchThrowable(() -> openAIClient.analyzeImages(sixteen));
+            Throwable thrown = catchThrowable(() -> openAIClient.analyzeImages(urls));
 
-            assertThat(reasonOf(thrown)).isEqualTo(AnalysisFailureReason.TOO_MANY_IMAGES);
+            assertThat(reasonOf(thrown)).isEqualTo(AnalysisFailureReason.INVALID_IMAGE_SOURCE);
             server.verify(); // 기대한 요청이 없으므로 OpenAI 호출이 없어야 한다
             assertThat(externalTimer("analyze_images", "failure"))
                     .as("OpenAI 를 부르지 않았으니 OpenAI 호출 지표에도 남기지 않는다").isNull();
@@ -1322,6 +1322,47 @@ class OpenAIClientTest {
             assertThat(imageUrls(content)).containsExactly(dataUrl(problem),
                     dataUrl(answers.get(0)), dataUrl(answers.get(1)), dataUrl(answers.get(2)));
             assertThat(content.get(0).get("text").asText()).contains("해설 이미지 3장");
+        }
+
+        @Test
+        @DisplayName("문제 이미지가 상한(5장)을 넘으면 앞 5장만 [문제 이미지 i/5] 로 싣고, 프롬프트도 5장이라 하며 뺀 장수를 메트릭에 센다")
+        void capsProblemImagesAndPromptCount() {
+            OpenAIClient client = clientWith(new AnalysisImageLoader(amazonS3Client, BUCKET, 5,
+                    AnalysisImageLoader.DEFAULT_MAX_TOTAL_BYTES, AnalysisImageLoader.DEFAULT_MAX_ANSWER_IMAGES));
+            List<String> problemUrls = new ArrayList<>();
+            List<byte[]> problems = new ArrayList<>();
+            for (int i = 1; i <= 7; i++) {
+                byte[] problem = webp(40 + i);
+                problems.add(problem);
+                stub("image/p" + i + ".webp", problem);
+                problemUrls.add(PREFIX + "image/p" + i + ".webp");
+            }
+            AtomicReference<JsonNode> body = captureRequestAndRespond(chatCompletionJson(plainFullAnalysisJson("2", "no_explanation"), "stop", null));
+
+            ProblemAnalysisResult result = client.analyze(new AnalysisInput(problemUrls, List.of(), null, null));
+
+            assertThat(result.getSubject()).isEqualTo("수학");
+            JsonNode content = body.get().get("messages").get(1).get("content");
+            assertThat(content.get(0).get("text").asText()).contains("다음 5장의 문제 이미지");
+            assertThat(texts(content)).contains("[문제 이미지 1/5]", "[문제 이미지 5/5]")
+                    .noneMatch(text -> text.contains("/7]"));
+            assertThat(imageUrls(content)).containsExactly(dataUrl(problems.get(0)), dataUrl(problems.get(1)),
+                    dataUrl(problems.get(2)), dataUrl(problems.get(3)), dataUrl(problems.get(4)));
+            assertThat(meterRegistry.find("ono.ai.analysis.problem_image_skipped").tag("reason", "over_count")
+                    .counter().count()).isEqualTo(2.0);
+        }
+
+        @Test
+        @DisplayName("문제 이미지가 상한 이하면 problem_image_skipped 를 남기지 않는다")
+        void noProblemSkipMetricWithinLimit() {
+            OpenAIClient client = clientWith(new AnalysisImageLoader(amazonS3Client, BUCKET, 5,
+                    AnalysisImageLoader.DEFAULT_MAX_TOTAL_BYTES, AnalysisImageLoader.DEFAULT_MAX_ANSWER_IMAGES));
+            stub("image/p.webp", webp(40));
+            captureRequestAndRespond(chatCompletionJson(plainFullAnalysisJson("2", "no_explanation"), "stop", null));
+
+            client.analyze(new AnalysisInput(List.of(PREFIX + "image/p.webp"), List.of(), null, null));
+
+            assertThat(meterRegistry.find("ono.ai.analysis.problem_image_skipped").counters()).isEmpty();
         }
 
         @Test
