@@ -204,7 +204,7 @@ class OpenAIClientTest {
             assertThat(jsonSchema.get("strict").asBoolean()).isTrue();
 
             JsonNode schema = jsonSchema.get("schema");
-            List<String> expected = List.of("analyzable", "internalSolution", "finalAnswer", "explanationCheck",
+            List<String> expected = List.of("analyzable", "internalSolution", "finalAnswer", "answerValue", "explanationCheck",
                     "subject", "problemType", "keyPoints", "solution", "commonMistakes", "studyTips");
             assertThat(schema.get("type").asText()).isEqualTo("object");
             assertThat(schema.get("additionalProperties").isBoolean()).isTrue();
@@ -218,21 +218,21 @@ class OpenAIClientTest {
             assertThat(properties.get("analyzable").get("type").asText()).isEqualTo("boolean");
             assertThat(properties.get("keyPoints").get("type").asText()).isEqualTo("array");
             assertThat(properties.get("keyPoints").get("items").get("type").asText()).isEqualTo("string");
-            for (String field : List.of("internalSolution", "finalAnswer", "explanationCheck",
+            for (String field : List.of("internalSolution", "finalAnswer", "answerValue", "explanationCheck",
                     "subject", "problemType", "solution", "commonMistakes", "studyTips")) {
                 assertThat(properties.get(field).get("type").asText()).as(field).isEqualTo("string");
             }
         }
 
         @Test
-        @DisplayName("스키마의 10개 필드에 모두 description 이 있고, 필드 뜻을 모델에 알려 준다")
+        @DisplayName("스키마의 11개 필드에 모두 description 이 있고, 필드 뜻을 모델에 알려 준다")
         void describesEverySchemaField() {
             AtomicReference<JsonNode> body = captureRequestAndRespond(chatCompletionJson(analysisJson(), "stop", null));
 
             openAIClient.analyzeImage(IMAGE_URL);
 
             JsonNode properties = body.get().get("response_format").get("json_schema").get("schema").get("properties");
-            for (String field : List.of("analyzable", "internalSolution", "finalAnswer", "explanationCheck",
+            for (String field : List.of("analyzable", "internalSolution", "finalAnswer", "answerValue", "explanationCheck",
                     "subject", "problemType", "keyPoints", "solution", "commonMistakes", "studyTips")) {
                 JsonNode description = properties.get(field).get("description");
                 assertThat(description).as(field + " description").isNotNull();
@@ -1038,6 +1038,27 @@ class OpenAIClientTest {
         }
     }
 
+    /** 객관식 응답처럼 선지 번호(finalAnswer)와 그 값(answerValue)을 따로 담은 응답 */
+    private String fullAnalysisJsonWithValue(String finalAnswer, String answerValue, String solution) {
+        Map<String, Object> content = new java.util.LinkedHashMap<>();
+        content.put("analyzable", true);
+        content.put("internalSolution", INTERNAL_MARKER);
+        content.put("finalAnswer", finalAnswer);
+        content.put("answerValue", answerValue);
+        content.put("explanationCheck", "no_explanation");
+        content.put("subject", "수학");
+        content.put("problemType", "이차방정식");
+        content.put("keyPoints", List.of("근과 계수의 관계"));
+        content.put("solution", solution);
+        content.put("commonMistakes", "c");
+        content.put("studyTips", "t");
+        try {
+            return objectMapper.writeValueAsString(content);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     private String plainFullAnalysisJson(String finalAnswer, String explanationCheck) {
         return fullAnalysisJson(finalAnswer, explanationCheck, List.of("근의 공식", "판별식"),
                 "먼저 조건을 정리하고 판별식을 세워보세요.", "부호를 놓치기 쉽습니다.", "교과서 2단원을 복습하세요.");
@@ -1475,6 +1496,18 @@ class OpenAIClientTest {
         }
 
         @Test
+        @DisplayName("객관식 선지 번호와 따로 받은 값(answerValue)이 등식 끝에 나오면 지운다 (2026-10-29 dev 실호출)")
+        void removesAnswerValueAtEquationEnd() {
+            respondWithContent(fullAnalysisJsonWithValue("3", "13",
+                    "3단계: 곱셈 공식을 이용해 식을 정리합니다.\n4단계: α² + β² = 25 - 12 = 13입니다."));
+
+            assertThat(openAIClient.analyzeImage(IMAGE_URL).getSolution())
+                    .isEqualTo("3단계: 곱셈 공식을 이용해 식을 정리합니다.");
+            assertThat(meterRegistry.find("ono.ai.analysis.answer_leak").tag("field", "solution").counter())
+                    .isNotNull();
+        }
+
+        @Test
         @DisplayName("finalAnswer 가 비었거나 내부 필드가 없는 예전 형식이면 거르지 않는다")
         void skipsFilterWithoutFinalAnswer() {
             respondWithContent(fullAnalysisJson("", "no_explanation", List.of("판별식"),
@@ -1648,13 +1681,14 @@ class OpenAIClientTest {
         @DisplayName("내부 값 record 의 toString 은 내부 풀이와 답 대신 길이만 보인다")
         void internalRecordsHideValuesInToString() {
             OpenAIClient.AnalysisInternal internal =
-                    new OpenAIClient.AnalysisInternal(INTERNAL_MARKER, "FINAL_ANSWER_MARKER", "matches");
+                    new OpenAIClient.AnalysisInternal(INTERNAL_MARKER, "FINAL_ANSWER_MARKER", "ANSWER_VALUE_MARKER", "matches");
             OpenAIClient.ParsedAnalysis parsed = new OpenAIClient.ParsedAnalysis(
                     ProblemAnalysisResult.builder().subject("수학").build(), internal);
 
             assertThat(internal.toString())
-                    .doesNotContain(INTERNAL_MARKER).doesNotContain("FINAL_ANSWER_MARKER")
+                    .doesNotContain(INTERNAL_MARKER).doesNotContain("FINAL_ANSWER_MARKER").doesNotContain("ANSWER_VALUE_MARKER")
                     .contains("internalSolutionLength=" + INTERNAL_MARKER.length())
+                    .contains("answerValueLength=" + "ANSWER_VALUE_MARKER".length())
                     .contains("finalAnswerLength=" + "FINAL_ANSWER_MARKER".length())
                     .contains("explanationCheck=matches");
             assertThat(parsed.toString())
@@ -1665,10 +1699,10 @@ class OpenAIClientTest {
         @Test
         @DisplayName("대조 값이 목록 밖이면 toString 에 원문 대신 other 를 보이고, null 은 null 로 둔다")
         void internalToStringHidesUnexpectedCheck() {
-            assertThat(new OpenAIClient.AnalysisInternal(null, null, "정답은 3").toString())
+            assertThat(new OpenAIClient.AnalysisInternal(null, null, null, "정답은 3").toString())
                     .doesNotContain("정답은 3").contains("explanationCheck=other")
                     .contains("internalSolutionLength=0").contains("finalAnswerLength=0");
-            assertThat(new OpenAIClient.AnalysisInternal(null, null, null).toString())
+            assertThat(new OpenAIClient.AnalysisInternal(null, null, null, null).toString())
                     .contains("explanationCheck=null");
         }
     }
