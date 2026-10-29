@@ -101,6 +101,11 @@ public class AnalysisImageLoader {
             @Value("${openai.analysis.max-total-bytes:" + DEFAULT_MAX_TOTAL_BYTES + "}") long maxTotalBytes,
             @Value("${openai.analysis.max-answer-images:" + DEFAULT_MAX_ANSWER_IMAGES + "}") int maxAnswerImages
     ) {
+        // 0 이면 이미지 없이 OpenAI 를 부르고, 음수면 subList 에서 예외가 나 재시도 끝에 DLQ 로 간다.
+        // 설정을 잘못 넣었을 때 분석이 하나씩 이상하게 끝나는 대신 기동 단계에서 바로 드러나게 한다.
+        if (maxImages < 1) {
+            throw new IllegalArgumentException("openai.analysis.max-images 는 1 이상이어야 합니다: " + maxImages);
+        }
         this.amazonS3Client = amazonS3Client;
         this.bucket = bucket;
         this.maxImages = maxImages;

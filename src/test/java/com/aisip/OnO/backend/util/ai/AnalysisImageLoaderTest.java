@@ -247,6 +247,16 @@ class AnalysisImageLoaderTest {
     @DisplayName("장수")
     class ImageCount {
 
+        @ParameterizedTest
+        @ValueSource(ints = {0, -1})
+        @DisplayName("장수 상한을 1 미만으로 설정하면 만들 때 바로 실패한다")
+        void rejectsNonPositiveMaxImages(int maxImages) {
+            assertThatThrownBy(() -> new AnalysisImageLoader(amazonS3Client, BUCKET, maxImages,
+                    AnalysisImageLoader.DEFAULT_MAX_TOTAL_BYTES, AnalysisImageLoader.DEFAULT_MAX_ANSWER_IMAGES))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("max-images");
+        }
+
         /** 크기로 몇 번째 이미지인지 구분하는 WEBP. 줄이지 않고 그대로 보내므로 data URL 에서 다시 꺼내 볼 수 있다 */
         private byte[] numberedWebp(int index) {
             byte[] bytes = new byte[32 + index];
