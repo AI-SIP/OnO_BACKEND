@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -42,6 +43,9 @@ class NoticeServiceTest extends IntegrationTestSupport {
 
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     private User user;
     private User other;
@@ -222,6 +226,42 @@ class NoticeServiceTest extends IntegrationTestSupport {
         void rejectsUnknownNotice() {
             assertNoticeError(NoticeErrorCase.NOTICE_NOT_FOUND, () ->
                     noticeService.removeNotice(999_999L));
+        }
+    }
+
+    @Nested
+    @DisplayName("캐시 무효화 시점")
+    class CacheEvictionTiming {
+
+        @Test
+        @DisplayName("바깥 트랜잭션이 커밋된 뒤에 캐시를 지운다")
+        void evictsAfterCommit() {
+            assertThat(noticeService.findActiveNoticeForUser(user.getId())).isNull();
+            assertThat(redisTemplate.hasKey(ACTIVE_CACHE_KEY)).isTrue();
+
+            transactionTemplate.executeWithoutResult(status -> {
+                registerNotice("커밋 후 반영");
+                assertThat(redisTemplate.hasKey(ACTIVE_CACHE_KEY))
+                        .as("커밋 전에 지우면 그 사이 조회가 공지 없음을 다시 캐싱한다")
+                        .isTrue();
+            });
+
+            assertThat(redisTemplate.hasKey(ACTIVE_CACHE_KEY)).isFalse();
+            assertThat(noticeService.findActiveNoticeForUser(user.getId())).isNotNull();
+        }
+
+        @Test
+        @DisplayName("등록이 롤백되면 캐시를 지우지 않는다")
+        void keepsCacheOnRollback() {
+            assertThat(noticeService.findActiveNoticeForUser(user.getId())).isNull();
+
+            transactionTemplate.executeWithoutResult(status -> {
+                registerNotice("롤백될 공지");
+                status.setRollbackOnly();
+            });
+
+            assertThat(redisTemplate.hasKey(ACTIVE_CACHE_KEY)).isTrue();
+            assertThat(noticeService.findActiveNoticeForUser(user.getId())).isNull();
         }
     }
 
