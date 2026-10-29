@@ -130,6 +130,25 @@ class RateLimitServiceTest extends IntegrationTestSupport {
         }
 
         @Test
+        @DisplayName("한도를 넘겨 막힌 요청이 여러 번 있었어도 환불하면 다시 1회 통과한다")
+        void refundWorksAfterRejectedAttempts() {
+            String key = uniqueKey();
+            rateLimitService.tryConsume(key, 1L, 2);
+            rateLimitService.tryConsume(key, 1L, 2);
+            assertThat(rateLimitService.tryConsume(key, 1L, 2)).isFalse();
+            assertThat(rateLimitService.tryConsume(key, 1L, 2)).isFalse();
+
+            rateLimitService.refund(key, 1L);
+
+            assertThat(redisTemplate.opsForValue().get(redisKey(key, 1L)))
+                    .as("막힌 요청은 횟수로 남지 않아 한도(2)에서 1회만 돌아온다")
+                    .isEqualTo("1");
+            assertThat(rateLimitService.tryConsume(key, 1L, 2))
+                    .as("예전에는 막힌 요청이 4까지 쌓여 환불해도 3 이라 계속 막혔다")
+                    .isTrue();
+        }
+
+        @Test
         @DisplayName("0 아래로는 내려가지 않는다")
         void neverGoesBelowZero() {
             String key = uniqueKey();

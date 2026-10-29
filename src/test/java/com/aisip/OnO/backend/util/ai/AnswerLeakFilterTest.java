@@ -484,4 +484,27 @@ class AnswerLeakFilterTest {
             assertThat(String.join("", sentences)).as("나눈 조각을 이으면 원문이다").isEqualTo(actual);
         }
     }
+
+    @Nested
+    @DisplayName("배포 전 검토 반영 - 단계 번호")
+    class StepNumbers {
+
+        @ParameterizedTest(name = "{0} / 답 {1}")
+        @CsvSource(delimiter = '|', value = {
+                "1단계: 답이 될 수 있는 경우를 나눠 보세요.|1",
+                "2 단계: 구하려는 값은 무엇인지 먼저 적어 보세요.|2",
+                "답이 정해지는 조건을 3번째 줄에서 확인하세요.|3"
+        })
+        @DisplayName("단계나 순서를 세는 숫자는 단정 표현과 함께 있어도 답으로 보지 않는다")
+        void stepNumberIsNotAnswer(String sentence, String answer) {
+            assertThat(solutionAfter(sentence, answer)).isEqualTo(sentence);
+        }
+
+        @Test
+        @DisplayName("같은 줄에 단계 번호와 답이 함께 있으면 여전히 지운다")
+        void answerBesideStepNumberIsRemoved() {
+            assertThat(solutionAfter("1단계: 조건 정리\n2단계: 따라서 답은 2이다.", "2"))
+                    .isEqualTo("1단계: 조건 정리");
+        }
+    }
 }

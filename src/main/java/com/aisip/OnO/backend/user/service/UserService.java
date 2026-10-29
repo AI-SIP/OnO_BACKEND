@@ -254,7 +254,10 @@ public class UserService {
 
     @Transactional
     public void deleteUserById(Long userId) {
-        User user = findUserEntity(userId);
+        // 복습 기록 등록, 미션 적립, 스터디룸 쓰기는 사용자 행을 먼저 잠그고 문제나 방 행을 잡는다(#401).
+        // 탈퇴가 문제 행을 먼저 지우고 마지막에 사용자 행을 잡으면 그 순서와 엇갈려 교착이 날 수 있어, 여기서도 먼저 잠근다.
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
         deleteImageAsync(user.getProfileImageUrl(), userId);
         sharedProblemCommentReactionRepository.deleteByCommentAuthorId(userId);
         sharedProblemCommentReactionRepository.deleteByUserId(userId);

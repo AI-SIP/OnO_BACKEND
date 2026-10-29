@@ -37,6 +37,10 @@ public class RateLimitService {
             if (count != null && count > limitPerDay) {
                 log.warn("Rate limit exceeded - userId: {}, key: {}, count: {}/{}",
                         userId, keyName, count, limitPerDay);
+                // 거절된 요청은 쓴 횟수가 아니다. 남겨 두면 막힌 요청마다 값이 한도 위로 쌓여,
+                // 앞서 쓴 1회를 refund 로 돌려줘도 여전히 한도를 넘어 다시 요청할 수 없다.
+                // 그 사이 키가 만료돼 TTL 없는 키가 생기지 않도록 환불과 같은 스크립트로 되돌린다.
+                redisTemplate.execute(REFUND_SCRIPT, List.of(key));
                 return false;
             }
             return true;

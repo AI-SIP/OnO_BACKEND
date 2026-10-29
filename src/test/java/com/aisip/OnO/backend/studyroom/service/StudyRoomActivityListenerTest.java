@@ -11,7 +11,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -87,5 +92,48 @@ class StudyRoomActivityListenerTest {
         assertThat(listener.awaitIdle(Duration.ofSeconds(5))).isTrue();
         assertThat(worker[0]).isNotNull().isNotSameAs(caller);
         assertThat(worker[0].getName()).startsWith("study-room-activity-");
+    }
+
+    @Test
+    @DisplayName("같은 사용자의 활동은 한 스레드에서 들어온 순서대로 처리해 피드 누적이 겹치지 않는다")
+    void sameUserRunsSequentiallyOnOneThread() {
+        Set<String> threads = ConcurrentHashMap.newKeySet();
+        List<Integer> order = new CopyOnWriteArrayList<>();
+        AtomicInteger running = new AtomicInteger();
+        AtomicInteger maxRunning = new AtomicInteger();
+        willAnswer(invocation -> {
+            threads.add(Thread.currentThread().getName());
+            maxRunning.accumulateAndGet(running.incrementAndGet(), Math::max);
+            Thread.sleep(20);
+            Map<String, Object> metadata = invocation.getArgument(2);
+            order.add((Integer) metadata.get("seq"));
+            running.decrementAndGet();
+            return null;
+        }).given(feedService).createFeedsForUserRooms(anyLong(), any(), any());
+
+        for (int i = 0; i < 6; i++) {
+            listener.onActivity(new StudyRoomActivityEvent(7L, StudyRoomFeedEventType.PROBLEM_REGISTERED, Map.of("seq", i)));
+        }
+
+        assertThat(listener.awaitIdle(Duration.ofSeconds(5))).isTrue();
+        assertThat(threads).hasSize(1);
+        assertThat(maxRunning.get()).as("같은 사용자의 뒤처리가 동시에 돌면 피드가 갈라지거나 개수를 잃는다").isEqualTo(1);
+        assertThat(order).containsExactly(0, 1, 2, 3, 4, 5);
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 활동은 다른 스레드로 나뉘어 함께 처리될 수 있다")
+    void differentUsersCanRunOnDifferentThreads() {
+        Set<String> threads = ConcurrentHashMap.newKeySet();
+        willAnswer(invocation -> {
+            threads.add(Thread.currentThread().getName());
+            return null;
+        }).given(feedService).createFeedsForUserRooms(anyLong(), any(), any());
+
+        listener.onActivity(new StudyRoomActivityEvent(1L, StudyRoomFeedEventType.PRACTICE_COMPLETED, Map.of()));
+        listener.onActivity(new StudyRoomActivityEvent(2L, StudyRoomFeedEventType.PRACTICE_COMPLETED, Map.of()));
+
+        assertThat(listener.awaitIdle(Duration.ofSeconds(5))).isTrue();
+        assertThat(threads).hasSize(StudyRoomActivityListener.WORKERS);
     }
 }

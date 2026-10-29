@@ -111,6 +111,11 @@ class UserServiceTest {
         given(userRepository.findById(USER_ID)).willReturn(Optional.of(user));
     }
 
+    /** 탈퇴는 사용자 행을 먼저 잠그고 시작한다(#401 과 같은 잠금 순서) */
+    private void givenLockedUser(User user) {
+        given(userRepository.findByIdForUpdate(USER_ID)).willReturn(Optional.of(user));
+    }
+
     private static MockMultipartFile pngFile() {
         return new MockMultipartFile("profileImage", "profile.png", "image/png", new byte[]{
                 (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x00
@@ -479,7 +484,7 @@ class UserServiceTest {
         @DisplayName("사용자 데이터를 모두 정리하고 identifier 를 마스킹한 뒤 삭제한다")
         void deletesUserWithAllRelatedData() {
             User user = User.from(registerDto);
-            givenExistingUser(user);
+            givenLockedUser(user);
 
             userService.deleteUserById(USER_ID);
 
@@ -502,7 +507,7 @@ class UserServiceTest {
         @Test
         @DisplayName("세션 행은 무거운 정리를 모두 끝낸 뒤 지운다")
         void deletesRefreshTokenAfterHeavyCleanup() {
-            givenExistingUser(User.from(registerDto));
+            givenLockedUser(User.from(registerDto));
 
             userService.deleteUserById(USER_ID);
 
@@ -516,7 +521,7 @@ class UserServiceTest {
         @Test
         @DisplayName("스터디룸 정리는 사용자를 소프트 삭제하기 전에 한다")
         void leavesStudyRoomsBeforeSoftDelete() {
-            givenExistingUser(User.from(registerDto));
+            givenLockedUser(User.from(registerDto));
 
             userService.deleteUserById(USER_ID);
 
@@ -528,7 +533,7 @@ class UserServiceTest {
         @Test
         @DisplayName("없는 사용자를 탈퇴시키려 하면 3001 로 끝내고 아무것도 지우지 않는다")
         void rejectsUnknownUser() {
-            given(userRepository.findById(404L)).willReturn(Optional.empty());
+            given(userRepository.findByIdForUpdate(404L)).willReturn(Optional.empty());
 
             assertThatThrownBy(() -> userService.deleteUserById(404L))
                     .isInstanceOf(ApplicationException.class);
@@ -543,7 +548,7 @@ class UserServiceTest {
         void enqueuesProfileImageDeletion() {
             User user = User.from(registerDto);
             user.updateProfileImageUrl("https://cdn.test.ono/profile.png");
-            givenExistingUser(user);
+            givenLockedUser(user);
 
             userService.deleteUserById(USER_ID);
 
@@ -557,7 +562,7 @@ class UserServiceTest {
         @Test
         @DisplayName("탈퇴하면 그 사용자 앞으로 나간 액세스 토큰을 막는다")
         void blacklistsIssuedAccessTokens() {
-            givenExistingUser(User.from(registerDto));
+            givenLockedUser(User.from(registerDto));
 
             userService.deleteUserById(USER_ID);
 
@@ -567,7 +572,7 @@ class UserServiceTest {
         @Test
         @DisplayName("없는 사용자면 토큰을 막지 않는다")
         void doesNotBlacklistWhenUserIsMissing() {
-            given(userRepository.findById(404L)).willReturn(Optional.empty());
+            given(userRepository.findByIdForUpdate(404L)).willReturn(Optional.empty());
 
             assertThatThrownBy(() -> userService.deleteUserById(404L))
                     .isInstanceOf(ApplicationException.class);

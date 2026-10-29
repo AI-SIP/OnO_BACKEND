@@ -94,7 +94,9 @@ final class AnalysisTextNormalizer {
 
     private static List<String> decorationNames() {
         return List.of("text", "textbf", "textit", "textrm", "mathrm", "mathbf", "mathit", "mathbb", "mathcal",
-                "operatorname", "boldsymbol", "overline", "underline", "vec", "hat", "bar", "boxed", "ce");
+                "operatorname", "boldsymbol", "overline", "underline", "vec", "hat", "bar", "boxed", "ce",
+                // 고교 벡터 표기와 t 로 시작하는 꾸밈. 목록에 없으면 \tilde 가 탭 이스케이프로 읽혀 " ilde" 가 된다
+                "overrightarrow", "widehat", "tilde");
     }
 
     static ProblemAnalysisResult normalize(ProblemAnalysisResult result) {
@@ -220,10 +222,13 @@ final class AnalysisTextNormalizer {
     /**
      * 역슬래시 뒤 낱말을 바꾼다. 줄바꿈은 역슬래시와 n 이 다음 낱말에 붙어 나오므로("\n2단계", "\nHowever")
      * 목록에 없는 n, r, t 로 시작하는 낱말은 이스케이프 문자와 나머지 글자로 본다.
-     * 글이 줄바꿈 이스케이프를 쓰고 있으면 \ne, \nu 처럼 목록에 있는 n 낱말도 줄바꿈으로 본다("\ne.g.", "\ne 는 자연상수").
+     * 글이 줄바꿈 이스케이프를 쓰고 있으면 \ne, \nu 처럼 영어 낱말과 겹치는 짧은 n 명령도 줄바꿈으로 본다("\ne.g.", "\ne 는 자연상수").
+     * \neq, \notin, \nabla 처럼 세 글자 이상인 명령은 COMMAND 가 영문자를 끝까지 먹은 뒤의 이름이라
+     * 줄바꿈 뒤에 그 낱말이 올 일이 거의 없고, 수식 글에서는 자주 쓰여 기호로 둔다. 줄바꿈으로 보면 "x \neq 0" 이 "x⏎eq 0" 이 됐다.
      */
     private static String command(String name, boolean usesNewlineEscape) {
-        if (usesNewlineEscape && name.charAt(0) == 'n' && !name.equals("newline")) {
+        if (usesNewlineEscape && name.charAt(0) == 'n' && !name.equals("newline")
+                && !(name.length() > 2 && SYMBOLS.containsKey(name))) {
             return "\n" + name.substring(1);
         }
         String symbol = SYMBOLS.get(name);
