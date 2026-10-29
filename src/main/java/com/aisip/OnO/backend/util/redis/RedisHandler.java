@@ -1,10 +1,12 @@
 package com.aisip.OnO.backend.util.redis;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.ListOperations;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class RedisHandler {
@@ -32,16 +34,17 @@ public class RedisHandler {
 
     /**
      * Redis 작업중 등록, 수정, 삭제에 대해서 처리 및 예외처리를 수행합니다.
+     * 예외는 호출부로 던지지 않고 경고 로그만 남긴다. 운영 로그 수집에 잡히도록 stdout 대신 로거를 쓴다(#410).
      *
-     * @param operation
-     * @return
+     * @param operation 실행할 Redis 쓰기·삭제 작업
+     * @return 성공(1), 실패(0)
      */
     public int executeOperation(Runnable operation) {
         try {
             operation.run();
             return 1;
         } catch (Exception e) {
-            System.out.println("Redis 작업 오류 발생 :: " + e.getMessage());
+            log.warn("Redis 작업 오류 발생 :: {}: {}", e.getClass().getSimpleName(), e.getMessage());
             return 0;
         }
     }

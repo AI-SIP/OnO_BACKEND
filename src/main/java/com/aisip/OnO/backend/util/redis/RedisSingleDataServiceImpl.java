@@ -45,12 +45,13 @@ public class RedisSingleDataServiceImpl implements RedisSingleDataService {
      * Redis 키를 기반으로 단일 데이터의 값을 조회합니다.
      *
      * @param key : redis key
-     * @return {String} redis value 값 반환 or 미 존재시 null 반환
+     * @return {String} redis value 값 반환 or 미 존재시 빈 문자열 반환
      */
     @Override
     public String getSingleData(String key) {
-        if (redisHandler.getValueOperations().get(key) == null) return "";
-        return String.valueOf(redisHandler.getValueOperations().get(key));
+        // GET 은 한 번만 보낸다. 두 번 읽으면 그 사이 키가 만료될 때 문자열 "null" 이 나간다(#410).
+        Object value = redisHandler.getValueOperations().get(key);
+        return value == null ? "" : String.valueOf(value);
     }
 
     /**
