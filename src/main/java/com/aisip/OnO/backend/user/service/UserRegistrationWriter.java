@@ -48,7 +48,7 @@ public class UserRegistrationWriter {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public User create(UserRegisterDto userRegisterDto) {
-        User user = userRepository.saveAndFlush(User.from(userRegisterDto));
+        User user = userRepository.saveAndFlush(User.fromSocialSignUp(userRegisterDto));
         folderService.initializeDefaultFoldersIfAbsent(user.getId());
         practiceNoteService.registerDefaultPractice(user.getId());
         return user;

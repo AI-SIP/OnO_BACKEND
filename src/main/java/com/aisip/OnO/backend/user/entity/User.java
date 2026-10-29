@@ -61,12 +61,26 @@ public class User extends BaseEntity {
     private List<MissionLog> missionLogList = new ArrayList<>();
 
     public static User from(UserRegisterDto userRegisterDto) {
+        return create(userRegisterDto, userRegisterDto.password());
+    }
+
+    /**
+     * 소셜 로그인으로 가입하는 회원 계정을 만든다.
+     *
+     * <p>소셜 회원은 비밀번호로 로그인하지 않으므로 요청에 password 가 있어도 저장하지 않는다.
+     * 비밀번호가 있는 계정은 {@code AdminConfig} 가 만드는 관리자 계정뿐이다.
+     */
+    public static User fromSocialSignUp(UserRegisterDto userRegisterDto) {
+        return create(userRegisterDto, null);
+    }
+
+    private static User create(UserRegisterDto userRegisterDto, String password) {
         return User.builder()
                 .email(userRegisterDto.email())
                 .name(userRegisterDto.name())
                 .identifier(userRegisterDto.identifier())
                 .platform(userRegisterDto.platform())
-                .password(userRegisterDto.password())
+                .password(password)
                 .userMissionStatus(new UserMissionStatus(
                         1L, 0L,  // 데일리 출석
                         1L, 0L,  // 오답노트 작성
@@ -98,6 +112,23 @@ public class User extends BaseEntity {
         this.profileImageUrl = profileImageUrl;
     }
 
+    /**
+     * 사용자가 앱에서 자기 정보를 고칠 때 쓴다. 이름과 이메일만 바꾼다.
+     *
+     * <p>identifier, platform 은 로그인 계정을 가리키는 값이고 password 는 관리자 로그인에만 쓰여서
+     * 요청에 들어 있어도 무시한다. 출시된 앱이 이 필드들을 함께 보내므로 거절하지 않고 무시만 한다.
+     */
+    public void updateProfile(UserRegisterDto userRegisterDto) {
+        if (userRegisterDto.email() != null && !userRegisterDto.email().isBlank()) {
+            this.email = userRegisterDto.email();
+        }
+
+        if (userRegisterDto.name() != null && !userRegisterDto.name().isBlank()) {
+            this.name = userRegisterDto.name();
+        }
+    }
+
+    /** 관리자 화면에서 사용자 정보를 고칠 때 쓴다. 보낸 필드를 모두 반영한다. */
     public void updateUser(UserRegisterDto userRegisterDto) {
         if (userRegisterDto.email() != null && !userRegisterDto.email().isBlank()) {
             this.email = userRegisterDto.email();
