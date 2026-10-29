@@ -352,7 +352,8 @@ class ProblemControllerTest extends ProblemTestSupport {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json(new ProblemRegisterV2Dto(
                                     null, "메모", null, ownerRoot.getId(), null,
-                                    List.of("https://s3/p.png"), List.of("https://s3/a.png")))))
+                                    List.of(fixtures.uploadedImageUrl(owner.getId())),
+                                    List.of(fixtures.uploadedImageUrl(owner.getId()))))))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data").isNumber());
 
@@ -397,7 +398,7 @@ class ProblemControllerTest extends ProblemTestSupport {
         void uploadImages() throws Exception {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
             saveSkippedAnalysis(problem);
-            org.mockito.BDDMockito.given(fileUploadService.uploadFileToS3(org.mockito.ArgumentMatchers.any()))
+            org.mockito.BDDMockito.given(fileUploadService.uploadFileToS3(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
                     .willReturn("https://s3/uploaded.png");
 
             mockMvc.perform(MockMvcRequestBuilders.multipart("/api/problems/{id}/imageData", problem.getId())
@@ -417,7 +418,7 @@ class ProblemControllerTest extends ProblemTestSupport {
             mockMvc.perform(post("/api/problems/{id}/imageData/urls", problem.getId())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json(new AddProblemImageUrlsRequest(List.of(
-                                    new AddProblemImageUrlsRequest.ImageUrlItem("https://s3/p.png", "PROBLEM_IMAGE")
+                                    new AddProblemImageUrlsRequest.ImageUrlItem(fixtures.uploadedImageUrl(owner.getId()), "PROBLEM_IMAGE")
                             )))))
                     .andExpect(status().isOk());
 
@@ -453,17 +454,18 @@ class ProblemControllerTest extends ProblemTestSupport {
         void updateImageData() throws Exception {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
             saveSkippedAnalysis(problem);
+            String imageUrl = fixtures.uploadedImageUrl(owner.getId());
 
             mockMvc.perform(patch("/api/problems/imageData")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json(new UpdateProblemImageDataRequest(problem.getId(), List.of(
-                                    new UpdateProblemImageDataRequest.ImageItem("https://s3/new.png", "PROBLEM_IMAGE")
+                                    new UpdateProblemImageDataRequest.ImageItem(imageUrl, "PROBLEM_IMAGE")
                             )))))
                     .andExpect(status().isOk());
 
             assertThat(problemImageDataRepository.findAllByProblemId(problem.getId()))
                     .extracting(image -> image.getImageUrl())
-                    .containsExactly("https://s3/new.png");
+                    .containsExactly(imageUrl);
         }
 
         @Test
@@ -475,7 +477,7 @@ class ProblemControllerTest extends ProblemTestSupport {
             mockMvc.perform(delete("/api/problems/imageData").param("imageUrl", "https://s3/mine.png"))
                     .andExpect(status().isOk());
 
-            assertThat(problemImageDataRepository.findByImageUrl("https://s3/mine.png")).isEmpty();
+            assertThat(problemImageDataRepository.existsByImageUrl("https://s3/mine.png")).isFalse();
         }
 
         @Test
@@ -487,7 +489,7 @@ class ProblemControllerTest extends ProblemTestSupport {
             mockMvc.perform(delete("/api/problems/imageData").param("imageUrl", "https://s3/theirs.png"))
                     .andExpect(status().isForbidden());
 
-            assertThat(problemImageDataRepository.findByImageUrl("https://s3/theirs.png")).isPresent();
+            assertThat(problemImageDataRepository.existsByImageUrl("https://s3/theirs.png")).isTrue();
         }
 
         @Test

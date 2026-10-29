@@ -9,6 +9,8 @@ import com.aisip.OnO.backend.problemsolve.entity.ProblemSolve;
 import com.aisip.OnO.backend.problemsolve.entity.ProblemSolveImageData;
 import com.aisip.OnO.backend.problemsolve.exception.ProblemSolveErrorCase;
 import com.aisip.OnO.backend.problemsolve.repository.ProblemSolveImageDataRepository;
+import com.aisip.OnO.backend.studyroom.repository.StudyRoomRepository;
+import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.util.fileupload.dto.PresignedUrlResponse;
 import com.aisip.OnO.backend.util.fileupload.exception.FileUploadErrorCase;
 import com.amazonaws.HttpMethod;
@@ -61,6 +63,7 @@ class FileUploadServiceTest {
 
     private static final String BUCKET = "test-ono-bucket";
     private static final String URL_PREFIX = "https://" + BUCKET + ".s3.ap-northeast-2.amazonaws.com/";
+    private static final Long USER_ID = 7L;
 
     private AmazonS3Client amazonS3Client;
     private ProblemImageDataRepository problemImageDataRepository;
@@ -74,8 +77,13 @@ class FileUploadServiceTest {
         problemImageDataRepository = mock(ProblemImageDataRepository.class);
         problemSolveImageDataRepository = mock(ProblemSolveImageDataRepository.class);
         meterRegistry = new SimpleMeterRegistry();
+        ImageUrlOwnershipService imageUrlOwnershipService = new ImageUrlOwnershipService(
+                problemImageDataRepository, problemSolveImageDataRepository,
+                mock(UserRepository.class), mock(StudyRoomRepository.class));
+        ReflectionTestUtils.setField(imageUrlOwnershipService, "bucket", BUCKET);
         fileUploadService = new FileUploadService(
-                amazonS3Client, meterRegistry, problemImageDataRepository, problemSolveImageDataRepository);
+                amazonS3Client, meterRegistry, problemImageDataRepository, problemSolveImageDataRepository,
+                imageUrlOwnershipService);
         ReflectionTestUtils.setField(fileUploadService, "bucket", BUCKET);
     }
 
@@ -95,16 +103,25 @@ class FileUploadServiceTest {
         @Test
         @DisplayName("업로드한 파일의 공개 URL 을 돌려준다")
         void returnsPublicUrl() {
-            String url = fileUploadService.uploadFileToS3(imageFile("photo.jpg"));
+            String url = fileUploadService.uploadFileToS3(imageFile("photo.jpg"), USER_ID);
 
             assertThat(url).startsWith(URL_PREFIX + "image/");
             assertThat(url).endsWith(".jpg");
         }
 
         @Test
+        @DisplayName("올린 사용자의 id 를 key 에 넣는다")
+        void putsUserIdIntoKey() {
+            String url = fileUploadService.uploadFileToS3(imageFile("photo.jpg"), USER_ID);
+
+            assertThat(url).matches(java.util.regex.Pattern.quote(URL_PREFIX)
+                    + "image/users/7/\\d{4}/\\d{2}/\\d{2}/[0-9a-f-]{36}\\.jpg");
+        }
+
+        @Test
         @DisplayName("원본 확장자를 유지한 키로 S3 에 올린다")
         void keepsOriginalExtension() {
-            String url = fileUploadService.uploadFileToS3(imageFile("스크린샷.PNG"));
+            String url = fileUploadService.uploadFileToS3(imageFile("스크린샷.PNG"), USER_ID);
 
             ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
             verify(amazonS3Client).putObject(
@@ -118,7 +135,7 @@ class FileUploadServiceTest {
         void sendsMetadata() {
             MultipartFile file = imageFile("photo.jpg");
 
-            fileUploadService.uploadFileToS3(file);
+            fileUploadService.uploadFileToS3(file, USER_ID);
 
             ArgumentCaptor<ObjectMetadata> metadata = ArgumentCaptor.forClass(ObjectMetadata.class);
             verify(amazonS3Client).putObject(anyString(), anyString(), any(InputStream.class), metadata.capture());
@@ -129,7 +146,7 @@ class FileUploadServiceTest {
         @Test
         @DisplayName("업로드 성공은 success 태그로 계측된다")
         void recordsSuccessMetric() {
-            fileUploadService.uploadFileToS3(imageFile("photo.jpg"));
+            fileUploadService.uploadFileToS3(imageFile("photo.jpg"), USER_ID);
 
             Timer timer = meterRegistry.find("ono.external.requests")
                     .tags("dependency", "s3", "operation", "upload", "outcome", "success")
@@ -143,7 +160,7 @@ class FileUploadServiceTest {
         void translatesIoException() {
             MultipartFile brokenFile = brokenMultipartFile();
 
-            assertThatThrownBy(() -> fileUploadService.uploadFileToS3(brokenFile))
+            assertThatThrownBy(() -> fileUploadService.uploadFileToS3(brokenFile, USER_ID))
                     .isInstanceOf(ApplicationException.class)
                     .extracting(exception -> ((ApplicationException) exception).getErrorCase())
                     .isEqualTo(FileUploadErrorCase.FILE_UPLOAD_FAILED);
@@ -160,7 +177,7 @@ class FileUploadServiceTest {
         void rejectsFilenameWithoutExtension(String filename) {
             MultipartFile file = imageFile(filename);
 
-            assertThatThrownBy(() -> fileUploadService.uploadFileToS3(file))
+            assertThatThrownBy(() -> fileUploadService.uploadFileToS3(file, USER_ID))
                     .isInstanceOf(ApplicationException.class)
                     .extracting(exception -> ((ApplicationException) exception).getErrorCase())
                     .isEqualTo(FileUploadErrorCase.INVALID_IMAGE_FILE);
@@ -174,7 +191,7 @@ class FileUploadServiceTest {
             MultipartFile fileWithoutName = mock(MultipartFile.class);
             when(fileWithoutName.getOriginalFilename()).thenReturn(null);
 
-            assertThatThrownBy(() -> fileUploadService.uploadFileToS3(fileWithoutName))
+            assertThatThrownBy(() -> fileUploadService.uploadFileToS3(fileWithoutName, USER_ID))
                     .as("filename 헤더가 없는 멀티파트 파트가 500 이 되면 안 된다")
                     .isInstanceOf(ApplicationException.class)
                     .extracting(exception -> ((ApplicationException) exception).getErrorCase())
@@ -186,46 +203,10 @@ class FileUploadServiceTest {
         @Test
         @DisplayName("확장자 검증에 걸리면 S3 호출 없이 끝난다")
         void doesNotCallS3WhenFilenameIsInvalid() {
-            assertThatThrownBy(() -> fileUploadService.uploadFileToS3(imageFile("no-extension")))
+            assertThatThrownBy(() -> fileUploadService.uploadFileToS3(imageFile("no-extension"), USER_ID))
                     .isInstanceOf(ApplicationException.class);
 
             verify(amazonS3Client, never()).putObject(anyString(), anyString(), any(InputStream.class), any());
-        }
-    }
-
-    @Nested
-    @DisplayName("S3 URL 검증")
-    class ValidateUrl {
-
-        @Test
-        @DisplayName("우리 버킷 URL 은 통과한다")
-        void acceptsOwnBucketUrl() {
-            assertThatCode(() -> fileUploadService.validateS3Url(URL_PREFIX + "image/2026/03/01/uuid.jpg"))
-                    .doesNotThrowAnyException();
-        }
-
-        @ParameterizedTest(name = "\"{0}\"")
-        @ValueSource(strings = {
-                "https://evil.com/image.jpg",
-                "https://other-bucket.s3.ap-northeast-2.amazonaws.com/image.jpg",
-                "http://test-ono-bucket.s3.ap-northeast-2.amazonaws.com/image.jpg",
-                "javascript:alert(1)",
-                "   "
-        })
-        @DisplayName("외부 URL 이나 빈 값은 거절한다")
-        void rejectsForeignUrl(String url) {
-            assertThatThrownBy(() -> fileUploadService.validateS3Url(url))
-                    .as("우리 버킷이 아닌 주소를 저장하면 외부 이미지를 앱에 띄우게 된다")
-                    .isInstanceOf(ApplicationException.class)
-                    .extracting(exception -> ((ApplicationException) exception).getErrorCase())
-                    .isEqualTo(FileUploadErrorCase.INVALID_IMAGE_FILE);
-        }
-
-        @Test
-        @DisplayName("null 도 거절한다")
-        void rejectsNull() {
-            assertThatThrownBy(() -> fileUploadService.validateS3Url(null))
-                    .isInstanceOf(ApplicationException.class);
         }
     }
 
@@ -242,19 +223,19 @@ class FileUploadServiceTest {
         @Test
         @DisplayName("요청한 개수만큼 발급한다")
         void issuesRequestedCount() {
-            List<PresignedUrlResponse> responses = fileUploadService.generatePresignedUrls("image/jpeg", 3);
+            List<PresignedUrlResponse> responses = fileUploadService.generatePresignedUrls("image/jpeg", 3, USER_ID);
 
             assertThat(responses).hasSize(3);
             assertThat(responses).allSatisfy(response -> {
                 assertThat(response.presignedUrl()).contains("signature=abc");
-                assertThat(response.fileUrl()).startsWith(URL_PREFIX);
+                assertThat(response.fileUrl()).startsWith(URL_PREFIX + "image/users/7/");
             });
         }
 
         @Test
         @DisplayName("0개를 요청하면 빈 목록을 준다")
         void issuesNothingForZeroCount() {
-            assertThat(fileUploadService.generatePresignedUrls("image/jpeg", 0)).isEmpty();
+            assertThat(fileUploadService.generatePresignedUrls("image/jpeg", 0, USER_ID)).isEmpty();
             verifyNoInteractions(amazonS3Client);
         }
 
@@ -270,7 +251,7 @@ class FileUploadServiceTest {
         })
         @DisplayName("컨텐츠 타입에 맞는 확장자로 키를 만든다")
         void mapsContentTypeToExtension(String contentType, String expectedExtension) {
-            List<PresignedUrlResponse> responses = fileUploadService.generatePresignedUrls(contentType, 1);
+            List<PresignedUrlResponse> responses = fileUploadService.generatePresignedUrls(contentType, 1, USER_ID);
 
             assertThat(responses.get(0).fileUrl()).endsWith(expectedExtension);
         }
@@ -280,7 +261,7 @@ class FileUploadServiceTest {
         void signsPutRequestWithExpiration() {
             long before = System.currentTimeMillis();
 
-            fileUploadService.generatePresignedUrls("image/jpeg", 1);
+            fileUploadService.generatePresignedUrls("image/jpeg", 1, USER_ID);
 
             ArgumentCaptor<GeneratePresignedUrlRequest> request =
                     ArgumentCaptor.forClass(GeneratePresignedUrlRequest.class);
@@ -300,25 +281,39 @@ class FileUploadServiceTest {
     @DisplayName("이미지 삭제 - 소유권")
     class DeleteWithOwnership {
 
-        private static final String IMAGE_URL = URL_PREFIX + "image/2026/03/01/uuid.jpg";
+        private static final String IMAGE_URL = URL_PREFIX + "image/users/1/2026/03/01/0b8f4a52-7c1e-4d33-9a51-8e8d0f6f2a10.jpg";
+        private static final String LEGACY_URL = URL_PREFIX + "image/2025/03/01/0b8f4a52-7c1e-4d33-9a51-8e8d0f6f2a10.jpg";
 
         @Test
         @DisplayName("본인 문제 이미지는 S3 와 DB 에서 함께 지운다")
         void deletesOwnProblemImage() {
             ProblemImageData imageData = problemImageData(1L);
-            when(problemImageDataRepository.findByImageUrl(IMAGE_URL)).thenReturn(Optional.of(imageData));
+            when(problemImageDataRepository.findAllByImageUrlAndUserId(IMAGE_URL, 1L)).thenReturn(List.of(imageData));
 
             fileUploadService.deleteUserImageFile(IMAGE_URL, 1L);
 
             verify(amazonS3Client).deleteObject(any(DeleteObjectRequest.class));
-            verify(problemImageDataRepository).deleteByImageUrl(IMAGE_URL);
+            verify(problemImageDataRepository).deleteAll(List.of(imageData));
+        }
+
+        @Test
+        @DisplayName("예전 형식 이미지를 다른 사용자의 행도 쓰고 있으면 내 행만 지우고 S3 파일은 남긴다")
+        void keepsS3FileUsedByOtherUser() {
+            ProblemImageData imageData = problemImageData(1L);
+            when(problemImageDataRepository.findAllByImageUrlAndUserId(LEGACY_URL, 1L)).thenReturn(List.of(imageData));
+            when(problemImageDataRepository.findImageUrlsUsedByOtherUsers(List.of(LEGACY_URL), 1L))
+                    .thenReturn(List.of(LEGACY_URL));
+
+            fileUploadService.deleteUserImageFile(LEGACY_URL, 1L);
+
+            verify(amazonS3Client, never()).deleteObject(any(DeleteObjectRequest.class));
+            verify(problemImageDataRepository).deleteAll(List.of(imageData));
         }
 
         @Test
         @DisplayName("다른 사용자의 문제 이미지는 지울 수 없다")
         void rejectsOtherUsersProblemImage() {
-            ProblemImageData imageData = problemImageData(1L);
-            when(problemImageDataRepository.findByImageUrl(IMAGE_URL)).thenReturn(Optional.of(imageData));
+            when(problemImageDataRepository.existsByImageUrl(IMAGE_URL)).thenReturn(true);
 
             assertThatThrownBy(() -> fileUploadService.deleteUserImageFile(IMAGE_URL, 2L))
                     .isInstanceOf(ApplicationException.class)
@@ -326,28 +321,25 @@ class FileUploadServiceTest {
                     .isEqualTo(ProblemErrorCase.PROBLEM_USER_UNMATCHED);
 
             verify(amazonS3Client, never()).deleteObject(any(DeleteObjectRequest.class));
-            verify(problemImageDataRepository, never()).deleteByImageUrl(anyString());
+            verify(problemImageDataRepository, never()).deleteAll(any());
         }
 
         @Test
         @DisplayName("본인 복습 기록 이미지도 지울 수 있다")
         void deletesOwnProblemSolveImage() {
             ProblemSolveImageData imageData = problemSolveImageData(1L);
-            when(problemImageDataRepository.findByImageUrl(IMAGE_URL)).thenReturn(Optional.empty());
-            when(problemSolveImageDataRepository.findByImageUrl(IMAGE_URL)).thenReturn(Optional.of(imageData));
+            when(problemSolveImageDataRepository.findAllByImageUrlAndUserId(IMAGE_URL, 1L)).thenReturn(List.of(imageData));
 
             fileUploadService.deleteUserImageFile(IMAGE_URL, 1L);
 
             verify(amazonS3Client).deleteObject(any(DeleteObjectRequest.class));
-            verify(problemSolveImageDataRepository).deleteByImageUrl(IMAGE_URL);
+            verify(problemSolveImageDataRepository).deleteAll(List.of(imageData));
         }
 
         @Test
         @DisplayName("다른 사용자의 복습 기록 이미지는 지울 수 없다")
         void rejectsOtherUsersProblemSolveImage() {
-            ProblemSolveImageData imageData = problemSolveImageData(1L);
-            when(problemImageDataRepository.findByImageUrl(IMAGE_URL)).thenReturn(Optional.empty());
-            when(problemSolveImageDataRepository.findByImageUrl(IMAGE_URL)).thenReturn(Optional.of(imageData));
+            when(problemSolveImageDataRepository.existsByImageUrl(IMAGE_URL)).thenReturn(true);
 
             assertThatThrownBy(() -> fileUploadService.deleteUserImageFile(IMAGE_URL, 2L))
                     .isInstanceOf(ApplicationException.class)
@@ -360,9 +352,6 @@ class FileUploadServiceTest {
         @Test
         @DisplayName("어느 쪽에도 없는 이미지는 404 로 거절한다")
         void rejectsUnknownImage() {
-            when(problemImageDataRepository.findByImageUrl(anyString())).thenReturn(Optional.empty());
-            when(problemSolveImageDataRepository.findByImageUrl(anyString())).thenReturn(Optional.empty());
-
             assertThatThrownBy(() -> fileUploadService.deleteUserImageFile(IMAGE_URL, 1L))
                     .isInstanceOf(ApplicationException.class)
                     .extracting(exception -> ((ApplicationException) exception).getErrorCase())
@@ -387,6 +376,21 @@ class FileUploadServiceTest {
             assertThat(request.getValue().getKey()).isEqualTo("image/2026/03/01/uuid.jpg");
         }
 
+        @ParameterizedTest(name = "\"{0}\"")
+        @ValueSource(strings = {
+                "https://example.com/image/2026/03/01/uuid.jpg",
+                "https://other-bucket.s3.ap-northeast-2.amazonaws.com/image/2026/03/01/uuid.jpg",
+                "https://example.com/" + "https://test-ono-bucket.s3.ap-northeast-2.amazonaws.com/x.com/image.jpg",
+                "https://test-ono-bucket.s3.ap-northeast-2.amazonaws.com/",
+                "https://test-ono-bucket.s3.ap-northeast-2.amazonaws.com/image/../secret.jpg"
+        })
+        @DisplayName("우리 버킷 URL 이 아니면 S3 를 부르지 않는다")
+        void skipsForeignUrl(String url) {
+            assertThatCode(() -> fileUploadService.deleteImageFileFromS3(url)).doesNotThrowAnyException();
+
+            verifyNoInteractions(amazonS3Client);
+        }
+
         @Test
         @DisplayName("삭제 실패는 그대로 전파되고 failure 로 계측된다")
         void propagatesDeleteFailure() {
@@ -405,17 +409,17 @@ class FileUploadServiceTest {
 
     private ProblemImageData problemImageData(Long ownerId) {
         Problem problem = mock(Problem.class);
-        when(problem.getUserId()).thenReturn(ownerId);
+        org.mockito.Mockito.lenient().when(problem.getUserId()).thenReturn(ownerId);
         ProblemImageData imageData = mock(ProblemImageData.class);
-        when(imageData.getProblem()).thenReturn(problem);
+        org.mockito.Mockito.lenient().when(imageData.getProblem()).thenReturn(problem);
         return imageData;
     }
 
     private ProblemSolveImageData problemSolveImageData(Long ownerId) {
         ProblemSolve problemSolve = mock(ProblemSolve.class);
-        when(problemSolve.getUserId()).thenReturn(ownerId);
+        org.mockito.Mockito.lenient().when(problemSolve.getUserId()).thenReturn(ownerId);
         ProblemSolveImageData imageData = mock(ProblemSolveImageData.class);
-        when(imageData.getProblemSolve()).thenReturn(problemSolve);
+        org.mockito.Mockito.lenient().when(imageData.getProblemSolve()).thenReturn(problemSolve);
         return imageData;
     }
 

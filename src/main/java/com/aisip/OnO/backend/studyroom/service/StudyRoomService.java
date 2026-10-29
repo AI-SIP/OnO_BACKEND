@@ -15,6 +15,7 @@ import com.aisip.OnO.backend.user.exception.UserErrorCase;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.util.fileupload.exception.FileUploadErrorCase;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.util.fileupload.service.ImageUrlOwnershipService;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -44,6 +45,7 @@ public class StudyRoomService {
     private final StudyRoomStatsService statsService;
     private final StudyRoomMapper mapper;
     private final FileUploadService fileUploadService;
+    private final ImageUrlOwnershipService imageUrlOwnershipService;
     private final S3DeleteProducer s3DeleteProducer;
     private final EntityManager entityManager;
 
@@ -93,7 +95,7 @@ public class StudyRoomService {
         roomRepository.save(room);
         if (thumbnailImage != null && !thumbnailImage.isEmpty()) {
             validateThumbnail(thumbnailImage);
-            String thumbnailUrl = fileUploadService.uploadFileToS3(thumbnailImage);
+            String thumbnailUrl = fileUploadService.uploadFileToS3(thumbnailImage, userId);
             deleteThumbnailOnRollback(thumbnailUrl, room.getId());
             room.updateThumbnailUrl(thumbnailUrl);
         }
@@ -122,10 +124,10 @@ public class StudyRoomService {
         if (thumbnailImage != null) {
             validateThumbnail(thumbnailImage);
             String previousThumbnailUrl = room.getThumbnailUrl();
-            String thumbnailUrl = fileUploadService.uploadFileToS3(thumbnailImage);
+            String thumbnailUrl = fileUploadService.uploadFileToS3(thumbnailImage, userId);
             deleteThumbnailOnRollback(thumbnailUrl, roomId);
             room.updateThumbnailUrl(thumbnailUrl);
-            deleteThumbnailAsync(previousThumbnailUrl, roomId);
+            deleteThumbnailAsync(previousThumbnailUrl, roomId, room.getHostUserId());
         }
         return buildDetail(room);
     }
@@ -134,7 +136,7 @@ public class StudyRoomService {
     public void deleteRoom(Long roomId, Long userId) {
         accessService.validateHost(roomId, userId);
         StudyRoom room = lockRoom(roomId);
-        deleteThumbnailAsync(room.getThumbnailUrl(), roomId);
+        deleteThumbnailAsync(room.getThumbnailUrl(), roomId, room.getHostUserId());
         roomRepository.delete(room);
     }
 
@@ -191,7 +193,7 @@ public class StudyRoomService {
                 .findFirst()
                 .orElse(null);
         if (nextHost == null) {
-            deleteThumbnailAsync(room.getThumbnailUrl(), roomId);
+            deleteThumbnailAsync(room.getThumbnailUrl(), roomId, room.getHostUserId());
             roomRepository.delete(room);
             return;
         }
@@ -245,21 +247,25 @@ public class StudyRoomService {
         validateThumbnail(thumbnail);
         StudyRoom room = accessService.getRoomOrThrow(roomId);
         String previousThumbnailUrl = room.getThumbnailUrl();
-        String thumbnailUrl = fileUploadService.uploadFileToS3(thumbnail);
+        String thumbnailUrl = fileUploadService.uploadFileToS3(thumbnail, userId);
         deleteThumbnailOnRollback(thumbnailUrl, roomId);
         room.updateThumbnailUrl(thumbnailUrl);
-        deleteThumbnailAsync(previousThumbnailUrl, roomId);
+        deleteThumbnailAsync(previousThumbnailUrl, roomId, room.getHostUserId());
         return new StudyRoomThumbnailUpdateResponse(thumbnailUrl);
     }
 
     @Transactional
     public StudyRoomThumbnailUpdateResponse updateThumbnailByUrl(Long roomId, Long userId, String thumbnailUrl) {
         accessService.validateHost(roomId, userId);
-        fileUploadService.validateS3Url(thumbnailUrl);
         StudyRoom room = accessService.getRoomOrThrow(roomId);
         String previousThumbnailUrl = room.getThumbnailUrl();
+        // 지금 썸네일 URL 은 예전 형식이어도 그대로 받는다.
+        imageUrlOwnershipService.validateUploadedBy(thumbnailUrl, userId, previousThumbnailUrl);
         room.updateThumbnailUrl(thumbnailUrl);
-        deleteThumbnailAsync(previousThumbnailUrl, roomId);
+        // 같은 URL 을 다시 보내면 지금 쓰는 파일이라 지우지 않는다.
+        if (!thumbnailUrl.equals(previousThumbnailUrl)) {
+            deleteThumbnailAsync(previousThumbnailUrl, roomId, room.getHostUserId());
+        }
         return new StudyRoomThumbnailUpdateResponse(thumbnailUrl);
     }
 
@@ -364,8 +370,15 @@ public class StudyRoomService {
         };
     }
 
-    private void deleteThumbnailAsync(String thumbnailUrl, Long roomId) {
+    /**
+     * @param hostUserId 지금 방장. 썸네일은 방장이 올린 파일이라 이 사용자를 주인으로 보고,
+     *                   다른 사용자가 같은 파일을 쓰고 있으면 S3 파일은 남긴다.
+     */
+    private void deleteThumbnailAsync(String thumbnailUrl, Long roomId, Long hostUserId) {
         if (thumbnailUrl == null || thumbnailUrl.isBlank()) {
+            return;
+        }
+        if (!imageUrlOwnershipService.isDeletable(thumbnailUrl, hostUserId)) {
             return;
         }
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {

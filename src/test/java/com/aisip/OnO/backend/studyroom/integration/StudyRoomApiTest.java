@@ -133,7 +133,7 @@ class StudyRoomApiTest extends StudyRoomTestSupport {
         void createWithThumbnail() throws Exception {
             User host = fixtures.createUser("host");
             authenticateAs(host.getId());
-            given(fileUploadService.uploadFileToS3(any())).willReturn("https://cdn.example.com/new-room.png");
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn("https://cdn.example.com/new-room.png");
 
             mockMvc.perform(multipart("/api/study-room")
                             .file(new MockMultipartFile("thumbnailImage", "t.png", "image/png", pngBytes()))
@@ -331,7 +331,7 @@ class StudyRoomApiTest extends StudyRoomTestSupport {
         void multipartUpdatesNameAndThumbnail() throws Exception {
             RoomFixture fixture = createRoomWithMemberAndOutsider();
             authenticateAs(fixture.host().getId());
-            given(fileUploadService.uploadFileToS3(any())).willReturn("https://cdn.example.com/updated.png");
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn("https://cdn.example.com/updated.png");
 
             mockMvc.perform(multipart("/api/study-rooms/{roomId}", fixture.roomId())
                             .file(new MockMultipartFile("thumbnailImage", "t.png", "image/png", pngBytes()))
@@ -352,7 +352,7 @@ class StudyRoomApiTest extends StudyRoomTestSupport {
         void hostUploadIsReflectedEverywhere() throws Exception {
             RoomFixture fixture = createRoomWithMemberAndOutsider();
             authenticateAs(fixture.host().getId());
-            given(fileUploadService.uploadFileToS3(any())).willReturn("https://cdn.example.com/room.png");
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn("https://cdn.example.com/room.png");
 
             mockMvc.perform(multipart("/api/study-room/{roomId}/thumbnail", fixture.roomId())
                             .file(new MockMultipartFile("thumbnail", "t.png", "image/png", pngBytes()))
@@ -426,17 +426,35 @@ class StudyRoomApiTest extends StudyRoomTestSupport {
         void hostCanSetThumbnailByUrl() throws Exception {
             RoomFixture fixture = createRoomWithMemberAndOutsider();
             authenticateAs(fixture.host().getId());
+            String thumbnailUrl = fixtures.uploadedImageUrl(fixture.host().getId());
 
             mockMvc.perform(patch("/api/study-room/{roomId}/thumbnail-url", fixture.roomId())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(
-                                    new ThumbnailUrlUpdateRequest("https://cdn.example.com/by-url.png"))))
+                                    new ThumbnailUrlUpdateRequest(thumbnailUrl))))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.thumbnailUrl").value("https://cdn.example.com/by-url.png"));
+                    .andExpect(jsonPath("$.data.thumbnailUrl").value(thumbnailUrl));
 
             assertThat(roomRepository.findById(fixture.roomId()).orElseThrow().getThumbnailUrl())
                     .as("저장된 썸네일 URL")
-                    .isEqualTo("https://cdn.example.com/by-url.png");
+                    .isEqualTo(thumbnailUrl);
+        }
+
+        @Test
+        @DisplayName("다른 사용자가 올린 URL 로는 썸네일을 지정할 수 없다 - 403 + 2006")
+        void thumbnailUrlUploadedByOtherUserIsRejected() throws Exception {
+            RoomFixture fixture = createRoomWithMemberAndOutsider();
+            authenticateAs(fixture.host().getId());
+
+            mockMvc.perform(patch("/api/study-room/{roomId}/thumbnail-url", fixture.roomId())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(
+                                    new ThumbnailUrlUpdateRequest(fixtures.uploadedImageUrl(fixture.member().getId())))))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode").value(2006));
+
+            assertThat(roomRepository.findById(fixture.roomId()).orElseThrow().getThumbnailUrl())
+                    .as("변경되지 않은 썸네일").isNull();
         }
 
         @Test
@@ -461,14 +479,11 @@ class StudyRoomApiTest extends StudyRoomTestSupport {
         void invalidS3UrlIsRejected() throws Exception {
             RoomFixture fixture = createRoomWithMemberAndOutsider();
             authenticateAs(fixture.host().getId());
-            org.mockito.BDDMockito.willThrow(new com.aisip.OnO.backend.common.exception.ApplicationException(
-                            com.aisip.OnO.backend.util.fileupload.exception.FileUploadErrorCase.INVALID_IMAGE_FILE))
-                    .given(fileUploadService).validateS3Url("https://evil.example.com/x.png");
 
             mockMvc.perform(patch("/api/study-room/{roomId}/thumbnail-url", fixture.roomId())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(
-                                    new ThumbnailUrlUpdateRequest("https://evil.example.com/x.png"))))
+                                    new ThumbnailUrlUpdateRequest("https://example.com/x.png"))))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.errorCode").value(2003));
         }
@@ -478,13 +493,13 @@ class StudyRoomApiTest extends StudyRoomTestSupport {
         void previousThumbnailIsScheduledForDeletion() throws Exception {
             RoomFixture fixture = createRoomWithMemberAndOutsider();
             authenticateAs(fixture.host().getId());
-            given(fileUploadService.uploadFileToS3(any())).willReturn("https://cdn.example.com/first.png");
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn("https://cdn.example.com/first.png");
             mockMvc.perform(multipart("/api/study-room/{roomId}/thumbnail", fixture.roomId())
                             .file(new MockMultipartFile("thumbnail", "t.png", "image/png", pngBytes()))
                             .with(patchMethod()))
                     .andExpect(status().isOk());
 
-            given(fileUploadService.uploadFileToS3(any())).willReturn("https://cdn.example.com/second.png");
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn("https://cdn.example.com/second.png");
             mockMvc.perform(multipart("/api/study-room/{roomId}/thumbnail", fixture.roomId())
                             .file(new MockMultipartFile("thumbnail", "t.png", "image/png", pngBytes()))
                             .with(patchMethod()))

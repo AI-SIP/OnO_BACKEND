@@ -165,8 +165,8 @@ class ProblemServiceTest extends ProblemTestSupport {
         @DisplayName("이미지가 함께 조회된다")
         void returnsImageData() {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
-            saveImageData(problem, "https://s3/problem.png", ProblemImageType.PROBLEM_IMAGE);
-            saveImageData(problem, "https://s3/answer.png", ProblemImageType.ANSWER_IMAGE);
+            saveImageData(problem, fixtures.bucketImageUrl("problem"), ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(problem, fixtures.bucketImageUrl("answer"), ProblemImageType.ANSWER_IMAGE);
 
             ProblemResponseDto response = problemService.findProblem(problem.getId(), owner.getId());
 
@@ -494,8 +494,8 @@ class ProblemServiceTest extends ProblemTestSupport {
         void savesImageUrls() {
             Long problemId = problemService.registerProblemV2(new ProblemRegisterV2Dto(
                     null, "메모", "출처", ownerRoot.getId(), null,
-                    List.of("https://s3/p1.png", "https://s3/p2.png"),
-                    List.of("https://s3/a1.png")
+                    List.of(fixtures.uploadedImageUrl(owner.getId()), fixtures.uploadedImageUrl(owner.getId())),
+                    List.of(fixtures.uploadedImageUrl(owner.getId()))
             ), owner.getId());
 
             assertThat(problemImageDataRepository.findAllByProblemId(problemId))
@@ -527,15 +527,16 @@ class ProblemServiceTest extends ProblemTestSupport {
         @Test
         @DisplayName("공백/빈 문자열 URL 은 걸러진다")
         void filtersBlankUrls() {
+            String imageUrl = fixtures.uploadedImageUrl(owner.getId());
             Long problemId = problemService.registerProblemV2(new ProblemRegisterV2Dto(
                     null, "메모", null, ownerRoot.getId(), null,
-                    java.util.Arrays.asList("  ", "", null, " https://s3/p.png "),
+                    java.util.Arrays.asList("  ", "", null, " " + imageUrl + " "),
                     List.of()
             ), owner.getId());
 
             assertThat(problemImageDataRepository.findAllByProblemId(problemId))
                     .extracting(image -> image.getImageUrl())
-                    .containsExactly("https://s3/p.png");
+                    .containsExactly(imageUrl);
         }
 
         @Test
@@ -1037,7 +1038,7 @@ class ProblemServiceTest extends ProblemTestSupport {
         @DisplayName("문제를 삭제하면 이미지·태그 매핑도 함께 정리된다")
         void deletesProblemWithRelations() {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
-            saveImageData(problem, "https://s3/p.png", ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(problem, fixtures.bucketImageUrl("p"), ProblemImageType.PROBLEM_IMAGE);
             saveTagMapping(problem, saveTag(owner.getId(), "삭제대상"));
 
             problemService.deleteProblem(problem.getId(), owner.getId());
@@ -1146,8 +1147,8 @@ class ProblemServiceTest extends ProblemTestSupport {
         @DisplayName("일괄 삭제 중 뒤쪽 id 가 실패하면 앞서 지운 문제의 S3 삭제 메시지도 나가지 않는다")
         void sendsNothingWhenListDeleteRollsBack() {
             Problem mine = saveProblem(owner.getId(), ownerRoot);
-            saveImageData(mine, "https://s3/mine-1.png", ProblemImageType.PROBLEM_IMAGE);
-            saveImageData(mine, "https://s3/mine-2.png", ProblemImageType.ANSWER_IMAGE);
+            saveImageData(mine, fixtures.bucketImageUrl("mine-1"), ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(mine, fixtures.bucketImageUrl("mine-2"), ProblemImageType.ANSWER_IMAGE);
             Problem theirs = saveProblem(intruder.getId(), intruderRoot);
 
             assertThatThrownBy(() -> problemService.deleteProblemList(
@@ -1164,7 +1165,7 @@ class ProblemServiceTest extends ProblemTestSupport {
         @DisplayName("일괄 삭제 중 없는 id 가 섞여도 S3 삭제 메시지는 나가지 않는다")
         void sendsNothingWhenListDeleteHitsUnknownProblem() {
             Problem mine = saveProblem(owner.getId(), ownerRoot);
-            saveImageData(mine, "https://s3/mine.png", ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(mine, fixtures.bucketImageUrl("mine"), ProblemImageType.PROBLEM_IMAGE);
 
             assertThatThrownBy(() -> problemService.deleteProblemList(
                     owner.getId(), List.of(mine.getId(), 999_999L)))
@@ -1178,33 +1179,33 @@ class ProblemServiceTest extends ProblemTestSupport {
         @DisplayName("단건 삭제는 커밋된 뒤에 S3 삭제 메시지를 보낸다")
         void sendsAfterCommitOnSingleDelete() {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
-            saveImageData(problem, "https://s3/one.png", ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(problem, fixtures.bucketImageUrl("one"), ProblemImageType.PROBLEM_IMAGE);
 
             inTransaction(() -> {
                 problemService.deleteProblem(problem.getId(), owner.getId());
                 verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
             });
 
-            verify(s3DeleteProducer).sendDeleteMessage("https://s3/one.png", problem.getId());
+            verify(s3DeleteProducer).sendDeleteMessage(fixtures.bucketImageUrl("one"), problem.getId());
         }
 
         @Test
         @DisplayName("일괄 삭제가 성공하면 커밋 뒤에 모든 이미지의 메시지를 보낸다")
         void sendsAllAfterCommitOnListDelete() {
             Problem first = saveProblem(owner.getId(), ownerRoot);
-            saveImageData(first, "https://s3/first.png", ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(first, fixtures.bucketImageUrl("first"), ProblemImageType.PROBLEM_IMAGE);
             Problem second = saveProblem(owner.getId(), ownerRoot);
-            saveImageData(second, "https://s3/second-1.png", ProblemImageType.PROBLEM_IMAGE);
-            saveImageData(second, "https://s3/second-2.png", ProblemImageType.ANSWER_IMAGE);
+            saveImageData(second, fixtures.bucketImageUrl("second-1"), ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(second, fixtures.bucketImageUrl("second-2"), ProblemImageType.ANSWER_IMAGE);
 
             inTransaction(() -> {
                 problemService.deleteProblemList(owner.getId(), List.of(first.getId(), second.getId()));
                 verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
             });
 
-            verify(s3DeleteProducer).sendDeleteMessage("https://s3/first.png", first.getId());
-            verify(s3DeleteProducer).sendDeleteMessage("https://s3/second-1.png", second.getId());
-            verify(s3DeleteProducer).sendDeleteMessage("https://s3/second-2.png", second.getId());
+            verify(s3DeleteProducer).sendDeleteMessage(fixtures.bucketImageUrl("first"), first.getId());
+            verify(s3DeleteProducer).sendDeleteMessage(fixtures.bucketImageUrl("second-1"), second.getId());
+            verify(s3DeleteProducer).sendDeleteMessage(fixtures.bucketImageUrl("second-2"), second.getId());
             verify(s3DeleteProducer, times(3)).sendDeleteMessage(any(), any());
         }
 
@@ -1213,16 +1214,16 @@ class ProblemServiceTest extends ProblemTestSupport {
         void sendsAfterCommitOnFolderDelete() {
             Folder subFolder = fixtures.createFolder(owner.getId(), "정리 대상", ownerRoot);
             Problem inFolder = saveProblem(owner.getId(), subFolder);
-            saveImageData(inFolder, "https://s3/folder.png", ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(inFolder, fixtures.bucketImageUrl("folder"), ProblemImageType.PROBLEM_IMAGE);
             Problem keep = saveProblem(owner.getId(), ownerRoot);
-            saveImageData(keep, "https://s3/keep.png", ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(keep, fixtures.bucketImageUrl("keep"), ProblemImageType.PROBLEM_IMAGE);
 
             inTransaction(() -> {
                 problemService.deleteAllByFolderIds(owner.getId(), List.of(subFolder.getId()));
                 verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
             });
 
-            verify(s3DeleteProducer).sendDeleteMessage("https://s3/folder.png", inFolder.getId());
+            verify(s3DeleteProducer).sendDeleteMessage(fixtures.bucketImageUrl("folder"), inFolder.getId());
             verify(s3DeleteProducer, times(1)).sendDeleteMessage(any(), any());
         }
 
@@ -1230,27 +1231,27 @@ class ProblemServiceTest extends ProblemTestSupport {
         @DisplayName("전체 삭제는 커밋된 뒤에 S3 삭제 메시지를 보낸다")
         void sendsAfterCommitOnDeleteAll() {
             Problem first = saveProblem(owner.getId(), ownerRoot);
-            saveImageData(first, "https://s3/all-1.png", ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(first, fixtures.bucketImageUrl("all-1"), ProblemImageType.PROBLEM_IMAGE);
             Problem second = saveProblem(owner.getId(), ownerRoot);
-            saveImageData(second, "https://s3/all-2.png", ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(second, fixtures.bucketImageUrl("all-2"), ProblemImageType.PROBLEM_IMAGE);
             Problem theirs = saveProblem(intruder.getId(), intruderRoot);
-            saveImageData(theirs, "https://s3/theirs.png", ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(theirs, fixtures.bucketImageUrl("theirs"), ProblemImageType.PROBLEM_IMAGE);
 
             inTransaction(() -> {
                 problemService.deleteAllUserProblems(owner.getId());
                 verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
             });
 
-            verify(s3DeleteProducer).sendDeleteMessage("https://s3/all-1.png", first.getId());
-            verify(s3DeleteProducer).sendDeleteMessage("https://s3/all-2.png", second.getId());
-            verify(s3DeleteProducer, never()).sendDeleteMessage("https://s3/theirs.png", theirs.getId());
+            verify(s3DeleteProducer).sendDeleteMessage(fixtures.bucketImageUrl("all-1"), first.getId());
+            verify(s3DeleteProducer).sendDeleteMessage(fixtures.bucketImageUrl("all-2"), second.getId());
+            verify(s3DeleteProducer, never()).sendDeleteMessage(fixtures.bucketImageUrl("theirs"), theirs.getId());
         }
 
         @Test
         @DisplayName("전체 삭제를 부른 바깥 트랜잭션이 롤백되면 S3 삭제 메시지를 보내지 않는다")
         void sendsNothingWhenOuterTransactionRollsBack() {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
-            saveImageData(problem, "https://s3/outer.png", ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(problem, fixtures.bucketImageUrl("outer"), ProblemImageType.PROBLEM_IMAGE);
 
             transactionTemplate.executeWithoutResult(status -> {
                 problemService.deleteAllUserProblems(owner.getId());
@@ -1265,7 +1266,7 @@ class ProblemServiceTest extends ProblemTestSupport {
         @DisplayName("커밋 뒤 메시지 전송이 실패해도 삭제 요청은 성공한다")
         void succeedsEvenIfSendFails() {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
-            saveImageData(problem, "https://s3/fail.png", ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(problem, fixtures.bucketImageUrl("fail"), ProblemImageType.PROBLEM_IMAGE);
             willThrow(new AmqpConnectException(new RuntimeException("broker down")))
                     .given(s3DeleteProducer).sendDeleteMessage(any(), any());
 
@@ -1273,7 +1274,7 @@ class ProblemServiceTest extends ProblemTestSupport {
                     .doesNotThrowAnyException();
 
             assertThat(problemRepository.findById(problem.getId())).isEmpty();
-            verify(s3DeleteProducer).sendDeleteMessage("https://s3/fail.png", problem.getId());
+            verify(s3DeleteProducer).sendDeleteMessage(fixtures.bucketImageUrl("fail"), problem.getId());
         }
     }
 
@@ -1285,33 +1286,34 @@ class ProblemServiceTest extends ProblemTestSupport {
         @DisplayName("본인 문제의 이미지를 URL 로 삭제한다")
         void deletesOwnImage() {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
-            saveImageData(problem, "https://s3/mine.png", ProblemImageType.PROBLEM_IMAGE);
+            String imageUrl = fixtures.uploadedImageUrl(owner.getId());
+            saveImageData(problem, imageUrl, ProblemImageType.PROBLEM_IMAGE);
 
-            problemService.deleteProblemImageData("https://s3/mine.png", owner.getId());
+            problemService.deleteProblemImageData(imageUrl, owner.getId());
 
-            assertThat(problemImageDataRepository.findByImageUrl("https://s3/mine.png")).isEmpty();
-            verify(fileUploadService).deleteImageFileFromS3("https://s3/mine.png");
+            assertThat(problemImageDataRepository.existsByImageUrl(imageUrl)).isFalse();
+            verify(fileUploadService).deleteImageFileFromS3(imageUrl);
         }
 
         @Test
         @DisplayName("다른 사용자의 이미지는 삭제할 수 없다")
         void rejectsOtherUsersImage() {
             Problem othersProblem = saveProblem(intruder.getId(), intruderRoot);
-            saveImageData(othersProblem, "https://s3/theirs.png", ProblemImageType.PROBLEM_IMAGE);
+            saveImageData(othersProblem, fixtures.bucketImageUrl("theirs"), ProblemImageType.PROBLEM_IMAGE);
 
-            assertThatThrownBy(() -> problemService.deleteProblemImageData("https://s3/theirs.png", owner.getId()))
+            assertThatThrownBy(() -> problemService.deleteProblemImageData(fixtures.bucketImageUrl("theirs"), owner.getId()))
                     .isInstanceOf(ApplicationException.class)
                     .extracting(ProblemServiceTest::errorCaseOf)
                     .isEqualTo(ProblemErrorCase.PROBLEM_USER_UNMATCHED);
 
-            assertThat(problemImageDataRepository.findByImageUrl("https://s3/theirs.png")).isPresent();
+            assertThat(problemImageDataRepository.existsByImageUrl(fixtures.bucketImageUrl("theirs"))).isTrue();
             verify(fileUploadService, never()).deleteImageFileFromS3(any());
         }
 
         @Test
         @DisplayName("없는 이미지 URL 이면 PROBLEM_NOT_FOUND")
         void rejectsUnknownImageUrl() {
-            assertThatThrownBy(() -> problemService.deleteProblemImageData("https://s3/none.png", owner.getId()))
+            assertThatThrownBy(() -> problemService.deleteProblemImageData(fixtures.bucketImageUrl("none"), owner.getId()))
                     .isInstanceOf(ApplicationException.class)
                     .extracting(ProblemServiceTest::errorCaseOf)
                     .isEqualTo(ProblemErrorCase.PROBLEM_NOT_FOUND);
@@ -1328,7 +1330,7 @@ class ProblemServiceTest extends ProblemTestSupport {
         @DisplayName("멀티파트 업로드 시 S3 URL 이 이미지 데이터로 저장된다")
         void uploadsImagesToS3() {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
-            given(fileUploadService.uploadFileToS3(any())).willReturn("https://s3/uploaded.png");
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn(fixtures.bucketImageUrl("uploaded"));
 
             problemService.uploadProblemImages(
                     problem.getId(), owner.getId(),
@@ -1338,7 +1340,7 @@ class ProblemServiceTest extends ProblemTestSupport {
 
             assertThat(problemImageDataRepository.findAllByProblemId(problem.getId()))
                     .extracting(image -> image.getImageUrl())
-                    .containsExactly("https://s3/uploaded.png");
+                    .containsExactly(fixtures.bucketImageUrl("uploaded"));
         }
 
         @Test
@@ -1348,7 +1350,7 @@ class ProblemServiceTest extends ProblemTestSupport {
 
             assertThatCode(() -> problemService.uploadProblemImages(problem.getId(), owner.getId(), null, null))
                     .doesNotThrowAnyException();
-            verify(fileUploadService, never()).uploadFileToS3(any());
+            verify(fileUploadService, never()).uploadFileToS3(any(), any());
         }
 
         @Test
@@ -1365,7 +1367,7 @@ class ProblemServiceTest extends ProblemTestSupport {
                     .extracting(ProblemServiceTest::errorCaseOf)
                     .isEqualTo(ProblemErrorCase.PROBLEM_USER_UNMATCHED);
 
-            verify(fileUploadService, never()).uploadFileToS3(any());
+            verify(fileUploadService, never()).uploadFileToS3(any(), any());
         }
 
         @Test
@@ -1374,8 +1376,8 @@ class ProblemServiceTest extends ProblemTestSupport {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
 
             problemService.addImageDataUrls(problem.getId(), owner.getId(), new AddProblemImageUrlsRequest(List.of(
-                    new AddProblemImageUrlsRequest.ImageUrlItem("https://s3/p.png", "PROBLEM_IMAGE"),
-                    new AddProblemImageUrlsRequest.ImageUrlItem("https://s3/a.png", "ANSWER_IMAGE")
+                    new AddProblemImageUrlsRequest.ImageUrlItem(fixtures.uploadedImageUrl(owner.getId()), "PROBLEM_IMAGE"),
+                    new AddProblemImageUrlsRequest.ImageUrlItem(fixtures.uploadedImageUrl(owner.getId()), "ANSWER_IMAGE")
             )));
 
             assertThat(problemImageDataRepository.findAllByProblemId(problem.getId())).hasSize(2);
@@ -1397,11 +1399,11 @@ class ProblemServiceTest extends ProblemTestSupport {
         void allowsSecondSolveImageOnSameDay() {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
             problemService.addImageDataUrls(problem.getId(), owner.getId(), new AddProblemImageUrlsRequest(List.of(
-                    new AddProblemImageUrlsRequest.ImageUrlItem("https://s3/s1.png", "SOLVE_IMAGE")
+                    new AddProblemImageUrlsRequest.ImageUrlItem(fixtures.uploadedImageUrl(owner.getId()), "SOLVE_IMAGE")
             )));
 
             problemService.addImageDataUrls(problem.getId(), owner.getId(), new AddProblemImageUrlsRequest(List.of(
-                    new AddProblemImageUrlsRequest.ImageUrlItem("https://s3/s2.png", "SOLVE_IMAGE")
+                    new AddProblemImageUrlsRequest.ImageUrlItem(fixtures.uploadedImageUrl(owner.getId()), "SOLVE_IMAGE")
             )));
 
             assertThat(problemImageDataRepository.findAllByProblemId(problem.getId()))
@@ -1416,7 +1418,7 @@ class ProblemServiceTest extends ProblemTestSupport {
 
             assertThatThrownBy(() -> problemService.addImageDataUrls(
                     othersProblem.getId(), owner.getId(), new AddProblemImageUrlsRequest(List.of(
-                            new AddProblemImageUrlsRequest.ImageUrlItem("https://s3/p.png", "PROBLEM_IMAGE")
+                            new AddProblemImageUrlsRequest.ImageUrlItem(fixtures.bucketImageUrl("p"), "PROBLEM_IMAGE")
                     ))))
                     .isInstanceOf(ApplicationException.class)
                     .extracting(ProblemServiceTest::errorCaseOf)
@@ -1455,7 +1457,7 @@ class ProblemServiceTest extends ProblemTestSupport {
             Long problemId = problemService.registerProblem(
                     new ProblemRegisterDto(null, "메모", null, ownerRoot.getId(), null), owner.getId());
             saveImageData(problemRepository.findById(problemId).orElseThrow(),
-                    "https://s3/a.png", ProblemImageType.ANSWER_IMAGE);
+                    fixtures.bucketImageUrl("a"), ProblemImageType.ANSWER_IMAGE);
 
             problemService.analysisProblem(problemId, owner.getId());
 
@@ -1469,7 +1471,7 @@ class ProblemServiceTest extends ProblemTestSupport {
             Long problemId = problemService.registerProblem(
                     new ProblemRegisterDto(null, "메모", null, ownerRoot.getId(), null), owner.getId());
             saveImageData(problemRepository.findById(problemId).orElseThrow(),
-                    "https://s3/p.png", ProblemImageType.PROBLEM_IMAGE);
+                    fixtures.bucketImageUrl("p"), ProblemImageType.PROBLEM_IMAGE);
             redisTemplate.delete(rateLimitKey(owner.getId()));
 
             problemService.analysisProblem(problemId, owner.getId());
@@ -1485,7 +1487,7 @@ class ProblemServiceTest extends ProblemTestSupport {
             Long problemId = problemService.registerProblem(
                     new ProblemRegisterDto(null, "메모", null, ownerRoot.getId(), null), owner.getId());
             saveImageData(problemRepository.findById(problemId).orElseThrow(),
-                    "https://s3/p.png", ProblemImageType.PROBLEM_IMAGE);
+                    fixtures.bucketImageUrl("p"), ProblemImageType.PROBLEM_IMAGE);
             inTransaction(() -> {
                 ProblemAnalysis analysis = problemAnalysisRepository.findByProblemId(problemId).orElseThrow();
                 analysis.updateWithSuccess("수학", "계산", "[]", "풀이", "실수", "팁");
@@ -1505,7 +1507,7 @@ class ProblemServiceTest extends ProblemTestSupport {
             Long problemId = problemService.registerProblem(
                     new ProblemRegisterDto(null, "메모", null, ownerRoot.getId(), null), owner.getId());
             saveImageData(problemRepository.findById(problemId).orElseThrow(),
-                    "https://s3/p.png", ProblemImageType.PROBLEM_IMAGE);
+                    fixtures.bucketImageUrl("p"), ProblemImageType.PROBLEM_IMAGE);
 
             try {
                 redisTemplate.delete(rateLimitKey(owner.getId()));
@@ -1555,7 +1557,7 @@ class ProblemServiceTest extends ProblemTestSupport {
             Long problemId = problemService.registerProblem(
                     new ProblemRegisterDto(null, "메모", null, ownerRoot.getId(), null), owner.getId());
             saveImageData(problemRepository.findById(problemId).orElseThrow(),
-                    "https://s3/p.png", ProblemImageType.PROBLEM_IMAGE);
+                    fixtures.bucketImageUrl("p"), ProblemImageType.PROBLEM_IMAGE);
             redisTemplate.delete(rateLimitKey(owner.getId()));
             return problemId;
         }

@@ -25,6 +25,7 @@ import com.aisip.OnO.backend.studyroom.event.StudyRoomActivityEvent;
 import com.aisip.OnO.backend.user.exception.UserErrorCase;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.util.fileupload.service.ImageUrlOwnershipService;
 import com.aisip.OnO.backend.config.rabbitmq.message.S3DeleteMessage;
 import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteAfterCommitSender;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -60,6 +61,7 @@ public class ProblemSolveService {
     private final MissionLogService missionLogService;
     private final MissionProgressUpdater missionProgressUpdater;
     private final FileUploadService fileUploadService;
+    private final ImageUrlOwnershipService imageUrlOwnershipService;
     private final S3DeleteAfterCommitSender s3DeleteAfterCommitSender;
     private final ObjectMapper objectMapper;
     private final StreakCacheService streakCacheService;
@@ -205,7 +207,7 @@ public class ProblemSolveService {
         // S3 업로드를 병렬로 실행 (트랜잭션과 무관한 네트워크 I/O)
         List<CompletableFuture<String>> uploadFutures = IntStream.range(0, images.size())
                 .mapToObj(i -> CompletableFuture.supplyAsync(
-                        () -> fileUploadService.uploadFileToS3(images.get(i)),
+                        () -> fileUploadService.uploadFileToS3(images.get(i), userId),
                         s3UploadExecutor
                 ))
                 .toList();
@@ -236,12 +238,14 @@ public class ProblemSolveService {
         if (!Objects.equals(problemSolve.getUserId(), userId)) {
             throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_USER_UNMATCHED);
         }
-        int existingCount = problemSolve.getImages() == null ? 0 : problemSolve.getImages().size();
+        List<ProblemSolveImageData> existingImages = problemSolve.getImages() == null ? List.of() : problemSolve.getImages();
+        int existingCount = existingImages.size();
+        // 이미 이 기록에 붙어 있는 URL 은 예전 형식이어도 그대로 받는다.
+        imageUrlOwnershipService.validateUploadedBy(imageUrls, userId, existingImages.stream()
+                .map(ProblemSolveImageData::getImageUrl)
+                .toList());
         List<ProblemSolveImageData> imageDataList = IntStream.range(0, imageUrls.size())
-                .mapToObj(i -> {
-                    fileUploadService.validateS3Url(imageUrls.get(i));
-                    return ProblemSolveImageData.create(imageUrls.get(i), existingCount + i);
-                })
+                .mapToObj(i -> ProblemSolveImageData.create(imageUrls.get(i), existingCount + i))
                 .collect(Collectors.toList());
         imageDataList.forEach(problemSolve::addImage);
         problemSolveImageDataRepository.saveAll(imageDataList);
@@ -304,9 +308,12 @@ public class ProblemSolveService {
         streakCacheService.evict(userId);
         log.info("userId: {} deleted problem solve: {}", userId, problemSolveId);
 
+        // 다른 사용자가 같은 파일을 쓰고 있으면 S3 파일은 남긴다.
         // 커밋된 뒤에만 S3 파일을 지운다. 롤백되면 기록과 함께 파일도 남는다.
-        s3DeleteAfterCommitSender.sendAfterCommit(images.stream()
-                .map(image -> new S3DeleteMessage(image.getImageUrl(), problemSolveId))
+        s3DeleteAfterCommitSender.sendAfterCommit(imageUrlOwnershipService.filterDeletable(images.stream()
+                        .map(ProblemSolveImageData::getImageUrl)
+                        .toList(), userId).stream()
+                .map(imageUrl -> new S3DeleteMessage(imageUrl, problemSolveId))
                 .toList());
     }
 
@@ -339,9 +346,12 @@ public class ProblemSolveService {
     public void deleteAllProblemSolvesByProblemId(Long problemId) {
         List<ProblemSolve> problemSolves = problemSolveRepository.findAllByProblemIdWithImages(problemId);
 
+        // 다른 사용자가 같은 파일을 쓰고 있으면 S3 파일은 남긴다.
         List<S3DeleteMessage> s3DeleteMessages = problemSolves.stream()
-                .flatMap(record -> record.getImages().stream()
-                        .map(image -> new S3DeleteMessage(image.getImageUrl(), record.getId())))
+                .flatMap(record -> imageUrlOwnershipService.filterDeletable(record.getImages().stream()
+                                .map(ProblemSolveImageData::getImageUrl)
+                                .toList(), record.getUserId()).stream()
+                        .map(imageUrl -> new S3DeleteMessage(imageUrl, record.getId())))
                 .toList();
 
         problemSolveRepository.deleteAllByProblemId(problemId);

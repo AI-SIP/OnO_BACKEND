@@ -19,6 +19,7 @@ import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.util.fcm.repository.FcmTokenRepository;
 import com.aisip.OnO.backend.util.fileupload.exception.FileUploadErrorCase;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.util.fileupload.service.ImageUrlOwnershipService;
 import com.aisip.OnO.backend.util.webhook.DiscordWebhookNotificationService;
 import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import lombok.RequiredArgsConstructor;
@@ -76,6 +77,7 @@ public class UserService {
     private final StudyRoomService studyRoomService;
 
     private final FileUploadService fileUploadService;
+    private final ImageUrlOwnershipService imageUrlOwnershipService;
 
     private final S3DeleteProducer s3DeleteProducer;
 
@@ -226,7 +228,7 @@ public class UserService {
         validateProfileImage(profileImage);
         User user = findUserEntity(userId);
         String previousProfileImageUrl = user.getProfileImageUrl();
-        String profileImageUrl = fileUploadService.uploadFileToS3(profileImage);
+        String profileImageUrl = fileUploadService.uploadFileToS3(profileImage, userId);
         deleteImageOnRollback(profileImageUrl, userId);
         user.updateProfileImageUrl(profileImageUrl);
         deleteImageAsync(previousProfileImageUrl, userId);
@@ -235,11 +237,15 @@ public class UserService {
 
     @Transactional
     public UserResponseDto updateProfileImageByUrl(Long userId, String imageUrl) {
-        fileUploadService.validateS3Url(imageUrl);
         User user = findUserEntity(userId);
         String previousProfileImageUrl = user.getProfileImageUrl();
+        // 지금 프로필 URL 은 예전 형식이어도 그대로 받는다.
+        imageUrlOwnershipService.validateUploadedBy(imageUrl, userId, previousProfileImageUrl);
         user.updateProfileImageUrl(imageUrl);
-        deleteImageAsync(previousProfileImageUrl, userId);
+        // 같은 URL 을 다시 보내면 지금 쓰는 파일이라 지우지 않는다.
+        if (!imageUrl.equals(previousProfileImageUrl)) {
+            deleteImageAsync(previousProfileImageUrl, userId);
+        }
         return UserResponseDto.from(user);
     }
 
@@ -382,6 +388,10 @@ public class UserService {
 
     private void deleteImageAsync(String imageUrl, Long userId) {
         if (imageUrl == null || imageUrl.isBlank()) {
+            return;
+        }
+        // 다른 사용자가 같은 파일을 쓰고 있으면 S3 파일은 남긴다.
+        if (!imageUrlOwnershipService.isDeletable(imageUrl, userId)) {
             return;
         }
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
