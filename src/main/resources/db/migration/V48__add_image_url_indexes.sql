@@ -9,6 +9,15 @@
 --
 -- V44 와 같은 이유로 ALGORITHM=INPLACE, LOCK=NONE 을 명시한다. 진행 중에도 쓰기가 계속 처리되고,
 -- 온라인으로 못 하는 경우에는 테이블을 오래 잠그는 대신 바로 실패한다.
+--
+-- 온라인 DDL 도 시작과 끝에 짧은 메타데이터 잠금을 잡는다. 긴 트랜잭션이 열려 있으면 그 잠금을 기다리는 동안
+-- 같은 테이블의 다른 쿼리가 모두 뒤에 줄을 서므로(기본 대기 한도 1년), 이 세션의 대기를 10초로 줄인다.
+-- 넘기면 마이그레이션이 실패하고 새 컨테이너가 뜨지 않으며, 기존 컨테이너는 그대로 서비스한다.
+--
+-- MySQL DDL 은 트랜잭션으로 묶이지 않는다. 중간에 실패하면 앞서 만든 인덱스가 남으므로,
+-- 다시 실행하기 전에 남은 idx_*_url 인덱스를 지우고 flyway repair 를 한다.
+SET SESSION lock_wait_timeout = 10;
+
 ALTER TABLE image_data
     ADD INDEX idx_image_data_image_url (image_url),
     ALGORITHM = INPLACE,
