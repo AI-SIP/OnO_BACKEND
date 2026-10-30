@@ -356,6 +356,11 @@ final class AnswerLeakFilter {
             char answer = token.strip().charAt(0);
             String particles = answer >= 'ㄱ' && answer <= 'ㅎ' ? JAMO_PARTICLE_START : KOREAN_PARTICLE_START;
             regex.append("(?:(?![가-힣ㄱ-ㅎ])|(?=").append(particles).append("))");
+        } else if (last >= '가' && last <= '힣') {
+            // 프롬프트가 1단계를 "주어진 조건" 으로 쓰게 해서, 답이 "주어" 이면 거의 모든 단계 문장이 지워졌다.
+            // 뒤에 진, 졌, 져 가 붙으면 "주어지다" 의 활용이라 다른 낱말로 본다.
+            // "세종대왕" 처럼 답 뒤에 다른 낱말이 이어지는 경우는 그대로 답으로 본다.
+            regex.append("(?![진졌져])");
         }
         return regex.toString();
     }

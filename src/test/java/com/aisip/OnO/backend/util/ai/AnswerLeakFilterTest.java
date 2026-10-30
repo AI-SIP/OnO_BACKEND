@@ -610,6 +610,24 @@ class AnswerLeakFilterTest {
             assertThat(solutionAfter(sentence, answerValue, answerValue)).isEqualTo(sentence);
         }
 
+        @ParameterizedTest(name = "\"{0}\" / {1}")
+        @CsvSource(delimiter = '|', value = {
+                "1단계: 주어진 조건을 정리해 보세요.|주어",
+                "조건이 주어졌으니 문장 성분을 하나씩 나눠 보세요.|주어",
+                "문장에서 무엇이 주어져 있는지 먼저 보세요.|주어"
+        })
+        @DisplayName("답이 주어일 때 \"주어진\" 처럼 주어지다의 활용은 답으로 보지 않는다")
+        void conjugationOfAnswerWordIsKept(String sentence, String answerValue) {
+            assertThat(solutionAfter(sentence, "2", answerValue)).isEqualTo(sentence);
+        }
+
+        @Test
+        @DisplayName("답이 주어일 때 주어를 짚는 문장은 지운다")
+        void answerWordWithParticleIsRemoved() {
+            assertThat(solutionAfter("조건을 정리하세요.\n이 문장의 주어는 '나는'이다.", "2", "주어"))
+                    .isEqualTo("조건을 정리하세요.");
+        }
+
         @Test
         @DisplayName("한 글자 값(가, A)은 선지 표기라 문장 안에 나온 것만으로 지우지 않는다")
         void singleCharacterValueIsNotWord() {
