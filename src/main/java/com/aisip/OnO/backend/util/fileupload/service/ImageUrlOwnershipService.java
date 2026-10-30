@@ -42,11 +42,11 @@ public class ImageUrlOwnershipService {
 
     /** 지금 발급하는 key. 그룹 1 이 올린 사용자 id 다. */
     private static final Pattern USER_KEY = Pattern.compile(
-            "^image/users/(\\d+)/\\d{4}/\\d{2}/\\d{2}/[0-9a-fA-F-]{36}\\.[^/?#]+$");
+            "^image/users/(\\d+)/\\d{4}/\\d{2}/\\d{2}/[0-9a-fA-F-]{36}\\.[A-Za-z0-9]{1,5}$");
 
     /** userId 를 key 에 넣기 전 형식. 이 형식은 다른 사용자의 행이 쓰고 있지 않을 때만 받는다. */
     private static final Pattern DATED_KEY = Pattern.compile(
-            "^image/\\d{4}/\\d{2}/\\d{2}/[0-9a-fA-F-]{36}\\.[^/?#]+$");
+            "^image/\\d{4}/\\d{2}/\\d{2}/[0-9a-fA-F-]{36}\\.[A-Za-z0-9]{1,5}$");
 
     private static final int IN_CLAUSE_CHUNK_SIZE = 500;
 

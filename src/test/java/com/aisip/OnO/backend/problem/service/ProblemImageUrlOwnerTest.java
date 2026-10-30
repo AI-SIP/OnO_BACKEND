@@ -119,7 +119,9 @@ class ProblemImageUrlOwnerTest extends ProblemTestSupport {
                     "http://" + imageUrlOwnershipService.urlPrefix().substring("https://".length())
                             + "image/2026/10/29/0b8f4a52-7c1e-4d33-9a51-8e8d0f6f2a10.png",
                     imageUrlOwnershipService.urlPrefix() + "cosmetic/hat.png",
-                    imageUrlOwnershipService.urlPrefix() + "image/users/" + owner.getId() + "/../x.png");
+                    imageUrlOwnershipService.urlPrefix() + "image/users/" + owner.getId() + "/../x.png",
+                    // 확장자 자리에 인코딩된 글자가 오면 같은 파일을 다른 문자열로 가리킬 수 있다
+                    imageUrlOwnershipService.urlPrefix() + "image/2026/10/29/0b8f4a52-7c1e-4d33-9a51-8e8d0f6f2a10.%6Apg");
 
             for (String url : rejected) {
                 assertThatThrownBy(() -> problemService.registerProblemV2(v2Dto(List.of(url), null), owner.getId()))
@@ -249,7 +251,7 @@ class ProblemImageUrlOwnerTest extends ProblemTestSupport {
             assertThat(problemImageDataRepository.findAllByProblemId(theirs.getId()))
                     .extracting(image -> image.getImageUrl())
                     .containsExactly(sharedUrl);
-            verify(fileUploadService, never()).deleteImageFileFromS3(any());
+            assertThat(sentS3DeleteUrls()).isEmpty();
         }
 
         @Test
@@ -262,7 +264,7 @@ class ProblemImageUrlOwnerTest extends ProblemTestSupport {
             problemService.deleteProblemImageData(legacyUrl, owner.getId());
 
             assertThat(problemImageDataRepository.existsByImageUrl(legacyUrl)).isFalse();
-            verify(fileUploadService).deleteImageFileFromS3(legacyUrl);
+            assertThat(sentS3DeleteUrls()).containsExactly(legacyUrl);
         }
     }
 
