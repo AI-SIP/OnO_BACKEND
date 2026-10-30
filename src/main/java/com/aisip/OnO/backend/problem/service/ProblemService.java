@@ -828,10 +828,12 @@ public class ProblemService {
             throw new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND);
         }
 
-        if (imageUrlOwnershipService.isDeletable(imageUrl, userId)) {
-            fileUploadService.deleteImageFileFromS3(imageUrl);
-        }
         problemImageDataRepository.deleteAll(imageDataList);
+        // 다른 삭제 경로와 같이 커밋된 뒤에 지운다. 먼저 지우면 행 삭제가 롤백돼도 파일은 이미 없다.
+        if (imageUrlOwnershipService.isDeletable(imageUrl, userId)) {
+            s3DeleteAfterCommitSender.sendAfterCommit(
+                    List.of(new S3DeleteMessage(imageUrl, imageDataList.get(0).getProblem().getId())));
+        }
     }
 
     @Transactional

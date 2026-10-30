@@ -1,5 +1,7 @@
 package com.aisip.OnO.backend.util.fileupload.service;
 
+import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
+import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteAfterCommitSender;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
@@ -45,6 +47,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -69,6 +72,7 @@ class FileUploadServiceTest {
     private ProblemImageDataRepository problemImageDataRepository;
     private ProblemSolveImageDataRepository problemSolveImageDataRepository;
     private MeterRegistry meterRegistry;
+    private S3DeleteProducer s3DeleteProducer;
     private FileUploadService fileUploadService;
 
     @BeforeEach
@@ -81,9 +85,10 @@ class FileUploadServiceTest {
                 problemImageDataRepository, problemSolveImageDataRepository,
                 mock(UserRepository.class), mock(StudyRoomRepository.class));
         ReflectionTestUtils.setField(imageUrlOwnershipService, "bucket", BUCKET);
+        s3DeleteProducer = mock(S3DeleteProducer.class);
         fileUploadService = new FileUploadService(
                 amazonS3Client, meterRegistry, problemImageDataRepository, problemSolveImageDataRepository,
-                imageUrlOwnershipService);
+                imageUrlOwnershipService, new S3DeleteAfterCommitSender(s3DeleteProducer));
         ReflectionTestUtils.setField(fileUploadService, "bucket", BUCKET);
     }
 
@@ -292,7 +297,8 @@ class FileUploadServiceTest {
 
             fileUploadService.deleteUserImageFile(IMAGE_URL, 1L);
 
-            verify(amazonS3Client).deleteObject(any(DeleteObjectRequest.class));
+            verify(s3DeleteProducer).sendDeleteMessage(eq(IMAGE_URL), any());
+            verify(amazonS3Client, never()).deleteObject(any(DeleteObjectRequest.class));
             verify(problemImageDataRepository).deleteAll(List.of(imageData));
         }
 
@@ -306,7 +312,7 @@ class FileUploadServiceTest {
 
             fileUploadService.deleteUserImageFile(LEGACY_URL, 1L);
 
-            verify(amazonS3Client, never()).deleteObject(any(DeleteObjectRequest.class));
+            verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
             verify(problemImageDataRepository).deleteAll(List.of(imageData));
         }
 
@@ -332,7 +338,7 @@ class FileUploadServiceTest {
 
             fileUploadService.deleteUserImageFile(IMAGE_URL, 1L);
 
-            verify(amazonS3Client).deleteObject(any(DeleteObjectRequest.class));
+            verify(s3DeleteProducer).sendDeleteMessage(eq(IMAGE_URL), any());
             verify(problemSolveImageDataRepository).deleteAll(List.of(imageData));
         }
 
@@ -357,7 +363,7 @@ class FileUploadServiceTest {
                     .extracting(exception -> ((ApplicationException) exception).getErrorCase())
                     .isEqualTo(FileUploadErrorCase.FILE_NOT_FOUND);
 
-            verifyNoInteractions(amazonS3Client);
+            verifyNoInteractions(amazonS3Client, s3DeleteProducer);
         }
     }
 

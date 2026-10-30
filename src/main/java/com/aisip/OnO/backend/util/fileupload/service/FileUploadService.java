@@ -1,5 +1,7 @@
 package com.aisip.OnO.backend.util.fileupload.service;
 
+import com.aisip.OnO.backend.config.rabbitmq.message.S3DeleteMessage;
+import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteAfterCommitSender;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
@@ -41,6 +43,7 @@ public class FileUploadService {
     private final ProblemImageDataRepository problemImageDataRepository;
     private final ProblemSolveImageDataRepository problemSolveImageDataRepository;
     private final ImageUrlOwnershipService imageUrlOwnershipService;
+    private final S3DeleteAfterCommitSender s3DeleteAfterCommitSender;
 
     @Value("${cloud.aws.s3.bucket}")
     private String bucket;
@@ -116,8 +119,8 @@ public class FileUploadService {
     public void deleteUserImageFile(String imageUrl, Long userId) {
         List<ProblemImageData> problemImages = problemImageDataRepository.findAllByImageUrlAndUserId(imageUrl, userId);
         if (!problemImages.isEmpty()) {
-            deleteFromS3IfDeletable(imageUrl, userId);
             problemImageDataRepository.deleteAll(problemImages);
+            deleteFromS3AfterCommitIfDeletable(imageUrl, userId, problemImages.get(0).getProblem().getId());
             return;
         }
         if (problemImageDataRepository.existsByImageUrl(imageUrl)) {
@@ -126,8 +129,8 @@ public class FileUploadService {
 
         List<ProblemSolveImageData> solveImages = problemSolveImageDataRepository.findAllByImageUrlAndUserId(imageUrl, userId);
         if (!solveImages.isEmpty()) {
-            deleteFromS3IfDeletable(imageUrl, userId);
             problemSolveImageDataRepository.deleteAll(solveImages);
+            deleteFromS3AfterCommitIfDeletable(imageUrl, userId, null);
             return;
         }
         if (problemSolveImageDataRepository.existsByImageUrl(imageUrl)) {
@@ -137,9 +140,10 @@ public class FileUploadService {
         throw new ApplicationException(FileUploadErrorCase.FILE_NOT_FOUND);
     }
 
-    private void deleteFromS3IfDeletable(String imageUrl, Long userId) {
+    /** 행 삭제가 롤백되면 파일도 남아야 하므로 S3 는 커밋된 뒤에 지운다. */
+    private void deleteFromS3AfterCommitIfDeletable(String imageUrl, Long userId, Long problemId) {
         if (imageUrlOwnershipService.isDeletable(imageUrl, userId)) {
-            deleteImageFileFromS3(imageUrl);
+            s3DeleteAfterCommitSender.sendAfterCommit(List.of(new S3DeleteMessage(imageUrl, problemId)));
         }
     }
 

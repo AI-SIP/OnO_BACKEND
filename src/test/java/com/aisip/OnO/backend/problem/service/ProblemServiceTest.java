@@ -1289,10 +1289,14 @@ class ProblemServiceTest extends ProblemTestSupport {
             String imageUrl = fixtures.uploadedImageUrl(owner.getId());
             saveImageData(problem, imageUrl, ProblemImageType.PROBLEM_IMAGE);
 
-            problemService.deleteProblemImageData(imageUrl, owner.getId());
+            inTransaction(() -> {
+                problemService.deleteProblemImageData(imageUrl, owner.getId());
+                verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
+            });
 
             assertThat(problemImageDataRepository.existsByImageUrl(imageUrl)).isFalse();
-            verify(fileUploadService).deleteImageFileFromS3(imageUrl);
+            verify(s3DeleteProducer).sendDeleteMessage(imageUrl, problem.getId());
+            verify(fileUploadService, never()).deleteImageFileFromS3(any());
         }
 
         @Test
