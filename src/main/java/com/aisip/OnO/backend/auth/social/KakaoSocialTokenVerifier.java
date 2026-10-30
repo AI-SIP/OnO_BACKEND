@@ -73,8 +73,13 @@ public class KakaoSocialTokenVerifier implements SocialTokenVerifier {
                     .retrieve()
                     .body(KakaoTokenInfo.class);
         } catch (HttpClientErrorException e) {
-            // 401(만료·잘못된 토큰), 400(형식 오류)
-            throw SocialTokenVerificationException.invalid("kakao access token rejected: " + e.getStatusCode().value(), e);
+            int status = e.getStatusCode().value();
+            // 401(만료되거나 잘못된 토큰), 400(형식 오류)만 토큰 탓이다.
+            // 429(호출 한도)나 403(앱 설정) 같은 나머지 4xx 는 사용자가 고칠 수 없으니 확인 불가로 본다.
+            if (status == 400 || status == 401) {
+                throw SocialTokenVerificationException.invalid("kakao access token rejected: " + status, e);
+            }
+            throw SocialTokenVerificationException.unavailable("kakao token info unavailable: " + status, e);
         } catch (IllegalArgumentException e) {
             // 헤더에 실을 수 없는 문자가 섞인 토큰
             throw SocialTokenVerificationException.invalid("kakao access token is malformed", e);

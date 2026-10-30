@@ -100,6 +100,16 @@ class KakaoSocialTokenVerifierTest {
     }
 
     @Test
+    @DisplayName("Kakao 가 429 를 주면 토큰 탓이 아니므로 unavailable 로 알린다")
+    void reportsUnavailableOnTooManyRequests() {
+        server.expect(requestTo(TOKEN_INFO_URL)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+
+        assertThatThrownBy(() -> verifier.verify("kakao-token"))
+                .isInstanceOfSatisfying(SocialTokenVerificationException.class,
+                        e -> assertThat(e.isUnavailable()).isTrue());
+    }
+
+    @Test
     @DisplayName("app id 가 비어 있으면 설정되지 않은 것으로 본다")
     void notConfiguredWithoutAppIds() {
         assertThat(new KakaoSocialTokenVerifier(Set.of(), TOKEN_INFO_URL, RestClient.create()).isConfigured()).isFalse();
