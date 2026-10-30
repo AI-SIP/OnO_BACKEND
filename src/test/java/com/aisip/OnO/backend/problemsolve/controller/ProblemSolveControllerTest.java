@@ -403,7 +403,7 @@ class ProblemSolveControllerTest extends ProblemSolveTestSupport {
         @DisplayName("멀티파트로 올린 이미지가 기록에 붙는다")
         void uploadsImages() throws Exception {
             ProblemSolve solve = saveSolve(problem, user.getId(), PRACTICED_AT);
-            given(fileUploadService.uploadFileToS3(any(MultipartFile.class)))
+            given(fileUploadService.uploadFileToS3(any(MultipartFile.class), any()))
                     .willReturn("https://test-ono-bucket.s3.ap-northeast-2.amazonaws.com/a.png");
 
             mockMvc.perform(multipart("/api/problem-solves/" + solve.getId() + "/images")
@@ -431,21 +431,19 @@ class ProblemSolveControllerTest extends ProblemSolveTestSupport {
         @DisplayName("presigned URL 목록을 붙이면 200이고 순서대로 저장된다")
         void addsImageUrls() throws Exception {
             ProblemSolve solve = saveSolve(problem, user.getId(), PRACTICED_AT);
+            String firstUrl = fixtures.uploadedImageUrl(user.getId());
+            String secondUrl = fixtures.uploadedImageUrl(user.getId());
 
             mockMvc.perform(post("/api/problem-solves/" + solve.getId() + "/image-urls")
                             .contentType(APPLICATION_JSON)
-                            .content(json(Map.of("imageUrls", List.of(
-                                    "https://test-ono-bucket.s3.ap-northeast-2.amazonaws.com/a.png",
-                                    "https://test-ono-bucket.s3.ap-northeast-2.amazonaws.com/b.png"))))
+                            .content(json(Map.of("imageUrls", List.of(firstUrl, secondUrl))))
                             .with(asUser(user.getId())))
                     .andExpect(status().isOk());
 
             mockMvc.perform(get("/api/problem-solves/" + solve.getId())
                             .with(asUser(user.getId())))
-                    .andExpect(jsonPath("$.data.imageUrls[0]")
-                            .value("https://test-ono-bucket.s3.ap-northeast-2.amazonaws.com/a.png"))
-                    .andExpect(jsonPath("$.data.imageUrls[1]")
-                            .value("https://test-ono-bucket.s3.ap-northeast-2.amazonaws.com/b.png"));
+                    .andExpect(jsonPath("$.data.imageUrls[0]").value(firstUrl))
+                    .andExpect(jsonPath("$.data.imageUrls[1]").value(secondUrl));
         }
 
         @Test

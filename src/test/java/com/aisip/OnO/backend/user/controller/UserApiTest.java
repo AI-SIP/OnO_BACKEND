@@ -1,7 +1,6 @@
 package com.aisip.OnO.backend.user.controller;
 
 import com.aisip.OnO.backend.auth.exception.AuthErrorCase;
-import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.support.IntegrationTestSupport;
 import com.aisip.OnO.backend.user.dto.NotificationSettingsUpdateDto;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
@@ -23,9 +22,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -184,7 +181,7 @@ class UserApiTest extends IntegrationTestSupport {
         @DisplayName("이미지를 올리면 S3 URL 이 프로필에 반영된다")
         void uploadsProfileImage() throws Exception {
             User user = fixtures.createUser();
-            given(fileUploadService.uploadFileToS3(any())).willReturn("https://cdn.test.ono/profile.png");
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn("https://cdn.test.ono/profile.png");
 
             mockMvc.perform(multipart(HttpMethod.PATCH, "/api/users/me/profile-image")
                             .file(pngFile())
@@ -214,16 +211,46 @@ class UserApiTest extends IntegrationTestSupport {
         @DisplayName("우리 버킷이 아닌 URL 로는 프로필 이미지를 바꿀 수 없다")
         void rejectsForeignImageUrl() throws Exception {
             User user = fixtures.createUser();
-            willThrow(new ApplicationException(FileUploadErrorCase.INVALID_IMAGE_FILE))
-                    .given(fileUploadService).validateS3Url(anyString());
 
             mockMvc.perform(patch("/api/users/me/profile-image-url")
                             .with(asUser(user))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(
-                                    new UserController.ProfileImageUrlRequest("https://evil.example.com/a.png"))))
+                                    new UserController.ProfileImageUrlRequest("https://example.com/a.png"))))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.errorCode").value(FileUploadErrorCase.INVALID_IMAGE_FILE.getErrorCode()));
+
+            assertThat(userRepository.findById(user.getId()).orElseThrow().getProfileImageUrl()).isNull();
+        }
+
+        @Test
+        @DisplayName("내가 올린 URL 로 프로필 이미지를 바꾼다")
+        void updatesProfileImageWithOwnUrl() throws Exception {
+            User user = fixtures.createUser();
+            String imageUrl = fixtures.uploadedImageUrl(user.getId());
+
+            mockMvc.perform(patch("/api/users/me/profile-image-url")
+                            .with(asUser(user))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(
+                                    new UserController.ProfileImageUrlRequest(imageUrl))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.profileImageUrl").value(imageUrl));
+        }
+
+        @Test
+        @DisplayName("다른 사용자가 올린 URL 로는 프로필 이미지를 바꿀 수 없다 - 403 + 2006")
+        void rejectsImageUrlUploadedByOtherUser() throws Exception {
+            User user = fixtures.createUser();
+            User other = fixtures.createOtherUser();
+
+            mockMvc.perform(patch("/api/users/me/profile-image-url")
+                            .with(asUser(user))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(
+                                    new UserController.ProfileImageUrlRequest(fixtures.uploadedImageUrl(other.getId())))))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode").value(FileUploadErrorCase.IMAGE_USER_UNMATCHED.getErrorCode()));
 
             assertThat(userRepository.findById(user.getId()).orElseThrow().getProfileImageUrl()).isNull();
         }
@@ -232,7 +259,7 @@ class UserApiTest extends IntegrationTestSupport {
         @DisplayName("프로필 이미지를 지우면 URL 이 비워진다")
         void deletesProfileImage() throws Exception {
             User user = fixtures.createUser();
-            given(fileUploadService.uploadFileToS3(any())).willReturn("https://cdn.test.ono/profile.png");
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn("https://cdn.test.ono/profile.png");
             mockMvc.perform(multipart(HttpMethod.PATCH, "/api/users/me/profile-image")
                             .file(pngFile())
                             .with(asUser(user)))

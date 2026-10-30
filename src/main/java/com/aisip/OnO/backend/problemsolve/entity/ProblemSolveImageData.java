@@ -12,7 +12,8 @@ import org.hibernate.annotations.SQLRestriction;
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "problem_solve_image_data", indexes = {
-        @Index(name = "idx_solve_image_data_solve_id", columnList = "problem_solve_id")
+        @Index(name = "idx_solve_image_data_solve_id", columnList = "problem_solve_id"),
+        @Index(name = "idx_solve_image_data_image_url", columnList = "image_url")
 })
 @SQLDelete(sql = "UPDATE problem_solve_image_data SET deleted_at = now() WHERE id = ?")
 @SQLRestriction("deleted_at IS NULL")

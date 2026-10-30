@@ -24,7 +24,8 @@ import java.util.List;
 @SQLDelete(sql = "UPDATE user SET deleted_at = now() WHERE id = ?")
 @SQLRestriction("deleted_at IS NULL")
 @Table(name = "user", indexes = {
-        @Index(name = "idx_user_identifier", columnList = "identifier", unique = true)
+        @Index(name = "idx_user_identifier", columnList = "identifier", unique = true),
+        @Index(name = "idx_user_profile_image_url", columnList = "profile_image_url")
 })
 public class User extends BaseEntity {
 

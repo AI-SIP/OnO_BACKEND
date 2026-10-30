@@ -25,7 +25,8 @@ public class FileUploadController {
     public CommonResponse<String> uploadImageFile(
             @RequestParam("image") MultipartFile file
     ) {
-        String imageUrl = fileUploadService.uploadFileToS3(file);
+        Long userId = currentUserId();
+        String imageUrl = fileUploadService.uploadFileToS3(file, userId);
 
         return CommonResponse.success(imageUrl);
     }
@@ -34,8 +35,9 @@ public class FileUploadController {
     public CommonResponse<List<String>> uploadMultipleImageFiles(
             @RequestParam("images") List<MultipartFile> files
     ) {
+        Long userId = currentUserId();
         List<String> imageUrls = files.stream()
-                .map(fileUploadService::uploadFileToS3)
+                .map(file -> fileUploadService.uploadFileToS3(file, userId))
                 .toList();
 
         return CommonResponse.success(imageUrls);
@@ -51,16 +53,19 @@ public class FileUploadController {
             @RequestParam(defaultValue = "image/jpeg") String contentType
     ) {
         int safeCount = Math.min(count, 20);
-        return CommonResponse.success(fileUploadService.generatePresignedUrls(contentType, safeCount));
+        return CommonResponse.success(fileUploadService.generatePresignedUrls(contentType, safeCount, currentUserId()));
     }
 
     @DeleteMapping("/image")
     public CommonResponse<String> deleteImageFile(
             @RequestParam("imageUrl") String imageUrl
     ) {
-        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        fileUploadService.deleteUserImageFile(imageUrl, userId);
+        fileUploadService.deleteUserImageFile(imageUrl, currentUserId());
 
         return CommonResponse.success("이미지 삭제가 완료되었습니다.");
+    }
+
+    private Long currentUserId() {
+        return (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
     }
 }

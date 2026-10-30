@@ -90,7 +90,7 @@ class StudyRoomThumbnailValidationTest extends StudyRoomTestSupport {
 
         @BeforeEach
         void stubUpload() {
-            given(fileUploadService.uploadFileToS3(any())).willReturn(UPLOADED_URL);
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn(UPLOADED_URL);
         }
 
         @ParameterizedTest(name = "{0} / {1}")

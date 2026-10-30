@@ -13,7 +13,8 @@ import java.util.List;
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "study_room", indexes = {
-        @Index(name = "idx_study_room_host_user", columnList = "host_user_id")
+        @Index(name = "idx_study_room_host_user", columnList = "host_user_id"),
+        @Index(name = "idx_study_room_thumbnail_url", columnList = "thumbnail_url")
 })
 public class StudyRoom extends BaseEntity {
 

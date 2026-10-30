@@ -6,7 +6,8 @@ import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.common.ratelimit.RateLimitKeys;
 import com.aisip.OnO.backend.common.ratelimit.RateLimitService;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
-import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
+import com.aisip.OnO.backend.config.rabbitmq.message.S3DeleteMessage;
+import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteAfterCommitSender;
 import com.aisip.OnO.backend.mission.entity.MissionMetric;
 import com.aisip.OnO.backend.mission.service.MissionLogService;
 import com.aisip.OnO.backend.mission.service.MissionProgressUpdater;
@@ -14,6 +15,7 @@ import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.ProblemAnalysis;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.util.fileupload.service.ImageUrlOwnershipService;
 import com.aisip.OnO.backend.problem.dto.AddProblemImageUrlsRequest;
 import com.aisip.OnO.backend.problem.dto.ProblemImageDataRegisterDto;
 import com.aisip.OnO.backend.problem.dto.ProblemRegisterDto;
@@ -83,6 +85,8 @@ public class ProblemService {
 
     private final FileUploadService fileUploadService;
 
+    private final ImageUrlOwnershipService imageUrlOwnershipService;
+
     private final MissionLogService missionLogService;
 
     private final MissionProgressUpdater missionProgressUpdater;
@@ -93,7 +97,7 @@ public class ProblemService {
 
     private final ProblemSolveRepository problemSolveRepository;
 
-    private final S3DeleteProducer s3DeleteProducer;
+    private final S3DeleteAfterCommitSender s3DeleteAfterCommitSender;
 
     private final ProblemAnalysisDispatcher analysisDispatcher;
     private final ProblemAnalysisDispatchGuard analysisDispatchGuard;
@@ -255,6 +259,9 @@ public class ProblemService {
     @Transactional
     public Long registerProblemV2(ProblemRegisterV2Dto problemRegisterV2Dto, Long userId) {
         validateProblemContent(problemRegisterV2Dto.memo(), problemRegisterV2Dto.reference());
+        List<String> problemImageUrls = normalizeImageUrls(problemRegisterV2Dto.problemImageUrls());
+        List<String> answerImageUrls = normalizeImageUrls(problemRegisterV2Dto.answerImageUrls());
+        imageUrlOwnershipService.validateUploadedBy(concat(problemImageUrls, answerImageUrls), userId);
         Folder folder = resolveRegisterFolder(problemRegisterV2Dto.folderId(), userId);
 
         ProblemRegisterDto baseDto = new ProblemRegisterDto(
@@ -271,31 +278,19 @@ public class ProblemService {
         problemRepository.save(problem);
         syncProblemTags(problem, userId, baseDto.tagIds());
 
-        if (problemRegisterV2Dto.problemImageUrls() != null) {
-            problemRegisterV2Dto.problemImageUrls().stream()
-                    .filter(Objects::nonNull)
-                    .map(String::trim)
-                    .filter(url -> !url.isEmpty())
-                    .forEach(url -> {
-                        ProblemImageData imageData = ProblemImageData.from(
-                                new ProblemImageDataRegisterDto(problem.getId(), url, ProblemImageType.PROBLEM_IMAGE));
-                        imageData.updateProblem(problem);
-                        problemImageDataRepository.save(imageData);
-                    });
-        }
+        problemImageUrls.forEach(url -> {
+            ProblemImageData imageData = ProblemImageData.from(
+                    new ProblemImageDataRegisterDto(problem.getId(), url, ProblemImageType.PROBLEM_IMAGE));
+            imageData.updateProblem(problem);
+            problemImageDataRepository.save(imageData);
+        });
 
-        if (problemRegisterV2Dto.answerImageUrls() != null) {
-            problemRegisterV2Dto.answerImageUrls().stream()
-                    .filter(Objects::nonNull)
-                    .map(String::trim)
-                    .filter(url -> !url.isEmpty())
-                    .forEach(url -> {
-                        ProblemImageData imageData = ProblemImageData.from(
-                                new ProblemImageDataRegisterDto(problem.getId(), url, ProblemImageType.ANSWER_IMAGE));
-                        imageData.updateProblem(problem);
-                        problemImageDataRepository.save(imageData);
-                    });
-        }
+        answerImageUrls.forEach(url -> {
+            ProblemImageData imageData = ProblemImageData.from(
+                    new ProblemImageDataRegisterDto(problem.getId(), url, ProblemImageType.ANSWER_IMAGE));
+            imageData.updateProblem(problem);
+            problemImageDataRepository.save(imageData);
+        });
         problem.updateReviewSchedule(LocalDate.now(java.time.ZoneId.of("Asia/Seoul")), 1, 0);
         analysisService.createSkippedAnalysis(problem.getId());
         streakCacheService.evict(userId);
@@ -323,6 +318,9 @@ public class ProblemService {
             return List.of();
         }
         registerDtos.forEach(dto -> validateProblemContent(dto.memo(), dto.reference()));
+        imageUrlOwnershipService.validateUploadedBy(registerDtos.stream()
+                .flatMap(dto -> concat(normalizeImageUrls(dto.problemImageUrls()), normalizeImageUrls(dto.answerImageUrls())).stream())
+                .toList(), userId);
 
         Map<Long, Folder> foldersById = resolveRegisterFolders(registerDtos, userId);
         Folder rootFolder = registerDtos.stream().anyMatch(dto -> dto.folderId() == null)
@@ -460,20 +458,29 @@ public class ProblemService {
     }
 
     private void addImageData(List<ProblemImageData> imageDataList, Problem problem, List<String> imageUrls, ProblemImageType imageType) {
-        if (imageUrls == null) {
-            return;
-        }
+        normalizeImageUrls(imageUrls).forEach(url -> {
+            ProblemImageData imageData = ProblemImageData.from(
+                    new ProblemImageDataRegisterDto(problem.getId(), url, imageType));
+            imageData.updateProblem(problem);
+            imageDataList.add(imageData);
+        });
+    }
 
-        imageUrls.stream()
+    private List<String> normalizeImageUrls(List<String> imageUrls) {
+        if (imageUrls == null) {
+            return List.of();
+        }
+        return imageUrls.stream()
                 .filter(Objects::nonNull)
                 .map(String::trim)
                 .filter(url -> !url.isEmpty())
-                .forEach(url -> {
-                    ProblemImageData imageData = ProblemImageData.from(
-                            new ProblemImageDataRegisterDto(problem.getId(), url, imageType));
-                    imageData.updateProblem(problem);
-                    imageDataList.add(imageData);
-                });
+                .toList();
+    }
+
+    private List<String> concat(List<String> first, List<String> second) {
+        List<String> merged = new ArrayList<>(first);
+        merged.addAll(second);
+        return merged;
     }
 
     /**
@@ -501,7 +508,7 @@ public class ProblemService {
             ProblemImageType imageType = imageTypes.get(i);
 
             // S3에 업로드
-            String imageUrl = fileUploadService.uploadFileToS3(imageFile);
+            String imageUrl = fileUploadService.uploadFileToS3(imageFile, userId);
 
             // DB에 저장
             ProblemImageData problemImageData = ProblemImageData.from(
@@ -520,8 +527,14 @@ public class ProblemService {
     @Transactional
     public void addImageDataUrls(Long problemId, Long userId, AddProblemImageUrlsRequest request) {
         Problem problem = findProblemEntity(problemId, userId);
+        // 이미 이 문제에 붙어 있는 URL 은 예전 형식이어도 그대로 받는다.
+        List<String> attachedUrls = problemImageDataRepository.findAllByProblemId(problemId).stream()
+                .map(ProblemImageData::getImageUrl)
+                .toList();
+        imageUrlOwnershipService.validateUploadedBy(request.imageDataList().stream()
+                .map(AddProblemImageUrlsRequest.ImageUrlItem::imageUrl)
+                .toList(), userId, attachedUrls);
         for (AddProblemImageUrlsRequest.ImageUrlItem item : request.imageDataList()) {
-            fileUploadService.validateS3Url(item.imageUrl());
             ProblemImageType imageType = ProblemImageType.valueOf(item.problemImageType());
             ProblemImageData imageData = ProblemImageData.from(
                     new ProblemImageDataRegisterDto(problemId, item.imageUrl(), imageType));
@@ -736,11 +749,11 @@ public class ProblemService {
     /**
      * 문제 삭제 (비동기 S3 파일 삭제 적용)
      * - DB 삭제: 동기 (즉시 완료)
-     * - S3 파일 삭제: 비동기 (RabbitMQ Producer로 전송)
+     * - S3 파일 삭제: 지울 이미지 목록만 돌려준다. 호출자가 모아서 커밋 뒤에 한 번에 보낸다
      * - PracticeNote 매핑 삭제: 동기 (데이터 정합성)
      */
-    // 호출자(deleteProblem / deleteFolderProblems / deleteAllUserProblems)의 트랜잭션 안에서 실행된다.
-    private void deleteProblemWithoutOwnerCheck(Long problemId) {
+    // 호출자(deleteProblem / deleteProblemList / deleteFolderProblems / deleteAllUserProblems)의 트랜잭션 안에서 실행된다.
+    private List<S3DeleteMessage> deleteProblemWithoutOwnerCheck(Long problemId) {
         // 1. 이미지 데이터 조회
         List<ProblemImageData> imageDataList = problemImageDataRepository.findAllByProblemId(problemId);
         // 1-1. 태그 매핑 조회
@@ -765,67 +778,98 @@ public class ProblemService {
 
         log.info("problemId: {} DB 삭제 완료", problemId);
 
-        // 7. S3 파일 삭제는 비동기로 처리 (RabbitMQ Producer)
-        imageDataList.forEach(imageData -> {
-            try {
-                s3DeleteProducer.sendDeleteMessage(imageData.getImageUrl(), problemId);
-            } catch (Exception e) {
-                log.error("S3 삭제 메시지 전송 실패 - problemId: {}, error: {}",
-                        problemId, e.getMessage());
-            }
-        });
+        // 7. S3 파일은 여기서 지우지 않는다. 같은 트랜잭션의 뒤쪽 작업이 실패해 롤백되면 파일도 남아야 한다.
+        return imageDataList.stream()
+                .map(imageData -> new S3DeleteMessage(imageData.getImageUrl(), problemId))
+                .toList();
+    }
 
-        log.info("problemId: {} S3 삭제 메시지 전송 완료 ({}개)", problemId, imageDataList.size());
+    /**
+     * ownerUserId 의 문제에서 지운 이미지 중 다른 사용자가 쓰지 않는 파일만 남긴다.
+     * 다른 사용자의 행이 같은 URL 을 가리키거나 key 의 사용자가 다르면 그 파일은 S3 에서 지우지 않는다.
+     * 같은 URL 이 여러 번 나오면 한 번만 보낸다.
+     */
+    private List<S3DeleteMessage> filterDeletableMessages(List<S3DeleteMessage> messages, Long ownerUserId) {
+        if (messages.isEmpty()) {
+            return messages;
+        }
+        Map<String, S3DeleteMessage> byUrl = new LinkedHashMap<>();
+        messages.forEach(message -> byUrl.putIfAbsent(message.getImageUrl(), message));
+        List<String> deletableUrls = imageUrlOwnershipService.filterDeletable(byUrl.keySet(), ownerUserId);
+        log.info("userId: {} S3 삭제 대상 {}/{}개", ownerUserId, deletableUrls.size(), byUrl.size());
+        return deletableUrls.stream()
+                .map(byUrl::get)
+                .toList();
     }
 
     @Transactional
     public void deleteProblem(Long problemId, Long userId) {
-        findProblemEntity(problemId, userId);
-        deleteProblemWithoutOwnerCheck(problemId);
-        streakCacheService.evict(userId);
+        s3DeleteAfterCommitSender.sendAfterCommit(filterDeletableMessages(deleteOwnedProblem(problemId, userId), userId));
     }
 
+    private List<S3DeleteMessage> deleteOwnedProblem(Long problemId, Long userId) {
+        findProblemEntity(problemId, userId);
+        List<S3DeleteMessage> s3DeleteMessages = deleteProblemWithoutOwnerCheck(problemId);
+        streakCacheService.evict(userId);
+        return s3DeleteMessages;
+    }
+
+    /**
+     * 이 사용자의 문제에 붙은 이미지 행만 지운다. 같은 URL 을 가진 다른 사용자의 행은 남기고,
+     * 다른 사용자가 그 파일을 쓰고 있으면 S3 파일도 남긴다.
+     */
     @Transactional
     public void deleteProblemImageData(String imageUrl, Long userId) {
-        ProblemImageData imageData = problemImageDataRepository.findByImageUrl(imageUrl)
-                .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
-        if (!Objects.equals(imageData.getProblem().getUserId(), userId)) {
-            throw new ApplicationException(ProblemErrorCase.PROBLEM_USER_UNMATCHED);
+        List<ProblemImageData> imageDataList = problemImageDataRepository.findAllByImageUrlAndUserId(imageUrl, userId);
+        if (imageDataList.isEmpty()) {
+            if (problemImageDataRepository.existsByImageUrl(imageUrl)) {
+                throw new ApplicationException(ProblemErrorCase.PROBLEM_USER_UNMATCHED);
+            }
+            throw new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND);
         }
 
-        fileUploadService.deleteImageFileFromS3(imageUrl);
-        problemImageDataRepository.deleteByImageUrl(imageUrl);
+        problemImageDataRepository.deleteAll(imageDataList);
+        // 다른 삭제 경로와 같이 커밋된 뒤에 지운다. 먼저 지우면 행 삭제가 롤백돼도 파일은 이미 없다.
+        if (imageUrlOwnershipService.isDeletable(imageUrl, userId)) {
+            s3DeleteAfterCommitSender.sendAfterCommit(
+                    List.of(new S3DeleteMessage(imageUrl, imageDataList.get(0).getProblem().getId())));
+        }
     }
 
     @Transactional
     public void deleteProblemList(Long userId, List<Long> problemIdList) {
-        problemIdList.forEach(problemId -> deleteProblem(problemId, userId));
+        // 중간에 하나라도 실패하면 전체가 롤백되므로, S3 삭제는 모두 지운 뒤 커밋되면 한 번에 보낸다.
+        List<S3DeleteMessage> s3DeleteMessages = new ArrayList<>();
+        problemIdList.forEach(problemId -> s3DeleteMessages.addAll(deleteOwnedProblem(problemId, userId)));
+        s3DeleteAfterCommitSender.sendAfterCommit(filterDeletableMessages(s3DeleteMessages, userId));
     }
 
     // 호출자(deleteAllByFolderIds)의 트랜잭션 안에서 실행된다.
-    private void deleteFolderProblems(Long folderId) {
+    private List<S3DeleteMessage> deleteFolderProblems(Long folderId) {
+        List<S3DeleteMessage> s3DeleteMessages = new ArrayList<>();
         problemRepository.findAllByFolderId(folderId)
-                .forEach(problem -> {
-                    deleteProblemWithoutOwnerCheck(problem.getId());
-                });
+                .forEach(problem -> s3DeleteMessages.addAll(deleteProblemWithoutOwnerCheck(problem.getId())));
 
         log.info("problem in folderId: {} has deleted", folderId);
+        return s3DeleteMessages;
     }
 
     @Transactional
     public void deleteAllByFolderIds(Long userId, Collection<Long> folderIds) {
+        List<S3DeleteMessage> s3DeleteMessages = new ArrayList<>();
         folderIds.forEach(folderId -> {
             validateFolderOwner(folderId, userId);
-            deleteFolderProblems(folderId);
+            s3DeleteMessages.addAll(deleteFolderProblems(folderId));
         });
+        s3DeleteAfterCommitSender.sendAfterCommit(filterDeletableMessages(s3DeleteMessages, userId));
     }
 
     @Transactional
     public void deleteAllUserProblems(Long userId) {
+        List<S3DeleteMessage> s3DeleteMessages = new ArrayList<>();
         problemRepository.findAllByUserId(userId)
-                .forEach(problem -> {
-                    deleteProblemWithoutOwnerCheck(problem.getId());
-                });
+                .forEach(problem -> s3DeleteMessages.addAll(deleteProblemWithoutOwnerCheck(problem.getId())));
+        s3DeleteAfterCommitSender.sendAfterCommit(filterDeletableMessages(s3DeleteMessages, userId));
 
         streakCacheService.evict(userId);
         log.info("userId: {} delete all user problems", userId);
