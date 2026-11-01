@@ -121,9 +121,11 @@ public class OpenAIClient {
                 input.problemImageUrls().size(), input.answerImageUrls().size(),
                 lengthOf(input.reference()), lengthOf(input.memo()));
 
-        // 1. 이미지 로드. 외부 URL·장수 초과·형식 오류는 여기서 NonRetryable 로 끝난다(OpenAI 호출 시간 계측에서 뺀다)
+        // 1. 이미지 로드. 외부 URL·형식 오류는 여기서 NonRetryable 로 끝난다(OpenAI 호출 시간 계측에서 뺀다).
+        //    장수 상한을 넘은 문제 이미지는 앞의 상한만큼만 담겨 오고, 프롬프트의 "N장" 도 담긴 장수로 쓴다
         AnalysisImageLoader.LoadedImages images =
                 analysisImageLoader.loadForAnalysis(input.problemImageUrls(), input.answerImageUrls());
+        recordSkippedProblemImages(images);
         recordSkippedAnswerImages(images);
 
         Timer.Sample sample = Timer.start(meterRegistry);
@@ -204,6 +206,20 @@ public class OpenAIClient {
      */
     public ProblemAnalysisResult analyzeImage(String imageUrl) {
         return analyzeImages(List.of(imageUrl));
+    }
+
+    /**
+     * 장수 상한을 넘어 빼고 보낸 문제 이미지 수를 센다. 늘면 상한(openai.analysis.max-images)을 다시 볼 신호다.
+     */
+    private void recordSkippedProblemImages(AnalysisImageLoader.LoadedImages images) {
+        if (images == null || images.skippedProblemImageCount() <= 0) {
+            return;
+        }
+        Counter.builder("ono.ai.analysis.problem_image_skipped")
+                .description("AI 분석에서 장수 상한을 넘어 빼고 보낸 문제 이미지 수")
+                .tag("reason", AnalysisImageLoader.SKIP_OVER_COUNT)
+                .register(meterRegistry)
+                .increment(images.skippedProblemImageCount());
     }
 
     /** 빼고 보낸 해설 이미지를 이유별로 센다. 403 이 늘면 버킷 권한이나 key 정리를 의심할 수 있다 */

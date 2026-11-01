@@ -913,7 +913,7 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
 
         @ParameterizedTest(name = "{0}")
         @EnumSource(value = AnalysisFailureReason.class,
-                names = {"INVALID_IMAGE_SOURCE", "UNSUPPORTED_IMAGE", "TOO_MANY_IMAGES", "IMAGE_TOO_LARGE"})
+                names = {"INVALID_IMAGE_SOURCE", "UNSUPPORTED_IMAGE", "IMAGE_TOO_LARGE"})
         @DisplayName("OpenAI 를 부르기 전에 끝난 이미지 실패는 하루 한도 1회를 돌려준다")
         void refundsImageSideFailure(AnalysisFailureReason reason) {
             Problem problem = problemWithImage();
@@ -932,7 +932,7 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
 
         @ParameterizedTest(name = "{0}")
         @EnumSource(value = AnalysisFailureReason.class,
-                names = {"INVALID_IMAGE_SOURCE", "UNSUPPORTED_IMAGE", "TOO_MANY_IMAGES", "IMAGE_TOO_LARGE"},
+                names = {"INVALID_IMAGE_SOURCE", "UNSUPPORTED_IMAGE", "IMAGE_TOO_LARGE"},
                 mode = EnumSource.Mode.EXCLUDE)
         @DisplayName("AI 를 쓴 실패(거절, 판독 불가, 요청 거부, 재시도 소진 등)는 한도를 돌려주지 않는다")
         void keepsQuotaForOtherFailures(AnalysisFailureReason reason) {
@@ -1058,9 +1058,6 @@ class ProblemAnalysisServiceTest extends ProblemTestSupport {
                     .as("20MB 넘는 JPG 도 올 수 있으니 형식을 단정하지 않는다")
                     .doesNotContain("형식")
                     .contains("JPG나 PNG");
-            assertThat(AnalysisFailureReason.TOO_MANY_IMAGES.userMessage())
-                    .as("장수 상한은 설정값이라 문구에 숫자를 넣지 않는다")
-                    .doesNotContainPattern("[0-9]");
         }
 
         @Test

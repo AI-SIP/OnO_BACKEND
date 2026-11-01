@@ -75,9 +75,15 @@ public class AnalysisImageLoader {
     private static final String S3_HOST_SUFFIX = ".amazonaws.com/";
     private static final Set<String> HEIF_BRANDS = Set.of("heic", "heix", "hevc", "heim", "heis", "mif1", "msf1");
 
+    /**
+     * 문제 이미지 장수 상한. 넘으면 실패시키지 않고 앞에서부터 상한만큼만 분석한다.
+     * 출시된 앱은 문제 하나의 이미지 장수를 막지 않고(한 번 촬영 상한 20장) 운영도 장수로 거부한 적이 없어서,
+     * 실패시키면 지금까지 분석되던 문제가 실패로 바뀐다. 메모리는 장수가 아니라 총용량 상한(max-total-bytes)이 막는다.
+     */
+    static final int DEFAULT_MAX_IMAGES = 10;
     static final int DEFAULT_MAX_ANSWER_IMAGES = 3;
 
-    /** 해설 이미지를 뺀 이유. 메트릭 ono.ai.analysis.answer_image_skipped 의 reason 태그로 쓴다 */
+    /** 이미지를 뺀 이유. 메트릭 ono.ai.analysis.answer_image_skipped, problem_image_skipped 의 reason 태그로 쓴다 */
     static final String SKIP_ACCESS_DENIED = "access_denied";
     static final String SKIP_TOTAL_SIZE = "total_size_limit";
     static final String SKIP_OVER_COUNT = "over_count";
@@ -91,10 +97,15 @@ public class AnalysisImageLoader {
     public AnalysisImageLoader(
             AmazonS3Client amazonS3Client,
             @Value("${cloud.aws.s3.bucket}") String bucket,
-            @Value("${openai.analysis.max-images:5}") int maxImages,
+            @Value("${openai.analysis.max-images:" + DEFAULT_MAX_IMAGES + "}") int maxImages,
             @Value("${openai.analysis.max-total-bytes:" + DEFAULT_MAX_TOTAL_BYTES + "}") long maxTotalBytes,
             @Value("${openai.analysis.max-answer-images:" + DEFAULT_MAX_ANSWER_IMAGES + "}") int maxAnswerImages
     ) {
+        // 0 이면 이미지 없이 OpenAI 를 부르고, 음수면 subList 에서 예외가 나 재시도 끝에 DLQ 로 간다.
+        // 설정을 잘못 넣었을 때 분석이 하나씩 이상하게 끝나는 대신 기동 단계에서 바로 드러나게 한다.
+        if (maxImages < 1) {
+            throw new IllegalArgumentException("openai.analysis.max-images 는 1 이상이어야 합니다: " + maxImages);
+        }
         this.amazonS3Client = amazonS3Client;
         this.bucket = bucket;
         this.maxImages = maxImages;
@@ -114,7 +125,7 @@ public class AnalysisImageLoader {
 
     /**
      * 문제 이미지 URL 목록을 OpenAI image_url.url 에 넣을 data URL 목록으로 바꾼다.
-     * 재시도로 해결되지 않는 문제(외부 URL, 형식, 장수, 크기)는 NonRetryableAnalysisException,
+     * 재시도로 해결되지 않는 문제(외부 URL, 형식, 크기)는 NonRetryableAnalysisException,
      * 그 밖의 S3/IO 오류는 재시도 대상인 일반 RuntimeException 으로 던진다.
      */
     public List<String> loadAsDataUrls(List<String> imageUrls) {
@@ -125,6 +136,8 @@ public class AnalysisImageLoader {
      * 문제 이미지와 해설 이미지를 함께 data URL 로 바꾼다. 총용량 상한은 둘을 합쳐 적용한다.
      *
      * 문제 이미지는 분석 대상이라 지금까지처럼 하나라도 문제가 있으면 분석을 실패시킨다.
+     * 다만 장수가 상한(기본 10장)을 넘으면 실패시키지 않고 앞에서부터 상한만큼만 쓴다. 뺀 장수는
+     * LoadedImages.skippedProblemImageCount 에 담는다. 뒤쪽 이미지는 key 검증도 S3 읽기도 하지 않는다.
      * 해설 이미지는 모델이 답을 맞춰 보는 보조 자료라, 해설 때문에 분석 전체가 실패하지 않게 한다.
      * - 상한(기본 3장)을 넘으면 앞에서부터 상한만큼만 쓴다
      * - key 제한, 형식, 크기 검증은 문제 이미지와 똑같이 하고, 걸리면 그 해설 이미지만 빼고 보낸다
@@ -139,10 +152,13 @@ public class AnalysisImageLoader {
         if (problemImageUrls == null || problemImageUrls.isEmpty()) {
             throw new NonRetryableAnalysisException(AnalysisFailureReason.UNREADABLE_IMAGE, "분석할 문제 이미지가 없습니다.");
         }
-        // S3 를 읽기 전에 판정해야 많은 장수 요청이 재시도마다 S3 를 두드리지 않는다
-        if (problemImageUrls.size() > maxImages) {
-            throw new NonRetryableAnalysisException(AnalysisFailureReason.TOO_MANY_IMAGES,
-                    "문제 이미지가 " + problemImageUrls.size() + "장으로 상한 " + maxImages + "장을 넘습니다.");
+        // S3 를 읽기 전에 잘라야 많은 장수 요청이 재시도마다 뒤쪽 이미지까지 S3 에서 읽지 않는다
+        List<String> problems = problemImageUrls;
+        int skippedProblemImageCount = 0;
+        if (problems.size() > maxImages) {
+            skippedProblemImageCount = problems.size() - maxImages;
+            log.info("Problem images over limit, using first {} of {}", maxImages, problems.size());
+            problems = problems.subList(0, maxImages);
         }
         List<String> answers = answerImageUrls == null ? List.of() : answerImageUrls;
         List<String> skippedAnswerReasons = new ArrayList<>();
@@ -154,7 +170,7 @@ public class AnalysisImageLoader {
             answers = answers.subList(0, maxAnswerImages);
         }
 
-        List<String> keys = problemImageUrls.stream().map(this::extractKey).toList();
+        List<String> keys = problems.stream().map(this::extractKey).toList();
         List<String> problemDataUrls = new ArrayList<>(keys.size());
         long totalBytes = 0;
         for (String key : keys) {
@@ -202,18 +218,24 @@ public class AnalysisImageLoader {
             totalBytes += encoded.bytes().length;
             answerDataUrls.add(toDataUrl(encoded));
         }
-        return new LoadedImages(problemDataUrls, answerDataUrls, skippedAnswerReasons);
+        return new LoadedImages(problemDataUrls, answerDataUrls, skippedAnswerReasons, skippedProblemImageCount);
     }
 
     /**
      * 분석에 보낼 data URL. 문제 이미지와 해설 이미지를 나눠 담아 프롬프트에서 라벨을 따로 붙인다.
      * skippedAnswerReasons 는 빼고 보낸 해설 이미지마다 그 이유(SKIP_* 또는 AnalysisFailureReason 태그)다.
+     * skippedProblemImageCount 는 장수 상한을 넘어 빼고 보낸 문제 이미지 수다.
      */
-    public record LoadedImages(List<String> problemImages, List<String> answerImages, List<String> skippedAnswerReasons) {
+    public record LoadedImages(List<String> problemImages, List<String> answerImages, List<String> skippedAnswerReasons,
+                               int skippedProblemImageCount) {
         public LoadedImages {
             problemImages = List.copyOf(problemImages);
             answerImages = List.copyOf(answerImages);
             skippedAnswerReasons = skippedAnswerReasons == null ? List.of() : List.copyOf(skippedAnswerReasons);
+        }
+
+        public LoadedImages(List<String> problemImages, List<String> answerImages, List<String> skippedAnswerReasons) {
+            this(problemImages, answerImages, skippedAnswerReasons, 0);
         }
 
         public LoadedImages(List<String> problemImages, List<String> answerImages) {
