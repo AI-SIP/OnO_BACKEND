@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
@@ -31,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @DisplayName("ProblemSolveService")
@@ -38,6 +40,9 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
 
     @Autowired
     private ProblemSolveService problemSolveService;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     private User user;
     private User other;
@@ -551,8 +556,8 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
         @DisplayName("이미지가 달린 기록을 지워도 예외 없이 끝난다")
         void deletesSolveWithImages() {
             ProblemSolve solve = saveSolve(problem, user.getId(), PRACTICED_AT);
-            saveImage(solve, "https://test-ono-bucket.s3.amazonaws.com/a.png", 0);
-            saveImage(solve, "https://test-ono-bucket.s3.amazonaws.com/b.png", 1);
+            saveImage(solve, fixtures.bucketImageUrl("a"), 0);
+            saveImage(solve, fixtures.bucketImageUrl("b"), 1);
 
             problemSolveService.deleteProblemSolve(solve.getId(), user.getId());
 
@@ -574,6 +579,55 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
                     .as("다른 문제의 기록까지 지우면 안 된다")
                     .isEqualTo(1L);
         }
+
+        @Test
+        @DisplayName("기록의 이미지 S3 삭제 메시지는 커밋된 뒤에 나간다")
+        void sendsS3DeleteAfterCommit() {
+            ProblemSolve solve = saveSolve(problem, user.getId(), PRACTICED_AT);
+            saveImage(solve, fixtures.bucketImageUrl("a"), 0);
+            saveImage(solve, fixtures.bucketImageUrl("b"), 1);
+
+            transactionTemplate.executeWithoutResult(status -> {
+                problemSolveService.deleteProblemSolve(solve.getId(), user.getId());
+                verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
+            });
+
+            verify(s3DeleteProducer).sendDeleteMessage(fixtures.bucketImageUrl("a"), solve.getId());
+            verify(s3DeleteProducer).sendDeleteMessage(fixtures.bucketImageUrl("b"), solve.getId());
+        }
+
+        @Test
+        @DisplayName("기록 삭제가 롤백되면 S3 삭제 메시지를 보내지 않는다")
+        void sendsNothingWhenSolveDeleteRollsBack() {
+            ProblemSolve solve = saveSolve(problem, user.getId(), PRACTICED_AT);
+            saveImage(solve, fixtures.bucketImageUrl("a"), 0);
+
+            transactionTemplate.executeWithoutResult(status -> {
+                problemSolveService.deleteProblemSolve(solve.getId(), user.getId());
+                status.setRollbackOnly();
+            });
+
+            assertThat(problemSolveService.getUserProblemSolveCount(user.getId())).isEqualTo(1L);
+            verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
+        }
+
+        @Test
+        @DisplayName("문제의 기록을 한 번에 지울 때도 S3 삭제 메시지는 커밋된 뒤에 나간다")
+        void sendsS3DeleteAfterCommitOnDeleteAll() {
+            ProblemSolve first = saveSolve(problem, user.getId(), PRACTICED_AT);
+            saveImage(first, fixtures.bucketImageUrl("first"), 0);
+            ProblemSolve second = saveSolve(problem, user.getId(), PRACTICED_AT.plusDays(1));
+            saveImage(second, fixtures.bucketImageUrl("second"), 0);
+
+            transactionTemplate.executeWithoutResult(status -> {
+                problemSolveService.deleteAllProblemSolvesByProblemId(problem.getId());
+                verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
+            });
+
+            verify(s3DeleteProducer).sendDeleteMessage(fixtures.bucketImageUrl("first"), first.getId());
+            verify(s3DeleteProducer).sendDeleteMessage(fixtures.bucketImageUrl("second"), second.getId());
+            verify(s3DeleteProducer, times(2)).sendDeleteMessage(any(), any());
+        }
     }
 
     @Nested
@@ -584,9 +638,9 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
         @DisplayName("업로드한 이미지가 순서대로 저장된다")
         void uploadsImagesInOrder() {
             ProblemSolve solve = saveSolve(problem, user.getId(), PRACTICED_AT);
-            given(fileUploadService.uploadFileToS3(any(MultipartFile.class)))
-                    .willReturn("https://test-ono-bucket.s3.amazonaws.com/first.png",
-                            "https://test-ono-bucket.s3.amazonaws.com/second.png");
+            given(fileUploadService.uploadFileToS3(any(MultipartFile.class), any()))
+                    .willReturn(fixtures.bucketImageUrl("first"),
+                            fixtures.bucketImageUrl("second"));
 
             problemSolveService.uploadProblemSolveImages(solve.getId(), user.getId(), List.of(
                     new MockMultipartFile("images", "a.png", "image/png", "a".getBytes()),
@@ -604,7 +658,7 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
                     () -> problemSolveService.uploadProblemSolveImages(othersSolve.getId(), user.getId(),
                             List.of(new MockMultipartFile("images", "a.png", "image/png", "a".getBytes()))));
 
-            verify(fileUploadService, never()).uploadFileToS3(any());
+            verify(fileUploadService, never()).uploadFileToS3(any(), any());
         }
 
         @Test
@@ -630,16 +684,28 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
         @DisplayName("presigned 방식으로 넘어온 URL 은 검증 후 기존 이미지 뒤에 이어 붙는다")
         void appendsImageUrlsAfterExistingOnes() {
             ProblemSolve solve = saveSolve(problem, user.getId(), PRACTICED_AT);
-            saveImage(solve, "https://test-ono-bucket.s3.amazonaws.com/existing.png", 0);
+            saveImage(solve, fixtures.bucketImageUrl("existing"), 0);
 
-            problemSolveService.addImageUrls(solve.getId(), user.getId(),
-                    List.of("https://test-ono-bucket.s3.amazonaws.com/new.png"));
+            String newUrl = fixtures.uploadedImageUrl(user.getId());
+
+            problemSolveService.addImageUrls(solve.getId(), user.getId(), List.of(newUrl));
 
             assertThat(problemSolveService.getProblemSolve(solve.getId(), user.getId()).imageUrls())
                     .as("imageOrder 가 겹치면 이미지 순서가 뒤섞인다")
-                    .containsExactly("https://test-ono-bucket.s3.amazonaws.com/existing.png",
-                            "https://test-ono-bucket.s3.amazonaws.com/new.png");
-            verify(fileUploadService).validateS3Url("https://test-ono-bucket.s3.amazonaws.com/new.png");
+                    .containsExactly(fixtures.bucketImageUrl("existing"), newUrl);
+        }
+
+        @Test
+        @DisplayName("다른 사용자가 올린 이미지 URL 은 붙이지 않는다")
+        void rejectsImageUrlUploadedByOtherUser() {
+            ProblemSolve solve = saveSolve(problem, user.getId(), PRACTICED_AT);
+            String othersUrl = fixtures.uploadedImageUrl(user.getId() + 1000);
+
+            assertThatThrownBy(() -> problemSolveService.addImageUrls(solve.getId(), user.getId(), List.of(othersUrl)))
+                    .isInstanceOf(ApplicationException.class)
+                    .extracting(e -> ((ApplicationException) e).getErrorCase())
+                    .isEqualTo(com.aisip.OnO.backend.util.fileupload.exception.FileUploadErrorCase.IMAGE_USER_UNMATCHED);
+            assertThat(problemSolveService.getProblemSolve(solve.getId(), user.getId()).imageUrls()).isEmpty();
         }
 
         @Test
@@ -649,7 +715,7 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
 
             assertErrorCase(ProblemSolveErrorCase.PROBLEM_SOLVE_USER_UNMATCHED,
                     () -> problemSolveService.addImageUrls(othersSolve.getId(), user.getId(),
-                            List.of("https://test-ono-bucket.s3.amazonaws.com/new.png")));
+                            List.of(fixtures.bucketImageUrl("new"))));
         }
 
         @Test
@@ -666,7 +732,7 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
         void rejectsUnknownSolve() {
             assertErrorCase(ProblemSolveErrorCase.PROBLEM_SOLVE_NOT_FOUND,
                     () -> problemSolveService.addImageUrls(999_999L, user.getId(),
-                            List.of("https://test-ono-bucket.s3.amazonaws.com/new.png")));
+                            List.of(fixtures.bucketImageUrl("new"))));
         }
     }
 

@@ -1,14 +1,18 @@
 package com.aisip.OnO.backend.util.redis;
 
+import io.lettuce.core.ClientOptions;
+import io.lettuce.core.SocketOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
-import org.springframework.data.redis.core.ListOperations;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+
+import java.time.Duration;
 
 @Configuration
 public class RedisConfig {
@@ -20,13 +24,32 @@ public class RedisConfig {
     private int port;
 
     /**
+     * 명령 하나를 기다리는 최대 시간. 팩토리를 직접 만들어서 spring.data.redis.timeout 이 적용되지 않고,
+     * 지정하지 않으면 Lettuce 기본값 60초가 쓰인다. 한도 확인처럼 요청 트랜잭션 안에서 부르는 곳이 있어
+     * Redis 가 응답하지 않으면 DB 커넥션을 60초씩 잡고 있게 되므로 짧게 둔다(#389).
+     */
+    @Value("${ono.redis.command-timeout-ms:2000}")
+    private long commandTimeoutMs;
+
+    @Value("${ono.redis.connect-timeout-ms:2000}")
+    private long connectTimeoutMs;
+
+    /**
      * Redis 연결을 위한 'Connection' 생성합니다.
      *
      * @return RedisConnectionFactory
      */
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
-        return new LettuceConnectionFactory(host, port);
+        LettuceClientConfiguration clientConfiguration = LettuceClientConfiguration.builder()
+                .commandTimeout(Duration.ofMillis(commandTimeoutMs))
+                .clientOptions(ClientOptions.builder()
+                        .socketOptions(SocketOptions.builder()
+                                .connectTimeout(Duration.ofMillis(connectTimeoutMs))
+                                .build())
+                        .build())
+                .build();
+        return new LettuceConnectionFactory(new RedisStandaloneConfiguration(host, port), clientConfiguration);
     }
 
     /**
@@ -54,40 +77,5 @@ public class RedisConfig {
         redisTemplate.setDefaultSerializer(new StringRedisSerializer());
 
         return redisTemplate;
-    }
-
-    /**
-     * 리스트에 접근하여 다양한 연산을 수행합니다.
-     *
-     * @return ListOperations<String, Object>
-     */
-    public ListOperations<String, Object> getListOperations() {
-        return this.redisTemplate().opsForList();
-    }
-
-    /**
-     * 단일 데이터에 접근하여 다양한 연산을 수행합니다.
-     *
-     * @return ValueOperations<String, Object>
-     */
-    public ValueOperations<String, Object> getValueOperations() {
-        return this.redisTemplate().opsForValue();
-    }
-
-
-    /**
-     * Redis 작업중 등록, 수정, 삭제에 대해서 처리 및 예외처리를 수행합니다.
-     *
-     * @param operation
-     * @return
-     */
-    public int executeOperation(Runnable operation) {
-        try {
-            operation.run();
-            return 1;
-        } catch (Exception e) {
-            System.out.println("Redis 작업 오류 발생 :: " + e.getMessage());
-            return 0;
-        }
     }
 }

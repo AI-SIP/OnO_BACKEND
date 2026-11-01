@@ -1,7 +1,6 @@
 package com.aisip.OnO.backend.user.controller;
 
 import com.aisip.OnO.backend.auth.exception.AuthErrorCase;
-import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.support.IntegrationTestSupport;
 import com.aisip.OnO.backend.user.dto.NotificationSettingsUpdateDto;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
@@ -23,9 +22,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -145,6 +142,57 @@ class UserApiTest extends IntegrationTestSupport {
             assertThat(userRepository.findById(other.getId()).orElseThrow().getName()).isEqualTo(otherNameBefore);
         }
 
+        /**
+         * 출시된 앱(4.1.1)은 이름만 바꿀 때도 {email, name, identifier, platform, password, profileImageUrl}
+         * 형태로 보낸다. 요청은 그대로 200 으로 받고, 이름과 이메일만 반영한다.
+         */
+        @Test
+        @DisplayName("이름과 이메일만 바뀌고 identifier, platform, password 는 요청에 있어도 그대로다")
+        void updatesOnlyNameAndEmail() throws Exception {
+            User me = fixtures.createUser();
+            String identifierBefore = me.getIdentifier();
+            String platformBefore = me.getPlatform();
+
+            mockMvc.perform(patch("/api/users")
+                            .with(asUser(me))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"email":"changed@test.ono","name":"바뀐이름","identifier":"changed-identifier",
+                                     "platform":"ADMIN","password":"changed-password","profileImageUrl":null}
+                                    """))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data").value("사용자 정보 수정이 완료되었습니다."));
+
+            User updated = userRepository.findById(me.getId()).orElseThrow();
+            assertThat(updated.getName()).isEqualTo("바뀐이름");
+            assertThat(updated.getEmail()).isEqualTo("changed@test.ono");
+            assertThat(updated.getIdentifier())
+                    .as("identifier 가 바뀌면 다음 소셜 로그인에서 같은 계정을 찾지 못한다")
+                    .isEqualTo(identifierBefore);
+            assertThat(updated.getPlatform()).isEqualTo(platformBefore);
+            assertThat(updated.getPassword()).isNull();
+        }
+
+        @Test
+        @DisplayName("앱이 이름만 바꿀 때 보내는 요청(빈 password, null identifier)도 이름만 반영한다")
+        void acceptsReleasedAppPayload() throws Exception {
+            User me = fixtures.createUser();
+            String emailBefore = me.getEmail();
+
+            mockMvc.perform(patch("/api/users")
+                            .with(asUser(me))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"email":null,"name":"새이름","identifier":null,
+                                     "platform":null,"password":"","profileImageUrl":null}
+                                    """))
+                    .andExpect(status().isOk());
+
+            User updated = userRepository.findById(me.getId()).orElseThrow();
+            assertThat(updated.getName()).isEqualTo("새이름");
+            assertThat(updated.getEmail()).isEqualTo(emailBefore);
+        }
+
         @Test
         @DisplayName("인증 없이 수정하면 401 로 막는다")
         void rejectsAnonymousUpdate() throws Exception {
@@ -184,7 +232,7 @@ class UserApiTest extends IntegrationTestSupport {
         @DisplayName("이미지를 올리면 S3 URL 이 프로필에 반영된다")
         void uploadsProfileImage() throws Exception {
             User user = fixtures.createUser();
-            given(fileUploadService.uploadFileToS3(any())).willReturn("https://cdn.test.ono/profile.png");
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn("https://cdn.test.ono/profile.png");
 
             mockMvc.perform(multipart(HttpMethod.PATCH, "/api/users/me/profile-image")
                             .file(pngFile())
@@ -214,16 +262,46 @@ class UserApiTest extends IntegrationTestSupport {
         @DisplayName("우리 버킷이 아닌 URL 로는 프로필 이미지를 바꿀 수 없다")
         void rejectsForeignImageUrl() throws Exception {
             User user = fixtures.createUser();
-            willThrow(new ApplicationException(FileUploadErrorCase.INVALID_IMAGE_FILE))
-                    .given(fileUploadService).validateS3Url(anyString());
 
             mockMvc.perform(patch("/api/users/me/profile-image-url")
                             .with(asUser(user))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(
-                                    new UserController.ProfileImageUrlRequest("https://evil.example.com/a.png"))))
+                                    new UserController.ProfileImageUrlRequest("https://example.com/a.png"))))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.errorCode").value(FileUploadErrorCase.INVALID_IMAGE_FILE.getErrorCode()));
+
+            assertThat(userRepository.findById(user.getId()).orElseThrow().getProfileImageUrl()).isNull();
+        }
+
+        @Test
+        @DisplayName("내가 올린 URL 로 프로필 이미지를 바꾼다")
+        void updatesProfileImageWithOwnUrl() throws Exception {
+            User user = fixtures.createUser();
+            String imageUrl = fixtures.uploadedImageUrl(user.getId());
+
+            mockMvc.perform(patch("/api/users/me/profile-image-url")
+                            .with(asUser(user))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(
+                                    new UserController.ProfileImageUrlRequest(imageUrl))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.profileImageUrl").value(imageUrl));
+        }
+
+        @Test
+        @DisplayName("다른 사용자가 올린 URL 로는 프로필 이미지를 바꿀 수 없다 - 403 + 2006")
+        void rejectsImageUrlUploadedByOtherUser() throws Exception {
+            User user = fixtures.createUser();
+            User other = fixtures.createOtherUser();
+
+            mockMvc.perform(patch("/api/users/me/profile-image-url")
+                            .with(asUser(user))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(
+                                    new UserController.ProfileImageUrlRequest(fixtures.uploadedImageUrl(other.getId())))))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.errorCode").value(FileUploadErrorCase.IMAGE_USER_UNMATCHED.getErrorCode()));
 
             assertThat(userRepository.findById(user.getId()).orElseThrow().getProfileImageUrl()).isNull();
         }
@@ -232,7 +310,7 @@ class UserApiTest extends IntegrationTestSupport {
         @DisplayName("프로필 이미지를 지우면 URL 이 비워진다")
         void deletesProfileImage() throws Exception {
             User user = fixtures.createUser();
-            given(fileUploadService.uploadFileToS3(any())).willReturn("https://cdn.test.ono/profile.png");
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn("https://cdn.test.ono/profile.png");
             mockMvc.perform(multipart(HttpMethod.PATCH, "/api/users/me/profile-image")
                             .file(pngFile())
                             .with(asUser(user)))

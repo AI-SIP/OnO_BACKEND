@@ -1,6 +1,6 @@
 ---
 name: logic-reviewer
-description: 비즈니스 로직 정합성 검증. 엣지케이스·널·동시성·예외·롤백을 검사한다. /check 명령 시 자동 위임.
+description: 읽기 전용(코드 수정·커밋 금지). 비즈니스 로직 정합성 검증. 엣지케이스·널·동시성·예외·롤백을 검사한다. /check 에서 항상, /analysis 에서 필요 시 위임.
 tools: Read, Grep, Glob, Bash
 ---
 

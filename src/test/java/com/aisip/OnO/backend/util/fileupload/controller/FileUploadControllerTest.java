@@ -68,7 +68,7 @@ class FileUploadControllerTest extends IntegrationTestSupport {
         void returnsUploadedUrl() throws Exception {
             User user = fixtures.createUser();
             authenticateAs(user.getId());
-            given(fileUploadService.uploadFileToS3(any())).willReturn(UPLOADED_URL);
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn(UPLOADED_URL);
 
             mockMvc.perform(multipart("/api/fileUpload/image").file(image("image")))
                     .andExpect(status().isOk())
@@ -76,7 +76,7 @@ class FileUploadControllerTest extends IntegrationTestSupport {
                     .andExpect(jsonPath("$.errorCode").doesNotExist());
 
             ArgumentCaptor<MultipartFile> uploaded = ArgumentCaptor.forClass(MultipartFile.class);
-            verify(fileUploadService).uploadFileToS3(uploaded.capture());
+            verify(fileUploadService).uploadFileToS3(uploaded.capture(), eq(user.getId()));
             assertThat(uploaded.getValue().getOriginalFilename()).isEqualTo("photo.jpg");
         }
 
@@ -85,13 +85,13 @@ class FileUploadControllerTest extends IntegrationTestSupport {
         void passesEmptyFileToService() throws Exception {
             User user = fixtures.createUser();
             authenticateAs(user.getId());
-            given(fileUploadService.uploadFileToS3(any())).willReturn(UPLOADED_URL);
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn(UPLOADED_URL);
 
             mockMvc.perform(multipart("/api/fileUpload/image").file(image("image", "photo.jpg", new byte[0])))
                     .andExpect(status().isOk());
 
             ArgumentCaptor<MultipartFile> uploaded = ArgumentCaptor.forClass(MultipartFile.class);
-            verify(fileUploadService).uploadFileToS3(uploaded.capture());
+            verify(fileUploadService).uploadFileToS3(uploaded.capture(), eq(user.getId()));
             assertThat(uploaded.getValue().isEmpty())
                     .as("빈 파일 여부 판단은 서비스 책임이다")
                     .isTrue();
@@ -103,7 +103,7 @@ class FileUploadControllerTest extends IntegrationTestSupport {
             User user = fixtures.createUser();
             authenticateAs(user.getId());
             willThrow(new ApplicationException(FileUploadErrorCase.INVALID_IMAGE_FILE))
-                    .given(fileUploadService).uploadFileToS3(any());
+                    .given(fileUploadService).uploadFileToS3(any(), any());
 
             mockMvc.perform(multipart("/api/fileUpload/image").file(image("image", "photo", new byte[]{1})))
                     .andExpect(status().isBadRequest())
@@ -119,7 +119,7 @@ class FileUploadControllerTest extends IntegrationTestSupport {
             User user = fixtures.createUser();
             authenticateAs(user.getId());
             willThrow(new ApplicationException(FileUploadErrorCase.FILE_UPLOAD_FAILED))
-                    .given(fileUploadService).uploadFileToS3(any());
+                    .given(fileUploadService).uploadFileToS3(any(), any());
 
             mockMvc.perform(multipart("/api/fileUpload/image").file(image("image")))
                     .andExpect(status().isBadRequest())
@@ -173,7 +173,7 @@ class FileUploadControllerTest extends IntegrationTestSupport {
         void keepsUploadOrder() throws Exception {
             User user = fixtures.createUser();
             authenticateAs(user.getId());
-            given(fileUploadService.uploadFileToS3(any()))
+            given(fileUploadService.uploadFileToS3(any(), any()))
                     .willReturn(UPLOADED_URL + "#1", UPLOADED_URL + "#2");
 
             mockMvc.perform(multipart("/api/fileUpload/images")
@@ -184,7 +184,7 @@ class FileUploadControllerTest extends IntegrationTestSupport {
                     .andExpect(jsonPath("$.data[0]").value(UPLOADED_URL + "#1"))
                     .andExpect(jsonPath("$.data[1]").value(UPLOADED_URL + "#2"));
 
-            verify(fileUploadService, org.mockito.Mockito.times(2)).uploadFileToS3(any());
+            verify(fileUploadService, org.mockito.Mockito.times(2)).uploadFileToS3(any(), any());
         }
 
         @Test
@@ -192,7 +192,7 @@ class FileUploadControllerTest extends IntegrationTestSupport {
         void failsWholeRequestWhenOneFileIsInvalid() throws Exception {
             User user = fixtures.createUser();
             authenticateAs(user.getId());
-            given(fileUploadService.uploadFileToS3(any()))
+            given(fileUploadService.uploadFileToS3(any(), any()))
                     .willReturn(UPLOADED_URL)
                     .willThrow(new ApplicationException(FileUploadErrorCase.INVALID_IMAGE_FILE));
 
@@ -233,7 +233,7 @@ class FileUploadControllerTest extends IntegrationTestSupport {
     class PresignedUrls {
 
         private void stubPresignedUrls() {
-            given(fileUploadService.generatePresignedUrls(anyString(), anyInt()))
+            given(fileUploadService.generatePresignedUrls(anyString(), anyInt(), any()))
                     .willAnswer(invocation -> {
                         int count = invocation.getArgument(1);
                         return java.util.stream.IntStream.range(0, Math.max(0, count))
@@ -254,7 +254,7 @@ class FileUploadControllerTest extends IntegrationTestSupport {
                     .andExpect(jsonPath("$.data.length()").value(1))
                     .andExpect(jsonPath("$.data[0].presignedUrl").value("https://signed/0"));
 
-            verify(fileUploadService).generatePresignedUrls("image/jpeg", 1);
+            verify(fileUploadService).generatePresignedUrls("image/jpeg", 1, user.getId());
         }
 
         @Test
@@ -270,7 +270,7 @@ class FileUploadControllerTest extends IntegrationTestSupport {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.length()").value(20));
 
-            verify(fileUploadService).generatePresignedUrls("image/png", 20);
+            verify(fileUploadService).generatePresignedUrls("image/png", 20, user.getId());
         }
 
         @Test
@@ -284,8 +284,8 @@ class FileUploadControllerTest extends IntegrationTestSupport {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.length()").value(20));
 
-            verify(fileUploadService).generatePresignedUrls("image/jpeg", 20);
-            verify(fileUploadService, never()).generatePresignedUrls(anyString(), eq(10000));
+            verify(fileUploadService).generatePresignedUrls("image/jpeg", 20, user.getId());
+            verify(fileUploadService, never()).generatePresignedUrls(anyString(), eq(10000), any());
         }
 
         @Test

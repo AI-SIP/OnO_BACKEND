@@ -8,9 +8,14 @@ import com.aisip.OnO.backend.folder.dto.FolderRegisterDto;
 import com.aisip.OnO.backend.folder.dto.FolderResponseDto;
 import com.aisip.OnO.backend.folder.dto.FolderThumbnailResponseDto;
 import com.aisip.OnO.backend.folder.service.FolderService;
+import com.aisip.OnO.backend.common.validation.ValidationGroups;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -44,7 +49,7 @@ public class FolderController {
     public CommonResponse<CursorPageResponse<FolderThumbnailResponseDto>> getSubFoldersWithCursor(
             @PathVariable("folderId") Long folderId,
             @RequestParam(value = "cursor", required = false) Long cursor,
-            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestParam(value = "size", defaultValue = "20") @Min(CursorPageResponse.MIN_SIZE) @Max(CursorPageResponse.MAX_SIZE) int size,
             @RequestParam(value = "sort", defaultValue = "OLDEST") CursorSort sort) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} get subfolders for folderId: {} with cursor: {}, size: {}", userId, folderId, cursor, size);
@@ -64,7 +69,7 @@ public class FolderController {
     @GetMapping("/thumbnails/V2")
     public CommonResponse<CursorPageResponse<FolderThumbnailResponseDto>> getAllUserFolderThumbnailsWithCursor(
             @RequestParam(value = "cursor", required = false) Long cursor,
-            @RequestParam(value = "size", defaultValue = "20") int size) {
+            @RequestParam(value = "size", defaultValue = "20") @Min(CursorPageResponse.MIN_SIZE) @Max(CursorPageResponse.MAX_SIZE) int size) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} get all folder thumbnails with cursor: {}, size: {}", userId, cursor, size);
 
@@ -90,7 +95,8 @@ public class FolderController {
 
     // ✅ 폴더 정보 수정
     @PatchMapping("")
-    public CommonResponse<String> updateFolderInfo(@RequestBody FolderRegisterDto folderRegisterDto) {
+    public CommonResponse<String> updateFolderInfo(
+            @Validated(ValidationGroups.Update.class) @RequestBody FolderRegisterDto folderRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
         folderService.updateFolder(folderRegisterDto, userId);
@@ -99,7 +105,7 @@ public class FolderController {
 
     // ✅ 폴더 삭제 기능
     @DeleteMapping("")
-    public CommonResponse<String> deleteFoldersWithProblems(@RequestBody FolderDeleteRequestDto folderDeleteRequestDto) {
+    public CommonResponse<String> deleteFoldersWithProblems(@Valid @RequestBody FolderDeleteRequestDto folderDeleteRequestDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         folderService.deleteFoldersWithProblems(userId, folderDeleteRequestDto.deleteFolderIdList());
         return CommonResponse.success("폴더가 성공적으로 삭제되었습니다.");

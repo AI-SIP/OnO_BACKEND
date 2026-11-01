@@ -13,7 +13,9 @@ import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.problem.support.ProblemTestSupport;
 import com.aisip.OnO.backend.tag.entity.Tag;
 import com.aisip.OnO.backend.user.entity.User;
+import com.aisip.OnO.backend.util.ai.AnalysisFailureReason;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.amqp.AmqpConnectException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -25,6 +27,10 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -95,6 +101,19 @@ class ProblemControllerTest extends ProblemTestSupport {
         void rejectsDelete() throws Exception {
             mockMvc.perform(delete("/api/problems/all"))
                     .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("분석 요청은 401 로 막히고 메시지도 나가지 않는다")
+        void rejectsAnalysisRequest() throws Exception {
+            Problem problem = saveProblem(owner.getId(), ownerRoot);
+            saveImageData(problem, "https://s3/p.png", ProblemImageType.PROBLEM_IMAGE);
+            saveSkippedAnalysis(problem);
+
+            mockMvc.perform(post("/api/problems/{id}/analysis", problem.getId()))
+                    .andExpect(status().isUnauthorized());
+
+            verify(problemAnalysisProducer, never()).sendAnalysisMessage(any());
         }
 
         @Test
@@ -333,7 +352,8 @@ class ProblemControllerTest extends ProblemTestSupport {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json(new ProblemRegisterV2Dto(
                                     null, "메모", null, ownerRoot.getId(), null,
-                                    List.of("https://s3/p.png"), List.of("https://s3/a.png")))))
+                                    List.of(fixtures.uploadedImageUrl(owner.getId())),
+                                    List.of(fixtures.uploadedImageUrl(owner.getId()))))))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data").isNumber());
 
@@ -378,7 +398,7 @@ class ProblemControllerTest extends ProblemTestSupport {
         void uploadImages() throws Exception {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
             saveSkippedAnalysis(problem);
-            org.mockito.BDDMockito.given(fileUploadService.uploadFileToS3(org.mockito.ArgumentMatchers.any()))
+            org.mockito.BDDMockito.given(fileUploadService.uploadFileToS3(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
                     .willReturn("https://s3/uploaded.png");
 
             mockMvc.perform(MockMvcRequestBuilders.multipart("/api/problems/{id}/imageData", problem.getId())
@@ -398,7 +418,7 @@ class ProblemControllerTest extends ProblemTestSupport {
             mockMvc.perform(post("/api/problems/{id}/imageData/urls", problem.getId())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json(new AddProblemImageUrlsRequest(List.of(
-                                    new AddProblemImageUrlsRequest.ImageUrlItem("https://s3/p.png", "PROBLEM_IMAGE")
+                                    new AddProblemImageUrlsRequest.ImageUrlItem(fixtures.uploadedImageUrl(owner.getId()), "PROBLEM_IMAGE")
                             )))))
                     .andExpect(status().isOk());
 
@@ -434,17 +454,18 @@ class ProblemControllerTest extends ProblemTestSupport {
         void updateImageData() throws Exception {
             Problem problem = saveProblem(owner.getId(), ownerRoot);
             saveSkippedAnalysis(problem);
+            String imageUrl = fixtures.uploadedImageUrl(owner.getId());
 
             mockMvc.perform(patch("/api/problems/imageData")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json(new UpdateProblemImageDataRequest(problem.getId(), List.of(
-                                    new UpdateProblemImageDataRequest.ImageItem("https://s3/new.png", "PROBLEM_IMAGE")
+                                    new UpdateProblemImageDataRequest.ImageItem(imageUrl, "PROBLEM_IMAGE")
                             )))))
                     .andExpect(status().isOk());
 
             assertThat(problemImageDataRepository.findAllByProblemId(problem.getId()))
                     .extracting(image -> image.getImageUrl())
-                    .containsExactly("https://s3/new.png");
+                    .containsExactly(imageUrl);
         }
 
         @Test
@@ -456,7 +477,7 @@ class ProblemControllerTest extends ProblemTestSupport {
             mockMvc.perform(delete("/api/problems/imageData").param("imageUrl", "https://s3/mine.png"))
                     .andExpect(status().isOk());
 
-            assertThat(problemImageDataRepository.findByImageUrl("https://s3/mine.png")).isEmpty();
+            assertThat(problemImageDataRepository.existsByImageUrl("https://s3/mine.png")).isFalse();
         }
 
         @Test
@@ -468,7 +489,7 @@ class ProblemControllerTest extends ProblemTestSupport {
             mockMvc.perform(delete("/api/problems/imageData").param("imageUrl", "https://s3/theirs.png"))
                     .andExpect(status().isForbidden());
 
-            assertThat(problemImageDataRepository.findByImageUrl("https://s3/theirs.png")).isPresent();
+            assertThat(problemImageDataRepository.existsByImageUrl("https://s3/theirs.png")).isTrue();
         }
 
         @Test
@@ -506,6 +527,30 @@ class ProblemControllerTest extends ProblemTestSupport {
 
             mockMvc.perform(post("/api/problems/{id}/analysis", othersProblem.getId()))
                     .andExpect(status().isForbidden());
+
+            verify(problemAnalysisProducer, never()).sendAnalysisMessage(any());
+        }
+
+        @Test
+        @DisplayName("POST /{id}/analysis - 큐 전송이 실패해도 200 이고, 분석은 FAILED 로 바뀐다")
+        void requestAnalysisSucceedsEvenWhenDispatchFails() throws Exception {
+            Problem problem = saveProblem(owner.getId(), ownerRoot);
+            saveImageData(problem, "https://s3/p.png", ProblemImageType.PROBLEM_IMAGE);
+            saveSkippedAnalysis(problem);
+            willThrow(new AmqpConnectException(new java.net.ConnectException("Connection refused")))
+                    .given(problemAnalysisProducer).sendAnalysisMessage(problem.getId());
+            try {
+                mockMvc.perform(post("/api/problems/{id}/analysis", problem.getId()))
+                        .andExpect(status().isOk());
+
+                var analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
+                assertThat(analysis.getStatus())
+                        .isEqualTo(com.aisip.OnO.backend.problem.entity.AnalysisStatus.FAILED);
+                assertThat(analysis.getErrorMessage()).isEqualTo(AnalysisFailureReason.DISPATCH.userMessage());
+            } finally {
+                redisTemplate.delete("rate_limit:ai_analysis:" + owner.getId());
+                redisTemplate.delete("ai_analysis_inflight:" + problem.getId());
+            }
         }
 
         @Test
@@ -519,6 +564,26 @@ class ProblemControllerTest extends ProblemTestSupport {
 
             assertThat(problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow().getStatus())
                     .isEqualTo(com.aisip.OnO.backend.problem.entity.AnalysisStatus.NO_IMAGE);
+        }
+
+        @Test
+        @DisplayName("PATCH /{id}/no-image - 완료된 분석은 그대로 둔다")
+        void keepsCompletedAnalysisOnNoImage() throws Exception {
+            Problem problem = saveProblem(owner.getId(), ownerRoot);
+            saveSkippedAnalysis(problem);
+            inTransaction(() -> {
+                var analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
+                analysis.updateWithSuccess("수학", "계산", "[\"판별식\"]", "풀이", "실수", "팁");
+                problemAnalysisRepository.save(analysis);
+            });
+
+            mockMvc.perform(patch("/api/problems/{id}/no-image", problem.getId()))
+                    .andExpect(status().isOk());
+
+            var analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
+            assertThat(analysis.getStatus())
+                    .isEqualTo(com.aisip.OnO.backend.problem.entity.AnalysisStatus.COMPLETED);
+            assertThat(analysis.getSubject()).isEqualTo("수학");
         }
     }
 

@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.tag.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.common.transaction.AfterCommit;
 import com.aisip.OnO.backend.tag.dto.TagCreateRequestDto;
 import com.aisip.OnO.backend.tag.dto.TagDeleteRequestDto;
 import com.aisip.OnO.backend.tag.dto.TagRecommendRequestDto;
@@ -123,7 +124,8 @@ public class TagService {
         }
 
         tagRepository.deleteAll(tags);
-        evictTagCache(userId);
+        // 커밋 전에 비우면 그 사이 들어온 목록 조회가 지운 태그를 다시 캐싱해 최대 1시간 남는다.
+        AfterCommit.run("태그 목록 캐시 삭제 userId=" + userId, () -> evictTagCache(userId));
         log.info("userId: {} deleted tags count: {}", userId, tagIds.size());
     }
 

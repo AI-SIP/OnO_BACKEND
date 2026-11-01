@@ -1,6 +1,6 @@
 ---
 name: perf-reviewer
-description: 성능·자원 검증. N+1, JPA 풀스캔, 커넥션풀 고갈, 인덱스 누락을 검사한다. /check, /perf 명령 시 자동 위임.
+description: 읽기 전용(코드 수정·커밋 금지). 성능·자원 검증. N+1, JPA 풀스캔, 커넥션풀 고갈, 인덱스 누락을 검사한다. /check, /perf 에서 항상, /analysis, /plan 에서 필요 시 위임.
 tools: Read, Grep, Glob, Bash
 ---
 

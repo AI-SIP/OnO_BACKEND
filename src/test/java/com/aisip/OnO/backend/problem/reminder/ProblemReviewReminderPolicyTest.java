@@ -4,6 +4,7 @@ import com.aisip.OnO.backend.util.fcm.dto.NotificationRequestDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -197,5 +198,112 @@ class ProblemReviewReminderPolicyTest {
         assertThat(data).containsEntry("problemId", String.valueOf(problemId));
         assertThat(data).containsEntry("sequence", String.valueOf(sequence));
         assertThat(data).containsEntry("intervalDays", String.valueOf(intervalDays));
+    }
+
+    // ──────────────────────── 하루 상한 ────────────────────────────
+
+    @Test
+    @DisplayName("사용자당 하루 복습 푸시 상한은 5건이다")
+    void getDailyPushLimit_isFive() {
+        assertThat(policy.getDailyPushLimit()).isEqualTo(5);
+    }
+
+    // ──────────────────────── buildBundleNotification ──────────────
+
+    /** id 는 DB 가 채우는 값이라 단위 테스트에서는 직접 넣는다. 동률 정렬 검증에 필요하다. */
+    private static ProblemReviewReminder reminderWithId(long id, long problemId, LocalDateTime scheduledAt) {
+        ProblemReviewReminder reminder = ProblemReviewReminder.create(
+                1L, problemId, "memo", "ref", 1, 1, scheduledAt);
+        ReflectionTestUtils.setField(reminder, "id", id);
+        return reminder;
+    }
+
+    @Test
+    @DisplayName("묶음이 1건이면 기존 단건 알림과 똑같다")
+    void buildBundleNotification_single_sameAsSingle() {
+        ProblemReviewReminder reminder = reminderWithId(10L, 42L, LocalDateTime.of(2026, 7, 18, 12, 0));
+
+        NotificationRequestDto bundle = policy.buildBundleNotification(List.of(reminder));
+
+        assertThat(bundle).isEqualTo(policy.buildNotification(reminder));
+        assertThat(bundle.data())
+                .as("단건은 count 없이 sequence, intervalDays 를 그대로 담는다")
+                .doesNotContainKey("count")
+                .containsKeys("sequence", "intervalDays");
+    }
+
+    @Test
+    @DisplayName("묶음이 3건이면 본문에 개수를, data 에 count 와 가장 이른 예약의 problemId 를 담는다")
+    void buildBundleNotification_multiple_bodyAndData() {
+        LocalDateTime base = LocalDateTime.of(2026, 7, 18, 12, 0);
+        List<ProblemReviewReminder> reminders = List.of(
+                reminderWithId(1L, 101L, base.minusMinutes(5)),
+                reminderWithId(2L, 102L, base.minusMinutes(30)),
+                reminderWithId(3L, 103L, base.minusMinutes(10)));
+
+        NotificationRequestDto dto = policy.buildBundleNotification(reminders);
+
+        assertThat(dto.title()).isEqualTo("오답노트 복습");
+        assertThat(dto.body()).isEqualTo("다시 풀어볼 오답이 3개 있어요");
+        assertThat(dto.data())
+                .containsOnly(
+                        Map.entry("type", "problem_review_reminder"),
+                        Map.entry("problemId", "102"),
+                        Map.entry("count", "3"));
+    }
+
+    @Test
+    @DisplayName("예약 시각이 같으면 id 가 작은 예약의 problemId 를 쓴다")
+    void buildBundleNotification_tieOnScheduledAt_usesSmallestId() {
+        LocalDateTime same = LocalDateTime.of(2026, 7, 18, 12, 0);
+        List<ProblemReviewReminder> reminders = List.of(
+                reminderWithId(9L, 209L, same),
+                reminderWithId(4L, 204L, same),
+                reminderWithId(7L, 207L, same));
+
+        NotificationRequestDto dto = policy.buildBundleNotification(reminders);
+
+        assertThat(dto.data()).containsEntry("problemId", "204").containsEntry("count", "3");
+    }
+
+    @Test
+    @DisplayName("같은 문제의 여러 차수가 섞이면 개수를 예약 행이 아니라 문제 수로 센다")
+    void buildBundleNotification_sameProblemSequences_countsDistinctProblems() {
+        LocalDateTime base = LocalDateTime.of(2026, 7, 18, 12, 0);
+        List<ProblemReviewReminder> reminders = List.of(
+                reminderWithId(1L, 401L, base.minusDays(2)),
+                reminderWithId(2L, 401L, base),
+                reminderWithId(3L, 402L, base.minusDays(1)));
+
+        NotificationRequestDto dto = policy.buildBundleNotification(reminders);
+
+        assertThat(dto.body()).isEqualTo("다시 풀어볼 오답이 2개 있어요");
+        assertThat(dto.data()).containsEntry("problemId", "401").containsEntry("count", "2");
+    }
+
+    @Test
+    @DisplayName("묶음이 한 문제의 여러 차수뿐이면 가장 이른 예약으로 단건 알림을 보낸다")
+    void buildBundleNotification_singleProblem_sameAsEarliestSingle() {
+        LocalDateTime base = LocalDateTime.of(2026, 7, 18, 12, 0);
+        ProblemReviewReminder earliest = reminderWithId(5L, 501L, base.minusDays(2));
+        ProblemReviewReminder later = reminderWithId(6L, 501L, base);
+
+        NotificationRequestDto dto = policy.buildBundleNotification(List.of(later, earliest));
+
+        assertThat(dto).isEqualTo(policy.buildNotification(earliest));
+        assertThat(dto.data()).doesNotContainKey("count");
+    }
+
+    @Test
+    @DisplayName("묶음이 2건이어도 묶음 문구를 쓴다")
+    void buildBundleNotification_two_usesBundleBody() {
+        LocalDateTime base = LocalDateTime.of(2026, 7, 18, 12, 0);
+
+        NotificationRequestDto dto = policy.buildBundleNotification(List.of(
+                reminderWithId(1L, 301L, base),
+                reminderWithId(2L, 302L, base.plusMinutes(1))));
+
+        assertThat(dto.body()).isEqualTo("다시 풀어볼 오답이 2개 있어요");
+        assertThat(dto.data()).containsEntry("problemId", "301").containsEntry("count", "2");
     }
 }

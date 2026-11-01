@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import org.springframework.transaction.annotation.Propagation;
 
 @Slf4j
 @Service
@@ -283,9 +282,13 @@ public class StudyRoomChallengeService {
 
     /**
      * 사용자의 학습 활동 이후 해당 사용자가 속한 룸들의 IN_PROGRESS 챌린지 완료 여부를 즉시 확인합니다.
-     * REQUIRES_NEW로 독립 트랜잭션 실행 — 실패해도 피드 생성 트랜잭션에 영향 없음.
+     *
+     * <p>{@link StudyRoomActivityListener} 가 피드 생성과 따로, 트랜잭션 없이 부르므로 여기서 연 트랜잭션이
+     * 혼자 커밋되고 실패해도 피드 쪽에 영향이 없습니다. 예전에는 피드 트랜잭션 안에서 {@code REQUIRES_NEW} 로
+     * 불려 커넥션을 하나 더 잡았습니다(#405). 다른 트랜잭션 안에서 부르면 그 트랜잭션에 참여하니,
+     * 독립 실행이 필요하면 호출하는 쪽에서 트랜잭션 밖으로 빼야 합니다.
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public void checkAndNotifyChallengeCompletionForUser(Long userId) {
         List<StudyRoomMember> memberships = memberRepository.findAllWithRoomByUserId(userId);
         if (memberships.isEmpty()) {

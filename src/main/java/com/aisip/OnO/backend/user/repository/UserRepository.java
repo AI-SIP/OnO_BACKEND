@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -71,4 +72,7 @@ public interface UserRepository extends JpaRepository<User, Long>, UserRepositor
             @Param("inactiveCutoff") LocalDateTime inactiveCutoff,
             @Param("notificationCutoff") LocalDate notificationCutoff
     );
+
+    @Query("select distinct u.profileImageUrl from User u where u.profileImageUrl in :imageUrls and u.id <> :userId")
+    List<String> findProfileImageUrlsUsedByOtherUsers(@Param("imageUrls") Collection<String> imageUrls, @Param("userId") Long userId);
 }

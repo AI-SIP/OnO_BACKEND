@@ -1,0 +1,188 @@
+name: API Contract Check
+
+# PR 이 API 계약(경로, 메서드, 요청/응답 스키마)을 깨는지 base 와 비교해서 알려 준다.
+#
+# 출시된 앱은 스토어 심사를 거쳐야 고칠 수 있어서, 응답 필드가 빠지거나 경로가 바뀐 것을 배포 직전에 알면 늦다.
+# 지금까지는 배포 전에 사람이 diff 를 읽어서 확인했는데, 그 일을 PR 단계로 당긴다.
+#
+# 어떻게 비교하는가
+#  - actions/checkout 이 pull_request 에서 받는 것은 PR 을 base 에 합친 머지 커밋이다. 이것을 head 로 본다.
+#  - 머지 커밋의 첫 번째 부모(HEAD^1)가 base 브랜치 끝이다. 이것을 base 로 본다.
+#    PR 브랜치 끝이 아니라 머지 커밋과 비교해야, PR 이 갈라진 뒤 base 에 새로 들어온 API 가 "삭제"로 잡히지 않는다.
+#  - 양쪽에서 OpenApiSpecExportTest 를 돌려 /v3/api-docs 를 파일로 받고 oasdiff breaking 으로 비교한다.
+#  - base 에 그 테스트가 아직 없으면(이 workflow 가 들어가는 PR 자체가 그렇다) head 의 테스트 파일을 복사해서 돌린다.
+#    그래도 base 스펙을 만들지 못하면 비교를 건너뛰고 요약에 남긴다. 이때 체크는 실패시키지 않는다.
+#
+# 지금은 경고만 한다
+#  - breaking change 가 있으면 PR 에 코멘트를 하나 남기고(다시 푸시하면 같은 코멘트를 고친다) 경고 주석을 단다.
+#    체크 자체는 실패시키지 않는다. springdoc 이 만든 스펙은 처음 써 보는 것이라 오탐 비율을 아직 모른다.
+#    몇 번 써 보고 오탐이 적으면 oasdiff 단계에 fail-on: ERR 를 넣어 막는 쪽으로 바꾼다.
+#  - 스펙은 CI 밖으로 내보내지 않는다(review: false). PR 코멘트도 oasdiff 가 아니라 이 workflow 가 직접 단다.
+#
+# 운영 서버나 시크릿에는 닿지 않는다. 테스트는 test.yml 과 같은 방식으로 Testcontainers 위에서 돈다.
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "src/main/java/**"
+      - "src/main/resources/**"
+      - "build.gradle"
+      - "src/test/java/com/aisip/OnO/backend/contract/**"
+      - ".github/workflows/api-contract.yml"
+
+concurrency:
+  group: api-contract-${{ github.head_ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  SPEC_TEST: com.aisip.OnO.backend.contract.OpenApiSpecExportTest
+  SPEC_TEST_FILE: src/test/java/com/aisip/OnO/backend/contract/OpenApiSpecExportTest.java
+
+jobs:
+  contract:
+    name: API 계약 비교
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # 머지 커밋과 그 첫 번째 부모(base 끝)까지 있으면 된다.
+          fetch-depth: 2
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # test.yml 과 같은 이유다. docker-java 기본 API 버전을 최신 엔진이 거부한다.
+      - name: Resolve Docker API version
+        run: echo "DOCKER_API_VERSION=$(docker version --format '{{.Server.APIVersion}}')" >> "$GITHUB_ENV"
+
+      - name: Prepare base checkout
+        run: |
+          git worktree add --detach "$RUNNER_TEMP/base" HEAD^1
+          echo "base: $(git rev-parse --short HEAD^1), head(merge): $(git rev-parse --short HEAD)"
+          if [ ! -f "$RUNNER_TEMP/base/$SPEC_TEST_FILE" ]; then
+            echo "base 에 스펙 내보내기 테스트가 없어 head 의 파일을 복사합니다"
+            mkdir -p "$(dirname "$RUNNER_TEMP/base/$SPEC_TEST_FILE")"
+            cp "$SPEC_TEST_FILE" "$RUNNER_TEMP/base/$SPEC_TEST_FILE"
+          fi
+
+      # FcmConfig 의 @PostConstruct 가 키 파일을 읽지 못하면 컨텍스트가 뜨지 않는다. test.yml 과 같은 더미다.
+      - name: Create dummy FirebaseAdminKey.json
+        run: |
+          for dir in . "$RUNNER_TEMP/base"; do
+            cat > "$dir/src/test/resources/FirebaseAdminKey.json" <<'JSON'
+          {
+            "type": "authorized_user",
+            "client_id": "test-client-id",
+            "client_secret": "test-client-secret",
+            "refresh_token": "test-refresh-token"
+          }
+          JSON
+          done
+
+      - name: Generate head spec
+        run: |
+          chmod +x gradlew
+          ./gradlew test --tests "$SPEC_TEST" -x jacocoTestReport --no-daemon
+          mkdir -p build/oasdiff
+          cp build/openapi/openapi.json build/oasdiff/head.json
+
+      - name: Generate base spec
+        id: base
+        run: |
+          cd "$RUNNER_TEMP/base"
+          chmod +x gradlew
+          if ./gradlew test --tests "$SPEC_TEST" -x jacocoTestReport --no-daemon; then
+            cp build/openapi/openapi.json "$GITHUB_WORKSPACE/build/oasdiff/base.json"
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::base 스펙을 만들지 못해 API 계약 비교를 건너뜁니다. base 에서 스펙 내보내기 테스트가 돌지 않는 상태입니다"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 버전은 태그가 아니라 커밋으로 고정한다. 태그는 옮겨질 수 있다.
+      - name: Check breaking changes
+        id: oasdiff
+        if: steps.base.outputs.ready == 'true'
+        uses: oasdiff/oasdiff-action/breaking@b9325c9e0a27ab65b0da3b766522cedec6be81dc # v0.1.18
+        with:
+          base: build/oasdiff/base.json
+          revision: build/oasdiff/head.json
+          output-to-file: build/oasdiff/breaking.txt
+          review: 'false'
+          github-token: ''
+
+      - name: Report
+        if: always() && steps.base.outputs.ready == 'true' && steps.oasdiff.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          marker='<!-- api-contract-check -->'
+          report=build/oasdiff/breaking.txt
+          existing=$(gh api "repos/$REPO/issues/$PR/comments?per_page=100" \
+            --jq "[.[] | select(.body | contains(\"$marker\"))][0].id // empty" || true)
+
+          # 변경이 없으면 oasdiff-action 이 파일에 "No breaking changes" 한 줄만 쓴다.
+          if [ -s "$report" ] && ! grep -qx 'No breaking changes' "$report"; then
+            {
+              echo "## API 계약 비교 결과"
+              echo
+              echo "base 대비 breaking change 가 있습니다."
+              echo
+              echo '```'
+              head -c 60000 "$report"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::API breaking change 가 있습니다. PR 코멘트나 실행 요약을 확인해 주세요"
+            body=$(python3 - "$report" "$marker" "$RUN_URL" <<'PY'
+          import sys
+          path, marker, run_url = sys.argv[1:4]
+          text = open(path, encoding="utf-8", errors="replace").read().strip()
+          if len(text) > 60000:
+              text = text[:60000] + "\n... (잘림. 전체는 실행 요약에 있습니다)"
+          print(f"""{marker}
+          ### API 계약 비교: breaking change 가 있습니다
+
+          base 브랜치 대비 이 PR 이 기존 클라이언트를 깨뜨릴 수 있는 변경입니다. 출시된 앱(현재 `release/*`)이 이 경로나 필드를 쓰는지 확인해 주세요.
+          지금은 경고만 하고 체크를 실패시키지 않습니다.
+
+          ```
+          {text}
+          ```
+
+          [실행 기록]({run_url})""")
+          PY
+            )
+          else
+            echo "## API 계약 비교 결과" >> "$GITHUB_STEP_SUMMARY"
+            echo "breaking change 없음" >> "$GITHUB_STEP_SUMMARY"
+            # 앞선 푸시에서 남긴 코멘트가 있을 때만 고친다. 처음부터 깨끗한 PR 에는 코멘트를 달지 않는다.
+            [ -z "$existing" ] && exit 0
+            body="$marker
+          ### API 계약 비교: 최신 커밋 기준 breaking change 없음
+
+          [실행 기록]($RUN_URL)"
+          fi
+
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$existing" -f body="$body" > /dev/null
+          else
+            gh api -X POST "repos/$REPO/issues/$PR/comments" -f body="$body" > /dev/null
+          fi

@@ -1,15 +1,18 @@
 package com.aisip.OnO.backend.admin.service;
 
 import com.aisip.OnO.backend.admin.support.AdminTestSupport;
-import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.entity.User;
-import com.aisip.OnO.backend.user.exception.UserErrorCase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,33 +64,48 @@ class AdminServiceTest extends AdminTestSupport {
         }
 
         @Test
-        @DisplayName("존재하지 않는 identifier 는 USER_NOT_FOUND 로 거절한다")
+        @DisplayName("존재하지 않는 identifier 는 UsernameNotFoundException 으로 거절한다")
         void rejectsUnknownIdentifier() {
             assertThatThrownBy(() -> adminService.loadUserByUsername("존재하지-않는-관리자"))
-                    .isInstanceOf(ApplicationException.class)
-                    .extracting(thrown -> ((ApplicationException) thrown).getErrorCase())
-                    .isEqualTo(UserErrorCase.USER_NOT_FOUND);
+                    .isInstanceOf(UsernameNotFoundException.class);
         }
 
         @Test
-        @DisplayName("일반 사용자의 identifier 로도 조회되면 그 사용자에게 ROLE_ADMIN 이 붙는다는 사실을 고정해 둔다")
-        void grantsAdminRoleToAnyIdentifierItResolves() {
+        @DisplayName("설정된 관리자 identifier 라도 계정이 아직 없으면 거절한다")
+        void rejectsAdminIdentifierWithoutAccount() {
+            assertThatThrownBy(() -> adminService.loadUserByUsername(adminIdentifier))
+                    .isInstanceOf(UsernameNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("일반 회원의 identifier 는 관리자 계정으로 불러오지 않는다")
+        void rejectsMemberIdentifier() {
+            createAdminUser();
             User member = fixtures.createUser();
-            String memberIdentifier = member.getIdentifier();
 
-            UserDetails details = adminService.loadUserByUsername(memberIdentifier);
+            assertThatThrownBy(() -> adminService.loadUserByUsername(member.getIdentifier()))
+                    .as("관리자 로그인은 설정된 관리자 계정만 받는다")
+                    .isInstanceOf(UsernameNotFoundException.class);
+        }
 
-            assertThat(details.getAuthorities())
-                    .extracting(GrantedAuthority::getAuthority)
-                    .as("""
-                            AdminService 는 identifier 로 찾은 사용자에게 무조건 ROLE_ADMIN 을 부여한다.
-                            즉 관리자 여부를 가르는 유일한 방어선은 '비밀번호를 아는가' 하나뿐이다.
-                            일반 사용자는 password 가 null 이라 폼 로그인은 통과하지 못하지만,
-                            이 특성을 바꿀 때는 반드시 이 테스트를 다시 보게 만든다.""")
-                    .containsExactly("ROLE_ADMIN");
-            assertThat(details.getPassword())
-                    .as("소셜 로그인 사용자는 비밀번호가 없어 폼 로그인으로는 인증될 수 없다")
-                    .isNull();
+        @Test
+        @DisplayName("비밀번호가 저장된 회원이라도 관리자 identifier 가 아니면 불러오지 않는다")
+        void rejectsMemberWithPassword() {
+            User member = userRepository.save(User.from(new UserRegisterDto(
+                    "member@test.ono", "회원", "member-with-password", "GOOGLE", encoder.encode("pw"))));
+
+            assertThatThrownBy(() -> adminService.loadUserByUsername(member.getIdentifier()))
+                    .isInstanceOf(UsernameNotFoundException.class);
+        }
+
+        @ParameterizedTest(name = "identifier [{0}] 는 거절한다")
+        @NullAndEmptySource
+        @ValueSource(strings = {"   "})
+        void rejectsBlankIdentifier(String identifier) {
+            createAdminUser();
+
+            assertThatThrownBy(() -> adminService.loadUserByUsername(identifier))
+                    .isInstanceOf(UsernameNotFoundException.class);
         }
     }
 }

@@ -128,6 +128,12 @@ openai:
     key: test-openai-api-key
     url: https://api.openai.com/v1/chat/completions
 
+sentry:
+  logging:
+    # SENTRY_DSN 이 남아 있는 환경에서 테스트를 돌려도 logback 의 SentryAppender 가
+    # 붙지 않게 한다. 붙으면 appender 가 환경 변수의 DSN 으로 Sentry 를 다시 켠다.
+    enabled: false
+
 management:
   endpoints:
     web:

@@ -1,6 +1,6 @@
 ---
 name: api-contract-checker
-description: Flutter ↔ Spring REST API 계약 일관성 검증. 백엔드 DTO·엔드포인트 변경 시 Flutter가 깨질 수 있는 지점을 사전 탐지. /check, /plan에서 API 변경이 포함될 때 자동 위임.
+description: 읽기 전용(코드 수정·커밋 금지). Flutter ↔ Spring REST API 계약 일관성 검증. 백엔드 DTO·엔드포인트 변경 시 Flutter가 깨질 수 있는 지점을 사전 탐지. /check, /plan, /migrate 에서 API 변경이 포함될 때 위임.
 tools: Read, Grep, Glob, Bash
 ---
 

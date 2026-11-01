@@ -15,6 +15,10 @@ import com.aisip.OnO.backend.problem.dto.ProblemResponseDto;
 import com.aisip.OnO.backend.problem.dto.ProblemTagUpdateDto;
 import com.aisip.OnO.backend.problem.service.ProblemAnalysisService;
 import com.aisip.OnO.backend.problem.service.ProblemService;
+import com.aisip.OnO.backend.common.validation.ValidationGroups;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.propertyeditors.CustomNumberEditor;
@@ -70,7 +74,7 @@ public class ProblemController {
     public CommonResponse<CursorPageResponse<ProblemResponseDto>> getProblemsWithCursorByUserId(
             @PathVariable("folderId") Long folderId,
             @RequestParam(value = "cursor", required = false) Long cursor,
-            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestParam(value = "size", defaultValue = "20") @Min(CursorPageResponse.MIN_SIZE) @Max(CursorPageResponse.MAX_SIZE) int size,
             @RequestParam(value = "sort", defaultValue = "OLDEST") CursorSort sort) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} get problems for folderId: {} with cursor: {}, size: {}", userId, folderId, cursor, size);
@@ -83,7 +87,7 @@ public class ProblemController {
     public CommonResponse<CursorPageResponse<ProblemResponseDto>> getProblemsWithCursorByTag(
             @PathVariable("tagId") Long tagId,
             @RequestParam(value = "cursor", required = false) Long cursor,
-            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestParam(value = "size", defaultValue = "20") @Min(CursorPageResponse.MIN_SIZE) @Max(CursorPageResponse.MAX_SIZE) int size,
             @RequestParam(value = "sort", defaultValue = "OLDEST") CursorSort sort) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} get problems for tagId: {} with cursor: {}, size: {}", userId, tagId, cursor, size);
@@ -96,7 +100,7 @@ public class ProblemController {
     public CommonResponse<CursorPageResponse<ProblemResponseDto>> getProblemsWithCursorByTitle(
             @RequestParam("query") String query,
             @RequestParam(value = "cursor", required = false) Long cursor,
-            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestParam(value = "size", defaultValue = "20") @Min(CursorPageResponse.MIN_SIZE) @Max(CursorPageResponse.MAX_SIZE) int size,
             @RequestParam(value = "sort", defaultValue = "OLDEST") CursorSort sort) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} search problems by title query: '{}' with cursor: {}, size: {}",
@@ -198,7 +202,8 @@ public class ProblemController {
 
     // ✅ 문제 수정
     @PatchMapping("/info")
-    public CommonResponse<String> updateProblemInfo(@RequestBody ProblemRegisterDto problemRegisterDto) {
+    public CommonResponse<String> updateProblemInfo(
+            @Validated(ValidationGroups.Update.class) @RequestBody ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         problemService.updateProblemInfo(problemRegisterDto, userId);
 
@@ -207,7 +212,8 @@ public class ProblemController {
 
     // ✅ 문제 경로 변경
     @PatchMapping("/path")
-    public CommonResponse<String> updateProblemPath(@RequestBody ProblemRegisterDto problemRegisterDto) {
+    public CommonResponse<String> updateProblemPath(
+            @Validated(ValidationGroups.Update.class) @RequestBody ProblemRegisterDto problemRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         problemService.updateProblemFolder(problemRegisterDto, userId);
 
@@ -229,7 +235,7 @@ public class ProblemController {
     // ✅ 문제 삭제
     @DeleteMapping("")
     public CommonResponse<String> deleteProblems(
-            @RequestBody ProblemDeleteRequestDto problemDeleteRequestDto
+            @Valid @RequestBody ProblemDeleteRequestDto problemDeleteRequestDto
             ) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         problemService.deleteProblemList(userId, problemDeleteRequestDto.deleteProblemIdList());
