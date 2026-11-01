@@ -2,8 +2,10 @@ package com.aisip.OnO.backend.user.service;
 
 import com.aisip.OnO.backend.auth.repository.RefreshTokenRepository;
 import com.aisip.OnO.backend.auth.service.JwtTokenService;
-import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
+import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.util.fileupload.exception.FileUploadErrorCase;
+import com.aisip.OnO.backend.util.fileupload.service.ImageUrlOwnershipService;
 import com.aisip.OnO.backend.folder.service.FolderService;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
 import com.aisip.OnO.backend.problem.reminder.ProblemReviewReminderService;
@@ -87,6 +89,8 @@ class UserServiceTest {
     @Mock
     private S3DeleteProducer s3DeleteProducer;
     @Mock
+    private ImageUrlOwnershipService imageUrlOwnershipService;
+    @Mock
     private DiscordWebhookNotificationService discordWebhookNotificationService;
     @Mock
     private UserRegistrationWriter registrationWriter;
@@ -105,6 +109,8 @@ class UserServiceTest {
     @BeforeEach
     void setUp() {
         registerDto = new UserRegisterDto("test@example.com", "testUser", "testIdentifier", "GOOGLE", null);
+        // 다른 사용자가 쓰는 파일인지는 ImageUrlOwnershipService 테스트에서 따로 본다. 여기서는 지워도 되는 파일로 둔다.
+        org.mockito.Mockito.lenient().when(imageUrlOwnershipService.isDeletable(any(), any())).thenReturn(true);
     }
 
     private void givenExistingUser(User user) {
@@ -360,7 +366,7 @@ class UserServiceTest {
         void uploadsValidImage() {
             User user = User.from(registerDto);
             givenExistingUser(user);
-            given(fileUploadService.uploadFileToS3(any())).willReturn("https://cdn.test.ono/profile.png");
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn("https://cdn.test.ono/profile.png");
 
             UserResponseDto response = userService.updateProfileImage(USER_ID, pngFile());
 
@@ -374,7 +380,7 @@ class UserServiceTest {
             User user = User.from(registerDto);
             user.updateProfileImageUrl("https://cdn.test.ono/old.png");
             givenExistingUser(user);
-            given(fileUploadService.uploadFileToS3(any())).willReturn("https://cdn.test.ono/new.png");
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn("https://cdn.test.ono/new.png");
 
             userService.updateProfileImage(USER_ID, pngFile());
 
@@ -385,7 +391,7 @@ class UserServiceTest {
         @DisplayName("이전 이미지가 없으면 삭제 메시지를 보내지 않는다")
         void skipsDeletionWithoutPreviousImage() {
             givenExistingUser(User.from(registerDto));
-            given(fileUploadService.uploadFileToS3(any())).willReturn("https://cdn.test.ono/new.png");
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn("https://cdn.test.ono/new.png");
 
             userService.updateProfileImage(USER_ID, pngFile());
 
@@ -401,7 +407,7 @@ class UserServiceTest {
                     .isInstanceOf(ApplicationException.class)
                     .extracting(e -> ((ApplicationException) e).getErrorCase())
                     .isEqualTo(FileUploadErrorCase.INVALID_IMAGE_FILE);
-            verify(fileUploadService, never()).uploadFileToS3(any());
+            verify(fileUploadService, never()).uploadFileToS3(any(), any());
         }
 
         @Test
@@ -447,19 +453,64 @@ class UserServiceTest {
                     .isInstanceOf(ApplicationException.class)
                     .extracting(e -> ((ApplicationException) e).getErrorCase())
                     .isEqualTo(FileUploadErrorCase.INVALID_IMAGE_FILE);
-            verify(fileUploadService, never()).uploadFileToS3(any());
+            verify(fileUploadService, never()).uploadFileToS3(any(), any());
         }
 
         @Test
-        @DisplayName("URL 로 교체할 때는 우리 버킷 URL 인지 먼저 확인한다")
+        @DisplayName("URL 로 교체할 때는 그 사용자가 올린 파일인지 먼저 확인한다")
         void validatesUrlOwnership() {
             User user = User.from(registerDto);
+            user.updateProfileImageUrl("https://cdn.test.ono/old.png");
             givenExistingUser(user);
 
             userService.updateProfileImageByUrl(USER_ID, "https://cdn.test.ono/new.png");
 
-            verify(fileUploadService).validateS3Url("https://cdn.test.ono/new.png");
+            verify(imageUrlOwnershipService).validateUploadedBy("https://cdn.test.ono/new.png", USER_ID, "https://cdn.test.ono/old.png");
             assertThat(user.getProfileImageUrl()).isEqualTo("https://cdn.test.ono/new.png");
+            verify(s3DeleteProducer).sendDeleteMessage("https://cdn.test.ono/old.png", USER_ID);
+        }
+
+        @Test
+        @DisplayName("다른 사용자가 올린 URL 이면 프로필을 바꾸지 않고 기존 파일도 지우지 않는다")
+        void rejectsUrlUploadedByOtherUser() {
+            User user = User.from(registerDto);
+            user.updateProfileImageUrl("https://cdn.test.ono/old.png");
+            givenExistingUser(user);
+            org.mockito.BDDMockito.willThrow(new ApplicationException(FileUploadErrorCase.IMAGE_USER_UNMATCHED))
+                    .given(imageUrlOwnershipService).validateUploadedBy("https://cdn.test.ono/theirs.png", USER_ID, "https://cdn.test.ono/old.png");
+
+            assertThatThrownBy(() -> userService.updateProfileImageByUrl(USER_ID, "https://cdn.test.ono/theirs.png"))
+                    .isInstanceOf(ApplicationException.class);
+
+            assertThat(user.getProfileImageUrl()).isEqualTo("https://cdn.test.ono/old.png");
+            verify(s3DeleteProducer, never()).sendDeleteMessage(anyString(), anyLong());
+        }
+
+        @Test
+        @DisplayName("지금 프로필과 같은 URL 을 다시 보내면 그 파일을 지우지 않는다")
+        void keepsFileWhenSameUrlIsSentAgain() {
+            User user = User.from(registerDto);
+            user.updateProfileImageUrl("https://cdn.test.ono/same.png");
+            givenExistingUser(user);
+
+            userService.updateProfileImageByUrl(USER_ID, "https://cdn.test.ono/same.png");
+
+            assertThat(user.getProfileImageUrl()).isEqualTo("https://cdn.test.ono/same.png");
+            verify(s3DeleteProducer, never()).sendDeleteMessage(anyString(), anyLong());
+        }
+
+        @Test
+        @DisplayName("이전 프로필 파일을 다른 사용자도 쓰고 있으면 S3 삭제를 보내지 않는다")
+        void keepsPreviousFileUsedByOtherUser() {
+            User user = User.from(registerDto);
+            user.updateProfileImageUrl("https://cdn.test.ono/shared.png");
+            givenExistingUser(user);
+            given(imageUrlOwnershipService.isDeletable("https://cdn.test.ono/shared.png", USER_ID)).willReturn(false);
+
+            userService.deleteProfileImage(USER_ID);
+
+            assertThat(user.getProfileImageUrl()).isNull();
+            verify(s3DeleteProducer, never()).sendDeleteMessage(anyString(), anyLong());
         }
 
         @Test

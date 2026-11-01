@@ -16,7 +16,9 @@ public enum FileUploadErrorCase implements ErrorCase {
 
     FILE_SIZE_EXCEEDED(400, 2004, "파일 최대 용량을 초과했습니다."),
 
-    UPLOAD_RATE_LIMIT_EXCEEDED(429, 2005, "하루에 올릴 수 있는 이미지 개수를 초과했습니다.");
+    UPLOAD_RATE_LIMIT_EXCEEDED(429, 2005, "하루에 올릴 수 있는 이미지 개수를 초과했습니다."),
+
+    IMAGE_USER_UNMATCHED(403, 2006, "직접 올린 이미지만 사용할 수 있습니다.");
 
     private final Integer httpStatusCode;
     private final Integer errorCode;

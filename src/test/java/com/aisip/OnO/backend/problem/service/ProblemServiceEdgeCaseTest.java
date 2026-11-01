@@ -137,18 +137,20 @@ class ProblemServiceEdgeCaseTest extends ProblemTestSupport {
         @Test
         @DisplayName("정답 이미지 URL 중 null·공백은 걸러지고 나머지만 저장된다")
         void filtersBlankAnswerImageUrls() {
+            String problemUrl = fixtures.uploadedImageUrl(owner.getId());
+            String answerUrl = fixtures.uploadedImageUrl(owner.getId());
             Long problemId = problemService.registerProblemV2(
                     v2Dto("메모", ownerRoot.getId(),
-                            List.of(" https://s3/problem.png "),
-                            Arrays.asList(null, "   ", "", " https://s3/answer.png "),
+                            List.of(" " + problemUrl + " "),
+                            Arrays.asList(null, "   ", "", " " + answerUrl + " "),
                             null),
                     owner.getId());
 
             assertThat(problemImageDataRepository.findAllByProblemId(problemId))
                     .extracting(image -> image.getProblemImageType() + ":" + image.getImageUrl())
                     .containsExactlyInAnyOrder(
-                            ProblemImageType.PROBLEM_IMAGE + ":https://s3/problem.png",
-                            ProblemImageType.ANSWER_IMAGE + ":https://s3/answer.png");
+                            ProblemImageType.PROBLEM_IMAGE + ":" + problemUrl,
+                            ProblemImageType.ANSWER_IMAGE + ":" + answerUrl);
         }
 
         @Test
@@ -219,19 +221,21 @@ class ProblemServiceEdgeCaseTest extends ProblemTestSupport {
         @Test
         @DisplayName("배치 등록의 이미지 URL 도 null·공백은 걸러진다")
         void filtersBlankImageUrlsInBatch() {
+            String problemUrl = fixtures.uploadedImageUrl(owner.getId());
+            String answerUrl = fixtures.uploadedImageUrl(owner.getId());
             List<Long> problemIds = problemService.registerProblemsV2(
                     new ProblemRegisterV2BatchDto(List.of(
                             v2Dto("첫째", ownerRoot.getId(),
-                                    Arrays.asList(null, "  ", " https://s3/p.png "),
-                                    Arrays.asList("", " https://s3/a.png "),
+                                    Arrays.asList(null, "  ", " " + problemUrl + " "),
+                                    Arrays.asList("", " " + answerUrl + " "),
                                     null))),
                     owner.getId());
 
             assertThat(problemImageDataRepository.findAllByProblemId(problemIds.get(0)))
                     .extracting(image -> image.getProblemImageType() + ":" + image.getImageUrl())
                     .containsExactlyInAnyOrder(
-                            ProblemImageType.PROBLEM_IMAGE + ":https://s3/p.png",
-                            ProblemImageType.ANSWER_IMAGE + ":https://s3/a.png");
+                            ProblemImageType.PROBLEM_IMAGE + ":" + problemUrl,
+                            ProblemImageType.ANSWER_IMAGE + ":" + answerUrl);
         }
     }
 
@@ -255,7 +259,7 @@ class ProblemServiceEdgeCaseTest extends ProblemTestSupport {
         @Test
         @DisplayName("풀이 이미지는 같은 날 여러 번 올릴 수 있고, 보상은 첫 번째만 들어간다")
         void solveImageHasNoDailyLimitButRewardIsOncePerDay() {
-            given(fileUploadService.uploadFileToS3(any())).willReturn("https://s3/solve.png");
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn("https://s3/solve.png");
             Problem problem = saveProblem(owner.getId(), ownerRoot);
 
             problemService.uploadProblemImages(problem.getId(), owner.getId(),
@@ -277,7 +281,7 @@ class ProblemServiceEdgeCaseTest extends ProblemTestSupport {
         @Test
         @DisplayName("문제 이미지는 같은 날 여러 장 올릴 수 있다")
         void problemImageHasNoDailyLimit() {
-            given(fileUploadService.uploadFileToS3(any())).willReturn("https://s3/problem.png");
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn("https://s3/problem.png");
             Problem problem = saveProblem(owner.getId(), ownerRoot);
 
             assertThatCode(() -> problemService.uploadProblemImages(problem.getId(), owner.getId(),
