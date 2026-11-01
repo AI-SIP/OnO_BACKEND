@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.admin.security;
 
 import com.aisip.OnO.backend.admin.support.AdminTestSupport;
+import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.entity.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -155,6 +156,22 @@ class AdminFormLoginTest extends AdminTestSupport {
 
             assertThat(result.getResponse().getRedirectedUrl())
                     .as("비밀번호가 없는 사용자가 관리자로 로그인되면 전체 데이터가 열린다")
+                    .isEqualTo(FAILURE_URL);
+            assertThat(result.getResponse().getHeader("Authorization")).isNull();
+        }
+
+        @Test
+        @DisplayName("비밀번호가 저장된 일반 회원도 관리자 로그인을 할 수 없다")
+        void rejectsMemberWithPassword() throws Exception {
+            createAdminUser();
+            userRepository.save(User.from(new UserRegisterDto(
+                    "member@test.ono", "회원", "member-with-password", "GOOGLE",
+                    passwordEncoder.encode("회원비밀번호"))));
+
+            MvcResult result = login("member-with-password", "회원비밀번호");
+
+            assertThat(result.getResponse().getRedirectedUrl())
+                    .as("관리자 로그인은 설정된 관리자 계정만 받는다")
                     .isEqualTo(FAILURE_URL);
             assertThat(result.getResponse().getHeader("Authorization")).isNull();
         }

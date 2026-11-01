@@ -145,6 +145,57 @@ class UserApiTest extends IntegrationTestSupport {
             assertThat(userRepository.findById(other.getId()).orElseThrow().getName()).isEqualTo(otherNameBefore);
         }
 
+        /**
+         * 출시된 앱(4.1.1)은 이름만 바꿀 때도 {email, name, identifier, platform, password, profileImageUrl}
+         * 형태로 보낸다. 요청은 그대로 200 으로 받고, 이름과 이메일만 반영한다.
+         */
+        @Test
+        @DisplayName("이름과 이메일만 바뀌고 identifier, platform, password 는 요청에 있어도 그대로다")
+        void updatesOnlyNameAndEmail() throws Exception {
+            User me = fixtures.createUser();
+            String identifierBefore = me.getIdentifier();
+            String platformBefore = me.getPlatform();
+
+            mockMvc.perform(patch("/api/users")
+                            .with(asUser(me))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"email":"changed@test.ono","name":"바뀐이름","identifier":"changed-identifier",
+                                     "platform":"ADMIN","password":"changed-password","profileImageUrl":null}
+                                    """))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data").value("사용자 정보 수정이 완료되었습니다."));
+
+            User updated = userRepository.findById(me.getId()).orElseThrow();
+            assertThat(updated.getName()).isEqualTo("바뀐이름");
+            assertThat(updated.getEmail()).isEqualTo("changed@test.ono");
+            assertThat(updated.getIdentifier())
+                    .as("identifier 가 바뀌면 다음 소셜 로그인에서 같은 계정을 찾지 못한다")
+                    .isEqualTo(identifierBefore);
+            assertThat(updated.getPlatform()).isEqualTo(platformBefore);
+            assertThat(updated.getPassword()).isNull();
+        }
+
+        @Test
+        @DisplayName("앱이 이름만 바꿀 때 보내는 요청(빈 password, null identifier)도 이름만 반영한다")
+        void acceptsReleasedAppPayload() throws Exception {
+            User me = fixtures.createUser();
+            String emailBefore = me.getEmail();
+
+            mockMvc.perform(patch("/api/users")
+                            .with(asUser(me))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"email":null,"name":"새이름","identifier":null,
+                                     "platform":null,"password":"","profileImageUrl":null}
+                                    """))
+                    .andExpect(status().isOk());
+
+            User updated = userRepository.findById(me.getId()).orElseThrow();
+            assertThat(updated.getName()).isEqualTo("새이름");
+            assertThat(updated.getEmail()).isEqualTo(emailBefore);
+        }
+
         @Test
         @DisplayName("인증 없이 수정하면 401 로 막는다")
         void rejectsAnonymousUpdate() throws Exception {

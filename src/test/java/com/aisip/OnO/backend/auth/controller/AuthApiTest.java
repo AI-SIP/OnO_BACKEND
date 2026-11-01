@@ -180,6 +180,27 @@ class AuthApiTest extends IntegrationTestSupport {
             assertThat(refreshTokenRepository.findByRefreshToken(tablet.path("refreshToken").asText())).isPresent();
         }
 
+        /** 출시된 앱(4.1.1)은 가입 요청에 password 필드를 함께 보낸다. 요청은 받되 저장하지 않는다. */
+        @Test
+        @DisplayName("소셜 가입 요청에 password 가 있어도 저장하지 않고 가입은 성공한다")
+        void signUpDoesNotStorePassword() throws Exception {
+            mockMvc.perform(post("/api/auth/signup/member")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"email":"pw@test.ono","name":"소셜사용자","identifier":"google-sub-pw",
+                                     "platform":"GOOGLE","password":"signup-password","profileImageUrl":null}
+                                    """))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
+                    .andExpect(jsonPath("$.data.refreshToken").isNotEmpty());
+
+            var saved = userRepository.findByIdentifier("google-sub-pw").orElseThrow();
+            assertThat(saved.getPassword()).isNull();
+            assertThat(saved.getName()).isEqualTo("소셜사용자");
+            assertThat(saved.getEmail()).isEqualTo("pw@test.ono");
+            assertThat(saved.getPlatform()).isEqualTo("GOOGLE");
+        }
+
         @Test
         @DisplayName("본문이 없는 가입 요청은 400 으로 거절한다")
         void rejectsEmptyBody() throws Exception {
