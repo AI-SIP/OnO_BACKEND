@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.support;
 
 import com.aisip.OnO.backend.config.rabbitmq.producer.ProblemAnalysisProducer;
+import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import com.aisip.OnO.backend.studyroom.service.StudyRoomActivityListener;
 import com.aisip.OnO.backend.util.ai.OpenAIClient;
 import com.aisip.OnO.backend.util.fcm.service.FcmService;
@@ -74,6 +75,10 @@ public abstract class IntegrationTestSupport {
 
     @MockBean
     protected ProblemAnalysisProducer problemAnalysisProducer;
+
+    /** S3 삭제 메시지가 언제 나가는지(커밋 뒤에만) 확인할 때 쓴다. 실제 브로커로는 보내지 않는다. */
+    @MockBean
+    protected S3DeleteProducer s3DeleteProducer;
 
     /**
      * 테스트가 넘긴 활동 뒤처리(피드, 챌린지 판정)를 테스트 안에서 끝낸다.

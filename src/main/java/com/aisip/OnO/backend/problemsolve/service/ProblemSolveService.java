@@ -25,7 +25,8 @@ import com.aisip.OnO.backend.studyroom.event.StudyRoomActivityEvent;
 import com.aisip.OnO.backend.user.exception.UserErrorCase;
 import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
-import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
+import com.aisip.OnO.backend.config.rabbitmq.message.S3DeleteMessage;
+import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteAfterCommitSender;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -59,7 +60,7 @@ public class ProblemSolveService {
     private final MissionLogService missionLogService;
     private final MissionProgressUpdater missionProgressUpdater;
     private final FileUploadService fileUploadService;
-    private final S3DeleteProducer s3DeleteProducer;
+    private final S3DeleteAfterCommitSender s3DeleteAfterCommitSender;
     private final ObjectMapper objectMapper;
     private final StreakCacheService streakCacheService;
     private final ApplicationEventPublisher eventPublisher;
@@ -303,16 +304,10 @@ public class ProblemSolveService {
         streakCacheService.evict(userId);
         log.info("userId: {} deleted problem solve: {}", userId, problemSolveId);
 
-        images.forEach(image -> {
-            try {
-                s3DeleteProducer.sendDeleteMessage(image.getImageUrl(), problemSolveId);
-            } catch (Exception e) {
-                log.error("S3 삭제 메시지 전송 실패 - problemSolveId: {}, error: {}",
-                        problemSolveId, e.getMessage());
-            }
-        });
-
-        log.info("problemSolveId: {} S3 삭제 메시지 전송 완료 ({}개)", problemSolveId, images.size());
+        // 커밋된 뒤에만 S3 파일을 지운다. 롤백되면 기록과 함께 파일도 남는다.
+        s3DeleteAfterCommitSender.sendAfterCommit(images.stream()
+                .map(image -> new S3DeleteMessage(image.getImageUrl(), problemSolveId))
+                .toList());
     }
 
     /**
@@ -344,20 +339,14 @@ public class ProblemSolveService {
     public void deleteAllProblemSolvesByProblemId(Long problemId) {
         List<ProblemSolve> problemSolves = problemSolveRepository.findAllByProblemIdWithImages(problemId);
 
-        problemSolves.forEach(record -> {
-            List<ProblemSolveImageData> images = record.getImages();
-
-            images.forEach(image -> {
-                try {
-                    s3DeleteProducer.sendDeleteMessage(image.getImageUrl(), record.getId());
-                } catch (Exception e) {
-                    log.error("S3 삭제 메시지 전송 실패 - problemSolveId: {}, error: {}",
-                            record.getId(), e.getMessage());
-                }
-            });
-        });
+        List<S3DeleteMessage> s3DeleteMessages = problemSolves.stream()
+                .flatMap(record -> record.getImages().stream()
+                        .map(image -> new S3DeleteMessage(image.getImageUrl(), record.getId())))
+                .toList();
 
         problemSolveRepository.deleteAllByProblemId(problemId);
+        // 커밋된 뒤에만 S3 파일을 지운다. 롤백되면 기록과 함께 파일도 남는다.
+        s3DeleteAfterCommitSender.sendAfterCommit(s3DeleteMessages);
         log.info("problemId: {} 의 모든 복습 기록 삭제 완료", problemId);
     }
 

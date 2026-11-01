@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
@@ -31,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @DisplayName("ProblemSolveService")
@@ -38,6 +40,9 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
 
     @Autowired
     private ProblemSolveService problemSolveService;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     private User user;
     private User other;
@@ -573,6 +578,55 @@ class ProblemSolveServiceTest extends ProblemSolveTestSupport {
             assertThat(problemSolveRepository.countByProblemId(othersProblem.getId()))
                     .as("다른 문제의 기록까지 지우면 안 된다")
                     .isEqualTo(1L);
+        }
+
+        @Test
+        @DisplayName("기록의 이미지 S3 삭제 메시지는 커밋된 뒤에 나간다")
+        void sendsS3DeleteAfterCommit() {
+            ProblemSolve solve = saveSolve(problem, user.getId(), PRACTICED_AT);
+            saveImage(solve, "https://test-ono-bucket.s3.amazonaws.com/a.png", 0);
+            saveImage(solve, "https://test-ono-bucket.s3.amazonaws.com/b.png", 1);
+
+            transactionTemplate.executeWithoutResult(status -> {
+                problemSolveService.deleteProblemSolve(solve.getId(), user.getId());
+                verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
+            });
+
+            verify(s3DeleteProducer).sendDeleteMessage("https://test-ono-bucket.s3.amazonaws.com/a.png", solve.getId());
+            verify(s3DeleteProducer).sendDeleteMessage("https://test-ono-bucket.s3.amazonaws.com/b.png", solve.getId());
+        }
+
+        @Test
+        @DisplayName("기록 삭제가 롤백되면 S3 삭제 메시지를 보내지 않는다")
+        void sendsNothingWhenSolveDeleteRollsBack() {
+            ProblemSolve solve = saveSolve(problem, user.getId(), PRACTICED_AT);
+            saveImage(solve, "https://test-ono-bucket.s3.amazonaws.com/a.png", 0);
+
+            transactionTemplate.executeWithoutResult(status -> {
+                problemSolveService.deleteProblemSolve(solve.getId(), user.getId());
+                status.setRollbackOnly();
+            });
+
+            assertThat(problemSolveService.getUserProblemSolveCount(user.getId())).isEqualTo(1L);
+            verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
+        }
+
+        @Test
+        @DisplayName("문제의 기록을 한 번에 지울 때도 S3 삭제 메시지는 커밋된 뒤에 나간다")
+        void sendsS3DeleteAfterCommitOnDeleteAll() {
+            ProblemSolve first = saveSolve(problem, user.getId(), PRACTICED_AT);
+            saveImage(first, "https://test-ono-bucket.s3.amazonaws.com/first.png", 0);
+            ProblemSolve second = saveSolve(problem, user.getId(), PRACTICED_AT.plusDays(1));
+            saveImage(second, "https://test-ono-bucket.s3.amazonaws.com/second.png", 0);
+
+            transactionTemplate.executeWithoutResult(status -> {
+                problemSolveService.deleteAllProblemSolvesByProblemId(problem.getId());
+                verify(s3DeleteProducer, never()).sendDeleteMessage(any(), any());
+            });
+
+            verify(s3DeleteProducer).sendDeleteMessage("https://test-ono-bucket.s3.amazonaws.com/first.png", first.getId());
+            verify(s3DeleteProducer).sendDeleteMessage("https://test-ono-bucket.s3.amazonaws.com/second.png", second.getId());
+            verify(s3DeleteProducer, times(2)).sendDeleteMessage(any(), any());
         }
     }
 
