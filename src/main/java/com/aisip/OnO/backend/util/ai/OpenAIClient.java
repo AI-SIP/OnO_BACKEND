@@ -248,7 +248,8 @@ public class OpenAIClient {
     }
 
     private ProblemAnalysisResult removeAnswerLeak(ParsedAnalysis parsed) {
-        AnswerLeakFilter.Outcome outcome = AnswerLeakFilter.sanitize(parsed.result(), parsed.internal().finalAnswer());
+        AnswerLeakFilter.Outcome outcome = AnswerLeakFilter.sanitize(
+                parsed.result(), parsed.internal().finalAnswer(), parsed.internal().answerValue());
         for (String field : outcome.leakedFields()) {
             Counter.builder("ono.ai.analysis.answer_leak")
                     .description("학생에게 보이는 분석 글에서 정답을 밝히는 문장을 지운 횟수")
@@ -518,6 +519,7 @@ public class OpenAIClient {
             [풀이 순서]
             1. internalSolution 에 문제를 처음부터 끝까지 직접 푸세요. 핵심 단계만 간결하게 적습니다. 이 필드는 학습자에게 보이지 않습니다.
             2. finalAnswer 에 최종 답만 짧게 적으세요. 객관식이면 선지 번호(예: 3), 주관식이면 값이나 낱말만 적습니다.
+               answerValue 에는 정답의 값을 적으세요. 객관식이면 정답 선지에 적힌 값이나 내용(예: 선지 ③ 이 13 이면 13), 주관식이면 finalAnswer 와 같은 값입니다.
             3. 해설 이미지가 있으면 그 답과 내 답을 비교해 explanationCheck 를 matches(같음) 또는 differs(다름)로, 해설 이미지가 없으면 no_explanation 으로 적으세요.
             4. differs 이면 해설 이미지의 답과 풀이를 우선해 풀이 방향을 잡으세요. 문제를 잘못 읽었을 가능성이 높은 쪽은 대개 모델입니다.
             5. 그다음 학습자에게 보이는 필드(keyPoints, solution, commonMistakes, studyTips)를 쓰세요.
@@ -528,6 +530,9 @@ public class OpenAIClient {
                - 정답 선지의 문장이나 빈칸에 들어갈 표현을 그대로 옮기거나 우리말로 바꿔 사실처럼 적지 마세요. keyPoints 도 마찬가지입니다.
                  대신 선지를 판단할 기준(예: "제도가 처음 시행된 시기와 지역을 확인한다")이나 단서가 있는 위치를 짚어 주세요.
                - 계산 문제는 식을 세우는 방법까지만 쓰고, 마지막 계산 결과나 "따라서 ~는 ~이다", "최종적으로 ~이다" 같은 결론 값을 쓰지 마세요.
+                 마지막 단계는 "25 - 12 = 13입니다", "k = 4가 된다", "0으로 간단화한다" 처럼 결과를 적지 말고 "이 식을 계산해 값을 구해 보세요" 처럼 끝내세요.
+               - answerValue 에 적은 값이나 낱말은 학습자에게 보이는 필드 어디에도 쓰지 마세요. 낱말이나 개념을 고르는 문제(예: 답이 광해군, 은유법, were)는
+                 그 낱말을 쓰는 순간 답이 드러나므로, 낱말 대신 판단 기준(예: "비유하는 말이 있는지, '같이', '처럼' 이 붙었는지 본다")을 쓰세요.
             2. Thinking Step (solution):
                - 1단계: 문제에서 주어진 조건(Knowns)과 구해야 하는 것(Unknowns)을 명확히 정의하세요.
                - 2단계: 이 문제를 풀기 위해 머릿속에서 꺼내야 할 핵심 공식, 정의, 법리, 문법 규칙 등을 언급하세요.
@@ -553,7 +558,7 @@ public class OpenAIClient {
             - 수식은 일반 기호로 쓰세요. 예: 조합 5C2, 순열 5P2, 거듭제곱 3⁵, 분수 3/4, 곱셈 ×, 루트 √2.
               ², ³, √, π, ≤, ≥ 같은 유니코드 기호까지 쓸 수 있습니다.
             - 모든 내용은 한국어로 작성하며, 학습자가 스스로 답을 찾을 수 있게 격려하는 톤을 유지하세요.
-            - 응답은 지정된 JSON 스키마(analyzable, internalSolution, finalAnswer, explanationCheck, subject, problemType, keyPoints, solution, commonMistakes, studyTips)를 따르세요.
+            - 응답은 지정된 JSON 스키마(analyzable, internalSolution, finalAnswer, answerValue, explanationCheck, subject, problemType, keyPoints, solution, commonMistakes, studyTips)를 따르세요.
             """;
     }
 
@@ -581,9 +586,9 @@ public class OpenAIClient {
 
     /**
      * Structured Outputs(strict) 스키마. strict 모드는 모든 필드가 required 이고 additionalProperties 가 false 여야 한다.
-     * 앱이 그리는 필드 이름(ProblemAnalysisResult)은 그대로 두고 analyzable 과 내부 필드 3개를 더한다.
+     * 앱이 그리는 필드 이름(ProblemAnalysisResult)은 그대로 두고 analyzable 과 내부 필드 4개를 더한다.
      * 모델은 스키마 순서대로 쓰므로 내부 풀이를 학생용 필드보다 앞에 두어, 먼저 풀고 나서 힌트를 쓰게 한다.
-     * 내부 필드(internalSolution, finalAnswer, explanationCheck)는 정답 노출 검사와 메트릭에만 쓰고 저장하지 않는다.
+     * 내부 필드(internalSolution, finalAnswer, answerValue, explanationCheck)는 정답 노출 검사와 메트릭에만 쓰고 저장하지 않는다.
      */
     private static Map<String, Object> createAnalysisResponseFormat() {
         Map<String, Object> properties = new LinkedHashMap<>();
@@ -593,6 +598,8 @@ public class OpenAIClient {
                 "학습자에게 보이지 않는 내부 풀이. 문제를 처음부터 끝까지 직접 푼 핵심 단계를 간결하게 적는다"));
         properties.put("finalAnswer", described("string",
                 "학습자에게 보이지 않는 최종 답. 객관식이면 선지 번호(예: 3), 주관식이면 값이나 낱말만 짧게 적는다"));
+        properties.put("answerValue", described("string",
+                "학습자에게 보이지 않는 정답의 값. 객관식이면 정답 선지에 적힌 값이나 내용(예: 13), 주관식이면 finalAnswer 와 같게 적는다"));
         properties.put("explanationCheck", enumerated(EXPLANATION_CHECKS,
                 "해설 이미지의 답과 내부 풀이의 답이 같으면 matches, 다르면 differs, 해설 이미지가 없으면 no_explanation"));
         properties.put("subject", enumerated(SUBJECTS,
@@ -680,12 +687,13 @@ public class OpenAIClient {
      * 학생에게 보이지 않는 내부 필드. 정답 노출 검사와 메트릭에만 쓰고 결과, DB, 로그에 남기지 않는다.
      * 예전 형식 응답처럼 필드가 없으면 null 이다.
      */
-    record AnalysisInternal(String internalSolution, String finalAnswer, String explanationCheck) {
+    record AnalysisInternal(String internalSolution, String finalAnswer, String answerValue, String explanationCheck) {
         /** 기본 toString 은 내부 풀이와 답을 그대로 찍는다. 길이와 대조 결과만 보인다 */
         @Override
         public String toString() {
             return "AnalysisInternal[internalSolutionLength=" + lengthOf(internalSolution)
                     + ", finalAnswerLength=" + lengthOf(finalAnswer)
+                    + ", answerValueLength=" + lengthOf(answerValue)
                     + ", explanationCheck=" + (explanationCheck == null || EXPLANATION_CHECKS.contains(explanationCheck)
                     ? explanationCheck : "other") + "]";
         }
@@ -728,6 +736,7 @@ public class OpenAIClient {
             AnalysisInternal internal = new AnalysisInternal(
                     (String) parsed.get("internalSolution"),
                     AnalysisTextNormalizer.normalizeAnswer(result.getSubject(), (String) parsed.get("finalAnswer")),
+                    AnalysisTextNormalizer.normalizeAnswer(result.getSubject(), (String) parsed.get("answerValue")),
                     (String) parsed.get("explanationCheck"));
             return new ParsedAnalysis(result, internal);
 
