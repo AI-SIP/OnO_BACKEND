@@ -1,0 +1,86 @@
+name: Blackbox Test
+
+# 배포할 jar 를 운영 Dockerfile 그대로 컨테이너로 띄우고, HTTP 요청만으로 앱이 쓰는 기능 전체를 확인한다(#422).
+# 자세한 내용은 src/blackboxTest/README.md 에 있다.
+#
+# test.yml 과 무엇이 다른가
+#  - test.yml 의 MockMvc 테스트는 JWT 필터를 건너뛰고(SecurityContext 를 직접 세움), 외부 연동과 RabbitMQ 프로듀서를
+#    빈 단위로 목으로 바꾸고, 데이터를 DB 에 직접 넣는다.
+#  - 여기서는 앱이 실제로 받는 요청 순서대로 가입부터 한다. RabbitMQ 리스너와 Quartz 도 켜져 있고,
+#    OpenAI, 소셜 로그인, S3 는 HTTP 로 흉내 낸 가짜 서버(WireMock, s3mock)가 받는다.
+#
+# 운영 서버나 시크릿에는 닿지 않는다. 앱 컨테이너는 외부로 나가는 길이 없는 internal 네트워크에만 붙는다.
+#
+# 지금은 PR 을 막지 않는다. 몇 주 돌려서 흔들리는 테스트가 없으면 branch protection 의 required check 로 건다.
+
+on:
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: blackbox-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  blackbox:
+    name: 블랙박스 시나리오
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # test.yml 과 같은 이유다. docker-java 기본 API 버전을 최신 엔진이 거부한다.
+      - name: Resolve Docker API version
+        run: echo "DOCKER_API_VERSION=$(docker version --format '{{.Server.APIVersion}}')" >> "$GITHUB_ENV"
+
+      - name: Run blackbox scenarios
+        run: |
+          chmod +x gradlew
+          ./gradlew blackboxTest --no-daemon
+
+      - name: Summarize results
+        if: always()
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import glob, re
+          total = failed = 0
+          failures = []
+          for path in glob.glob('build/test-results/blackboxTest/*.xml'):
+              body = open(path, encoding='utf-8', errors='replace').read()
+              m = re.search(r'tests="(\d+)"[^>]*skipped="(\d+)" failures="(\d+)" errors="(\d+)"', body)
+              if not m:
+                  continue
+              total += int(m.group(1))
+              failed += int(m.group(3)) + int(m.group(4))
+              for case in re.finditer(r'<testcase name="([^"]+)" classname="([^"]+)"[^>]*>\s*<(failure|error)', body):
+                  failures.append(f"{case.group(2).rsplit('.', 1)[-1]} > {case.group(1)}")
+          print('## 블랙박스 시나리오\n')
+          print(f'- 전체 **{total}**개, 실패 **{failed}**개\n')
+          for name in failures[:50]:
+              print(f'- {name}')
+          PY
+
+      - name: Upload report and app log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blackbox-report
+          path: |
+            build/reports/tests/blackboxTest
+            build/blackbox/app.log
+          retention-days: 14
