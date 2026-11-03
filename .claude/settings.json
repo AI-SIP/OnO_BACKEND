@@ -2,8 +2,6 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "deny": [
-      "mcp__github__merge_pull_request",
-      "Bash(gh pr merge:*)",
       "Bash(git push origin main*)",
       "Bash(git push origin develop*)",
       "Bash(git push --force*)",
