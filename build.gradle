@@ -151,6 +151,72 @@ tasks.named('test') {
 	finalizedBy jacocoTestReport
 }
 
+// ── 블랙박스 테스트 (#422) ──────────────────────────────────────────────────────
+// 배포할 jar 를 Dockerfile 그대로 컨테이너로 띄우고 HTTP 요청만으로 기능을 확인한다.
+// 이 소스셋은 main 출력을 classpath 에 넣지 않는다. 앱 클래스를 import 할 수 없으니
+// 리포지토리를 꺼내 데이터를 넣거나 빈을 목으로 바꾸는 일이 컴파일 단계에서 막힌다.
+// 실행: ./gradlew blackboxTest   (./gradlew test 와 커버리지 게이트에는 들어가지 않는다)
+// 소스 위치는 관례대로 src/blackboxTest/java, src/blackboxTest/resources 다.
+sourceSets {
+	blackboxTest
+}
+
+dependencies {
+	blackboxTestImplementation 'org.junit.jupiter:junit-jupiter'
+	blackboxTestImplementation 'org.assertj:assertj-core'
+	blackboxTestImplementation 'org.testcontainers:junit-jupiter'
+	blackboxTestImplementation 'org.testcontainers:mysql'
+	blackboxTestImplementation 'org.testcontainers:rabbitmq'
+	blackboxTestImplementation 'com.fasterxml.jackson.core:jackson-databind'
+	// 구글, 애플 로그인 시나리오에서 테스트가 만든 RSA 키로 id token 을 서명한다.
+	blackboxTestImplementation 'com.auth0:java-jwt:4.4.0'
+	blackboxTestImplementation 'org.slf4j:slf4j-simple'
+	blackboxTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	// MySQL 컨테이너가 떴는지 Testcontainers 가 JDBC 로 확인한다. 시나리오는 DB 에 직접 붙지 않는다.
+	blackboxTestRuntimeOnly 'com.mysql:mysql-connector-j'
+}
+
+tasks.register('blackboxTest', Test) {
+	description = '배포 jar 를 컨테이너로 띄우고 HTTP 요청만으로 모든 기능 시나리오를 확인한다'
+	group = 'verification'
+	testClassesDirs = sourceSets.blackboxTest.output.classesDirs
+	classpath = sourceSets.blackboxTest.runtimeClasspath
+	dependsOn tasks.named('bootJar')
+	shouldRunAfter tasks.named('test')
+	useJUnitPlatform()
+	jacoco { enabled = false }
+
+	def bootJarFile = tasks.named('bootJar').flatMap { it.archiveFile }
+	inputs.file(bootJarFile)
+	doFirst {
+		systemProperty 'blackbox.jar', bootJarFile.get().asFile.absolutePath
+	}
+	systemProperty 'blackbox.dockerfile', file('Dockerfile').absolutePath
+	// 미션 정의와 꾸미기 아이템 카탈로그 시드를 운영과 같은 마이그레이션 파일에서 읽는다.
+	systemProperty 'blackbox.migrations', file('src/main/resources/db/migration').absolutePath
+	// presigned URL 은 S3 가짜 서버 호스트 이름(s3mock:9090)으로 서명된다. 게이트웨이 포트로 보내면서
+	// Host 헤더를 원래 값으로 맞추려면 JDK HttpClient 가 막아 둔 Host 헤더를 풀어야 한다.
+	systemProperty 'jdk.httpclient.allowRestrictedHeaders', 'host'
+	maxHeapSize = '1g'
+
+	// test 태스크와 같은 이유로 Docker 소켓과 API 버전을 넘긴다.
+	def userSocket = file("${System.getProperty('user.home')}/.docker/run/docker.sock")
+	def dockerHost = System.getenv('DOCKER_HOST')
+			?: (userSocket.exists() ? "unix://${userSocket.absolutePath}" : 'unix:///var/run/docker.sock')
+	environment 'DOCKER_HOST', dockerHost
+	systemProperty 'api.version', System.getenv('DOCKER_API_VERSION') ?: '1.44'
+	environment 'DOCKER_API_VERSION', System.getenv('DOCKER_API_VERSION') ?: '1.44'
+	environment 'TESTCONTAINERS_CHECKS_DISABLE', 'true'
+	environment.remove('SENTRY_DSN')
+	environment.remove('SENTRY_DSN_DEV')
+	testLogging {
+		events 'passed', 'failed', 'skipped'
+		exceptionFormat 'full'
+		showStackTraces = true
+		showCauses = true
+	}
+}
+
 jacoco {
 	toolVersion = '0.8.12'
 }
