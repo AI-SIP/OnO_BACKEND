@@ -16,6 +16,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -31,6 +33,12 @@ class TagServiceTest extends TagTestSupport {
 
     @Autowired
     private TagService tagService;
+
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     private User user;
     private User other;
@@ -436,6 +444,49 @@ class TagServiceTest extends TagTestSupport {
                     .as("연결이 남으면 지운 태그가 문제 상세에서 계속 보인다")
                     .isEmpty();
             assertThat(problemRepository.findById(problem.getId())).isPresent();
+        }
+    }
+
+    @Nested
+    @DisplayName("태그 삭제와 목록 캐시")
+    class DeleteTagsCacheEviction {
+
+        @Test
+        @DisplayName("바깥 트랜잭션이 커밋된 뒤에 목록 캐시를 지운다")
+        void evictsTagListCacheAfterCommit() {
+            Tag tag = saveTag(user.getId(), "지울태그");
+            tagService.getUserTags(user.getId());
+            String cacheKey = "TAG_LIST:" + user.getId();
+            assertThat(redisTemplate.hasKey(cacheKey)).isTrue();
+
+            transactionTemplate.executeWithoutResult(status -> {
+                tagService.deleteTags(user.getId(), new TagDeleteRequestDto(List.of(tag.getId())));
+                assertThat(redisTemplate.hasKey(cacheKey))
+                        .as("커밋 전에 지우면 그 사이 목록 조회가 지운 태그를 최대 1시간 다시 캐싱한다")
+                        .isTrue();
+            });
+
+            assertThat(redisTemplate.hasKey(cacheKey)).isFalse();
+            assertThat(tagService.getUserTags(user.getId())).isEmpty();
+        }
+
+        @Test
+        @DisplayName("삭제가 롤백되면 목록 캐시를 지우지 않는다")
+        void keepsTagListCacheOnRollback() {
+            Tag tag = saveTag(user.getId(), "남을태그");
+            tagService.getUserTags(user.getId());
+            String cacheKey = "TAG_LIST:" + user.getId();
+
+            transactionTemplate.executeWithoutResult(status -> {
+                tagService.deleteTags(user.getId(), new TagDeleteRequestDto(List.of(tag.getId())));
+                status.setRollbackOnly();
+            });
+
+            assertThat(tagRepository.findById(tag.getId())).isPresent();
+            assertThat(redisTemplate.hasKey(cacheKey)).isTrue();
+            assertThat(tagService.getUserTags(user.getId()))
+                    .extracting(TagResponseDto::name)
+                    .containsExactly("남을태그");
         }
     }
 

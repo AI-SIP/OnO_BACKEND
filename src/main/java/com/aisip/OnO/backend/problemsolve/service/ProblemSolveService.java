@@ -22,8 +22,12 @@ import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
 import com.aisip.OnO.backend.problem.repository.ProblemRepository;
 import com.aisip.OnO.backend.studyroom.entity.StudyRoomFeedEventType;
 import com.aisip.OnO.backend.studyroom.event.StudyRoomActivityEvent;
+import com.aisip.OnO.backend.user.exception.UserErrorCase;
+import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
-import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
+import com.aisip.OnO.backend.util.fileupload.service.ImageUrlOwnershipService;
+import com.aisip.OnO.backend.config.rabbitmq.message.S3DeleteMessage;
+import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteAfterCommitSender;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,10 +57,12 @@ public class ProblemSolveService {
     private final ProblemSolveRepository problemSolveRepository;
     private final ProblemSolveImageDataRepository problemSolveImageDataRepository;
     private final ProblemRepository problemRepository;
+    private final UserRepository userRepository;
     private final MissionLogService missionLogService;
     private final MissionProgressUpdater missionProgressUpdater;
     private final FileUploadService fileUploadService;
-    private final S3DeleteProducer s3DeleteProducer;
+    private final ImageUrlOwnershipService imageUrlOwnershipService;
+    private final S3DeleteAfterCommitSender s3DeleteAfterCommitSender;
     private final ObjectMapper objectMapper;
     private final StreakCacheService streakCacheService;
     private final ApplicationEventPublisher eventPublisher;
@@ -118,6 +124,15 @@ public class ProblemSolveService {
         if (dto == null || dto.problemId() == null || dto.answerStatus() == null) {
             throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_INVALID_INPUT);
         }
+
+        // 사용자 행을 이 트랜잭션에서 가장 먼저 잠근다 (#401).
+        // problem_solve INSERT 는 FK 때문에 문제 행에 공유 잠금을 걸고, 뒤의 미션 적립이 사용자 행을,
+        // 커밋 직전 복습 일정 반영이 문제 행 배타 잠금을 잡는다. 같은 문제에 두 요청이 겹치면
+        // 한쪽은 사용자 행을 쥐고 문제 행을, 다른 쪽은 문제 행 공유 잠금을 쥐고 사용자 행을 기다려 교착이 났다.
+        // 사용자 행을 먼저 잡으면 같은 사용자의 등록은 여기서 줄을 서고, 문제 행 잠금은 앞 요청이 커밋한 뒤에야 잡힌다.
+        // 잠금 조회는 스냅샷을 만들지 않아서, 뒤 요청의 미션 중복 확인도 앞 요청이 커밋한 기록을 본다.
+        userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
 
         Problem problem = problemRepository.findById(dto.problemId())
                 .orElseThrow(() -> new ApplicationException(ProblemErrorCase.PROBLEM_NOT_FOUND));
@@ -192,7 +207,7 @@ public class ProblemSolveService {
         // S3 업로드를 병렬로 실행 (트랜잭션과 무관한 네트워크 I/O)
         List<CompletableFuture<String>> uploadFutures = IntStream.range(0, images.size())
                 .mapToObj(i -> CompletableFuture.supplyAsync(
-                        () -> fileUploadService.uploadFileToS3(images.get(i)),
+                        () -> fileUploadService.uploadFileToS3(images.get(i), userId),
                         s3UploadExecutor
                 ))
                 .toList();
@@ -223,12 +238,14 @@ public class ProblemSolveService {
         if (!Objects.equals(problemSolve.getUserId(), userId)) {
             throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_USER_UNMATCHED);
         }
-        int existingCount = problemSolve.getImages() == null ? 0 : problemSolve.getImages().size();
+        List<ProblemSolveImageData> existingImages = problemSolve.getImages() == null ? List.of() : problemSolve.getImages();
+        int existingCount = existingImages.size();
+        // 이미 이 기록에 붙어 있는 URL 은 예전 형식이어도 그대로 받는다.
+        imageUrlOwnershipService.validateUploadedBy(imageUrls, userId, existingImages.stream()
+                .map(ProblemSolveImageData::getImageUrl)
+                .toList());
         List<ProblemSolveImageData> imageDataList = IntStream.range(0, imageUrls.size())
-                .mapToObj(i -> {
-                    fileUploadService.validateS3Url(imageUrls.get(i));
-                    return ProblemSolveImageData.create(imageUrls.get(i), existingCount + i);
-                })
+                .mapToObj(i -> ProblemSolveImageData.create(imageUrls.get(i), existingCount + i))
                 .collect(Collectors.toList());
         imageDataList.forEach(problemSolve::addImage);
         problemSolveImageDataRepository.saveAll(imageDataList);
@@ -291,16 +308,13 @@ public class ProblemSolveService {
         streakCacheService.evict(userId);
         log.info("userId: {} deleted problem solve: {}", userId, problemSolveId);
 
-        images.forEach(image -> {
-            try {
-                s3DeleteProducer.sendDeleteMessage(image.getImageUrl(), problemSolveId);
-            } catch (Exception e) {
-                log.error("S3 삭제 메시지 전송 실패 - problemSolveId: {}, error: {}",
-                        problemSolveId, e.getMessage());
-            }
-        });
-
-        log.info("problemSolveId: {} S3 삭제 메시지 전송 완료 ({}개)", problemSolveId, images.size());
+        // 다른 사용자가 같은 파일을 쓰고 있으면 S3 파일은 남긴다.
+        // 커밋된 뒤에만 S3 파일을 지운다. 롤백되면 기록과 함께 파일도 남는다.
+        s3DeleteAfterCommitSender.sendAfterCommit(imageUrlOwnershipService.filterDeletable(images.stream()
+                        .map(ProblemSolveImageData::getImageUrl)
+                        .toList(), userId).stream()
+                .map(imageUrl -> new S3DeleteMessage(imageUrl, problemSolveId))
+                .toList());
     }
 
     /**
@@ -332,20 +346,17 @@ public class ProblemSolveService {
     public void deleteAllProblemSolvesByProblemId(Long problemId) {
         List<ProblemSolve> problemSolves = problemSolveRepository.findAllByProblemIdWithImages(problemId);
 
-        problemSolves.forEach(record -> {
-            List<ProblemSolveImageData> images = record.getImages();
-
-            images.forEach(image -> {
-                try {
-                    s3DeleteProducer.sendDeleteMessage(image.getImageUrl(), record.getId());
-                } catch (Exception e) {
-                    log.error("S3 삭제 메시지 전송 실패 - problemSolveId: {}, error: {}",
-                            record.getId(), e.getMessage());
-                }
-            });
-        });
+        // 다른 사용자가 같은 파일을 쓰고 있으면 S3 파일은 남긴다.
+        List<S3DeleteMessage> s3DeleteMessages = problemSolves.stream()
+                .flatMap(record -> imageUrlOwnershipService.filterDeletable(record.getImages().stream()
+                                .map(ProblemSolveImageData::getImageUrl)
+                                .toList(), record.getUserId()).stream()
+                        .map(imageUrl -> new S3DeleteMessage(imageUrl, record.getId())))
+                .toList();
 
         problemSolveRepository.deleteAllByProblemId(problemId);
+        // 커밋된 뒤에만 S3 파일을 지운다. 롤백되면 기록과 함께 파일도 남는다.
+        s3DeleteAfterCommitSender.sendAfterCommit(s3DeleteMessages);
         log.info("problemId: {} 의 모든 복습 기록 삭제 완료", problemId);
     }
 

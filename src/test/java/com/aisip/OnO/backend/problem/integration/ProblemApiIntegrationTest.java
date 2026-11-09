@@ -98,8 +98,8 @@ class ProblemApiIntegrationTest extends ProblemTestSupport {
             mockMvc.perform(post("/api/problems/{id}/imageData/urls", problemId)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json(new AddProblemImageUrlsRequest(List.of(
-                                    new AddProblemImageUrlsRequest.ImageUrlItem("https://s3/p.png", "PROBLEM_IMAGE"),
-                                    new AddProblemImageUrlsRequest.ImageUrlItem("https://s3/a.png", "ANSWER_IMAGE")
+                                    new AddProblemImageUrlsRequest.ImageUrlItem(fixtures.uploadedImageUrl(owner.getId()), "PROBLEM_IMAGE"),
+                                    new AddProblemImageUrlsRequest.ImageUrlItem(fixtures.uploadedImageUrl(owner.getId()), "ANSWER_IMAGE")
                             )))))
                     .andExpect(status().isOk());
 
@@ -132,7 +132,7 @@ class ProblemApiIntegrationTest extends ProblemTestSupport {
             mockMvc.perform(post("/api/problems/{id}/imageData/urls", withImageId)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json(new AddProblemImageUrlsRequest(List.of(
-                                    new AddProblemImageUrlsRequest.ImageUrlItem("https://s3/p.png", "PROBLEM_IMAGE")
+                                    new AddProblemImageUrlsRequest.ImageUrlItem(fixtures.uploadedImageUrl(owner.getId()), "PROBLEM_IMAGE")
                             )))))
                     .andExpect(status().isOk());
 
@@ -172,7 +172,7 @@ class ProblemApiIntegrationTest extends ProblemTestSupport {
             List<ProblemRegisterV2Dto> dtos = new ArrayList<>();
             for (int i = 0; i < 12; i++) {
                 dtos.add(new ProblemRegisterV2Dto(
-                        null, "배치" + i, null, ownerRoot.getId(), null, List.of("https://s3/p" + i + ".png"), null));
+                        null, "배치" + i, null, ownerRoot.getId(), null, List.of(fixtures.uploadedImageUrl(owner.getId())), null));
             }
 
             mockMvc.perform(post("/api/problems/v2/batch")
@@ -417,14 +417,14 @@ class ProblemApiIntegrationTest extends ProblemTestSupport {
             mockMvc.perform(post("/api/problems/{id}/imageData/urls", problemId)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json(new AddProblemImageUrlsRequest(List.of(
-                                    new AddProblemImageUrlsRequest.ImageUrlItem("https://s3/s1.png", "SOLVE_IMAGE")
+                                    new AddProblemImageUrlsRequest.ImageUrlItem(fixtures.uploadedImageUrl(owner.getId()), "SOLVE_IMAGE")
                             )))))
                     .andExpect(status().isOk());
 
             mockMvc.perform(post("/api/problems/{id}/imageData/urls", problemId)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(json(new AddProblemImageUrlsRequest(List.of(
-                                    new AddProblemImageUrlsRequest.ImageUrlItem("https://s3/s2.png", "SOLVE_IMAGE")
+                                    new AddProblemImageUrlsRequest.ImageUrlItem(fixtures.uploadedImageUrl(owner.getId()), "SOLVE_IMAGE")
                             )))))
                     .andExpect(status().isOk());
 

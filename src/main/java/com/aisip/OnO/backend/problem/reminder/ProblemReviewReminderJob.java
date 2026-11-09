@@ -14,8 +14,8 @@ import java.time.ZoneId;
  *
  * <p>한 실행이 5분을 넘기면 다음 실행이 겹쳐 같은 사용자를 두 번 처리할 수 있어 중첩을 막는다.
  * 다만 스케줄러가 클러스터 모드가 아니라(application-prod.yml 의 isClustered: false) blue/green
- * 두 인스턴스 사이의 동시 폴링은 이것으로 막히지 않는다. 그건 findDueReminders 의
- * "오늘 이미 처리한 사용자" 판정이 막는다.
+ * 두 인스턴스 사이의 동시 폴링은 이것으로 막히지 않는다. 그건 {@link ProblemReviewReminderSender} 가
+ * 행마다 SCHEDULED 일 때만 선점하는 것으로 막는다.
  */
 @Slf4j
 @DisallowConcurrentExecution

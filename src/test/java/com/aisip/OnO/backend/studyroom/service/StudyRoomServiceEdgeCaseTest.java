@@ -108,7 +108,7 @@ class StudyRoomServiceEdgeCaseTest extends StudyRoomTestSupport {
             StudyRoomDetailResponse response = studyRoomService.createRoom("썸네일없음", emptyThumbnail(), user.getId());
 
             assertThat(response.thumbnailUrl()).isNull();
-            verify(fileUploadService, never()).uploadFileToS3(any());
+            verify(fileUploadService, never()).uploadFileToS3(any(), any());
         }
 
         @Test
@@ -160,7 +160,7 @@ class StudyRoomServiceEdgeCaseTest extends StudyRoomTestSupport {
         @Test
         @DisplayName("이름만 보내면 썸네일은 그대로 둔다")
         void updatesNameOnly() {
-            given(fileUploadService.uploadFileToS3(any())).willReturn(UPLOADED_URL);
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn(UPLOADED_URL);
             studyRoomService.updateThumbnail(fixture.roomId(), fixture.host().getId(), pngThumbnail());
 
             StudyRoomDetailResponse response =
@@ -173,7 +173,7 @@ class StudyRoomServiceEdgeCaseTest extends StudyRoomTestSupport {
         @Test
         @DisplayName("썸네일만 보내면 이름은 그대로 둔다")
         void updatesThumbnailOnly() {
-            given(fileUploadService.uploadFileToS3(any())).willReturn(UPLOADED_URL);
+            given(fileUploadService.uploadFileToS3(any(), any())).willReturn(UPLOADED_URL);
             String originalName = fixture.room().getName();
 
             StudyRoomDetailResponse response =

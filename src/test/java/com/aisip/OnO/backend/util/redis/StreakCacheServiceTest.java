@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -31,6 +32,9 @@ class StreakCacheServiceTest extends IntegrationTestSupport {
 
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     private Long uniqueUserId() {
         return USER_ID_SEQUENCE.incrementAndGet();
@@ -115,6 +119,43 @@ class StreakCacheServiceTest extends IntegrationTestSupport {
         @DisplayName("캐시가 없는 사용자를 evict 해도 예외가 나지 않는다")
         void evictingMissingCacheIsSafe() {
             assertThatCode(() -> streakCacheService.evict(uniqueUserId())).doesNotThrowAnyException();
+        }
+    }
+
+    @Nested
+    @DisplayName("트랜잭션 안에서 무효화")
+    class EvictionInTransaction {
+
+        @Test
+        @DisplayName("커밋 전에는 캐시를 남겨 두고 커밋 후에 지운다")
+        void evictsAfterCommit() {
+            Long userId = uniqueUserId();
+            streakCacheService.put(userId, dates("2026-03-01"));
+
+            transactionTemplate.executeWithoutResult(status -> {
+                streakCacheService.evict(userId);
+                assertThat(redisTemplate.hasKey("STREAK:" + userId))
+                        .as("커밋 전에 지우면 그 사이 조회가 옛 기록으로 자정까지 캐시를 다시 채운다")
+                        .isTrue();
+            });
+
+            assertThat(streakCacheService.get(userId)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("롤백되면 캐시를 지우지 않는다")
+        void keepsCacheOnRollback() {
+            Long userId = uniqueUserId();
+            streakCacheService.put(userId, dates("2026-03-01"));
+
+            transactionTemplate.executeWithoutResult(status -> {
+                streakCacheService.evict(userId);
+                status.setRollbackOnly();
+            });
+
+            assertThat(streakCacheService.get(userId))
+                    .as("DB 가 그대로면 캐시도 맞는 값이다")
+                    .isPresent();
         }
     }
 

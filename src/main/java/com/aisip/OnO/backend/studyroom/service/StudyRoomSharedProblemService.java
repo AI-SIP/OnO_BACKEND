@@ -51,7 +51,8 @@ public class StudyRoomSharedProblemService {
     @Transactional(readOnly = true)
     public CursorPageResponse<SharedProblemResponse> getSharedProblems(Long roomId, Long userId, Long cursor, int size) {
         accessService.validateMember(roomId, userId);
-        int safeSize = Math.min(size, 50);
+        // size 가 음수면 PageRequest.of 가 IllegalArgumentException 을 던져 500 이 났다(#400). 댓글 목록처럼 1 이상으로 맞춘다.
+        int safeSize = Math.min(Math.max(size, 1), 50);
         List<StudyRoomSharedProblem> sharedProblems = sharedProblemRepository.findByRoomIdAndCursor(roomId, cursor, PageRequest.of(0, safeSize + 1));
         boolean hasNext = sharedProblems.size() > safeSize;
         List<StudyRoomSharedProblem> contentSharedProblems = hasNext ? sharedProblems.subList(0, safeSize) : sharedProblems;

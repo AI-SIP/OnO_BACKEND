@@ -255,25 +255,34 @@ class ProblemSolveRepositoryTest extends ProblemSolveTestSupport {
         }
 
         @Test
-        @DisplayName("URL 로 이미지를 찾고, 없으면 빈 값이다")
-        void findsImageByUrl() {
-            ProblemSolve solve = saveSolve(problem, user.getId(), PRACTICED_AT);
-            saveImage(solve, "https://bucket.s3.amazonaws.com/a.png", 0);
+        @DisplayName("URL 로 찾을 때 그 사용자의 기록에 붙은 행만 나온다")
+        void findsOnlyUsersRowsByUrl() {
+            Long otherUserId = fixtures.createOtherUser().getId();
+            ProblemSolve mine = saveSolve(problem, user.getId(), PRACTICED_AT);
+            ProblemSolve others = saveSolve(problem, otherUserId, PRACTICED_AT);
+            saveImage(mine, "https://bucket.s3.amazonaws.com/a.png", 0);
+            saveImage(others, "https://bucket.s3.amazonaws.com/a.png", 0);
 
-            assertThat(problemSolveImageDataRepository.findByImageUrl("https://bucket.s3.amazonaws.com/a.png")).isPresent();
-            assertThat(problemSolveImageDataRepository.findByImageUrl("https://bucket.s3.amazonaws.com/none.png")).isEmpty();
+            assertThat(problemSolveImageDataRepository.findAllByImageUrlAndUserId("https://bucket.s3.amazonaws.com/a.png", user.getId()))
+                    .extracting(image -> image.getProblemSolve().getId())
+                    .containsExactly(mine.getId());
+            assertThat(problemSolveImageDataRepository.existsByImageUrl("https://bucket.s3.amazonaws.com/none.png")).isFalse();
         }
 
         @Test
-        @Transactional
-        @DisplayName("URL 로 이미지를 지우면 더 이상 조회되지 않는다")
-        void deletesImageByUrl() {
-            ProblemSolve solve = saveSolve(problem, user.getId(), PRACTICED_AT);
-            saveImage(solve, "https://bucket.s3.amazonaws.com/a.png", 0);
+        @DisplayName("다른 사용자의 기록이 쓰는 URL 만 골라낸다")
+        void findsUrlsUsedByOtherUsers() {
+            Long otherUserId = fixtures.createOtherUser().getId();
+            ProblemSolve mine = saveSolve(problem, user.getId(), PRACTICED_AT);
+            ProblemSolve others = saveSolve(problem, otherUserId, PRACTICED_AT);
+            saveImage(mine, "https://bucket.s3.amazonaws.com/mine.png", 0);
+            saveImage(mine, "https://bucket.s3.amazonaws.com/shared.png", 1);
+            saveImage(others, "https://bucket.s3.amazonaws.com/shared.png", 0);
 
-            problemSolveImageDataRepository.deleteByImageUrl("https://bucket.s3.amazonaws.com/a.png");
-
-            assertThat(problemSolveImageDataRepository.findByImageUrl("https://bucket.s3.amazonaws.com/a.png")).isEmpty();
+            assertThat(problemSolveImageDataRepository.findImageUrlsUsedByOtherUsers(List.of(
+                    "https://bucket.s3.amazonaws.com/mine.png",
+                    "https://bucket.s3.amazonaws.com/shared.png"), user.getId()))
+                    .containsExactly("https://bucket.s3.amazonaws.com/shared.png");
         }
     }
 

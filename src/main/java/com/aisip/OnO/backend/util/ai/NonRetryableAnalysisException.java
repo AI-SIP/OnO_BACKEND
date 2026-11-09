@@ -7,14 +7,23 @@ import com.aisip.OnO.backend.common.exception.HandledFailure;
  *
  * ProblemAnalysisConsumer 가 잡아서 재큐잉 없이 ACK 하고, 상태도 FAILED 로 정리한다.
  * 즉 여기까지가 정상 처리 경로라 HandledFailure 를 붙여 error 로그 대상에서 뺀다.
+ * reason 은 사용자에게 보여 줄 문구와 실패 메트릭 태그를 정한다.
  */
 public class NonRetryableAnalysisException extends RuntimeException implements HandledFailure {
 
-    public NonRetryableAnalysisException(String message) {
+    private final AnalysisFailureReason reason;
+
+    public NonRetryableAnalysisException(AnalysisFailureReason reason, String message) {
         super(message);
+        this.reason = reason;
     }
 
-    public NonRetryableAnalysisException(String message, Throwable cause) {
+    public NonRetryableAnalysisException(AnalysisFailureReason reason, String message, Throwable cause) {
         super(message, cause);
+        this.reason = reason;
+    }
+
+    public AnalysisFailureReason getReason() {
+        return reason;
     }
 }

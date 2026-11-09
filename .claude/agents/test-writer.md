@@ -8,7 +8,7 @@ tools: Read, Grep, Glob, Bash, Write, Edit
 
 **원칙**:
 1. **기존 테스트 품질 먼저 확인** — 같은 패키지의 기존 테스트를 읽어 품질을 판단. 좋으면 관례를 따르고, 그렇지 않으면 새로 깔끔하게 작성. 기존 테스트 복붙 금지.
-2. **격리 환경**: test 프로필 사용, H2 인메모리 DB 또는 전용 테스트 DB. 각 테스트는 독립적으로 실행 가능해야 함 (`@Transactional` 롤백 또는 `@BeforeEach` 정리).
+2. **격리 환경**: test 프로필 + Testcontainers MySQL(`src/test/java/com/aisip/OnO/backend/support/TestContainers.java`). H2 는 쓰지 않으며 실행에 Docker 가 필요. 각 테스트는 독립적으로 실행 가능해야 함 (`@Transactional` 롤백 또는 `@BeforeEach` 정리).
 3. **사용자 격리 필수**: 다음 케이스를 반드시 포함:
    - 정상: 본인 데이터 접근 성공
    - 격리: 다른 사용자 데이터 접근 시 예외 또는 빈 결과

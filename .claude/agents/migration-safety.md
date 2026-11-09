@@ -1,6 +1,6 @@
 ---
 name: migration-safety
-description: Flyway DB 마이그레이션 파일 안전성 검토. 새 V*.sql 파일 또는 스키마 변경 계획이 있을 때 자동 위임. 프로덕션 영향·되돌리기 불가 작업·락 위험을 사전 검토한다.
+description: 읽기 전용(코드 수정·커밋 금지). Flyway DB 마이그레이션 파일 안전성 검토. 프로덕션 영향·되돌리기 불가 작업·락 위험을 사전 검토한다. /migrate 에서 항상, /check, /plan 에서 새 V*.sql 이나 스키마 변경이 있을 때 위임.
 tools: Read, Grep, Glob, Bash
 ---
 

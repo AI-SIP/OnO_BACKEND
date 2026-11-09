@@ -32,7 +32,7 @@ public class UserController {
     @PatchMapping("")
     public CommonResponse<String> updateUserInfo(@RequestBody UserRegisterDto userRegisterDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        userService.updateUser(userId, userRegisterDto);
+        userService.updateUserProfile(userId, userRegisterDto);
 
         return CommonResponse.success("사용자 정보 수정이 완료되었습니다.");
     }

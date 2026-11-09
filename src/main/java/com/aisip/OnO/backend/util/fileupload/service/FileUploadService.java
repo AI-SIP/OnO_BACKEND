@@ -1,5 +1,7 @@
 package com.aisip.OnO.backend.util.fileupload.service;
 
+import com.aisip.OnO.backend.config.rabbitmq.message.S3DeleteMessage;
+import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteAfterCommitSender;
 import com.aisip.OnO.backend.common.exception.ApplicationException;
 import com.aisip.OnO.backend.problem.entity.ProblemImageData;
 import com.aisip.OnO.backend.problem.exception.ProblemErrorCase;
@@ -19,7 +21,7 @@ import io.micrometer.core.instrument.Timer;
 import java.io.IOException;
 import java.util.Date;
 import java.util.List;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,14 +42,16 @@ public class FileUploadService {
     private final MeterRegistry meterRegistry;
     private final ProblemImageDataRepository problemImageDataRepository;
     private final ProblemSolveImageDataRepository problemSolveImageDataRepository;
+    private final ImageUrlOwnershipService imageUrlOwnershipService;
+    private final S3DeleteAfterCommitSender s3DeleteAfterCommitSender;
 
     @Value("${cloud.aws.s3.bucket}")
     private String bucket;
 
-    public String uploadFileToS3(MultipartFile file) {
+    public String uploadFileToS3(MultipartFile file, Long userId) {
         Timer.Sample sample = Timer.start(meterRegistry);
 
-        String fileName = createFileName(file);
+        String fileName = createFileName(file, userId);
         String fileUrl = getFileUrl(fileName);
 
         ObjectMetadata objectMetadata = new ObjectMetadata();
@@ -66,21 +70,12 @@ public class FileUploadService {
         return fileUrl;
     }
 
-    public void validateS3Url(String url) {
-        if (url == null || url.isBlank()) {
-            throw new ApplicationException(FileUploadErrorCase.INVALID_IMAGE_FILE);
-        }
-        if (!url.startsWith("https://" + bucket + ".s3.")) {
-            throw new ApplicationException(FileUploadErrorCase.INVALID_IMAGE_FILE);
-        }
-    }
-
-    public List<PresignedUrlResponse> generatePresignedUrls(String contentType, int count) {
+    public List<PresignedUrlResponse> generatePresignedUrls(String contentType, int count, Long userId) {
         Date expiration = new Date(System.currentTimeMillis() + 10 * 60 * 1000L); // 10분
 
         return IntStream.range(0, count)
                 .mapToObj(i -> {
-                    String fileName = createFileNameForPresigned(contentType);
+                    String fileName = createFileNameForPresigned(contentType, userId);
                     GeneratePresignedUrlRequest request = new GeneratePresignedUrlRequest(bucket, fileName)
                             .withMethod(HttpMethod.PUT)
                             .withContentType(contentType)
@@ -91,10 +86,19 @@ public class FileUploadService {
                 .toList();
     }
 
+    /**
+     * 우리 버킷 URL 의 파일만 지운다. 다른 호스트 URL 은 key 를 뽑지 않고 넘어간다.
+     * 예전에는 URL 의 마지막 ".com/" 뒤를 그대로 key 로 써서 호스트와 상관없이 우리 버킷의 key 를 지웠다.
+     */
     public void deleteImageFileFromS3(String imageUrl) {
+        Optional<String> objectKey = imageUrlOwnershipService.extractObjectKey(imageUrl);
+        if (objectKey.isEmpty()) {
+            log.warn("S3 delete skipped - reason: not_bucket_url");
+            return;
+        }
+
         Timer.Sample sample = Timer.start(meterRegistry);
-        String splitStr = ".com/";
-        String fileName = imageUrl.substring(imageUrl.lastIndexOf(splitStr) + splitStr.length());
+        String fileName = objectKey.get();
 
         log.info("S3 delete requested");
 
@@ -107,41 +111,47 @@ public class FileUploadService {
         }
     }
 
+    /**
+     * 이 사용자의 행만 지운다. 같은 URL 을 가진 다른 사용자의 행은 남기고,
+     * 다른 사용자의 행이 그 파일을 쓰고 있으면 S3 파일도 남긴다.
+     */
     @Transactional
     public void deleteUserImageFile(String imageUrl, Long userId) {
-        problemImageDataRepository.findByImageUrl(imageUrl)
-                .ifPresentOrElse(
-                        imageData -> deleteProblemImageData(imageData, imageUrl, userId),
-                        () -> deleteProblemSolveImageData(imageUrl, userId)
-                );
-    }
-
-    private void deleteProblemImageData(ProblemImageData imageData, String imageUrl, Long userId) {
-        if (!Objects.equals(imageData.getProblem().getUserId(), userId)) {
+        List<ProblemImageData> problemImages = problemImageDataRepository.findAllByImageUrlAndUserId(imageUrl, userId);
+        if (!problemImages.isEmpty()) {
+            problemImageDataRepository.deleteAll(problemImages);
+            deleteFromS3AfterCommitIfDeletable(imageUrl, userId, problemImages.get(0).getProblem().getId());
+            return;
+        }
+        if (problemImageDataRepository.existsByImageUrl(imageUrl)) {
             throw new ApplicationException(ProblemErrorCase.PROBLEM_USER_UNMATCHED);
         }
 
-        deleteImageFileFromS3(imageUrl);
-        problemImageDataRepository.deleteByImageUrl(imageUrl);
-    }
-
-    private void deleteProblemSolveImageData(String imageUrl, Long userId) {
-        ProblemSolveImageData imageData = problemSolveImageDataRepository.findByImageUrl(imageUrl)
-                .orElseThrow(() -> new ApplicationException(FileUploadErrorCase.FILE_NOT_FOUND));
-
-        if (!Objects.equals(imageData.getProblemSolve().getUserId(), userId)) {
+        List<ProblemSolveImageData> solveImages = problemSolveImageDataRepository.findAllByImageUrlAndUserId(imageUrl, userId);
+        if (!solveImages.isEmpty()) {
+            problemSolveImageDataRepository.deleteAll(solveImages);
+            deleteFromS3AfterCommitIfDeletable(imageUrl, userId, null);
+            return;
+        }
+        if (problemSolveImageDataRepository.existsByImageUrl(imageUrl)) {
             throw new ApplicationException(ProblemSolveErrorCase.PROBLEM_SOLVE_USER_UNMATCHED);
         }
 
-        deleteImageFileFromS3(imageUrl);
-        problemSolveImageDataRepository.deleteByImageUrl(imageUrl);
+        throw new ApplicationException(FileUploadErrorCase.FILE_NOT_FOUND);
     }
 
-    private String createFileName(MultipartFile file) {
+    /** 행 삭제가 롤백되면 파일도 남아야 하므로 S3 는 커밋된 뒤에 지운다. */
+    private void deleteFromS3AfterCommitIfDeletable(String imageUrl, Long userId, Long problemId) {
+        if (imageUrlOwnershipService.isDeletable(imageUrl, userId)) {
+            s3DeleteAfterCommitSender.sendAfterCommit(List.of(new S3DeleteMessage(imageUrl, problemId)));
+        }
+    }
+
+    private String createFileName(MultipartFile file, Long userId) {
         String extension = resolveExtension(file.getOriginalFilename());
 
         String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
-        return "image/" + datePath + "/" + UUID.randomUUID() + extension;
+        return imageUrlOwnershipService.userKeyPrefix(userId) + datePath + "/" + UUID.randomUUID() + extension;
     }
 
     /**
@@ -161,7 +171,7 @@ public class FileUploadService {
         return originalFilename.substring(separatorIndex);
     }
 
-    private String createFileNameForPresigned(String contentType) {
+    private String createFileNameForPresigned(String contentType, Long userId) {
         String extension = switch (contentType) {
             case "image/png" -> ".png";
             case "image/gif" -> ".gif";
@@ -170,12 +180,12 @@ public class FileUploadService {
             default -> ".jpg"; // image/jpeg, image/jpg, application/octet-stream 등
         };
         String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
-        return "image/" + datePath + "/" + UUID.randomUUID() + extension;
+        return imageUrlOwnershipService.userKeyPrefix(userId) + datePath + "/" + UUID.randomUUID() + extension;
     }
 
 
     private String getFileUrl(String fileName) {
-        return "https://" + bucket + ".s3.ap-northeast-2.amazonaws.com/" + fileName;
+        return imageUrlOwnershipService.urlPrefix() + fileName;
     }
 
     private void recordExternalCall(String dependency, String operation, String outcome, Timer.Sample sample) {

@@ -247,6 +247,23 @@ class StudyRoomSharedProblemApiTest extends StudyRoomTestSupport {
                     .andExpect(jsonPath("$.data.content[0].sharedProblemId").value(ids.get(2)));
         }
 
+        @ParameterizedTest
+        @ValueSource(strings = {"0", "-1", "-5"})
+        @DisplayName("size 가 0 이하면 500 이 아니라 1 로 맞춰 준다 (#400)")
+        void nonPositiveSizeIsRaisedToOne(String size) throws Exception {
+            RoomFixture fixture = createRoomWithMemberAndOutsider();
+            saveSharedProblem(fixture.room(), fixture.host(), saveProblem(fixture.host().getId()), "하나");
+            saveSharedProblem(fixture.room(), fixture.host(), saveProblem(fixture.host().getId()), "둘");
+            authenticateAs(fixture.host().getId());
+
+            mockMvc.perform(get("/api/study-room/{roomId}/shared-problems", fixture.roomId())
+                            .param("size", size))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.content.length()").value(1))
+                    .andExpect(jsonPath("$.data.hasNext").value(true))
+                    .andExpect(jsonPath("$.data.size").value(1));
+        }
+
         @Test
         @DisplayName("댓글 수와 리액션 요약이 함께 온다")
         void listIncludesCommentCountAndReactions() throws Exception {

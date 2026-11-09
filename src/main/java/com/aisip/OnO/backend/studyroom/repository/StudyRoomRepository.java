@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,4 +20,7 @@ public interface StudyRoomRepository extends JpaRepository<StudyRoom, Long> {
 
     @Query("select r from StudyRoom r where r.id > :cursor order by r.id asc")
     List<StudyRoom> findBatchAfterId(@Param("cursor") Long cursor, Pageable pageable);
+
+    @Query("select distinct r.thumbnailUrl from StudyRoom r where r.thumbnailUrl in :imageUrls and r.hostUserId <> :userId")
+    List<String> findThumbnailUrlsUsedByOtherUsers(@Param("imageUrls") Collection<String> imageUrls, @Param("userId") Long userId);
 }

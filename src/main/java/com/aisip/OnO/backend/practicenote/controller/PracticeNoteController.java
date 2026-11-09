@@ -5,6 +5,9 @@ import com.aisip.OnO.backend.common.response.CommonResponse;
 import com.aisip.OnO.backend.common.response.CursorPageResponse;
 import com.aisip.OnO.backend.practicenote.dto.*;
 import com.aisip.OnO.backend.practicenote.service.PracticeNoteService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -45,7 +48,7 @@ public class PracticeNoteController {
     @GetMapping("/thumbnail/V2")
     public CommonResponse<CursorPageResponse<PracticeNoteThumbnailResponseDto>> getAllPracticeThumbnailWithCursor(
             @RequestParam(value = "cursor", required = false) Long cursor,
-            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestParam(value = "size", defaultValue = "20") @Min(CursorPageResponse.MIN_SIZE) @Max(CursorPageResponse.MAX_SIZE) int size,
             @RequestParam(value = "sort", defaultValue = "OLDEST") CursorSort sort) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         log.info("userId: {} get practice thumbnails with cursor: {}, size: {}", userId, cursor, size);
@@ -86,7 +89,7 @@ public class PracticeNoteController {
 
     // ✅ 복습 리스트 수정
     @PatchMapping("")
-    public CommonResponse<String> updatePractice(@RequestBody PracticeNoteUpdateDto practiceNoteUpdateDto) {
+    public CommonResponse<String> updatePractice(@Valid @RequestBody PracticeNoteUpdateDto practiceNoteUpdateDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         practiceNoteService.updatePracticeInfo(userId, practiceNoteUpdateDto);
 
@@ -95,7 +98,7 @@ public class PracticeNoteController {
 
     // ✅ 복습 리스트 삭제 (204 No Content 반환)
     @DeleteMapping("")
-    public CommonResponse<String> deletePractices(@RequestBody PracticeNoteDeleteRequestDto practiceNoteDeleteRequestDto) {
+    public CommonResponse<String> deletePractices(@Valid @RequestBody PracticeNoteDeleteRequestDto practiceNoteDeleteRequestDto) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         practiceNoteService.deletePractices(userId, practiceNoteDeleteRequestDto.deletePracticeIdList());
 

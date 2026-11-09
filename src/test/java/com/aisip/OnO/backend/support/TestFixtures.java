@@ -6,9 +6,11 @@ import com.aisip.OnO.backend.folder.repository.FolderRepository;
 import com.aisip.OnO.backend.user.dto.UserRegisterDto;
 import com.aisip.OnO.backend.user.entity.User;
 import com.aisip.OnO.backend.user.repository.UserRepository;
+import com.aisip.OnO.backend.util.fileupload.service.ImageUrlOwnershipService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -28,6 +30,23 @@ public class TestFixtures {
 
     private final UserRepository userRepository;
     private final FolderRepository folderRepository;
+    private final ImageUrlOwnershipService imageUrlOwnershipService;
+
+    /** 이 사용자가 presigned URL 로 올렸을 때 받는 형식의 URL. */
+    public String uploadedImageUrl(Long userId) {
+        return imageUrlOwnershipService.urlPrefix()
+                + imageUrlOwnershipService.userKeyPrefix(userId) + "2026/10/29/" + UUID.randomUUID() + ".png";
+    }
+
+    /** 우리 버킷의 고정 key URL. 같은 이름이면 같은 URL 이라 검증 쪽에서 문자열로 비교할 수 있다. */
+    public String bucketImageUrl(String name) {
+        return imageUrlOwnershipService.urlPrefix() + "image/test/" + name + ".png";
+    }
+
+    /** key 에 사용자 정보를 넣기 전 형식의 URL. */
+    public String legacyImageUrl() {
+        return imageUrlOwnershipService.urlPrefix() + "image/2025/03/06/" + UUID.randomUUID() + ".png";
+    }
 
     public User createUser() {
         return createUser("member");

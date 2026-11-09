@@ -1,14 +1,19 @@
 package com.aisip.OnO.backend.config.rabbitmq.consumer;
 
 import com.aisip.OnO.backend.config.rabbitmq.RabbitMQConfig;
+import com.aisip.OnO.backend.config.rabbitmq.RabbitRetryAttempts;
 import com.aisip.OnO.backend.folder.entity.Folder;
 import com.aisip.OnO.backend.problem.entity.AnalysisStatus;
 import com.aisip.OnO.backend.problem.entity.Problem;
 import com.aisip.OnO.backend.problem.entity.ProblemAnalysis;
 import com.aisip.OnO.backend.problem.entity.ProblemImageType;
 import com.aisip.OnO.backend.user.entity.User;
+import com.aisip.OnO.backend.util.ai.AnalysisFailureReason;
+import com.aisip.OnO.backend.util.ai.AnalysisInput;
 import com.aisip.OnO.backend.util.ai.NonRetryableAnalysisException;
 import com.aisip.OnO.backend.util.ai.ProblemAnalysisResult;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -16,21 +21,24 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.web.client.HttpClientErrorException;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willReturn;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -48,6 +56,9 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
 
     @Autowired
     private ProblemAnalysisConsumer consumer;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     private User owner;
     private Folder rootFolder;
@@ -99,6 +110,17 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
         return problem;
     }
 
+    private String errorMessageOf(Problem problem) {
+        return problemAnalysisRepository.findByProblemId(problem.getId())
+                .map(ProblemAnalysis::getErrorMessage)
+                .orElseThrow();
+    }
+
+    private double failureCount(AnalysisFailureReason reason) {
+        Counter counter = meterRegistry.find("ono.ai.analysis.failures").tag("reason", reason.tag()).counter();
+        return counter == null ? 0 : counter.count();
+    }
+
     private AnalysisStatus statusOf(Problem problem) {
         return problemAnalysisRepository.findByProblemId(problem.getId())
                 .map(ProblemAnalysis::getStatus)
@@ -115,7 +137,7 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
         @DisplayName("메시지의 문제를 분석해 COMPLETED 로 저장한다")
         void completesAnalysis() {
             Problem problem = analyzableProblem();
-            given(openAIClient.analyzeImages(anyList())).willReturn(successResult());
+            given(openAIClient.analyze(any())).willReturn(successResult());
 
             consumer.handleAnalysisMessage(analysisMessage(problem.getId()));
 
@@ -135,14 +157,13 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
             saveImageData(other, "https://s3/other.png", ProblemImageType.PROBLEM_IMAGE);
             saveAnalysisRow(other);
 
-            given(openAIClient.analyzeImages(anyList())).willReturn(successResult());
+            given(openAIClient.analyze(any())).willReturn(successResult());
 
             consumer.handleAnalysisMessage(analysisMessage(target.getId()));
 
-            @SuppressWarnings("unchecked")
-            ArgumentCaptor<List<String>> captor = ArgumentCaptor.forClass(List.class);
-            verify(openAIClient).analyzeImages(captor.capture());
-            assertThat(captor.getValue()).containsExactly("https://s3/target.png");
+            ArgumentCaptor<AnalysisInput> captor = ArgumentCaptor.forClass(AnalysisInput.class);
+            verify(openAIClient).analyze(captor.capture());
+            assertThat(captor.getValue().problemImageUrls()).containsExactly("https://s3/target.png");
         }
 
         @Test
@@ -157,14 +178,14 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
 
             consumer.handleAnalysisMessage(analysisMessage(problem.getId()));
 
-            verify(openAIClient, never()).analyzeImages(anyList());
+            verify(openAIClient, never()).analyze(any());
         }
 
         @Test
         @DisplayName("정상 처리에서는 Discord 알림을 보내지 않는다")
         void doesNotNotifyDiscordOnSuccess() {
             Problem problem = analyzableProblem();
-            given(openAIClient.analyzeImages(anyList())).willReturn(successResult());
+            given(openAIClient.analyze(any())).willReturn(successResult());
 
             consumer.handleAnalysisMessage(analysisMessage(problem.getId()));
 
@@ -182,14 +203,17 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
         @DisplayName("모델이 판독을 거절하면 FAILED 로 남기고 예외 없이 종료한다")
         void ackOnNonRetryableRejection() {
             Problem problem = analyzableProblem();
-            given(openAIClient.analyzeImages(anyList()))
-                    .willThrow(new NonRetryableAnalysisException("분석이 불가능한 이미지입니다."));
+            given(openAIClient.analyze(any()))
+                    .willThrow(new NonRetryableAnalysisException(AnalysisFailureReason.UNREADABLE_IMAGE, "분석이 불가능한 이미지입니다."));
 
             assertThatCode(() -> consumer.handleAnalysisMessage(analysisMessage(problem.getId())))
                     .as("재시도해도 같은 결과라 큐에 되돌리지 않는다")
                     .doesNotThrowAnyException();
 
             assertThat(statusOf(problem)).isEqualTo(AnalysisStatus.FAILED);
+            assertThat(errorMessageOf(problem))
+                    .as("앱 화면에 나가는 문구라 예외 원문 대신 사유별 문구를 쓴다")
+                    .isEqualTo(AnalysisFailureReason.UNREADABLE_IMAGE.userMessage());
         }
 
         @Test
@@ -201,7 +225,7 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
                     .as("사라진 문제를 재분석할 방법은 없다")
                     .doesNotThrowAnyException();
 
-            verify(openAIClient, never()).analyzeImages(anyList());
+            verify(openAIClient, never()).analyze(any());
         }
 
         @Test
@@ -213,7 +237,7 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
             assertThatCode(() -> consumer.handleAnalysisMessage(analysisMessage(problem.getId())))
                     .doesNotThrowAnyException();
 
-            verify(openAIClient, never()).analyzeImages(anyList());
+            verify(openAIClient, never()).analyze(any());
         }
     }
 
@@ -224,10 +248,10 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
     class RetryableFailure {
 
         @Test
-        @DisplayName("이미지 다운로드 타임아웃(OpenAI 400)은 FAILED 로 기록하고 예외를 던진다")
+        @DisplayName("이미지 다운로드 타임아웃(OpenAI 400)은 예외를 던지고, 재시도 인터셉터 밖이면 FAILED 로 기록한다")
         void rethrowsImageDownloadTimeout() {
             Problem problem = analyzableProblem();
-            given(openAIClient.analyzeImages(anyList())).willThrow(imageDownloadTimeout());
+            given(openAIClient.analyze(any())).willThrow(imageDownloadTimeout());
 
             assertThatThrownBy(() -> consumer.handleAnalysisMessage(analysisMessage(problem.getId())))
                     .as("일시적 실패는 재시도·DLQ 로 넘겨야 한다")
@@ -235,21 +259,95 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
                     .hasMessageContaining(String.valueOf(problem.getId()));
 
             assertThat(statusOf(problem))
-                    .as("재시도가 남아 있어도 현재 상태는 FAILED 로 드러난다")
+                    .as("재시도 인터셉터 없이 직접 부르면 다시 시도할 주체가 없으므로 바로 FAILED 다")
                     .isEqualTo(AnalysisStatus.FAILED);
+            assertThat(errorMessageOf(problem))
+                    .as("OpenAI 응답 원문(URL 다운로드 타임아웃)을 사용자에게 보여 주지 않는다")
+                    .isEqualTo(AnalysisFailureReason.TRANSIENT.userMessage())
+                    .doesNotContain("Unable to download");
+        }
+
+        @Test
+        @DisplayName("재시도 인터셉터 안에서는 1, 2회차에 PROCESSING 을 두고 3회차에 FAILED 로 바꾸며, 뒤이은 DLQ 는 다시 세지 않는다")
+        void marksFailedOnLastAttemptAndDeadLetterDoesNotDoubleCount() {
+            Problem problem = analyzableProblem();
+            inTransaction(() -> {
+                ProblemAnalysis analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
+                analysis.updateToProcessing();
+                problemAnalysisRepository.save(analysis);
+            });
+            given(openAIClient.analyze(any())).willThrow(imageDownloadTimeout());
+            double maxRetriesBefore = failureCount(AnalysisFailureReason.MAX_RETRIES);
+            double transientBefore = failureCount(AnalysisFailureReason.TRANSIENT);
+            List<AnalysisStatus> statusAfterAttempt = new ArrayList<>();
+
+            // 리스너 컨테이너의 재시도 인터셉터와 같이 한 스레드에서 RetryContext 를 걸고 세 번 부른다.
+            RetryTemplate retryTemplate = RetryTemplate.builder()
+                    .maxAttempts(RabbitRetryAttempts.MAX_ATTEMPTS).noBackoff().build();
+            assertThatThrownBy(() -> retryTemplate.execute(context -> {
+                try {
+                    consumer.handleAnalysisMessage(analysisMessage(problem.getId()));
+                    return null;
+                } finally {
+                    statusAfterAttempt.add(statusOf(problem));
+                }
+            })).isInstanceOf(RuntimeException.class);
+
+            verify(openAIClient, times(RabbitRetryAttempts.MAX_ATTEMPTS)).analyze(any());
+            assertThat(statusAfterAttempt)
+                    .as("중간에 FAILED 가 보이면 앱이 폴링을 멈춘다. 마지막 시도는 DLQ 를 기다리지 않고 FAILED 로 바꾼다")
+                    .containsExactly(AnalysisStatus.PROCESSING, AnalysisStatus.PROCESSING, AnalysisStatus.FAILED);
+            assertThat(errorMessageOf(problem)).isEqualTo(AnalysisFailureReason.MAX_RETRIES.userMessage());
+            assertThat(failureCount(AnalysisFailureReason.MAX_RETRIES)).isEqualTo(maxRetriesBefore + 1);
+            assertThat(failureCount(AnalysisFailureReason.TRANSIENT))
+                    .as("재시도 중간 실패는 메트릭에 세지 않는다")
+                    .isEqualTo(transientBefore);
+
+            consumer.handleAnalysisDLQ(analysisMessage(problem.getId()), rejectedAfterRetries(RabbitMQConfig.GPT_ANALYSIS_QUEUE));
+
+            assertThat(statusOf(problem)).isEqualTo(AnalysisStatus.FAILED);
+            assertThat(errorMessageOf(problem)).isEqualTo(AnalysisFailureReason.MAX_RETRIES.userMessage());
+            assertThat(failureCount(AnalysisFailureReason.MAX_RETRIES))
+                    .as("마지막 시도에서 이미 센 실패를 DLQ 가 다시 세지 않는다")
+                    .isEqualTo(maxRetriesBefore + 1);
+            verify(discordWebhookNotificationService).sendErrorNotification(
+                    eq("RabbitMQ DLQ - GPT Analysis"), anyString(), eq("ERROR"), anyString());
+        }
+
+        @Test
+        @DisplayName("재시도 인터셉터 안에서 두 번째 시도에 성공하면 FAILED 를 거치지 않고 COMPLETED 가 된다")
+        void completesOnSecondAttemptWithoutFailedInBetween() {
+            Problem problem = analyzableProblem();
+            given(openAIClient.analyze(any()))
+                    .willThrow(imageDownloadTimeout())
+                    .willReturn(successResult());
+            List<AnalysisStatus> statusesBetweenAttempts = new ArrayList<>();
+
+            RetryTemplate retryTemplate = RetryTemplate.builder()
+                    .maxAttempts(RabbitRetryAttempts.MAX_ATTEMPTS).noBackoff().build();
+            retryTemplate.execute(context -> {
+                if (context.getRetryCount() > 0) {
+                    statusesBetweenAttempts.add(statusOf(problem));
+                }
+                consumer.handleAnalysisMessage(analysisMessage(problem.getId()));
+                return null;
+            });
+
+            assertThat(statusesBetweenAttempts).doesNotContain(AnalysisStatus.FAILED);
+            assertThat(statusOf(problem)).isEqualTo(AnalysisStatus.COMPLETED);
         }
 
         @Test
         @DisplayName("재시도 실패가 반복돼도 다음 재시도에서 성공하면 COMPLETED 로 회복된다")
         void recoversOnRetry() {
             Problem problem = analyzableProblem();
-            given(openAIClient.analyzeImages(anyList())).willThrow(imageDownloadTimeout());
+            given(openAIClient.analyze(any())).willThrow(imageDownloadTimeout());
 
             assertThatThrownBy(() -> consumer.handleAnalysisMessage(analysisMessage(problem.getId())))
                     .isInstanceOf(RuntimeException.class);
 
             // 이미 예외를 던지도록 스텁된 목이라 given(...) 형태로 다시 스텁하면 스텁 도중 예외가 난다.
-            willReturn(successResult()).given(openAIClient).analyzeImages(anyList());
+            willReturn(successResult()).given(openAIClient).analyze(any());
             consumer.handleAnalysisMessage(analysisMessage(problem.getId()));
 
             assertThat(statusOf(problem))
@@ -261,7 +359,7 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
         @DisplayName("예상하지 못한 예외도 감싸서 던진다")
         void rethrowsUnexpectedError() {
             Problem problem = analyzableProblem();
-            given(openAIClient.analyzeImages(anyList())).willThrow(new IllegalStateException("boom"));
+            given(openAIClient.analyze(any())).willThrow(new IllegalStateException("boom"));
 
             assertThatThrownBy(() -> consumer.handleAnalysisMessage(analysisMessage(problem.getId())))
                     .isInstanceOf(RuntimeException.class)
@@ -282,7 +380,7 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
                     .as("조회할 수 없는 메시지는 재시도해도 영원히 실패한다")
                     .doesNotThrowAnyException();
 
-            verify(openAIClient, never()).analyzeImages(anyList());
+            verify(openAIClient, never()).analyze(any());
         }
     }
 
@@ -321,7 +419,9 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
 
             ProblemAnalysis analysis = problemAnalysisRepository.findByProblemId(problem.getId()).orElseThrow();
             assertThat(analysis.getStatus()).isEqualTo(AnalysisStatus.FAILED);
-            assertThat(analysis.getErrorMessage()).isNotBlank();
+            assertThat(analysis.getErrorMessage())
+                    .as("예전에는 \"최대 재시도 횟수 초과 또는 큐 만료\" 같은 내부 문구가 앱에 그대로 나갔다")
+                    .isEqualTo(AnalysisFailureReason.MAX_RETRIES.userMessage());
         }
 
         @Test
@@ -331,7 +431,7 @@ class ProblemAnalysisConsumerTest extends RabbitConsumerTestSupport {
 
             consumer.handleAnalysisDLQ(analysisMessage(problem.getId()), rejectedAfterRetries(RabbitMQConfig.GPT_ANALYSIS_QUEUE));
 
-            verify(openAIClient, never()).analyzeImages(anyList());
+            verify(openAIClient, never()).analyze(any());
         }
 
         @Test

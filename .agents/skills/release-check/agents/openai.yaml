@@ -1,0 +1,7 @@
+interface:
+  display_name: "OnO Release Check"
+  short_description: "배포 전 프론트 호환성 판정"
+  default_prompt: "Use $release-check to judge whether origin/develop can be deployed against the released OnO_FRONT client."
+
+policy:
+  allow_implicit_invocation: false

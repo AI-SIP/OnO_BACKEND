@@ -19,6 +19,7 @@ import com.aisip.OnO.backend.user.repository.UserRepository;
 import com.aisip.OnO.backend.util.fcm.repository.FcmTokenRepository;
 import com.aisip.OnO.backend.util.fileupload.exception.FileUploadErrorCase;
 import com.aisip.OnO.backend.util.fileupload.service.FileUploadService;
+import com.aisip.OnO.backend.util.fileupload.service.ImageUrlOwnershipService;
 import com.aisip.OnO.backend.util.webhook.DiscordWebhookNotificationService;
 import com.aisip.OnO.backend.config.rabbitmq.producer.S3DeleteProducer;
 import lombok.RequiredArgsConstructor;
@@ -76,6 +77,7 @@ public class UserService {
     private final StudyRoomService studyRoomService;
 
     private final FileUploadService fileUploadService;
+    private final ImageUrlOwnershipService imageUrlOwnershipService;
 
     private final S3DeleteProducer s3DeleteProducer;
 
@@ -211,6 +213,16 @@ public class UserService {
         findUserEntity(userId).updateNotificationEnabled(notificationEnabled);
     }
 
+    /** 앱에서 사용자가 자기 정보를 고칠 때 쓴다. 이름과 이메일만 바뀐다. */
+    @Transactional
+    public void updateUserProfile(Long userId, UserRegisterDto userRegisterDto) {
+        User user = findUserEntity(userId);
+        user.updateProfile(userRegisterDto);
+
+        log.info("userId: {} has updated profile", userId);
+    }
+
+    /** 관리자 화면에서 사용자 정보를 고칠 때 쓴다. */
     @Transactional
     public void updateUser(Long userId, UserRegisterDto userRegisterDto) {
 
@@ -226,7 +238,7 @@ public class UserService {
         validateProfileImage(profileImage);
         User user = findUserEntity(userId);
         String previousProfileImageUrl = user.getProfileImageUrl();
-        String profileImageUrl = fileUploadService.uploadFileToS3(profileImage);
+        String profileImageUrl = fileUploadService.uploadFileToS3(profileImage, userId);
         deleteImageOnRollback(profileImageUrl, userId);
         user.updateProfileImageUrl(profileImageUrl);
         deleteImageAsync(previousProfileImageUrl, userId);
@@ -235,11 +247,15 @@ public class UserService {
 
     @Transactional
     public UserResponseDto updateProfileImageByUrl(Long userId, String imageUrl) {
-        fileUploadService.validateS3Url(imageUrl);
         User user = findUserEntity(userId);
         String previousProfileImageUrl = user.getProfileImageUrl();
+        // 지금 프로필 URL 은 예전 형식이어도 그대로 받는다.
+        imageUrlOwnershipService.validateUploadedBy(imageUrl, userId, previousProfileImageUrl);
         user.updateProfileImageUrl(imageUrl);
-        deleteImageAsync(previousProfileImageUrl, userId);
+        // 같은 URL 을 다시 보내면 지금 쓰는 파일이라 지우지 않는다.
+        if (!imageUrl.equals(previousProfileImageUrl)) {
+            deleteImageAsync(previousProfileImageUrl, userId);
+        }
         return UserResponseDto.from(user);
     }
 
@@ -254,7 +270,10 @@ public class UserService {
 
     @Transactional
     public void deleteUserById(Long userId) {
-        User user = findUserEntity(userId);
+        // 복습 기록 등록, 미션 적립, 스터디룸 쓰기는 사용자 행을 먼저 잠그고 문제나 방 행을 잡는다(#401).
+        // 탈퇴가 문제 행을 먼저 지우고 마지막에 사용자 행을 잡으면 그 순서와 엇갈려 교착이 날 수 있어, 여기서도 먼저 잠근다.
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new ApplicationException(UserErrorCase.USER_NOT_FOUND));
         deleteImageAsync(user.getProfileImageUrl(), userId);
         sharedProblemCommentReactionRepository.deleteByCommentAuthorId(userId);
         sharedProblemCommentReactionRepository.deleteByUserId(userId);
@@ -379,6 +398,10 @@ public class UserService {
 
     private void deleteImageAsync(String imageUrl, Long userId) {
         if (imageUrl == null || imageUrl.isBlank()) {
+            return;
+        }
+        // 다른 사용자가 같은 파일을 쓰고 있으면 S3 파일은 남긴다.
+        if (!imageUrlOwnershipService.isDeletable(imageUrl, userId)) {
             return;
         }
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {

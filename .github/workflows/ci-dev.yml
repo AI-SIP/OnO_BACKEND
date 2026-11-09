@@ -186,13 +186,15 @@ jobs:
           fi
 
           echo "Checking Prometheus scrape status for ono-backend-dev..."
-          for i in $(seq 1 12); do
+          # 수집 주기가 60초(monitoring/prometheus.*.yml)라 재기동 직후 첫 수집이 60초를 넘길 수 있다.
+          # 예전 60초 대기는 앱이 정상이어도 실패했다(2026-10-29 dev 배포, 첫 수집이 61초 뒤에 up). 150초 기다린다.
+          for i in $(seq 1 30); do
             result=$(docker exec ono-prometheus-dev sh -lc 'wget -qO- "http://localhost:9090/prometheus/api/v1/query?query=up{job=\"ono-backend-dev\"}"' || true)
             if echo "$result" | grep -q '"value":\[.*,"1"\]'; then
               echo "Prometheus scrape is UP"
               exit 0
             fi
-            echo "Waiting scrape up... ($i/12)"
+            echo "Waiting scrape up... ($i/30)"
             sleep 5
           done
 

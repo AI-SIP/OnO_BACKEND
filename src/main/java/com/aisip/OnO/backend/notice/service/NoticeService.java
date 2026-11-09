@@ -1,6 +1,7 @@
 package com.aisip.OnO.backend.notice.service;
 
 import com.aisip.OnO.backend.common.exception.ApplicationException;
+import com.aisip.OnO.backend.common.transaction.AfterCommit;
 import com.aisip.OnO.backend.notice.dto.NoticeCreateRequestDto;
 import com.aisip.OnO.backend.notice.dto.NoticeResponseDto;
 import com.aisip.OnO.backend.notice.entity.NoticeType;
@@ -11,8 +12,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -141,17 +140,7 @@ public class NoticeService {
      * 다시 캐싱해서, 방금 등록하거나 내린 공지가 최대 TTL 동안 어긋난 채로 나간다.
      */
     private void evictCacheAfterCommit() {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            noticeCacheService.evict();
-            return;
-        }
-
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                noticeCacheService.evict();
-            }
-        });
+        AfterCommit.run("공지 캐시 삭제", noticeCacheService::evict);
     }
 
     private String validateTitle(String title) {

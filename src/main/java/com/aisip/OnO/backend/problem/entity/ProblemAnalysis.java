@@ -68,6 +68,8 @@ public class ProblemAnalysis extends BaseEntity {
         this.commonMistakes = commonMistakes;
         this.studyTips = studyTips;
         this.status = AnalysisStatus.COMPLETED;
+        // 실패 뒤 다시 분석해 성공하면 앞선 실패 문구가 COMPLETED 결과에 남지 않게 한다
+        this.errorMessage = null;
     }
 
     public void updateWithFailure(String errorMessage) {
