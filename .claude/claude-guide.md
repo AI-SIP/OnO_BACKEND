@@ -455,7 +455,6 @@ feat → test → check → commit → pr
 
 | 규칙 | 이유 |
 |---|---|
-| `mcp__github__merge_pull_request`, `gh pr merge` | merge 는 사용자가 명시적으로 요청할 때만, 직접 한다 |
 | `git push origin main/develop` | 보호 브랜치 직접 push 금지. 작업 브랜치 → PR 로만 |
 | `git push --force`, `git push -f` | 원격 히스토리 파괴 위험 |
 | `.env*`, `application.yml`, `application-dev/prod/local.yml`, `application*.properties`, `FirebaseAdminKey.json` 읽기 | 실제 비밀값이 든 gitignore 파일. 더미 값만 있는 `application-test.yml` 은 읽을 수 있다 |

@@ -1,0 +1,164 @@
+# 블랙박스 테스트(#422)에서 컨테이너로 띄운 앱이 쓰는 설정.
+#
+# 컨테이너 안 /app/config/ 에 마운트되고 SPRING_PROFILES_ACTIVE=blackbox 로 읽힌다.
+# 앱이 붙는 곳은 전부 같은 Docker 네트워크 안의 컨테이너 이름이다. 이 네트워크는 internal 이라
+# 밖으로 나가는 길이 없어서, 아래 값이 틀려도 실제 FCM, OpenAI, S3, Discord 에는 닿지 않는다.
+# 여기 있는 키와 비밀번호는 전부 테스트 전용이다. 운영 값과 같은 것을 쓰지 않는다.
+
+spring:
+  application:
+    name: backend-blackbox
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+  datasource:
+    url: jdbc:mysql://mysql:3306/ono_blackbox?rewriteBatchedStatements=true&characterEncoding=UTF-8
+    username: test
+    password: test
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  data:
+    redis:
+      host: redis
+      port: 6379
+
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: blackbox
+    password: blackbox
+    # AI 분석과 S3 삭제가 실제 큐를 거쳐 처리되는지 보려고 리스너를 켠다. (test 프로필은 끈다)
+    listener:
+      simple:
+        auto-startup: true
+
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        default_batch_fetch_size: 50
+    hibernate:
+      # 버려지는 컨테이너 DB 에만 쓴다. test 프로필과 같은 이유로 Flyway 는 빈 DB 에 돌릴 수 없다.
+      ddl-auto: update
+
+  flyway:
+    enabled: false
+
+  site:
+    url: http://localhost:8080
+
+  web:
+    resources:
+      static-locations: classpath:/static/
+
+  thymeleaf:
+    prefix: classpath:/templates/
+
+  quartz:
+    auto-startup: true
+    job-store-type: memory
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-name: google
+            client-id:
+              android: blackbox-android-client-id
+              ios: blackbox-ios-client-id
+            client-secret: blackbox-client-secret
+
+  crypto:
+    secretKey: Ymxha2JveC1jcnlwdG8ta2V5LWJsYWNrYm94LWtleSE=
+
+logging:
+  level:
+    org.springframework.security: WARN
+    org.quartz: WARN
+    p6spy: WARN
+    com.aisip.OnO.backend: INFO
+
+discord:
+  webhook-url: http://wiremock:8080/discord-webhook
+
+cloud:
+  aws:
+    s3:
+      bucket: blackbox-bucket
+      endpoint: http://s3mock:9090
+    region:
+      static: ap-northeast-2
+    stack:
+      auto: false
+    credentials:
+      access-key: blackbox-s3-access
+      secret-key: blackbox-s3-secret
+
+jwt:
+  accessToken:
+    secret: YmxhY2tib3gtYWNjZXNzLXRva2VuLXNlY3JldC1ibGFja2JveC1hY2Nlc3MtdG9rZW4=
+    expiration: 1800000
+  refreshToken:
+    secret: YmxhY2tib3gtcmVmcmVzaC10b2tlbi1zZWNyZXQtYmxhY2tib3gtcmVmcmVzaC10b2tlbg==
+    expiration: 604800000
+
+mcp:
+  admin:
+    token: blackbox-mcp-admin-token-0123456789abcdef
+
+admin:
+  identifier: blackbox_admin
+  password: blackbox_admin_password
+
+fcm:
+  file-path: FirebaseAdminKey.json
+  file_path: FirebaseAdminKey.json
+  project-id: aisip-ono-blackbox
+  project_id: aisip-ono-blackbox
+
+openai:
+  model: gpt-4o
+  api:
+    key: blackbox-openai-key
+    url: http://wiremock:8080/v1/chat/completions
+  http:
+    connect-timeout-ms: 2000
+    read-timeout-ms: 5000
+
+auth:
+  social-verification:
+    # 검증을 끄면 아무 토큰이나 가입이 되므로, 블랙박스에서는 운영과 같이 강제한다.
+    enforce: true
+    kakao:
+      app-ids: "1234567"
+      token-info-url: http://wiremock:8080/kakao/v1/user/access_token_info
+    google:
+      client-ids: blackbox-google-client-id
+      jwks-url: http://wiremock:8080/google/oauth2/v3/certs
+    apple:
+      client-ids: com.blackbox.ono
+      issuer: https://appleid.apple.com
+      jwks-url: http://wiremock:8080/apple/auth/keys
+
+ono:
+  redis:
+    command-timeout-ms: 2000
+    connect-timeout-ms: 2000
+
+sentry:
+  logging:
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always

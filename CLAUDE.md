@@ -86,4 +86,4 @@
 - `/feat` 은 구현만 하고 커밋하지 않는다. 테스트는 `/test` 에서 작성·실행하고, 커밋은 `/commit` 이 실제로 수행한다.
 - `/pr` 은 필요하면 원격 브랜치를 push 한 뒤 develop 대상 PR 을 미리보기 확인 없이 바로 만든다. merge 는 사용자가 명시적으로 요청할 때만.
 - 검토 강도: plan 후 🔴최고 / feat 후 🟠 / check 결과 🟡 / report 🟢.
-- 팀 공유 가드레일(DB 차단 훅, merge·force push 차단, 비밀값 파일 읽기 차단)은 `.claude/settings.json` 에 있다. 사용법은 `.claude/claude-guide.md`.
+- 팀 공유 가드레일(DB 차단 훅, 보호 브랜치 직접 push·force push 차단, 비밀값 파일 읽기 차단)은 `.claude/settings.json` 에 있다. 사용법은 `.claude/claude-guide.md`.
